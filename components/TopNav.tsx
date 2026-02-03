@@ -44,7 +44,7 @@ const TopNav: React.FC<TopNavProps> = ({ activeTab, setTab, onSearch, onUnlock }
                         className="cursor-pointer"
                         onClick={() => handleNavClick('home')}
                     >
-                        <img src="/logo.png" className="h-8 md:h-10 lg:h-12 w-auto object-contain" alt="MY DONKEY Logo" />
+                        <img src="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png" className="h-8 md:h-10 lg:h-12 w-auto object-contain" alt="MY DONKEY Logo" />
                     </div>
 
                     <div className="hidden lg:flex items-center gap-6">

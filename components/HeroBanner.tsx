@@ -95,7 +95,7 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
                     <div className="space-y-6 pt-20 md:pt-0">
                         {isOriginal && (
                             <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left duration-700">
-                                <img src="/logo.png" className="h-6 w-auto object-contain" alt="Logo" />
+                                <img src="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png" className="h-6 w-auto object-contain" alt="Logo" />
                                 <div className="text-gray-300 text-xs font-bold tracking-widest">ORIGINAL</div>
                             </div>
                         )}

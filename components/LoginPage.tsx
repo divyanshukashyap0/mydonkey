@@ -48,7 +48,7 @@ const LoginPage = () => {
 
                 <div className="flex flex-col items-center mb-10">
                     <div className="mb-6 flex items-center justify-center">
-                        <img src="/logo.png" className="h-20 w-auto object-contain drop-shadow-2xl" alt="MY DONKEY Logo" />
+                        <img src="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png" className="h-20 w-auto object-contain drop-shadow-2xl" alt="MY DONKEY Logo" />
                     </div>
                     <h1 className="text-3xl font-bold tracking-tight mb-2 text-center">
                         {isSignUp ? 'Create ID' : 'Sign In'}

@@ -3,7 +3,7 @@ const urlsToCache = [
     '/',
     '/index.html',
     '/index.css',
-    '/logo.png'
+    'https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png'
 ];
 
 self.addEventListener('install', (event) => {

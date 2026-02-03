@@ -58,7 +58,7 @@ const ProfileSelection = () => {
   return (
     <div className="min-h-screen bg-[#141414] flex flex-col items-center justify-center text-white animate-in zoom-in-95 duration-500">
       <div className="mb-12">
-        <img src="/logo.png" className="h-16 md:h-20 w-auto object-contain" alt="MY DONKEY Logo" />
+        <img src="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png" className="h-16 md:h-20 w-auto object-contain" alt="MY DONKEY Logo" />
       </div>
 
       <h1 className="text-3xl md:text-5xl font-medium mb-8 md:mb-12">Who's watching?</h1>

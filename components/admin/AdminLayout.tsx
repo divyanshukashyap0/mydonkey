@@ -17,7 +17,7 @@ export default function AdminLayout({ onExit }: { onExit: () => void }) {
       {/* Sidebar */}
       <aside className="w-64 bg-[#141414] border-r border-white/10 flex flex-col h-screen sticky top-0">
         <div className="p-6">
-          <img src="/logo.png" className="h-10 w-auto object-contain mb-1" alt="DONKEY ADMIN Logo" />
+          <img src="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png" className="h-10 w-auto object-contain mb-1" alt="DONKEY ADMIN Logo" />
           <p className="text-xs text-gray-500">Super Admin Console</p>
         </div>
 

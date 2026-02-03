@@ -26,7 +26,7 @@ const PlanSelectionModal: React.FC<PlanSelectionModalProps> = ({ onClose }) => {
             currency: plan.currency || "INR",
             name: "My Donkey OTT",
             description: `Subscription for ${plan.name}`,
-            image: "/logo.png",
+            image: "https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png",
             handler: async function (response: any) {
                 // Payment Success
                 console.log("Payment Successful", response);
