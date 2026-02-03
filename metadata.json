@@ -1,0 +1,7 @@
+{
+  "name": "My Donkey OTT",
+  "description": "A next-generation OTT streaming platform featuring Movies, TV Shows, Live Sports, and AI-powered recommendations.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

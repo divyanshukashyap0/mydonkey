@@ -1,0 +1,225 @@
+export interface Content {
+  id: string;
+  title: string;
+  overview: string;
+  poster_path: string;
+  backdrop_path: string;
+  youtubeId: string;
+  movieDriveId?: string;
+  movieYoutubeId?: string; // Main movie can be on YouTube too
+  allowDownload?: boolean;
+  allowPlayback?: boolean;
+  isPublished?: boolean;
+  type: 'movie' | 'tv' | 'sparks' | 'sports' | 'short' | 'trailer';
+  genres: string[];
+  release_date: string;
+  vote_average: number;
+  featured?: boolean;
+  createdAt: string;
+  cast?: string[];
+  tags?: string[];
+  comingSoon?: boolean;
+  progress?: number;
+  duration?: number | string;
+  stoppedAt?: number;
+  playMode?: 'trailer' | 'movie';
+  accessCode?: string; // Private content requiring code
+  seasons?: Season[];
+  rating?: string; // Censor rating e.g. U/A 16+
+  year?: number;
+  matchInfo?: any;
+  isOriginal?: boolean;
+  episodes?: Episode[];
+}
+
+export interface Episode {
+  id: string;
+  episodeNumber: number;
+  title: string;
+  overview?: string; // Optional description per episode
+  driveId?: string; // Drive source
+  youtubeId?: string; // YouTube source
+  duration?: string; // e.g., "45m"
+  stillUrl?: string; // Thumbnail for episode
+}
+
+export interface Season {
+  id: string;
+  seasonNumber: number;
+  title: string; // e.g. "Season 1"
+  trailerYoutubeId?: string; // Trailer specific to this season
+  episodes: Episode[];
+}
+
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  image?: string;
+  type: 'content' | 'system';
+  link?: string;
+  createdAt: string;
+  read?: boolean;
+}
+
+export interface Section {
+  id: string;
+  title: string;
+  order: number;
+  type: 'trending' | 'genre' | 'curated' | 'originals';
+  genreFilter?: string;
+  contentIds?: string[];
+  enabled: boolean;
+  scopes: ('home' | 'tv' | 'movie' | 'new')[];
+}
+
+export interface SiteSettings {
+  siteName: string;
+  heroContentId?: string;
+  heroVideoQuality?: 'auto' | 'hd720' | 'hd1080' | 'highres';
+  maintenanceMode: boolean;
+  contactEmail?: string;
+}
+
+export interface Plan {
+  id: string;
+  name: string;
+  price: number;
+  currency?: string;
+  interval?: 'monthly' | 'yearly';
+  razorpayPlanId?: string;
+  features: string[];
+  active?: boolean;
+  quality: 'Good' | 'Better' | 'Best';
+  resolution: '720p' | '1080p' | '4K +HDR';
+  period?: string;
+  maxDevices?: number;
+  ads?: boolean;
+}
+
+export interface Subscription {
+  id: string;
+  uid: string;
+  planId: string;
+  razorpaySubscriptionId: string;
+  status: 'active' | 'created' | 'authenticated' | 'expired' | 'halted' | 'cancelled';
+  currentPeriodStart: number;
+  currentPeriodEnd: number;
+}
+
+export interface User {
+  uid: string;
+  email: string;
+  razorpayCustomerId?: string;
+  plan: string;
+  subscriptionStatus?: 'active' | 'inactive' | 'canceled';
+  role?: 'user' | 'admin';
+  status?: 'active' | 'blocked';
+  lastLoginAt?: string;
+  lastLogoutAt?: string;
+  lastActiveAt?: string;
+  totalWatchTime?: number;
+  continueWatching?: ContinueWatchingItem[];
+  tokenVersion?: number;
+  lowDataMode?: boolean;
+}
+
+export interface ContinueWatchingItem {
+  movieId: string;
+  progress: number;
+  lastWatchedAt: string;
+  stoppedAt: number;
+  duration: number;
+}
+
+export interface ViewingLog {
+  id?: string;
+  userId: string;
+  contentId: string;
+  contentType: 'movie' | 'trailer';
+  genre: string[];
+  startedAt: string;
+  endedAt?: string;
+  watchDurationSeconds: number;
+}
+
+export interface DownloadLog {
+  id: string;
+  userId: string;
+  contentId: string;
+  downloadedAt: any;
+  status: 'completed' | 'failed' | 'deleted';
+  fileSize: number;
+}
+
+// UI & Layout Types
+export interface InfoPageData {
+  id?: string;
+  title: string;
+  description: string;
+  sections: {
+    heading: string;
+    content?: string;
+    listItems?: string[];
+    steps?: string[];
+    buttonLabel?: string;
+    buttonLink?: string;
+  }[];
+  lastUpdated?: string;
+}
+
+// Account & Billing Types
+export interface PaymentMethod {
+  id: string;
+  type: 'card' | 'upi' | 'paypal';
+  last4: string;
+  expiryDate?: string; // MM/YY
+  brand?: string; // Visa, MasterCard
+  isDefault: boolean;
+}
+
+export interface Invoice {
+  id: string;
+  amount: number;
+  currency: string;
+  date: string; // ISO String
+  status: 'paid' | 'pending' | 'failed';
+  planName: string;
+  periodStart: string;
+  periodEnd: string;
+  pdfUrl?: string;
+}
+
+export interface Device {
+  id: string;
+  name: string; // "Chrome on Windows"
+  type: 'mobile' | 'tablet' | 'desktop' | 'tv';
+  lastActiveAt: string;
+  ipAddress?: string;
+  isCurrent?: boolean;
+}
+
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
+
+export interface Profile {
+  id: string;
+  name: string;
+  avatarUrl: string;
+  isKids: boolean;
+  myList: string[];
+  unlockedContent?: string[];
+}
+
+export enum ContentType {
+  MOVIE = 'movie',
+  SERIES = 'tv',
+  SPARKS = 'sparks',
+  SPORTS = 'sports'
+}
+
+export type UserPlan = Plan;
+export type ContentItem = Content;
