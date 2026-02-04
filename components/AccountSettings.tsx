@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, CreditCard, Monitor, User as UserIcon, Plus, Calendar, Camera, Wifi, Settings, PlayCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, CreditCard, Monitor, User as UserIcon, Plus, Calendar, Camera, Wifi, Settings, PlayCircle, Smartphone, Download } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import PlanSelectionModal from './account/PlanSelectionModal';
 import PaymentMethodsModal from './account/PaymentMethodsModal';
@@ -18,7 +18,10 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
         updateUserEmail,
         triggerPasswordReset,
         updateProfileAvatar,
-        updateUser
+        updateUser,
+        isInstallable,
+        isIOS,
+        installPwa
     } = useStore();
 
     const [expandedProfile, setExpandedProfile] = useState<string | null>(null);
@@ -246,6 +249,32 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                             </div>
                         </button>
                     </div>
+
+                    {/* App Install Section */}
+                    {isInstallable && (
+                        <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl overflow-hidden border border-white/10 shadow-xl">
+                            <div className="px-5 py-3 border-b border-white/5">
+                                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Device Experience</span>
+                            </div>
+                            <button
+                                onClick={installPwa}
+                                className="w-full flex items-center justify-between px-5 py-5 hover:bg-white/5 transition group"
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-brand-red flex items-center justify-center shadow-lg shadow-brand-red/20 group-hover:scale-110 transition-transform">
+                                        <Smartphone size={24} className="text-white" />
+                                    </div>
+                                    <div className="text-left">
+                                        <div className="font-bold text-lg">{isIOS ? 'Add to Home Screen' : 'Download My Donkey App'}</div>
+                                        <div className="text-xs text-gray-400">{isIOS ? 'Install via Safari Share menu' : 'Get the best experience on your home screen'}</div>
+                                    </div>
+                                </div>
+                                <div className="bg-white/10 p-2 rounded-full group-hover:bg-brand-red group-hover:text-white transition-colors">
+                                    <Download size={20} />
+                                </div>
+                            </button>
+                        </div>
+                    )}
 
                     {/* Profiles Section */}
                     <div className="bg-white/5 rounded-xl overflow-hidden">

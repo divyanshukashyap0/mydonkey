@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Bell, Menu, X, User, LogOut, Settings, LayoutDashboard, ChevronRight } from 'lucide-react';
+import { Search, Bell, Menu, X, User, LogOut, Settings, LayoutDashboard, ChevronRight, Smartphone, Download } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 
 interface TopNavProps {
@@ -19,7 +19,7 @@ const TopNav: React.FC<TopNavProps> = ({ activeTab, setTab, onSearch, onUnlock }
     const profileRef = useRef<HTMLDivElement>(null);
     const notifRef = useRef<HTMLDivElement>(null);
 
-    const { logout, currentUser, currentProfile, notifications, markNotificationAsRead } = useStore();
+    const { logout, currentUser, currentProfile, notifications, markNotificationAsRead, isInstallable, installPwa, isIOS } = useStore();
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -261,6 +261,21 @@ const TopNav: React.FC<TopNavProps> = ({ activeTab, setTab, onSearch, onUnlock }
                         </div>
 
                         <div className="space-y-4 pt-10 border-t border-white/10">
+                            {isInstallable && (
+                                <button
+                                    onClick={() => { installPwa(); setMobileMenuOpen(false); }}
+                                    className="w-full flex items-center gap-3 px-4 py-3 bg-white/5 hover:bg-white/10 rounded-xl transition-all border border-white/10 group"
+                                >
+                                    <div className="bg-brand-red p-2 rounded-lg group-hover:scale-110 transition-transform">
+                                        <Smartphone size={20} className="text-white" />
+                                    </div>
+                                    <div className="text-left">
+                                        <div className="text-white font-bold text-sm">{isIOS ? 'Add to Home Screen' : 'Install App'}</div>
+                                        <div className="text-[10px] text-gray-400">{isIOS ? 'Tap Share and add' : 'Get the mobile app'}</div>
+                                    </div>
+                                    <Download size={16} className="ml-auto text-gray-500" />
+                                </button>
+                            )}
                             <button onClick={() => handleNavClick('account')} className="w-full text-left text-lg text-gray-400">Account</button>
                             <button onClick={logout} className="w-full text-left text-lg text-gray-400">Sign Out</button>
                         </div>

@@ -84,6 +84,9 @@ interface StoreContextType {
     updateProfileAvatar: (url: string) => Promise<void>;
     unlockContent: (code: string) => Promise<{ success: boolean; contentId?: string; message: string }>;
     markNotificationAsRead: (id: string) => Promise<void>;
+    isInstallable: boolean;
+    isIOS: boolean;
+    installPwa: () => void;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -108,6 +111,49 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const [users, setUsers] = useState<AppUser[]>([]);
     const [plans, setPlans] = useState<Plan[]>([]);
     const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+    const [isInstallable, setIsInstallable] = useState(false);
+    const [isIOS, setIsIOS] = useState(false);
+
+    // --- PWA Installation Logic ---
+    useEffect(() => {
+        const checkIOS = () => {
+            // @ts-ignore
+            const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+            setIsIOS(isIOSDevice);
+
+            const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+            if (isIOSDevice && !isStandalone) {
+                setIsInstallable(true);
+            }
+        };
+
+        const handler = (e: any) => {
+            e.preventDefault();
+            setDeferredPrompt(e);
+            setIsInstallable(true);
+        };
+
+        window.addEventListener('beforeinstallprompt', handler);
+        checkIOS();
+
+        return () => window.removeEventListener('beforeinstallprompt', handler);
+    }, []);
+
+    const installPwa = async () => {
+        if (isIOS) {
+            alert("To install My Donkey on your iPhone/iPad:\n\n1. Tap the 'Share' icon (square with arrow) at the bottom.\n2. Scroll down and tap 'Add to Home Screen'.\n3. Tap 'Add' to confirm.");
+            return;
+        }
+
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+            setIsInstallable(false);
+        }
+        setDeferredPrompt(null);
+    };
 
     // 1. Auth Listener
     useEffect(() => {
@@ -549,7 +595,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         logoutAllDevices,
         updateProfileAvatar,
         unlockContent,
-        markNotificationAsRead
+        markNotificationAsRead,
+        isInstallable,
+        isIOS,
+        installPwa
     }), [
         isAuthenticated,
         isLoading,
