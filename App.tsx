@@ -235,6 +235,7 @@ const AppContent = () => {
         };
     }, [currentProfile, switchProfile]);
 
+
     // Recommendation Engine
     const recommendedContent = useMemo(() => {
         if (!currentProfile) return [];

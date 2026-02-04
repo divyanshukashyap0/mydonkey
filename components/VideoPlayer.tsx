@@ -20,10 +20,26 @@ declare global {
 const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const { updatePlaybackProgress, currentUser } = useStore();
 
+    // Extract IDs locally for safety
+    const getDriveId = (url: string) => {
+        if (!url) return '';
+        const match = url.match(/[-\w]{25,}/);
+        return match ? match[0] : url;
+    };
+
+    const getYoutubeId = (url: string) => {
+        if (!url) return '';
+        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+        const match = url.match(regExp);
+        return (match && match[2].length === 11) ? match[2] : url;
+    };
+
     // Determine play mode
     const isMovieMode = content.playMode === 'movie';
-    const isDriveVideo = isMovieMode && !!content.movieDriveId;
-    const youtubeVideoId = (isMovieMode && content.movieYoutubeId) ? content.movieYoutubeId : content.youtubeId;
+    const driveIdToUse = isMovieMode ? getDriveId(content.movieDriveId || '') : getDriveId(content.youtubeId || '');
+    const isDriveVideo = (isMovieMode && !!content.movieDriveId) || (!isMovieMode && !!content.youtubeId && content.youtubeId.length > 20);
+    const youtubeVideoId = isMovieMode ? getYoutubeId(content.movieYoutubeId || '') : getYoutubeId(content.youtubeId || '');
+
 
     // Resume Logic
     const savedState = currentUser?.continueWatching?.find(i => i.movieId === content.id);
@@ -46,9 +62,23 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const [volume, setVolume] = useState(100);
     const [isMuted, setIsMuted] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [isApiReady, setIsApiReady] = useState(!!window.YT && !!window.YT.Player);
+    const [isPlayerReady, setIsPlayerReady] = useState(false);
+    const [isBuffering, setIsBuffering] = useState(false);
+    const [isBoosted, setIsBoosted] = useState(false);
 
     // Player Options
     const [qualities, setQualities] = useState<string[]>([]);
+
+    // Debug: Log qualities when they change
+    // useEffect(() => {
+    //     console.log('VideoPlayer State Debug:', {
+    //         isMovieMode,
+    //         isDriveVideo,
+    //         youtubeVideoId,
+    //         availableQualities: qualities
+    //     });
+    // }, [qualities, isMovieMode, isDriveVideo, youtubeVideoId]);
     const [currentQuality, setCurrentQuality] = useState('auto');
     const [subtitleTracks, setSubtitleTracks] = useState<any[]>([]);
     const [selectedSubtitle, setSelectedSubtitle] = useState<any>(null); // null = off
@@ -70,90 +100,104 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     useEffect(() => {
         if (isDriveVideo) return;
 
-        if (!window.YT) {
+        if (window.YT && window.YT.Player) {
+            setIsApiReady(true);
+            return;
+        }
+
+        // Global callback for YT API
+        window.onYouTubeIframeAPIReady = () => {
+            console.log('YouTube API Ready');
+            setIsApiReady(true);
+        };
+
+        const existingScript = document.querySelector('script[src*="youtube.com/iframe_api"]');
+        if (!existingScript) {
             const tag = document.createElement('script');
             tag.src = "https://www.youtube.com/iframe_api";
             const firstScriptTag = document.getElementsByTagName('script')[0];
             firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+        } else if (window.YT && window.YT.Player) {
+            setIsApiReady(true);
         }
-
-        const initPlayer = () => {
-            if (window.YT && window.YT.Player && playerContainerRef.current) {
-                // Calculate start time in seconds based on progress/duration or saved stoppedAt
-                let startSeconds = 0;
-                if (savedState?.stoppedAt) {
-                    startSeconds = savedState.stoppedAt;
-                } else if (initialProgress && initialDuration) {
-                    startSeconds = (initialProgress / 100) * initialDuration;
-                }
-
-                playerRef.current = new window.YT.Player(playerContainerRef.current, {
-                    height: '100%',
-                    width: '100%',
-                    videoId: youtubeVideoId,
-                    playerVars: {
-                        autoplay: currentUser?.lowDataMode ? 0 : 1,
-                        controls: 0,
-                        modestbranding: 1,
-                        rel: 0,
-                        showinfo: 0,
-                        start: Math.floor(startSeconds),
-                        enablejsapi: 1,
-                        origin: window.location.origin,
-                        cc_load_policy: 0
-                    },
-                    events: {
-                        'onReady': onPlayerReady,
-                        'onStateChange': onPlayerStateChange,
-                        'onApiChange': onPlayerApiChange
-                    }
-                });
-            }
-        };
-
-        if (window.YT && window.YT.Player) {
-            initPlayer();
-        } else {
-            window.onYouTubeIframeAPIReady = initPlayer;
-        }
-
-        return () => {
-            if (playerRef.current) {
-                try { playerRef.current.destroy(); } catch (e) { }
-            }
-        };
-    }, [youtubeVideoId, isDriveVideo]);
+    }, [isDriveVideo]);
 
     const onPlayerReady = (event: any) => {
-        setDuration(event.target.getDuration());
-        setQualities(event.target.getAvailableQualityLevels());
-        event.target.setVolume(volume);
+        console.log('Player Ready');
+        setIsPlayerReady(true);
+        setIsBuffering(false);
+        const playerDuration = event.target.getDuration();
+        if (playerDuration > 0) setDuration(playerDuration);
 
-        if (currentUser?.lowDataMode) {
-            event.target.setPlaybackQuality('small');
+        let avQualities = event.target.getAvailableQualityLevels();
+        if (!avQualities || avQualities.length === 0) {
+            // Fallback for when API returns empty (common with certain embeds)
+            avQualities = ['auto', 'hd1080', 'hd720', 'large', 'medium', 'small'];
         }
+        setQualities(avQualities);
 
-        // Seek to saved position if we have it (redundancy for init)
-        if (savedState?.stoppedAt) {
-            event.target.seekTo(savedState.stoppedAt, true);
+        if (initialProgress > 0) {
+            const seekTime = (initialProgress / 100) * playerDuration;
+            event.target.seekTo(seekTime, true);
         }
-
-        if (!currentUser?.lowDataMode) {
-            event.target.playVideo();
-        }
-
+        if (playing) event.target.playVideo();
         event.target.loadModule('captions');
     };
 
     const onPlayerStateChange = (event: any) => {
         if (event.data === window.YT.PlayerState.PLAYING) {
             setPlaying(true);
+            setIsBuffering(false);
             setDuration(event.target.getDuration());
         } else if (event.data === window.YT.PlayerState.PAUSED) {
             setPlaying(false);
+        } else if (event.data === window.YT.PlayerState.BUFFERING) {
+            setIsBuffering(true);
         } else if (event.data === window.YT.PlayerState.ENDED) {
             setPlaying(false);
         }
+    };
+
+    const handleSkip = (seconds: number) => {
+        if (isDriveVideo) return;
+        if (playerRef.current && playerRef.current.getCurrentTime) {
+            const curr = playerRef.current.getCurrentTime();
+            playerRef.current.seekTo(curr + seconds, true);
+        }
+    };
+
+    const handleQualityChange = (quality: string) => {
+        if (!playerRef.current) return;
+
+        console.log('VideoPlayer: Forcing quality to', quality);
+        const currentTime = playerRef.current.getCurrentTime();
+
+        // Use loadVideoById to force a reload stream with new quality (most reliable method)
+        // This persists the quality better than setPlaybackQuality
+        playerRef.current.loadVideoById({
+            videoId: youtubeVideoId,
+            startSeconds: currentTime,
+            suggestedQuality: quality
+        });
+
+        setCurrentQuality(quality);
+        setShowQualityMenu(false);
+    };
+
+    const toggleBoost = () => {
+        const newBoost = !isBoosted;
+        setIsBoosted(newBoost);
+        if (newBoost) {
+            setVolume(100);
+            if (playerRef.current) playerRef.current.setVolume(100);
+        }
+    };
+
+    const triggerRipple = (side: 'left' | 'right') => {
+        setRippleSides(prev => [...prev, side]);
+        setTimeout(() => {
+            setRippleSides(prev => prev.filter(s => s !== side));
+        }, 500);
     };
 
     const onPlayerApiChange = () => {
@@ -165,6 +209,48 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             }
         }
     };
+
+    // Initialize YouTube Player
+    useEffect(() => {
+        if (!isApiReady || isDriveVideo || playerRef.current || !youtubeVideoId) return;
+
+        console.log('Initializing YouTube Player for:', youtubeVideoId);
+
+        playerRef.current = new window.YT.Player('youtube-player', {
+            videoId: youtubeVideoId,
+            playerVars: {
+                autoplay: playing ? 1 : 0,
+                controls: 0,
+                modestbranding: 1,
+                rel: 0,
+                iv_load_policy: 3,
+                playsinline: 1,
+                origin: window.location.origin, // Critical for API communication
+                enablejsapi: 1
+            },
+            events: {
+                onReady: onPlayerReady,
+                onStateChange: onPlayerStateChange,
+                onApiChange: onPlayerApiChange,
+                onError: (e: any) => {
+                    console.error('YouTube Player Error:', e.data);
+                    setIsBuffering(false);
+                }
+            }
+        });
+
+        return () => {
+            if (playerRef.current) {
+                try {
+                    playerRef.current.destroy();
+                    playerRef.current = null;
+                    setIsPlayerReady(false);
+                } catch (e) {
+                    console.error('Error destroying YT player:', e);
+                }
+            }
+        };
+    }, [isApiReady, isDriveVideo, youtubeVideoId]);
 
     // React -> Player Sync & Logging
     useEffect(() => {
@@ -253,14 +339,67 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         };
     }, [showStats, showAudioSubMenu, showQualityMenu, playing]);
 
+    // Keyboard Shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Ignore if user is typing in an input
+            if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
 
+            switch (e.code) {
+                case 'Space':
+                case 'KeyK':
+                    e.preventDefault();
+                    setPlaying(prev => !prev);
+                    break;
+                case 'ArrowLeft':
+                case 'KeyJ':
+                    e.preventDefault();
+                    handleSkip(-10);
+                    triggerRipple('left');
+                    break;
+                case 'ArrowRight':
+                case 'KeyL':
+                    e.preventDefault();
+                    handleSkip(10);
+                    triggerRipple('right');
+                    break;
+                case 'ArrowUp':
+                    e.preventDefault();
+                    setVolume(prev => Math.min(100, prev + 5));
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
+                    setVolume(prev => Math.max(0, prev - 5));
+                    break;
+                case 'KeyF':
+                    e.preventDefault();
+                    toggleFullscreen();
+                    break;
+                case 'KeyM':
+                    e.preventDefault();
+                    setIsMuted(prev => !prev);
+                    break;
+                case 'Escape':
+                    if (isFullscreen) toggleFullscreen();
+                    else onClose();
+                    break;
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [playing, isFullscreen, isDriveVideo]);
+
+
+    // Resume Logic: Watch for currentUser to populate if it wasn't ready initially
     // Resume Logic: Watch for currentUser to populate if it wasn't ready initially
     useEffect(() => {
         if (!playerRef.current || !savedState?.stoppedAt) return;
 
-        // If player is ready but we haven't synchronized current time roughly to saved time
-        // We use a small threshold (e.g., if we are at < 5s but allowed to be at 1000s)
-        const currentPlTime = playerRef.current.getCurrentTime ? playerRef.current.getCurrentTime() : 0;
+        // Ensure the player API is actually ready and has the methods we need
+        if (typeof playerRef.current.getCurrentTime !== 'function' || typeof playerRef.current.seekTo !== 'function') return;
+
+        const currentPlTime = playerRef.current.getCurrentTime();
         if (Math.abs(currentPlTime - savedState.stoppedAt) > 10 && currentPlTime < 10) {
             playerRef.current.seekTo(savedState.stoppedAt, true);
         }
@@ -376,26 +515,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         }
     };
 
-    const triggerRipple = (side: 'left' | 'right') => {
-        setRippleSides(prev => [...prev, side]);
-        setTimeout(() => {
-            setRippleSides(prev => prev.filter(s => s !== side)); // Naive cleanup
-        }, 500);
-    };
-
-    // Volume Booster State
-    const [isBoosted, setIsBoosted] = useState(false);
-
-    // Toggle Booster
-    const toggleBoost = () => {
-        const newBoost = !isBoosted;
-        setIsBoosted(newBoost);
-        if (newBoost) {
-            setVolume(100);
-            if (playerRef.current) playerRef.current.setVolume(100);
-        }
-    };
-
     const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
         if (isDriveVideo) return;
         const rect = e.currentTarget.getBoundingClientRect();
@@ -403,23 +522,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         const newTime = pos * duration;
         setProgress(pos * 100);
         if (playerRef.current) playerRef.current.seekTo(newTime, true);
-    };
-
-    const handleSkip = (seconds: number) => {
-        if (isDriveVideo) return;
-        if (playerRef.current) {
-            const newTime = playerRef.current.getCurrentTime() + seconds;
-            playerRef.current.seekTo(newTime, true);
-        }
-    };
-
-    const handleQualityChange = (q: string) => {
-        if (isDriveVideo) return;
-        if (playerRef.current) {
-            playerRef.current.setPlaybackQuality(q);
-            setCurrentQuality(q);
-            setShowQualityMenu(false);
-        }
     };
 
     const handleSubtitleChange = (track: any) => {
@@ -465,33 +567,30 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     return (
         <div
             className="fixed inset-0 z-[100] bg-black flex flex-col justify-center items-center overflow-hidden font-sans select-none"
-            onContextMenu={(e) => { e.preventDefault(); return false; }}
         >
             {/* Strict Right-Click Block Overlay 
                 - For YouTube: pointer-events 'auto' when controls hidden (blocks all clicks to iframe).
                 - For Drive: MUST be 'none' always, otherwise user can't click internal iframe buttons.
             */}
-            <div
-                className="absolute inset-0 z-[110] bg-transparent"
-                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                style={{ pointerEvents: (showControls && !isDriveVideo) ? 'none' : (isDriveVideo ? 'none' : 'auto') }}
-            />
 
             {/* Player Container */}
             <div className="absolute inset-0 z-0 bg-black pointer-events-none overflow-hidden">
                 {isDriveVideo ? (
                     <div className="w-full h-full relative">
                         {/* Mask the top bar (filename) of Google Drive Player */}
-                        <iframe
-                            className="absolute top-[-64px] left-0 w-full h-[calc(100%+64px)] pointer-events-auto"
-                            src={`https://drive.google.com/file/d/${content.movieDriveId}/preview`}
-                            allowFullScreen
-                        ></iframe>
+                        {driveIdToUse && (
+                            <iframe
+                                className="absolute top-[-64px] left-0 w-full h-[calc(100%+64px)] pointer-events-auto"
+                                src={`https://drive.google.com/file/d/${driveIdToUse}/preview`}
+                                allowFullScreen
+                                allow="autoplay"
+                            ></iframe>
+                        )}
                     </div>
                 ) : (
                     <div className="w-full h-full relative overflow-hidden pointer-events-none">
                         {/* Scale up YouTube to hide top title bar and bottom branding */}
-                        <div ref={playerContainerRef} className="w-full h-[300%] -mt-[50%] md:h-[140%] md:-mt-[10%] scale-150 md:scale-125 origin-center pointer-events-none" />
+                        <div ref={playerContainerRef} id="youtube-player" className="w-full h-[300%] -mt-[50%] md:h-[140%] md:-mt-[10%] scale-150 md:scale-125 origin-center pointer-events-none" />
                     </div>
                 )}
             </div>
@@ -530,25 +629,27 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             </div>
 
             {/* Gesture Layer (Mobile Only) */}
-            <div
-                className="absolute inset-0 z-[115]"
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-                onClick={handleTap}
-            >
-                {/* Visual Feedback for Double Tap */}
-                {rippleSides.map((side) => (
-                    <div key={side} className={`absolute top-0 bottom-0 ${side === 'left' ? 'left-0' : 'right-0'} w-1/3 flex items-center justify-center pointer-events-none animate-ping opacity-0`}>
-                        <div className="bg-white/20 p-4 rounded-full">
-                            {side === 'left' ? <RotateCcw size={40} /> : <RotateCw size={40} />}
+            {!isDriveVideo && (
+                <div
+                    className="absolute inset-0 z-[115]"
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                    onClick={handleTap}
+                >
+                    {/* Visual Feedback for Double Tap */}
+                    {rippleSides.map((side) => (
+                        <div key={side} className={`absolute top-0 bottom-0 ${side === 'left' ? 'left-0' : 'right-0'} w-1/3 flex items-center justify-center pointer-events-none animate-ping opacity-0`}>
+                            <div className="bg-white/20 p-4 rounded-full">
+                                {side === 'left' ? <RotateCcw size={40} /> : <RotateCw size={40} />}
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    ))}
 
-                {/* Brightness Overlay (Simulated) */}
-                <div className="absolute inset-0 bg-black pointer-events-none transition-opacity duration-100" style={{ opacity: 1 - (brightness / 100) }} />
-            </div>
+                    {/* Brightness Overlay (Simulated) */}
+                    <div className="absolute inset-0 bg-black pointer-events-none transition-opacity duration-100" style={{ opacity: 1 - (brightness / 100) }} />
+                </div>
+            )}
 
             {/* Controls - Floating Glass Bar (Hide for Drive Video) */}
             {!isDriveVideo && (

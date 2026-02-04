@@ -36,6 +36,12 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
     const request = event.request;
+
+    // Skip non-GET requests and invalid URLs
+    if (request.method !== 'GET' || !request.url.startsWith('http')) {
+        return;
+    }
+
     const url = new URL(request.url);
 
     // 1. Navigation Requests (HTML) -> Network First, Fallback to Cache (App Shell)
@@ -54,16 +60,18 @@ self.addEventListener('fetch', (event) => {
     if (request.destination === 'image') {
         event.respondWith(
             caches.match(request).then((cachedResponse) => {
-                // Return cache if found, but also update in background if it's from our own origin
                 if (cachedResponse) return cachedResponse;
                 return fetch(request).then((networkResponse) => {
                     if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
                         const responseToCache = networkResponse.clone();
                         caches.open(CACHE_NAME).then((cache) => {
-                            cache.put(request, responseToCache);
+                            cache.put(request, responseToCache).catch(() => { });
                         });
                     }
                     return networkResponse;
+                }).catch(() => {
+                    // Fail gracefully for images
+                    return new Response(null, { status: 404 });
                 });
             })
         );
@@ -78,12 +86,17 @@ self.addEventListener('fetch', (event) => {
                     if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
                         const responseToCache = networkResponse.clone();
                         caches.open(CACHE_NAME).then((cache) => {
-                            cache.put(request, responseToCache);
+                            cache.put(request, responseToCache).catch(() => { });
                         });
                     }
                     return networkResponse;
+                }).catch(() => {
+                    // Fallback for failed fetches
+                    return cachedResponse || new Response(null, { status: 404 });
                 });
                 return cachedResponse || fetchPromise;
+            }).catch(() => {
+                return new Response(null, { status: 404 });
             })
     );
 });
