@@ -21,22 +21,22 @@ import UnlockContentModal from './components/UnlockContentModal';
 
 // --- Mobile Bottom Nav ---
 const MobileNav = ({ activeTab, setTab, currentProfile }: any) => (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 glass-nav border-t border-white/5 z-50 pb-safe">
+    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0a0a0a] border-t border-white/10 z-[60] pb-safe shadow-[0_-10px_40px_rgba(0,0,0,0.8)]">
         <div className="flex justify-around items-center h-16">
-            <button onClick={() => setTab('home')} className={`flex flex-col items-center gap-1 ${activeTab === 'home' ? 'text-white' : 'text-gray-500'}`}>
+            <button onClick={() => setTab('home')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'home' ? 'text-white' : 'text-gray-400 hover:text-gray-200'}`}>
                 <Home size={20} strokeWidth={activeTab === 'home' ? 3 : 2} />
                 <span className="text-[10px] font-medium">Home</span>
             </button>
-            <button onClick={() => setTab('search')} className={`flex flex-col items-center gap-1 ${activeTab === 'search' ? 'text-white' : 'text-gray-500'}`}>
+            <button onClick={() => setTab('search')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'search' ? 'text-white' : 'text-gray-400 hover:text-gray-200'}`}>
                 <Search size={20} strokeWidth={activeTab === 'search' ? 3 : 2} />
                 <span className="text-[10px] font-medium">Search</span>
             </button>
-            <button onClick={() => setTab('downloads')} className={`flex flex-col items-center gap-1 ${activeTab === 'downloads' ? 'text-white' : 'text-gray-500'}`}>
+            <button onClick={() => setTab('downloads')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'downloads' ? 'text-white' : 'text-gray-400 hover:text-gray-200'}`}>
                 <Download size={20} strokeWidth={activeTab === 'downloads' ? 3 : 2} />
                 <span className="text-[10px] font-medium">My List</span>
             </button>
-            <button onClick={() => setTab('account')} className={`flex flex-col items-center gap-1 ${activeTab === 'account' ? 'text-white' : 'text-gray-500'}`}>
-                <img src={currentProfile?.avatarUrl || "https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg"} className={`w-5 h-5 rounded ${activeTab === 'account' ? 'border-2 border-white' : ''}`} />
+            <button onClick={() => setTab('account')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'account' ? 'text-white' : 'text-gray-400 hover:text-gray-200'}`}>
+                <img src={currentProfile?.avatarUrl || "https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg"} className={`w-5 h-5 rounded object-cover ${activeTab === 'account' ? 'border-2 border-white' : 'opacity-80'}`} />
                 <span className="text-[10px] font-medium">Profile</span>
             </button>
         </div>
@@ -160,6 +160,29 @@ const InfoPageWrapper = ({ onBack }: { onBack: () => void }) => {
     return <InfoPage data={data} onBack={onBack} />;
 };
 
+// --- Deep Link Handler ---
+const DeepLinkHandler = ({ setViewingItem, content }: { setViewingItem: (item: any) => void, content: Content[] }) => {
+    const { contentId } = useParams<{ contentId: string }>();
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        if (contentId && content.length > 0) {
+            const item = content.find(c => c.id === contentId);
+            if (item) {
+                setViewingItem(item);
+            }
+            // Always redirect to home to clean URL and establish context
+            navigate('/', { replace: true });
+        } else if (content.length > 0) {
+            // Content loaded but ID not found
+            navigate('/', { replace: true });
+        }
+    }, [contentId, content, navigate, setViewingItem]);
+
+    // Return null or a loader while processing
+    return null;
+};
+
 const AppContent = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -183,7 +206,34 @@ const AppContent = () => {
     };
 
     // Consume Store
-    const { content, settings, sections, isAuthenticated, currentProfile, currentUser } = useStore();
+    const { content, settings, sections, isAuthenticated, currentProfile, currentUser, switchProfile } = useStore();
+
+    // --- Inactivity Timer (2 Hours) ---
+    useEffect(() => {
+        if (!currentProfile) return;
+
+        let timeout: NodeJS.Timeout;
+        const TIMEOUT_DURATION = 2 * 60 * 60 * 1000; // 2 Hours
+
+        const resetTimer = () => {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
+                switchProfile(null);
+            }, TIMEOUT_DURATION);
+        };
+
+        // Initial start
+        resetTimer();
+
+        // Listeners
+        const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+        events.forEach(event => window.addEventListener(event, resetTimer));
+
+        return () => {
+            clearTimeout(timeout);
+            events.forEach(event => window.removeEventListener(event, resetTimer));
+        };
+    }, [currentProfile, switchProfile]);
 
     // Recommendation Engine
     const recommendedContent = useMemo(() => {
@@ -221,6 +271,35 @@ const AppContent = () => {
         }
         window.scrollTo(0, 0);
     };
+
+    // --- Deep Link: Save pending link before auth redirect ---
+    useEffect(() => {
+        const path = location.pathname;
+        if (path.startsWith('/watch/') || path.startsWith('/browse/')) {
+            const contentId = path.split('/').pop();
+            if (contentId) {
+                localStorage.setItem('pendingDeepLink', contentId);
+            }
+        }
+    }, [location.pathname]);
+
+    // --- Deep Link: Process after login ---
+    useEffect(() => {
+        if (isAuthenticated && currentProfile && content.length > 0) {
+            const pendingId = localStorage.getItem('pendingDeepLink');
+            if (pendingId) {
+                const item = content.find(c => c.id === pendingId);
+                if (item) {
+                    setViewingItem(item);
+                }
+                localStorage.removeItem('pendingDeepLink');
+                // Clean URL
+                if (location.pathname !== '/') {
+                    navigate('/', { replace: true });
+                }
+            }
+        }
+    }, [isAuthenticated, currentProfile, content, navigate, location.pathname]);
 
     if (!isAuthenticated) return <LoginPage />;
     if (!currentProfile) return <ProfileSelection />;
@@ -308,6 +387,13 @@ const AppContent = () => {
                                         layout="landscape"
                                     />
                                 )}
+                                {/* Fallback Rail for Recently Added (All Published Content) */}
+                                <ContentRail
+                                    title="Recently Added"
+                                    items={availableContent.filter(c => c.isPublished).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 20)}
+                                    onDetails={setViewingItem}
+                                    layout="landscape"
+                                />
                             </div>
                             <Footer onNavigate={handleFooterNavigate} />
                         </>
@@ -360,7 +446,7 @@ const AppContent = () => {
                     } />
 
                     <Route path="/account" element={
-                        <div className="min-h-screen flex flex-col justify-between bg-[#f3f3f3]">
+                        <div className="min-h-screen flex flex-col justify-between bg-cinema-black">
                             <AccountSettings setActiveTab={setTab} />
                             <Footer onNavigate={handleFooterNavigate} />
                         </div>
@@ -375,6 +461,9 @@ const AppContent = () => {
                             <Footer onNavigate={handleFooterNavigate} />
                         </div>
                     } />
+
+                    <Route path="/browse/:contentId" element={<DeepLinkHandler setViewingItem={setViewingItem} content={content} />} />
+                    <Route path="/watch/:contentId" element={<DeepLinkHandler setViewingItem={setViewingItem} content={content} />} />
 
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

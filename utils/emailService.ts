@@ -14,7 +14,7 @@ export const sendSubscriptionEmail = async (toEmail: string, planName: string, a
                 subject: `Welcome to My Donkey ${planName} Plan!`,
             },
         ],
-        from: { email: senderEmail, name: 'My Donkey OTT' },
+        from: { email: senderEmail, name: 'My Donkey' },
         content: [
             {
                 type: 'text/html',
@@ -45,7 +45,7 @@ export const sendSubscriptionEmail = async (toEmail: string, planName: string, a
         });
 
         if (response.ok) {
-            console.log('Subscription email sent successfully!');
+            // Subscription email sent successfully!
         } else {
             const errorData = await response.json().catch(() => ({}));
             console.error('Failed to send email:', response.status, errorData);

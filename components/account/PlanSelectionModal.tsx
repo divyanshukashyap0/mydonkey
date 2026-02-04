@@ -24,12 +24,11 @@ const PlanSelectionModal: React.FC<PlanSelectionModalProps> = ({ onClose }) => {
             key: key,
             amount: plan.price * 100, // Amount in paise
             currency: plan.currency || "INR",
-            name: "My Donkey OTT",
+            name: "My Donkey",
             description: `Subscription for ${plan.name}`,
             image: "https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png",
             handler: async function (response: any) {
                 // Payment Success
-                console.log("Payment Successful", response);
                 try {
                     await updateSubscriptionPlan(planId, response);
                     alert(`Plan updated to ${plan.name} successfully!`);

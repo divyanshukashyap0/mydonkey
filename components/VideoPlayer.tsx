@@ -3,6 +3,7 @@ import { Play, Pause, Volume2, VolumeX, Maximize, Settings, SkipForward, ArrowLe
 import { Content } from '../types';
 import StatsPanel from './StatsPanel';
 import { useStore } from '../context/StoreContext';
+import { logUserActivity, incrementWatchTime } from '../utils/activityLogger';
 
 interface VideoPlayerProps {
     content: Content;
@@ -24,11 +25,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const isDriveVideo = isMovieMode && !!content.movieDriveId;
     const youtubeVideoId = (isMovieMode && content.movieYoutubeId) ? content.movieYoutubeId : content.youtubeId;
 
+    // Resume Logic
+    const savedState = currentUser?.continueWatching?.find(i => i.movieId === content.id);
+    const initialProgress = savedState?.progress || content.progress || 0;
+    const initialDuration = savedState?.duration || 0;
+
     // State
-    const [playing, setPlaying] = useState(!currentUser?.lowDataMode); // Autoplay off if Low Data Mode
-    const [progress, setProgress] = useState(content.progress || 0); // 0-100
-    const [currentTime, setCurrentTime] = useState(0);
-    const [duration, setDuration] = useState(0);
+    const [playing, setPlaying] = useState(!currentUser?.lowDataMode);
+    const [progress, setProgress] = useState(initialProgress);
+    const [currentTime, setCurrentTime] = useState(savedState?.stoppedAt || 0);
+    const [duration, setDuration] = useState(initialDuration);
     const [showControls, setShowControls] = useState(true);
     const [showSkipIntro, setShowSkipIntro] = useState(false);
     const [showStats, setShowStats] = useState(false);
@@ -50,10 +56,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     const playerRef = useRef<any>(null);
     const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const progressRef = useRef(progress);
+    const progressRef = useRef(initialProgress);
     const playerContainerRef = useRef<HTMLDivElement>(null);
 
-    // Mock Audio Options (Since YouTube API doesn't expose audio tracks easily for embeds)
+    // Mock Audio Options
     const AUDIO_OPTIONS = [
         { id: 'eng_5.1', label: 'English (Original)', format: '5.1' },
         { id: 'eng_stereo', label: 'English', format: 'Stereo' },
@@ -62,7 +68,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     // Load YouTube API
     useEffect(() => {
-        if (isDriveVideo) return; // Skip for Drive
+        if (isDriveVideo) return;
 
         if (!window.YT) {
             const tag = document.createElement('script');
@@ -73,20 +79,28 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
         const initPlayer = () => {
             if (window.YT && window.YT.Player && playerContainerRef.current) {
+                // Calculate start time in seconds based on progress/duration or saved stoppedAt
+                let startSeconds = 0;
+                if (savedState?.stoppedAt) {
+                    startSeconds = savedState.stoppedAt;
+                } else if (initialProgress && initialDuration) {
+                    startSeconds = (initialProgress / 100) * initialDuration;
+                }
+
                 playerRef.current = new window.YT.Player(playerContainerRef.current, {
                     height: '100%',
                     width: '100%',
                     videoId: youtubeVideoId,
                     playerVars: {
-                        autoplay: currentUser?.lowDataMode ? 0 : 1, // Disable autoplay for Low Data Mode
+                        autoplay: currentUser?.lowDataMode ? 0 : 1,
                         controls: 0,
                         modestbranding: 1,
                         rel: 0,
                         showinfo: 0,
-                        start: Math.floor((content.progress || 0) / 100 * (Number(content.duration) || 3600)),
+                        start: Math.floor(startSeconds),
                         enablejsapi: 1,
                         origin: window.location.origin,
-                        cc_load_policy: 0 // We control captions manually
+                        cc_load_policy: 0
                     },
                     events: {
                         'onReady': onPlayerReady,
@@ -115,21 +129,19 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         setQualities(event.target.getAvailableQualityLevels());
         event.target.setVolume(volume);
 
-        // Low Data Mode: Set lower quality
         if (currentUser?.lowDataMode) {
-            event.target.setPlaybackQuality('small'); // Try forcing lower quality
+            event.target.setPlaybackQuality('small');
         }
 
-        if (content.progress) {
-            const startTime = (content.progress / 100) * event.target.getDuration();
-            event.target.seekTo(startTime, true);
+        // Seek to saved position if we have it (redundancy for init)
+        if (savedState?.stoppedAt) {
+            event.target.seekTo(savedState.stoppedAt, true);
         }
 
         if (!currentUser?.lowDataMode) {
             event.target.playVideo();
         }
 
-        // Try to load captions module
         event.target.loadModule('captions');
     };
 
@@ -154,12 +166,30 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         }
     };
 
-    // React -> Player Sync
+    // React -> Player Sync & Logging
     useEffect(() => {
         if (isDriveVideo) return;
         if (!playerRef.current?.playVideo) return;
-        playing ? playerRef.current.playVideo() : playerRef.current.pauseVideo();
+
+        if (playing) {
+            playerRef.current.playVideo();
+            logUserActivity(currentUser?.uid, currentUser?.email, 'video_play', { contentId: content.id, title: content.title });
+        } else {
+            playerRef.current.pauseVideo();
+            logUserActivity(currentUser?.uid, currentUser?.email, 'video_pause', { contentId: content.id, title: content.title });
+        }
     }, [playing, isDriveVideo]);
+
+    // Real Screentime Heartbeat (Every 10 seconds)
+    useEffect(() => {
+        if (!playing || !currentUser?.uid) return;
+
+        const heartbeat = setInterval(() => {
+            incrementWatchTime(currentUser.uid, 10);
+        }, 10000);
+
+        return () => clearInterval(heartbeat);
+    }, [playing, currentUser?.uid]);
 
     useEffect(() => {
         if (isDriveVideo) return;
@@ -224,7 +254,148 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     }, [showStats, showAudioSubMenu, showQualityMenu, playing]);
 
 
-    // Handlers
+    // Resume Logic: Watch for currentUser to populate if it wasn't ready initially
+    useEffect(() => {
+        if (!playerRef.current || !savedState?.stoppedAt) return;
+
+        // If player is ready but we haven't synchronized current time roughly to saved time
+        // We use a small threshold (e.g., if we are at < 5s but allowed to be at 1000s)
+        const currentPlTime = playerRef.current.getCurrentTime ? playerRef.current.getCurrentTime() : 0;
+        if (Math.abs(currentPlTime - savedState.stoppedAt) > 10 && currentPlTime < 10) {
+            playerRef.current.seekTo(savedState.stoppedAt, true);
+        }
+    }, [currentUser, savedState]);
+
+    // Mobile Auto-Rotate & Fullscreen Logic
+    useEffect(() => {
+        const handleMobileOrientation = async () => {
+            const isMobile = window.innerWidth <= 768; // Simple mobile check
+            if (!isMobile) return;
+
+            try {
+                // 1. Request Fullscreen first (required for orientation lock on many browsers)
+                if (!document.fullscreenElement) {
+                    await document.documentElement.requestFullscreen();
+                    setIsFullscreen(true);
+                }
+
+                // 2. Lock Orientation to Landscape
+                // @ts-ignore - screen.orientation might not be typed in all environments
+                if (screen.orientation && screen.orientation.lock) {
+                    // @ts-ignore
+                    await screen.orientation.lock('landscape');
+                }
+            } catch (err) {
+                console.warn("Auto-rotate/fullscreen failed:", err);
+            }
+        };
+
+        handleMobileOrientation();
+
+        // Cleanup: Unlock and exit fullscreen on unmount
+        return () => {
+            const isMobile = window.innerWidth <= 768;
+            if (isMobile) {
+                try {
+                    // @ts-ignore
+                    if (screen.orientation && screen.orientation.unlock) {
+                        // @ts-ignore
+                        screen.orientation.unlock();
+                    }
+                    if (document.fullscreenElement && document.exitFullscreen) {
+                        document.exitFullscreen();
+                    }
+                } catch (e) {
+                    // Orientation/Fullscreen exit failed - silent
+                }
+            }
+        };
+    }, []);
+
+    // Gesture State
+    const [brightness, setBrightness] = useState(100);
+    const touchStartRef = useRef<{ x: number, y: number, time: number } | null>(null);
+    const lastTapRef = useRef<{ time: number, x: number } | null>(null);
+    const [rippleSides, setRippleSides] = useState<('left' | 'right')[]>([]);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        touchStartRef.current = {
+            x: e.touches[0].clientX,
+            y: e.touches[0].clientY,
+            time: Date.now()
+        };
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (!touchStartRef.current) return;
+
+        const deltaY = touchStartRef.current.y - e.touches[0].clientY;
+        const deltaX = e.touches[0].clientX - touchStartRef.current.x;
+        const isLeft = touchStartRef.current.x < window.innerWidth / 2;
+
+        // Vertical Swipe (Volume/Brightness) - Threshold 10px
+        if (Math.abs(deltaY) > 10 && Math.abs(deltaY) > Math.abs(deltaX)) {
+            const sensitivity = 0.5;
+            if (isLeft) {
+                // Brightness
+                setBrightness(prev => Math.min(100, Math.max(10, prev + (deltaY * sensitivity))));
+            } else {
+                // Volume
+                const newVol = Math.min(100, Math.max(0, volume + (deltaY * sensitivity)));
+                setVolume(newVol);
+                if (playerRef.current) playerRef.current.setVolume(newVol);
+            }
+            // Reset reference to avoid jumpiness, but keep "continuous" feel
+            touchStartRef.current.y = e.touches[0].clientY;
+        }
+    };
+
+    const handleTouchEnd = () => {
+        touchStartRef.current = null;
+    };
+
+    const handleTap = (e: React.MouseEvent) => {
+        const now = Date.now();
+        const x = e.clientX;
+
+        // Double Tap Logic
+        if (lastTapRef.current && (now - lastTapRef.current.time) < 300) {
+            const isLeft = x < window.innerWidth / 2;
+            if (isLeft) {
+                handleSkip(-10);
+                triggerRipple('left');
+            } else {
+                handleSkip(10);
+                triggerRipple('right');
+            }
+            lastTapRef.current = null; // Reset
+        } else {
+            // Single Tap - Toggle Controls
+            setShowControls(!showControls);
+            lastTapRef.current = { time: now, x };
+        }
+    };
+
+    const triggerRipple = (side: 'left' | 'right') => {
+        setRippleSides(prev => [...prev, side]);
+        setTimeout(() => {
+            setRippleSides(prev => prev.filter(s => s !== side)); // Naive cleanup
+        }, 500);
+    };
+
+    // Volume Booster State
+    const [isBoosted, setIsBoosted] = useState(false);
+
+    // Toggle Booster
+    const toggleBoost = () => {
+        const newBoost = !isBoosted;
+        setIsBoosted(newBoost);
+        if (newBoost) {
+            setVolume(100);
+            if (playerRef.current) playerRef.current.setVolume(100);
+        }
+    };
+
     const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
         if (isDriveVideo) return;
         const rect = e.currentTarget.getBoundingClientRect();
@@ -273,7 +444,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     const toggleFullscreen = () => {
         if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch((e) => console.log(e));
+            document.documentElement.requestFullscreen().catch(() => { });
             setIsFullscreen(true);
         } else {
             if (document.exitFullscreen) {
@@ -292,18 +463,36 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const isSports = content.genres?.includes('Sports') || content.tags?.includes('Sports');
 
     return (
-        <div className="fixed inset-0 z-[100] bg-black flex flex-col justify-center items-center overflow-hidden font-sans">
+        <div
+            className="fixed inset-0 z-[100] bg-black flex flex-col justify-center items-center overflow-hidden font-sans select-none"
+            onContextMenu={(e) => { e.preventDefault(); return false; }}
+        >
+            {/* Strict Right-Click Block Overlay 
+                - For YouTube: pointer-events 'auto' when controls hidden (blocks all clicks to iframe).
+                - For Drive: MUST be 'none' always, otherwise user can't click internal iframe buttons.
+            */}
+            <div
+                className="absolute inset-0 z-[110] bg-transparent"
+                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                style={{ pointerEvents: (showControls && !isDriveVideo) ? 'none' : (isDriveVideo ? 'none' : 'auto') }}
+            />
 
             {/* Player Container */}
-            <div className="absolute inset-0 z-0 bg-black pointer-events-none">
+            <div className="absolute inset-0 z-0 bg-black pointer-events-none overflow-hidden">
                 {isDriveVideo ? (
-                    <iframe
-                        className="w-full h-full pointer-events-auto"
-                        src={`https://drive.google.com/file/d/${content.movieDriveId}/preview`}
-                        allowFullScreen
-                    ></iframe>
+                    <div className="w-full h-full relative">
+                        {/* Mask the top bar (filename) of Google Drive Player */}
+                        <iframe
+                            className="absolute top-[-64px] left-0 w-full h-[calc(100%+64px)] pointer-events-auto"
+                            src={`https://drive.google.com/file/d/${content.movieDriveId}/preview`}
+                            allowFullScreen
+                        ></iframe>
+                    </div>
                 ) : (
-                    <div ref={playerContainerRef} className="w-full h-full" />
+                    <div className="w-full h-full relative overflow-hidden pointer-events-none">
+                        {/* Scale up YouTube to hide top title bar and bottom branding */}
+                        <div ref={playerContainerRef} className="w-full h-[300%] -mt-[50%] md:h-[140%] md:-mt-[10%] scale-150 md:scale-125 origin-center pointer-events-none" />
+                    </div>
                 )}
             </div>
 
@@ -314,7 +503,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             {!isDriveVideo && showSkipIntro && (
                 <button
                     onClick={(e) => { e.stopPropagation(); handleSkip(90); setShowSkipIntro(false); }}
-                    className="absolute bottom-24 right-4 md:bottom-32 md:right-12 bg-white text-black px-4 py-2 rounded font-bold text-sm shadow-lg hover:bg-gray-200 z-50 transition pointer-events-auto animate-in fade-in"
+                    className="absolute bottom-24 right-4 md:bottom-32 md:right-12 bg-white text-black px-4 py-2 rounded font-bold text-sm shadow-lg hover:bg-gray-200 z-[120] transition pointer-events-auto animate-in fade-in"
                 >
                     Skip Intro
                 </button>
@@ -322,142 +511,220 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
             {/* Stats Panel */}
             {showStats && isSports && (
-                <div className="pointer-events-auto z-50">
+                <div className="pointer-events-auto z-[120]">
                     <StatsPanel content={content as any} onClose={() => setShowStats(false)} />
                 </div>
             )}
 
-            {/* Header - Always Show for both Video types (needed for Close button) */}
-            <div className={`absolute top-0 left-0 w-full p-6 bg-gradient-to-b from-black/90 to-transparent transition-opacity duration-300 pointer-events-none z-40 ${showControls || isDriveVideo ? 'opacity-100' : 'opacity-0'}`}>
-                <button onClick={onClose} className="text-white hover:text-gray-300 flex items-center gap-4 pointer-events-auto group">
-                    <ArrowLeft size={36} className="group-hover:-translate-x-1 transition-transform" />
+            {/* Header - Transparent Floating Pill Style */}
+            <div className={`absolute top-0 left-0 w-full p-6 transition-opacity duration-300 pointer-events-none z-[120] ${showControls || isDriveVideo ? 'opacity-100' : 'opacity-0'}`}>
+                <div className="bg-black/40 backdrop-blur-md border border-white/5 inline-flex items-center gap-4 px-6 py-3 rounded-full pointer-events-auto hover:bg-black/60 transition-colors">
+                    <button onClick={onClose} className="text-white hover:text-brand-red transition-colors group">
+                        <ArrowLeft size={24} className="group-hover:-translate-x-1 transition-transform" />
+                    </button>
+                    <div className="h-6 w-px bg-white/10 mx-1"></div>
                     <div className="text-left">
-                        <div className="font-black text-xl md:text-2xl drop-shadow-md leading-tight uppercase tracking-tight">{content.title}</div>
-                        <div className="text-xs text-brand-red font-bold tracking-widest uppercase">Watching Now</div>
+                        <div className="text-white font-bold text-sm md:text-base leading-tight tracking-wide line-clamp-1 max-w-[200px] md:max-w-md">{content.title}</div>
                     </div>
-                </button>
+                </div>
             </div>
 
-            {/* Controls - Hide for Drive Video */}
-            {!isDriveVideo && (
-                <div className={`absolute bottom-0 left-0 right-0 px-4 md:px-12 pb-6 pt-32 bg-gradient-to-t from-black via-black/80 to-transparent transition-opacity duration-300 pointer-events-none z-40 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
-
-                    {/* Timeline */}
-                    <div className="w-full flex items-center gap-4 mb-4 group/timeline pointer-events-auto">
-                        <div className="w-full h-1 bg-gray-700/60 rounded-full relative cursor-pointer group-hover/timeline:h-2 transition-all duration-200 overflow-hidden"
-                            onClick={handleSeek}>
-                            <div className="h-full bg-brand-red rounded-full relative" style={{ width: `${progress}%` }}></div>
-                            {/* Buffered bar could be added here if API supports it */}
-                        </div>
-                        <div className="text-xs font-bold text-gray-300 whitespace-nowrap tabular-nums font-mono">
-                            {formatTime(currentTime)} / {formatTime(duration)}
+            {/* Gesture Layer (Mobile Only) */}
+            <div
+                className="absolute inset-0 z-[115]"
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                onClick={handleTap}
+            >
+                {/* Visual Feedback for Double Tap */}
+                {rippleSides.map((side) => (
+                    <div key={side} className={`absolute top-0 bottom-0 ${side === 'left' ? 'left-0' : 'right-0'} w-1/3 flex items-center justify-center pointer-events-none animate-ping opacity-0`}>
+                        <div className="bg-white/20 p-4 rounded-full">
+                            {side === 'left' ? <RotateCcw size={40} /> : <RotateCw size={40} />}
                         </div>
                     </div>
+                ))}
 
-                    {/* Control Icons */}
-                    <div className="flex justify-between items-center pointer-events-auto">
-                        {/* Play/Pause/Skip */}
-                        <div className="flex items-center gap-6 md:gap-8">
-                            <button onClick={(e) => { e.stopPropagation(); setPlaying(!playing); }} className="text-white hover:scale-110 transition">
-                                {playing ? <Pause size={32} fill="white" /> : <Play size={32} fill="white" />}
-                            </button>
-                            <button className="text-white hover:text-white/80 transition" onClick={(e) => { e.stopPropagation(); handleSkip(-10); }}>
-                                <RotateCcw size={24} />
-                            </button>
-                            <button className="text-white hover:text-white/80 transition" onClick={(e) => { e.stopPropagation(); handleSkip(10); }}>
-                                <RotateCw size={24} />
-                            </button>
+                {/* Brightness Overlay (Simulated) */}
+                <div className="absolute inset-0 bg-black pointer-events-none transition-opacity duration-100" style={{ opacity: 1 - (brightness / 100) }} />
+            </div>
 
-                            <div className="hidden md:flex items-center gap-2 group/vol cursor-pointer">
-                                <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }}>
-                                    {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
-                                </button>
-                                <div className="w-0 overflow-hidden group-hover/vol:w-24 transition-all duration-300">
-                                    <input type="range" min="0" max="100" value={isMuted ? 0 : volume}
-                                        onChange={(e) => setVolume(Number(e.target.value))}
-                                        className="h-1 bg-white rounded-full w-full ml-2 appearance-none outline-none accent-brand-red" />
+            {/* Controls - Floating Glass Bar (Hide for Drive Video) */}
+            {!isDriveVideo && (
+                <div className={`absolute bottom-0 left-0 right-0 p-4 md:p-8 transition-all duration-500 pointer-events-none z-[120] ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+
+                    {/* Main Control Bar */}
+                    <div className="bg-[#0f0f0f]/90 backdrop-blur-2xl border border-white/10 rounded-2xl md:rounded-3xl p-4 md:px-6 md:py-5 shadow-2xl pointer-events-auto flex flex-col gap-3 w-full max-w-5xl mx-auto ring-1 ring-white/5">
+
+                        {/* Slider / Timeline */}
+                        <div className="w-full flex items-center gap-4 group/timeline">
+                            {/* Current Time */}
+                            <div className="text-xs font-bold text-gray-400 font-mono w-12 text-right tracking-wider">
+                                {formatTime(currentTime)}
+                            </div>
+
+                            {/* Progress Bar */}
+                            <div className="flex-1 h-1.5 bg-white/10 rounded-full relative cursor-pointer group-hover/timeline:h-2.5 transition-all duration-300 overflow-visible"
+                                onClick={handleSeek}>
+                                {/* Buffered/Background */}
+                                <div className="absolute inset-0 rounded-full overflow-hidden">
+                                    <div className="h-full bg-white/5 w-full"></div>
                                 </div>
+                                {/* Filled Progress */}
+                                <div className="h-full bg-gradient-to-r from-brand-red to-red-600 rounded-full relative shadow-[0_0_15px_rgba(229,9,20,0.6)]" style={{ width: `${progress}%` }}>
+                                    {/* Handle */}
+                                    <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-md scale-0 group-hover/timeline:scale-125 transition-transform duration-200"></div>
+                                </div>
+                            </div>
+
+                            {/* Duration */}
+                            <div className="text-xs font-bold text-gray-400 font-mono w-12 text-left tracking-wider">
+                                {formatTime(duration)}
                             </div>
                         </div>
 
-                        {/* Right Side Controls */}
-                        <div className="flex items-center gap-4 md:gap-6 text-white/90">
-                            {isSports && (
-                                <button onClick={(e) => { e.stopPropagation(); setShowStats(!showStats); }}
-                                    className={`hover:text-white ${showStats ? 'text-brand-red scale-110' : ''} transition-all`} title="Match Stats">
-                                    <BarChart2 size={28} />
-                                </button>
-                            )}
+                        {/* Lower Controls Row */}
+                        <div className="flex justify-between items-center mt-1">
 
-                            {/* Audio & Subtitles Menu */}
-                            <div className="relative">
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); setShowAudioSubMenu(!showAudioSubMenu); setShowQualityMenu(false); }}
-                                    className={`hover:text-white transition ${showAudioSubMenu ? 'text-brand-red' : ''}`}
-                                    title="Audio & Subtitles"
-                                >
-                                    <MessageSquare size={26} />
+                            {/* LEFT: Playback Controls */}
+                            <div className="flex items-center gap-3 md:gap-5">
+                                <button onClick={(e) => { e.stopPropagation(); setPlaying(!playing); }}
+                                    className="text-white hover:text-brand-red hover:bg-white/10 transition-all p-3 rounded-full active:scale-95 group">
+                                    {playing ?
+                                        <Pause size={28} className="fill-current" /> :
+                                        <Play size={28} className="fill-current ml-1" />
+                                    }
                                 </button>
 
-                                {showAudioSubMenu && (
-                                    <div className="absolute bottom-full right-0 mb-4 bg-[#1a1a1a]/95 backdrop-blur-md border border-white/10 rounded-xl p-6 min-w-[400px] flex gap-8 animate-in slide-in-from-bottom-2 shadow-2xl">
-                                        {/* Audio Column */}
-                                        <div className="flex-1">
-                                            <h3 className="text-gray-400 font-bold text-xs uppercase tracking-widest mb-3">Audio</h3>
-                                            <div className="space-y-1">
-                                                {AUDIO_OPTIONS.map(audi => (
-                                                    <button key={audi.id} onClick={() => setSelectedAudio(audi)}
-                                                        className={`w-full text-left px-3 py-2 rounded flex justify-between items-center transition ${selectedAudio.id === audi.id ? 'bg-white/10 text-white font-bold' : 'text-gray-300 hover:bg-white/5'}`}>
-                                                        <span>{audi.label}</span>
-                                                        {selectedAudio.id === audi.id && <Check size={14} className="text-brand-red" />}
+                                <div className="flex items-center gap-1 text-gray-400">
+                                    <button className="hover:text-white hover:bg-white/10 transition p-2 rounded-full" onClick={(e) => { e.stopPropagation(); handleSkip(-10); }} title="-10s">
+                                        <RotateCcw size={20} />
+                                    </button>
+                                    <button className="hover:text-white hover:bg-white/10 transition p-2 rounded-full" onClick={(e) => { e.stopPropagation(); handleSkip(10); }} title="+10s">
+                                        <RotateCw size={20} />
+                                    </button>
+                                </div>
+
+                                {/* Volume Slider */}
+                                <div className="hidden md:flex items-center gap-2 group/vol cursor-pointer pl-4 border-l border-white/10 ml-2">
+                                    <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} className="text-gray-300 hover:text-white p-2 rounded-full hover:bg-white/10 transition">
+                                        {isMuted ? <VolumeX size={22} /> : <Volume2 size={22} />}
+                                    </button>
+                                    <div className="w-0 overflow-hidden group-hover/vol:w-24 transition-all duration-300 ease-out">
+                                        <input type="range" min="0" max="100" value={isMuted ? 0 : volume}
+                                            onChange={(e) => setVolume(Number(e.target.value))}
+                                            className="h-1 bg-white/20 rounded-full w-20 appearance-none outline-none accent-brand-red cursor-pointer hover:bg-white/30" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* RIGHT: Features */}
+                            <div className="flex items-center gap-2 md:gap-3 text-gray-400">
+                                {isSports && (
+                                    <button onClick={(e) => { e.stopPropagation(); setShowStats(!showStats); }}
+                                        className={`hover:text-brand-red transition-all p-2.5 rounded-xl hover:bg-white/5 ${showStats ? 'bg-brand-red/10 text-brand-red md:ring-1 md:ring-brand-red/50' : ''}`} title="Match Stats">
+                                        <BarChart2 size={22} />
+                                    </button>
+                                )}
+
+                                {/* Audio & Subs Button */}
+                                <div className="relative">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setShowAudioSubMenu(!showAudioSubMenu); setShowQualityMenu(false); }}
+                                        className={`hover:text-white transition-all p-2.5 rounded-xl hover:bg-white/5 ${showAudioSubMenu ? 'bg-white/10 text-white' : ''}`}
+                                        title="Audio & Subtitles"
+                                    >
+                                        <MessageSquare size={22} />
+                                    </button>
+
+                                    {/* Audio/Sub Menu Popup */}
+                                    {showAudioSubMenu && (
+                                        <div className="absolute bottom-full right-0 mb-6 bg-[#0f0f0f]/95 backdrop-blur-xl border border-white/10 rounded-2xl p-0 min-w-[340px] flex overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-200 shadow-2xl z-[150] ring-1 ring-white/5">
+
+                                            {/* Subtitles Col */}
+                                            <div className="flex-1 p-4 bg-white/[0.02]">
+                                                <h3 className="text-gray-500 font-bold text-[10px] uppercase tracking-widest mb-3 px-2 flex items-center gap-2">
+                                                    <Subtitles size={12} /> Subtitles
+                                                </h3>
+                                                <div className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                                                    <button onClick={() => handleSubtitleChange(null)}
+                                                        className={`w-full text-left px-3 py-2 rounded-lg text-sm flex justify-between items-center transition ${!selectedSubtitle ? 'bg-brand-red text-white shadow-lg shadow-brand-red/20' : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'}`}>
+                                                        <span>Off</span>
+                                                        {!selectedSubtitle && <Check size={14} strokeWidth={3} />}
+                                                    </button>
+                                                    {effectiveSubtitleTracks.map((sub, idx) => (
+                                                        <button key={sub.languageCode || idx} onClick={() => handleSubtitleChange(sub)}
+                                                            className={`w-full text-left px-3 py-2 rounded-lg text-sm flex justify-between items-center transition ${selectedSubtitle?.languageCode === sub.languageCode ? 'bg-brand-red text-white shadow-lg shadow-brand-red/20' : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'}`}>
+                                                            <span>{sub.displayName}</span>
+                                                            {selectedSubtitle?.languageCode === sub.languageCode && <Check size={14} strokeWidth={3} />}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Audio Col */}
+                                            <div className="flex-1 p-4 border-l border-white/5 bg-black/20">
+                                                <h3 className="text-gray-500 font-bold text-[10px] uppercase tracking-widest mb-3 px-2 flex items-center gap-2">
+                                                    <Headphones size={12} /> Audio
+                                                </h3>
+
+                                                {/* Booster */}
+                                                <div className="mb-4 px-1">
+                                                    <button
+                                                        onClick={toggleBoost}
+                                                        className={`w-full text-left p-3 rounded-xl border text-xs font-bold flex flex-col gap-2 transition-all ${isBoosted ? 'bg-brand-red/10 border-brand-red text-brand-red shadow-[0_0_15px_rgba(229,9,20,0.15)]' : 'border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'}`}
+                                                    >
+                                                        <div className="flex items-center justify-between w-full">
+                                                            <span className="tracking-wide">VOLUME BOOST</span>
+                                                            <div className={`w-2 h-2 rounded-full ${isBoosted ? 'bg-brand-red animate-pulse' : 'bg-gray-700'}`} />
+                                                        </div>
+                                                        <div className="w-full h-1 bg-gray-700 rounded-full overflow-hidden">
+                                                            <div className={`h-full transition-all duration-300 ${isBoosted ? 'w-full bg-brand-red' : 'w-0'}`} />
+                                                        </div>
+                                                    </button>
+                                                </div>
+
+                                                <div className="space-y-1">
+                                                    {AUDIO_OPTIONS.map(audi => (
+                                                        <button key={audi.id} onClick={() => setSelectedAudio(audi)}
+                                                            className={`w-full text-left px-3 py-2 rounded-lg text-sm flex justify-between items-center transition ${selectedAudio.id === audi.id ? 'bg-white/10 text-white font-medium' : 'text-gray-400 hover:bg-white/5'}`}>
+                                                            <span>{audi.label}</span>
+                                                            {selectedAudio.id === audi.id && <Check size={14} className="text-brand-red" />}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Quality Settings */}
+                                <div className="relative">
+                                    <button onClick={(e) => { e.stopPropagation(); setShowQualityMenu(!showQualityMenu); setShowAudioSubMenu(false); }}
+                                        className={`hover:text-white transition-all p-2.5 rounded-xl hover:bg-white/5 ${showQualityMenu ? 'bg-white/10 text-white' : ''}`}>
+                                        <Settings size={22} />
+                                    </button>
+                                    {showQualityMenu && (
+                                        <div className="absolute bottom-full right-0 mb-6 bg-[#0f0f0f]/95 backdrop-blur-xl border border-white/10 rounded-xl p-2 min-w-[140px] shadow-2xl animate-in slide-in-from-bottom-4 z-[150] ring-1 ring-white/5">
+                                            <h3 className="text-gray-500 font-bold text-[10px] uppercase tracking-widest px-4 py-2 mb-1 border-b border-white/5">Quality</h3>
+                                            <div className="max-h-48 overflow-y-auto custom-scrollbar p-1">
+                                                {qualities.map(q => (
+                                                    <button key={q} onClick={() => handleQualityChange(q)}
+                                                        className={`block w-full text-left px-4 py-2 text-xs hover:bg-white/10 rounded-lg transition-colors ${currentQuality === q ? 'text-brand-red font-bold bg-brand-red/5' : 'text-gray-400 hover:text-white'}`}>
+                                                        {q.toUpperCase()}
                                                     </button>
                                                 ))}
                                             </div>
                                         </div>
+                                    )}
+                                </div>
 
-                                        {/* Subtitle Column */}
-                                        <div className="flex-1 border-l border-white/10 pl-8">
-                                            <h3 className="text-gray-400 font-bold text-xs uppercase tracking-widest mb-3">Subtitles</h3>
-                                            <div className="space-y-1">
-                                                <button onClick={() => handleSubtitleChange(null)}
-                                                    className={`w-full text-left px-3 py-2 rounded flex justify-between items-center transition ${!selectedSubtitle ? 'bg-white/10 text-white font-bold' : 'text-gray-300 hover:bg-white/5'}`}>
-                                                    <span>Off</span>
-                                                    {!selectedSubtitle && <Check size={14} className="text-brand-red" />}
-                                                </button>
-                                                {effectiveSubtitleTracks.map((sub, idx) => (
-                                                    <button key={sub.languageCode || idx} onClick={() => handleSubtitleChange(sub)}
-                                                        className={`w-full text-left px-3 py-2 rounded flex justify-between items-center transition ${selectedSubtitle?.languageCode === sub.languageCode ? 'bg-white/10 text-white font-bold' : 'text-gray-300 hover:bg-white/5'}`}>
-                                                        <span>{sub.displayName}</span>
-                                                        {selectedSubtitle?.languageCode === sub.languageCode && <Check size={14} className="text-brand-red" />}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Quality Menu */}
-                            <div className="relative">
-                                <button onClick={(e) => { e.stopPropagation(); setShowQualityMenu(!showQualityMenu); setShowAudioSubMenu(false); }} className={`hover:text-white ${showQualityMenu ? 'text-brand-red' : ''}`}>
-                                    <Settings size={28} />
+                                {/* Fullscreen */}
+                                <button className="hover:text-white hover:bg-white/10 transition p-2.5 rounded-xl" onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}>
+                                    {isFullscreen ? <Minimize size={22} /> : <Maximize size={22} />}
                                 </button>
-                                {showQualityMenu && (
-                                    <div className="absolute bottom-full right-0 mb-4 bg-[#1a1a1a]/95 backdrop-blur-md border border-white/10 rounded-lg p-2 min-w-[140px] shadow-xl animate-in slide-in-from-bottom-2">
-                                        <h3 className="text-gray-500 font-bold text-[10px] uppercase tracking-widest px-4 py-2">Quality</h3>
-                                        {qualities.map(q => (
-                                            <button key={q} onClick={() => handleQualityChange(q)}
-                                                className={`block w-full text-left px-4 py-2 text-sm hover:bg-white/10 rounded ${currentQuality === q ? 'text-brand-red font-bold' : 'text-gray-300'}`}>
-                                                {q.toUpperCase()}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
                             </div>
-
-                            <button className="hover:text-white" onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}>
-                                {isFullscreen ? <Minimize size={28} /> : <Maximize size={28} />}
-                            </button>
                         </div>
                     </div>
                 </div>

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Search, Bell, Menu, X, User, LogOut, Settings, LayoutDashboard, ChevronRight } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 
@@ -15,7 +16,11 @@ const TopNav: React.FC<TopNavProps> = ({ activeTab, setTab, onSearch, onUnlock }
     const [isProfileMenuOpen, setProfileMenuOpen] = useState(false);
     const [isNotifOpen, setNotifOpen] = useState(false);
 
-    const { logout, currentUser, currentProfile, notifications } = useStore();
+    const profileRef = useRef<HTMLDivElement>(null);
+    const notifRef = useRef<HTMLDivElement>(null);
+
+    const { logout, currentUser, currentProfile, notifications, markNotificationAsRead } = useStore();
+    const navigate = useNavigate();
 
     useEffect(() => {
         const handleScroll = () => {
@@ -23,6 +28,23 @@ const TopNav: React.FC<TopNavProps> = ({ activeTab, setTab, onSearch, onUnlock }
         };
         window.addEventListener('scroll', handleScroll);
         return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    // --- Click Outside to Close ---
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+                setProfileMenuOpen(false);
+            }
+            if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+                setNotifOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
     }, []);
 
     const handleNavClick = (id: string) => {
@@ -35,7 +57,7 @@ const TopNav: React.FC<TopNavProps> = ({ activeTab, setTab, onSearch, onUnlock }
     const unreadNotifs = notifications.filter(n => !n.read).length;
 
     return (
-        <nav className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 ${isScrolled ? 'bg-cinema-black shadow-2xl' : 'bg-gradient-to-b from-black/80 to-transparent'}`}>
+        <nav className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-700 ${isScrolled ? 'bg-black/60 backdrop-blur-xl border-b border-white/5 shadow-2xl py-2' : 'bg-gradient-to-b from-black/90 via-black/40 to-transparent py-4'}`}>
             <div className="max-w-[1920px] mx-auto px-4 md:px-12 h-16 md:h-20 flex items-center justify-between">
 
                 {/* Logo & Desktop Links */}
@@ -44,7 +66,7 @@ const TopNav: React.FC<TopNavProps> = ({ activeTab, setTab, onSearch, onUnlock }
                         className="cursor-pointer"
                         onClick={() => handleNavClick('home')}
                     >
-                        <img src="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png" className="h-8 md:h-10 lg:h-12 w-auto object-contain" alt="MY DONKEY Logo" />
+                        <img src="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png" className="h-10 md:h-12 lg:h-14 w-auto object-contain" alt="MY DONKEY Logo" />
                     </div>
 
                     <div className="hidden lg:flex items-center gap-6">
@@ -57,8 +79,9 @@ const TopNav: React.FC<TopNavProps> = ({ activeTab, setTab, onSearch, onUnlock }
                         ].map(item => (
                             <button
                                 key={item.id}
+
                                 onClick={() => handleNavClick(item.id)}
-                                className={`text-sm font-medium transition-colors hover:text-gray-300 ${activeTab === item.id ? 'text-white font-bold' : 'text-gray-200'}`}
+                                className={`text-sm font-medium transition-all duration-300 hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] ${activeTab === item.id ? 'text-white font-bold drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]' : 'text-gray-300'}`}
                             >
                                 {item.label}
                             </button>
@@ -79,7 +102,7 @@ const TopNav: React.FC<TopNavProps> = ({ activeTab, setTab, onSearch, onUnlock }
                     </button>
 
                     {/* Notifications */}
-                    <div className="relative">
+                    <div className="relative" ref={notifRef}>
                         <button
                             onClick={() => setNotifOpen(!isNotifOpen)}
                             className="text-white hover:scale-110 transition relative"
@@ -93,18 +116,57 @@ const TopNav: React.FC<TopNavProps> = ({ activeTab, setTab, onSearch, onUnlock }
                         </button>
 
                         {isNotifOpen && (
-                            <div className="absolute top-12 right-0 w-80 bg-cinema-black/95 backdrop-blur-xl border border-white/10 rounded-lg shadow-2xl overflow-hidden animate-in slide-in-from-top-2">
-                                <div className="p-4 border-b border-white/10 font-bold">Notifications</div>
-                                <div className="max-h-96 overflow-y-auto">
+                            <div className="fixed md:absolute top-20 md:top-12 left-4 right-4 md:left-auto md:right-0 md:w-96 bg-[#0a0a0a] backdrop-blur-2xl border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-in slide-in-from-top-2 z-[300] ring-1 ring-white/5">
+                                <div className="p-3 md:p-4 border-b border-white/5 flex justify-between items-center bg-white/5">
+                                    <span className="font-bold text-white text-sm md:text-base tracking-wide">Notifications</span>
+                                    {unreadNotifs > 0 && <span className="text-[10px] md:text-xs text-brand-red font-bold uppercase tracking-wider">{unreadNotifs} New</span>}
+                                </div>
+                                <div className="max-h-[50vh] md:max-h-[400px] overflow-y-auto custom-scrollbar">
                                     {notifications.length > 0 ? (
                                         notifications.map(n => (
-                                            <div key={n.id} className="p-4 border-b border-white/5 hover:bg-white/5 cursor-pointer">
-                                                <div className="text-sm font-bold text-white mb-1">{n.title}</div>
-                                                <div className="text-xs text-gray-400 line-clamp-2">{n.message}</div>
+                                            <div key={n.id}
+                                                onClick={() => {
+                                                    markNotificationAsRead(n.id);
+                                                    if (n.link) {
+                                                        if (n.link.startsWith('http')) {
+                                                            window.open(n.link, '_blank');
+                                                        } else {
+                                                            navigate(n.link);
+                                                            setNotifOpen(false);
+                                                        }
+                                                    }
+                                                }}
+                                                className={`p-4 border-b border-white/5 flex gap-4 transition-all cursor-pointer group hover:bg-white/10 ${n.read ? 'opacity-60 hover:opacity-100 bg-transparent' : 'bg-white/5 border-l-2 border-l-brand-red'}`}
+                                            >
+                                                {/* Image if available */}
+                                                {n.image && (
+                                                    <div className="flex-shrink-0 w-12 h-16 rounded overflow-hidden bg-gray-800 shadow-lg">
+                                                        <img src={n.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                                    </div>
+                                                )}
+
+                                                <div className="flex-1">
+                                                    <div className={`text-sm mb-1 ${n.read ? 'font-medium text-gray-300' : 'font-bold text-white'}`}>{n.title}</div>
+                                                    <div className="text-xs text-gray-400 leading-relaxed line-clamp-2">{n.message}</div>
+                                                    <div className="flex items-center justify-between mt-2">
+                                                        {n.link && <span className="text-[10px] text-brand-red font-bold uppercase tracking-widest flex items-center gap-1 group-hover:translate-x-1 transition-transform">View <ChevronRight size={10} /></span>}
+                                                        <span className="text-[10px] text-gray-600 font-mono">
+                                                            {new Date(n.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Unread Dot */}
+                                                {!n.read && (
+                                                    <div className="w-2 h-2 rounded-full bg-brand-red flex-shrink-0 mt-1.5 shadow-[0_0_8px_rgba(229,9,20,0.6)]"></div>
+                                                )}
                                             </div>
                                         ))
                                     ) : (
-                                        <div className="p-8 text-center text-gray-500 text-sm">No new notifications.</div>
+                                        <div className="p-12 text-center flex flex-col items-center gap-3 text-gray-500">
+                                            <Bell size={32} className="opacity-20" />
+                                            <span className="text-sm font-medium">No new notifications</span>
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -112,7 +174,7 @@ const TopNav: React.FC<TopNavProps> = ({ activeTab, setTab, onSearch, onUnlock }
                     </div>
 
                     {/* Profile Dropdown */}
-                    <div className="relative">
+                    <div className="relative" ref={profileRef}>
                         <button
                             onClick={() => setProfileMenuOpen(!isProfileMenuOpen)}
                             className="flex items-center gap-2 group"

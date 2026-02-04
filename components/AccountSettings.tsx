@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, CreditCard, Monitor, User as UserIcon, Plus, Calendar, Camera, Wifi, Settings } from 'lucide-react';
+import { ChevronDown, ChevronUp, CreditCard, Monitor, User as UserIcon, Plus, Calendar, Camera, Wifi, Settings, PlayCircle } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import PlanSelectionModal from './account/PlanSelectionModal';
 import PaymentMethodsModal from './account/PaymentMethodsModal';
@@ -96,196 +96,194 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
     };
 
     return (
-        <div className="min-h-screen bg-[#141414] text-white font-sans animate-in fade-in">
+        <div className="min-h-screen bg-[#0f0617] text-white font-sans">
 
-            {/* Account Page Header */}
-            <div className="max-w-[1024px] mx-auto pt-24 pb-8 px-4 md:px-5 lg:px-0 border-b border-white/10">
-                <div className="flex flex-col md:flex-row gap-4 md:items-center justify-between">
-                    <div>
-                        <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">Account</h1>
-                        <div className="flex items-center gap-2 text-sm text-gray-400 font-medium">
-                            <Monitor size={16} />
-                            <span>Member Since {getMemberSinceDate()}</span>
-                        </div>
+            {/* Hotstar-style Account Layout */}
+            <div className="max-w-4xl mx-auto px-4 pt-24 md:pt-28 pb-32">
+
+                {/* Profile Header - Hotstar Style */}
+                <div className="flex items-center gap-4 mb-8">
+                    <div className="relative group">
+                        <img
+                            src={userProfiles[0]?.avatarUrl || 'https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg'}
+                            className="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover ring-2 ring-cyan-500/50 shadow-lg shadow-cyan-500/20"
+                        />
+                        <button
+                            onClick={handleChangeAvatar}
+                            className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition"
+                        >
+                            <Camera size={20} className="text-white" />
+                        </button>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <div className="text-right hidden md:block">
-                            <div className="text-xs text-gray-500 uppercase font-bold">Current Plan</div>
-                            <div className="font-bold text-red-500">{currentPlan?.name}</div>
-                        </div>
+                    <div>
+                        <h1 className="text-xl md:text-2xl font-bold text-white">{userProfiles[0]?.name || 'User'}</h1>
+                        <p className="text-sm text-gray-400 truncate max-w-[200px]">{currentUser.email}</p>
                     </div>
                 </div>
-            </div>
 
-            <div className="max-w-[1024px] mx-auto px-4 md:px-5 lg:px-0 pb-20 mt-8">
+                {/* Subscription Banner - Hotstar Gradient */}
+                <div className="bg-gradient-to-r from-cyan-600 via-blue-600 to-purple-600 rounded-2xl p-5 md:p-6 mb-6 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxjaXJjbGUgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuMDUiIGN4PSIyMCIgY3k9IjIwIiByPSIyIi8+PC9nPjwvc3ZnPg==')] opacity-30" />
+                    <div className="relative z-10 flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                            <div className="flex items-center gap-2 mb-1">
+                                <span className="text-xs font-bold uppercase tracking-wider text-cyan-200">Current Plan</span>
+                                <span className="px-2 py-0.5 bg-white/20 rounded text-[10px] font-bold">{currentPlan?.quality}</span>
+                            </div>
+                            <div className="text-2xl md:text-3xl font-black">{currentPlan?.name}</div>
+                        </div>
+                        <button
+                            onClick={() => setShowPlanModal(true)}
+                            className="px-6 py-2.5 bg-white text-gray-900 rounded-full font-bold text-sm hover:bg-gray-100 transition shadow-lg"
+                        >
+                            Upgrade
+                        </button>
+                    </div>
+                </div>
 
-                {/* Section: Membership & Billing */}
-                <div className="flex flex-col md:flex-row border-b border-white/10 py-8 gap-8">
-                    <div className="w-full md:w-[280px]">
-                        <h2 className="text-gray-400 text-lg font-medium uppercase tracking-wide mb-4">Membership & Billing</h2>
-                        <button onClick={logout} className="bg-white/10 hover:bg-white/20 text-white text-sm font-bold py-3 px-6 rounded shadow-sm w-full transition">
-                            Sign Out
+                {/* Settings Sections - Hotstar Style Clean List */}
+                <div className="space-y-3">
+
+                    {/* Account Section */}
+                    <div className="bg-white/5 rounded-xl overflow-hidden">
+                        <div className="px-5 py-3 border-b border-white/5">
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Account</span>
+                        </div>
+
+                        <button onClick={handleChangeEmail} className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition border-b border-white/5">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
+                                    <UserIcon size={18} />
+                                </div>
+                                <div className="text-left">
+                                    <div className="font-medium">Email</div>
+                                    <div className="text-xs text-gray-500 truncate max-w-[180px]">{currentUser.email}</div>
+                                </div>
+                            </div>
+                            <ChevronDown size={18} className="text-gray-500 -rotate-90" />
+                        </button>
+
+                        <button onClick={handlePasswordReset} className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+                                    <Settings size={18} />
+                                </div>
+                                <div className="text-left">
+                                    <div className="font-medium">Password</div>
+                                    <div className="text-xs text-gray-500">Reset your password</div>
+                                </div>
+                            </div>
+                            <ChevronDown size={18} className="text-gray-500 -rotate-90" />
                         </button>
                     </div>
 
-                    <div className="flex-1 space-y-4">
-                        <div className="bg-black/40 p-4 rounded-lg border border-white/5">
-                            <div className="flex justify-between items-center mb-1">
-                                <div className="font-bold text-lg">{currentUser.email}</div>
-                                <button onClick={handleChangeEmail} className="text-blue-400 hover:text-blue-300 text-sm font-medium">Change email</button>
-                            </div>
-                            <div className="flex justify-between items-center text-sm text-gray-400">
-                                <div>Password: ********</div>
-                                <button onClick={handlePasswordReset} className="text-blue-400 hover:text-blue-300 font-medium">Change password</button>
-                            </div>
+                    {/* Subscription Section */}
+                    <div className="bg-white/5 rounded-xl overflow-hidden">
+                        <div className="px-5 py-3 border-b border-white/5">
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Subscription</span>
                         </div>
 
-                        <div className="bg-black/40 p-4 rounded-lg border border-white/5 space-y-4">
-                            <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-3 font-bold">
-                                    <div className="bg-white p-1 rounded text-black">
-                                        <CreditCard size={20} />
-                                    </div>
-                                    <span className="text-gray-200">•••• •••• •••• 4242</span>
+                        <button onClick={() => setShowPaymentModal(true)} className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition border-b border-white/5">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
+                                    <CreditCard size={18} />
                                 </div>
-                                <button onClick={() => setShowPaymentModal(true)} className="text-blue-400 hover:text-blue-300 text-sm font-medium">Manage payment info</button>
+                                <div className="text-left">
+                                    <div className="font-medium">Payment Methods</div>
+                                    <div className="text-xs text-gray-500">•••• 4242</div>
+                                </div>
                             </div>
-                            <div className="border-t border-white/10 pt-4 flex justify-between items-center">
-                                <div className="text-gray-400 text-sm">Next Billing Date: <span className="text-white font-bold ml-1">Nov 23, 2025</span></div>
-                                <button onClick={() => setShowBillingModal(true)} className="text-blue-400 hover:text-blue-300 text-sm font-medium">Billing details</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                            <ChevronDown size={18} className="text-gray-500 -rotate-90" />
+                        </button>
 
-                {/* Section: Plan Details */}
-                <div className="flex flex-col md:flex-row border-b border-white/10 py-8 gap-8">
-                    <div className="w-full md:w-[280px]">
-                        <h2 className="text-gray-400 text-lg font-medium uppercase tracking-wide">Plan Details</h2>
-                    </div>
-                    <div className="flex-1 flex justify-between items-center bg-black/40 p-4 rounded-lg border border-white/5">
-                        <div className="flex items-center gap-3">
-                            <span className="font-bold text-xl text-white">{currentUser.plan}</span>
-                            {currentPlan && (
-                                <span className="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase">{currentPlan.quality}</span>
-                            )}
-                        </div>
-                        <button onClick={() => setShowPlanModal(true)} className="text-blue-400 hover:text-blue-300 text-sm font-bold">Change plan</button>
-                    </div>
-                </div>
-
-                {/* Section: App Settings (Low Data Mode) */}
-                <div className="flex flex-col md:flex-row border-b border-white/10 py-8 gap-8">
-                    <div className="w-full md:w-[280px]">
-                        <h2 className="text-gray-400 text-lg font-medium uppercase tracking-wide">App Settings</h2>
-                    </div>
-                    <div className="flex-1 bg-black/40 p-4 rounded-lg border border-white/5">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className={`p - 2 rounded - full ${currentUser.lowDataMode ? 'bg-yellow-500/20 text-yellow-500' : 'bg-gray-800 text-gray-400'} `}>
-                                    <Wifi size={20} />
+                        <button onClick={() => setShowDeviceModal(true)} className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center">
+                                    <Monitor size={18} />
                                 </div>
-                                <div>
-                                    <div className="font-bold text-white">Low Data Mode</div>
-                                    <div className="text-xs text-gray-400">Reduces video quality to save data. Disables autoplay.</div>
+                                <div className="text-left">
+                                    <div className="font-medium">Manage Devices</div>
+                                    <div className="text-xs text-gray-500">Control active logins</div>
                                 </div>
                             </div>
-                            <button
-                                onClick={toggleLowDataMode}
-                                className={`w - 12 h - 6 rounded - full relative transition - colors duration - 300 ${currentUser.lowDataMode ? 'bg-green-500' : 'bg-gray-700'} `}
-                            >
-                                <div className={`absolute top - 1 w - 4 h - 4 rounded - full bg - white transition - all duration - 300 ${currentUser.lowDataMode ? 'left-7' : 'left-1'} `} />
+                            <ChevronDown size={18} className="text-gray-500 -rotate-90" />
+                        </button>
+                    </div>
+
+                    {/* Preferences Section */}
+                    <div className="bg-white/5 rounded-xl overflow-hidden">
+                        <div className="px-5 py-3 border-b border-white/5">
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Preferences</span>
+                        </div>
+
+                        <button onClick={toggleLowDataMode} className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition border-b border-white/5">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center">
+                                    <Wifi size={18} />
+                                </div>
+                                <div className="text-left">
+                                    <div className="font-medium">Low Data Mode</div>
+                                    <div className="text-xs text-gray-500">Reduce streaming quality</div>
+                                </div>
+                            </div>
+                            <div className={`w-12 h-7 rounded-full relative transition-colors ${currentUser.lowDataMode ? 'bg-cyan-500' : 'bg-gray-700'}`}>
+                                <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-all ${currentUser.lowDataMode ? 'left-6' : 'left-1'}`} />
+                            </div>
+                        </button>
+
+                        <button onClick={() => updateUser({ autoplayEnabled: !currentUser.autoplayEnabled })} className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center">
+                                    <PlayCircle size={18} />
+                                </div>
+                                <div className="text-left">
+                                    <div className="font-medium">Autoplay Videos</div>
+                                    <div className="text-xs text-gray-500">Auto-start trailers on home</div>
+                                </div>
+                            </div>
+                            <div className={`w-12 h-7 rounded-full relative transition-colors ${currentUser.autoplayEnabled ? 'bg-cyan-500' : 'bg-gray-700'}`}>
+                                <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-all ${currentUser.autoplayEnabled ? 'left-6' : 'left-1'}`} />
+                            </div>
+                        </button>
+                    </div>
+
+                    {/* Profiles Section */}
+                    <div className="bg-white/5 rounded-xl overflow-hidden">
+                        <div className="px-5 py-3 border-b border-white/5 flex justify-between items-center">
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Profiles</span>
+                            <button onClick={handleAddProfile} className="text-cyan-400 text-sm font-bold hover:text-cyan-300 transition flex items-center gap-1">
+                                <Plus size={16} /> Add
                             </button>
                         </div>
-                    </div>
-                </div>
 
-                {/* Section: Profile & Parental Controls */}
-                <div className="flex flex-col md:flex-row py-8 border-b border-white/10 gap-8">
-                    <div className="w-full md:w-[280px]">
-                        <h2 className="text-gray-400 text-lg font-medium uppercase tracking-wide">Profiles</h2>
-                    </div>
-                    <div className="flex-1">
-                        <div className="space-y-4">
+                        <div className="p-4 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
                             {userProfiles.map(profile => (
-                                <div key={profile.id} className="bg-black/40 rounded-lg border border-white/5 overflow-hidden">
-                                    <div
-                                        className="flex justify-between items-center cursor-pointer group p-4 hover:bg-white/5 transition"
-                                        onClick={() => toggleProfile(profile.id)}
-                                    >
-                                        <div className="flex items-center gap-4">
-                                            <img src={profile.avatarUrl} className="w-12 h-12 rounded" alt="avatar" />
-                                            <div>
-                                                <div className="font-bold text-white group-hover:text-red-500 transition">{profile.name}</div>
-                                                <div className="text-xs text-gray-400">{profile.isKids ? 'Kids Profile' : 'All Maturity Ratings'}</div>
-                                            </div>
-                                        </div>
-                                        <div className="text-gray-500 group-hover:text-white transition transform duration-200">
-                                            {expandedProfile === profile.id ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
-                                        </div>
+                                <div key={profile.id} className="group text-center cursor-pointer" onClick={() => toggleProfile(profile.id)}>
+                                    <div className="relative mb-2">
+                                        <img
+                                            src={profile.avatarUrl}
+                                            className="w-14 h-14 md:w-16 md:h-16 mx-auto rounded-lg object-cover ring-2 ring-transparent group-hover:ring-cyan-500 transition"
+                                        />
+                                        {profile.isKids && (
+                                            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 bg-yellow-500 text-black text-[8px] font-bold rounded">KIDS</span>
+                                        )}
                                     </div>
-
-                                    {expandedProfile === profile.id && (
-                                        <div className="px-4 pb-4 pt-2 bg-black/20 border-t border-white/5 space-y-3 animate-in slide-in-from-top-2 duration-200">
-                                            <div className="flex justify-between items-center py-2 border-b border-white/5">
-                                                <div className="flex items-center gap-3">
-                                                    <Camera size={16} className="text-gray-400" />
-                                                    <div className="font-bold text-sm text-gray-300">Profile Picture</div>
-                                                </div>
-                                                <button onClick={handleChangeAvatar} className="text-blue-400 text-sm hover:underline">Change</button>
-                                            </div>
-
-                                            <div className="flex justify-between items-center py-2 border-b border-white/5">
-                                                <div className="flex items-center gap-3">
-                                                    <Settings size={16} className="text-gray-400" />
-                                                    <div>
-                                                        <div className="font-bold text-sm text-gray-300">Maturity Settings</div>
-                                                        <div className="text-xs text-gray-500">{profile.isKids ? 'Kids Content Only' : 'All Content'}</div>
-                                                    </div>
-                                                </div>
-                                                <button onClick={() => alert("Feature coming soon")} className="text-blue-400 text-sm hover:underline">Change</button>
-                                            </div>
-
-                                            <div className="flex justify-between items-center pt-2">
-                                                <button onClick={() => handleDeleteProfile(profile.id)} className="text-red-500 text-sm hover:text-red-400 font-bold">Delete Profile</button>
-                                            </div>
-                                        </div>
-                                    )}
+                                    <div className="text-xs font-medium truncate">{profile.name}</div>
                                 </div>
                             ))}
-
-                            {userProfiles.length < 5 && (
-                                <div className="pt-2">
-                                    <button
-                                        onClick={handleAddProfile}
-                                        className="flex items-center gap-2 text-gray-300 font-bold text-sm hover:bg-white/10 px-4 py-3 rounded transition w-full justify-center border border-white/10 border-dashed"
-                                    >
-                                        <Plus size={18} /> Add Profile
-                                    </button>
-                                </div>
-                            )}
                         </div>
                     </div>
-                </div>
 
-                {/* Section: Settings */}
-                <div className="flex flex-col md:flex-row py-8 mt-4 gap-8">
-                    <div className="w-full md:w-[280px]">
-                        <h2 className="text-gray-400 text-lg font-medium uppercase tracking-wide">Quick Links</h2>
-                    </div>
-                    <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <button onClick={() => setShowDeviceModal(true)} className="p-4 bg-black/40 border border-white/5 rounded-lg text-left hover:bg-white/5 transition group">
-                            <div className="font-bold text-gray-200 group-hover:text-blue-400">Manage download devices</div>
-                            <div className="text-xs text-gray-500 mt-1">Control where you can watch offline</div>
-                        </button>
-                        <button onClick={() => setActiveTab('activate')} className="p-4 bg-black/40 border border-white/5 rounded-lg text-left hover:bg-white/5 transition group">
-                            <div className="font-bold text-gray-200 group-hover:text-blue-400">Activate a device</div>
-                            <div className="text-xs text-gray-500 mt-1">Connect your TV to this account</div>
-                        </button>
-                        <button onClick={() => setShowDeviceModal(true)} className="p-4 bg-black/40 border border-white/5 rounded-lg text-left hover:bg-white/5 transition group">
-                            <div className="font-bold text-gray-200 group-hover:text-blue-400">Sign out of all devices</div>
-                            <div className="text-xs text-gray-500 mt-1">Security check for your account</div>
-                        </button>
+                    {/* Sign Out */}
+                    <button
+                        onClick={logout}
+                        className="w-full py-4 bg-white/5 hover:bg-red-500/20 rounded-xl text-gray-400 hover:text-red-400 font-bold transition flex items-center justify-center gap-2"
+                    >
+                        Sign Out
+                    </button>
+
+                    <div className="text-center text-xs text-gray-600 pt-2">
+                        Member since {getMemberSinceDate()} • Version 2.0
                     </div>
                 </div>
             </div>

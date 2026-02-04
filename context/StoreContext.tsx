@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo } from 'react';
 import {
     Content,
     User as AppUser,
@@ -23,9 +23,13 @@ import {
     GoogleAuthProvider,
     OAuthProvider,
     signInWithPopup,
+    signInWithRedirect,
+    getRedirectResult,
     sendPasswordResetEmail,
     updateEmail,
-    deleteUser
+    deleteUser,
+    setPersistence,
+    browserLocalPersistence
 } from 'firebase/auth';
 import {
     collection,
@@ -79,6 +83,7 @@ interface StoreContextType {
     logoutAllDevices: () => Promise<void>;
     updateProfileAvatar: (url: string) => Promise<void>;
     unlockContent: (code: string) => Promise<{ success: boolean; contentId?: string; message: string }>;
+    markNotificationAsRead: (id: string) => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -106,57 +111,82 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     // 1. Auth Listener
     useEffect(() => {
+        const initAuth = async () => {
+            try {
+                await setPersistence(auth, browserLocalPersistence);
+
+                // Process redirect result if any
+                const result = await getRedirectResult(auth);
+                if (result?.user) {
+                    // The onAuthStateChanged listener will pick this up automatically
+                }
+            } catch (error) {
+                // Auth initialization error - silent fail
+            }
+        };
+
+        initAuth();
+
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             setFbUser(firebaseUser);
-            if (firebaseUser) {
-                const userRef = doc(db, 'users', firebaseUser.uid);
-                const userSnap = await getDoc(userRef);
 
-                if (!userSnap.exists()) {
-                    const newAppUser: AppUser = {
-                        uid: firebaseUser.uid,
-                        email: firebaseUser.email || '',
-                        plan: 'Free',
-                        role: 'user',
-                        status: 'active',
-                        lastLoginAt: new Date().toISOString()
-                    };
-                    await setDoc(userRef, newAppUser);
-                    setCurrentUser(newAppUser);
+            try {
+                if (firebaseUser) {
+                    const userRef = doc(db, 'users', firebaseUser.uid);
+                    const userSnap = await getDoc(userRef);
 
-                    // Create default profile
-                    const profileId = 'main';
-                    const defaultProfile: Profile = {
-                        id: profileId,
-                        name: firebaseUser.displayName || 'Me',
-                        avatarUrl: 'https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg',
-                        isKids: false,
-                        myList: []
-                    };
-                    await setDoc(doc(db, 'users', firebaseUser.uid, 'profiles', profileId), defaultProfile);
+                    if (!userSnap.exists()) {
+                        const newAppUser: AppUser = {
+                            uid: firebaseUser.uid,
+                            email: firebaseUser.email || '',
+                            plan: 'Free',
+                            role: 'user',
+                            status: 'active',
+                            lastLoginAt: new Date().toISOString()
+                        };
+                        await setDoc(userRef, newAppUser);
+                        setCurrentUser(newAppUser);
+
+                        // Create default profile
+                        const profileId = 'main';
+                        const defaultProfile: Profile = {
+                            id: profileId,
+                            name: firebaseUser.displayName || 'Me',
+                            avatarUrl: 'https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg',
+                            isKids: false,
+                            myList: []
+                        };
+                        await setDoc(doc(db, 'users', firebaseUser.uid, 'profiles', profileId), defaultProfile);
+                    } else {
+                        const userData = userSnap.data() as AppUser;
+                        // Check token version to force logout if needed
+                        const localTokenVersion = localStorage.getItem('tokenVersion');
+                        if (userData.tokenVersion && localTokenVersion && parseInt(localTokenVersion) < userData.tokenVersion) {
+                            await signOut(auth);
+                            // Cleanup happens via auth listener
+                            return;
+                        }
+                        if (userData.tokenVersion) {
+                            localStorage.setItem('tokenVersion', userData.tokenVersion.toString());
+                        }
+
+                        setCurrentUser(userData);
+                    }
+                    setIsAuthenticated(true);
                 } else {
-                    const userData = userSnap.data() as AppUser;
-                    // Check token version to force logout if needed
-                    const localTokenVersion = localStorage.getItem('tokenVersion');
-                    if (userData.tokenVersion && localTokenVersion && parseInt(localTokenVersion) < userData.tokenVersion) {
-                        await signOut(auth);
-                        window.location.reload();
-                        return;
-                    }
-                    if (userData.tokenVersion) {
-                        localStorage.setItem('tokenVersion', userData.tokenVersion.toString());
-                    }
-
-                    setCurrentUser(userData);
+                    setCurrentUser(null);
+                    setCurrentProfile(null);
+                    setUserProfiles([]);
+                    setIsAuthenticated(false);
                 }
-                setIsAuthenticated(true);
-            } else {
-                setCurrentUser(null);
-                setCurrentProfile(null);
-                setUserProfiles([]);
+            } catch (error) {
+                console.error("Error fetching user data:", error);
+                // Fallback: If DB fails, try to logout or show error state?
+                // For now, allow auth but maybe incomplete data, or force logout
                 setIsAuthenticated(false);
+            } finally {
+                setIsLoading(false);
             }
-            setIsLoading(false);
         });
         return () => unsubscribe();
     }, []);
@@ -235,7 +265,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     const loginWithGoogle = async () => {
         const provider = new GoogleAuthProvider();
-        await signInWithPopup(auth, provider);
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
+
+        if (isMobile) {
+            await signInWithRedirect(auth, provider);
+        } else {
+            await signInWithPopup(auth, provider);
+        }
     };
 
     const loginWithApple = async () => {
@@ -249,7 +285,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
         await signOut(auth);
         setCurrentProfile(null);
-        window.location.reload();
+        // window.location.reload(); // Removed to prevent full page refresh
     };
 
     const addContent = async (item: Content) => {
@@ -265,7 +301,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
 
     const updateSettings = async (updates: Partial<SiteSettings>) => {
-        await updateDoc(doc(db, 'settings', 'global'), updates);
+        await setDoc(doc(db, 'settings', 'global'), updates, { merge: true });
     };
 
     const updateSections = async (newSections: Section[]) => {
@@ -453,47 +489,83 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         return { success: true, contentId: targetContent.id, message: `Unlocked: ${targetContent.title}` };
     };
 
+    const markNotificationAsRead = async (notificationId: string) => {
+        if (!fbUser || !currentUser) return;
+        const currentRead = currentUser.readNotifications || [];
+        if (currentRead.includes(notificationId)) return;
+
+        const newReadList = [...currentRead, notificationId];
+        // Optimistic update
+        setCurrentUser({ ...currentUser, readNotifications: newReadList });
+
+        await updateUser({ readNotifications: newReadList });
+    };
+
+    // Compute notifications with read status
+    const processedNotifications = useMemo(() => {
+        if (!currentUser) return notifications;
+        return notifications.map(n => ({
+            ...n,
+            read: currentUser.readNotifications?.includes(n.id) || false
+        }));
+    }, [notifications, currentUser?.readNotifications]);
+
+    const contextValue = useMemo(() => ({
+        isAuthenticated,
+        isLoading,
+        login,
+        signup,
+        loginWithGoogle,
+        loginWithApple,
+        logout,
+        content,
+        users,
+        currentUser,
+        currentProfile,
+        userProfiles,
+        settings,
+        sections,
+        plans,
+        notifications: processedNotifications,
+        addContent,
+        updateContent,
+        deleteContent,
+        updateSettings,
+        updateSections,
+        toggleSectionVisibility,
+        updateUser,
+        toggleWatchlist,
+        switchProfile,
+        addProfile,
+        deleteProfile,
+        updatePlaybackProgress,
+        updateUserEmail,
+        triggerPasswordReset,
+        updateSubscriptionPlan,
+        addPaymentMethod,
+        deletePaymentMethod,
+        getBillingHistory,
+        getDevices,
+        logoutAllDevices,
+        updateProfileAvatar,
+        unlockContent,
+        markNotificationAsRead
+    }), [
+        isAuthenticated,
+        isLoading,
+        content,
+        users,
+        currentUser,
+        currentProfile,
+        userProfiles,
+        settings,
+        sections,
+        plans,
+        processedNotifications
+    ]);
+
     return (
-        <StoreContext.Provider value={{
-            isAuthenticated,
-            isLoading,
-            login,
-            signup,
-            loginWithGoogle,
-            loginWithApple,
-            logout,
-            content,
-            users,
-            currentUser,
-            currentProfile,
-            userProfiles,
-            settings,
-            sections,
-            plans,
-            notifications,
-            addContent,
-            updateContent,
-            deleteContent,
-            updateSettings,
-            updateSections,
-            toggleSectionVisibility,
-            updateUser,
-            toggleWatchlist,
-            switchProfile,
-            addProfile,
-            deleteProfile,
-            updatePlaybackProgress,
-            updateUserEmail,
-            triggerPasswordReset,
-            updateSubscriptionPlan,
-            addPaymentMethod,
-            deletePaymentMethod,
-            getBillingHistory,
-            getDevices,
-            logoutAllDevices,
-            updateProfileAvatar,
-            unlockContent
-        }}>
+        <StoreContext.Provider value={contextValue}>
             {!isLoading && children}
         </StoreContext.Provider>
     );

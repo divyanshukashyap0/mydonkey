@@ -3,7 +3,9 @@ export interface Content {
   title: string;
   overview: string;
   poster_path: string;
+  poster_path_mobile?: string; // Optional mobile-optimized poster
   backdrop_path: string;
+  backdrop_path_mobile?: string; // Optional mobile-optimized backdrop
   youtubeId: string;
   movieDriveId?: string;
   movieYoutubeId?: string; // Main movie can be on YouTube too
@@ -28,6 +30,7 @@ export interface Content {
   rating?: string; // Censor rating e.g. U/A 16+
   year?: number;
   matchInfo?: any;
+  resolution?: 'HD' | '4K' | 'SD';
   isOriginal?: boolean;
   episodes?: Episode[];
 }
@@ -122,6 +125,8 @@ export interface User {
   continueWatching?: ContinueWatchingItem[];
   tokenVersion?: number;
   lowDataMode?: boolean;
+  autoplayEnabled?: boolean; // Controls hero video autoplay - default false on mobile
+  readNotifications?: string[];
 }
 
 export interface ContinueWatchingItem {

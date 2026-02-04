@@ -32,12 +32,8 @@ const UnlockContentModal: React.FC<UnlockContentModalProps> = ({ isOpen, onClose
                     onClose();
                     // Navigate to the content if ID is returned
                     if (result.contentId) {
-                        // Assuming your routing handles info/browse
-                        // Since we aren't using /browse/:id standardly in previous messages (we use modal or setViewingItem), 
-                        // we'll just close. The user will find it in "My List" or Search.
-                        // Or better, trigger the "viewingItem" state in App.tsx if possible.
-                        // For now, simple success feedback is enough.
-                        window.location.reload(); // To refresh lists if needed
+                        // Content is unlocked in context; no need to refresh.
+                        // Optionally trigger a view update if needed.
                     }
                 }, 1500);
             } else {

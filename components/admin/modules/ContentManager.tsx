@@ -27,6 +27,10 @@ const ContentManager = () => {
             allowPlayback: true,
             comingSoon: false,
             vote_average: 0,
+
+            duration: '',
+            rating: 'U/A 13+',
+            resolution: 'HD',
             seasons: []
         });
         setIsEditing(false);
@@ -128,7 +132,9 @@ const ContentManager = () => {
                 title: formData.title,
                 overview: formData.overview || '',
                 poster_path: formData.poster_path,
+                poster_path_mobile: formData.poster_path_mobile || undefined,
                 backdrop_path: formData.backdrop_path || formData.poster_path,
+                backdrop_path_mobile: formData.backdrop_path_mobile || undefined,
                 youtubeId: extractYoutubeId(formData.youtubeId || ''),
                 movieDriveId: formData.type === 'movie' ? extractDriveId(formData.movieDriveId || '') : undefined,
                 movieYoutubeId: formData.type === 'movie' ? extractYoutubeId(formData.movieYoutubeId || '') : undefined,
@@ -144,6 +150,10 @@ const ContentManager = () => {
                 comingSoon: formData.comingSoon || false,
                 createdAt: formData.createdAt || now,
                 featured: formData.featured || false,
+
+                duration: formData.duration,
+                rating: formData.rating || 'U/A 13+',
+                resolution: formData.resolution || 'HD',
                 accessCode: formData.accessCode || undefined,
                 // Sanitize Seasons/Episodes
                 seasons: formData.type === 'tv' ? (formData.seasons || []).map(s => ({
@@ -232,6 +242,43 @@ const ContentManager = () => {
                                     value={formData.release_date || ''} onChange={e => setFormData({ ...formData, release_date: e.target.value })} />
                             </div>
                         </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-xs text-gray-500 uppercase font-bold">Duration</label>
+                                <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none font-mono placeholder:text-gray-700"
+                                    value={formData.duration || ''} onChange={e => setFormData({ ...formData, duration: e.target.value })}
+                                    placeholder="e.g. 2h 15m" />
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-500 uppercase font-bold">Age Rating</label>
+                                <select className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none"
+                                    value={formData.rating || 'U/A 13+'} onChange={e => setFormData({ ...formData, rating: e.target.value })}>
+                                    <option value="U">U (Universal)</option>
+                                    <option value="U/A 7+">U/A 7+</option>
+                                    <option value="U/A 13+">U/A 13+</option>
+                                    <option value="U/A 16+">U/A 16+</option>
+                                    <option value="A (18+)">A (18+)</option>
+
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-xs text-gray-500 uppercase font-bold">Quality Label</label>
+                                <select className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none"
+                                    value={formData.resolution || 'HD'} onChange={e => setFormData({ ...formData, resolution: e.target.value as any })}>
+                                    <option value="4K">4K Ultra HD</option>
+                                    <option value="HD">HD (1080p)</option>
+                                    <option value="SD">SD (Standard)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-500 uppercase font-bold">Match Score (0-10)</label>
+                                <input type="number" min="0" max="10" step="0.1" className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none"
+                                    value={formData.vote_average || 0} onChange={e => setFormData({ ...formData, vote_average: Number(e.target.value) })} />
+                            </div>
+                        </div>
                         <div>
                             <label className="text-xs text-gray-500 uppercase font-bold">Cast (comma separated)</label>
                             <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none"
@@ -247,16 +294,43 @@ const ContentManager = () => {
                     </div>
 
                     <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="text-xs text-gray-500 uppercase font-bold">Poster URL</label>
-                                <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none"
-                                    value={formData.poster_path || ''} onChange={e => setFormData({ ...formData, poster_path: e.target.value })} />
+                        {/* Simplified Image Fields - One for PC, One for Mobile */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2">
+                                    🖥️ Image URL (Desktop/PC)
+                                </label>
+                                <input
+                                    className="w-full bg-black/50 border border-white/10 rounded p-2.5 outline-none focus:border-blue-500 transition"
+                                    placeholder="Paste image link for PC users"
+                                    value={formData.poster_path || ''}
+                                    onChange={e => setFormData({
+                                        ...formData,
+                                        poster_path: e.target.value,
+                                        backdrop_path: e.target.value // Same image for backdrop
+                                    })}
+                                />
+                                {formData.poster_path && (
+                                    <img src={formData.poster_path} className="w-full h-24 object-cover rounded border border-white/10" alt="Preview" />
+                                )}
                             </div>
-                            <div>
-                                <label className="text-xs text-gray-500 uppercase font-bold">Backdrop URL</label>
-                                <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none"
-                                    value={formData.backdrop_path || ''} onChange={e => setFormData({ ...formData, backdrop_path: e.target.value })} />
+                            <div className="space-y-2">
+                                <label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2">
+                                    📱 Image URL (Mobile) <span className="text-gray-600 font-normal normal-case">Optional</span>
+                                </label>
+                                <input
+                                    className="w-full bg-black/50 border border-white/10 rounded p-2.5 outline-none focus:border-blue-500 transition placeholder:text-gray-600"
+                                    placeholder="Leave empty to use PC image"
+                                    value={formData.poster_path_mobile || ''}
+                                    onChange={e => setFormData({
+                                        ...formData,
+                                        poster_path_mobile: e.target.value,
+                                        backdrop_path_mobile: e.target.value // Same image for backdrop
+                                    })}
+                                />
+                                {formData.poster_path_mobile && (
+                                    <img src={formData.poster_path_mobile} className="w-full h-24 object-cover rounded border border-white/10" alt="Mobile Preview" />
+                                )}
                             </div>
                         </div>
 
@@ -430,66 +504,129 @@ const ContentManager = () => {
         );
     }
 
-    // ... Render list (unchanged from previous) ...
+    // ... Render Hotstar-style card grid ...
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h2 className="text-3xl font-bold">Content Manager</h2>
-                <button onClick={() => { resetForm(); setIsEditing(true); }} className="bg-red-600 px-4 py-2 rounded font-bold flex items-center gap-2 hover:bg-red-700 transition">
+            {/* Header */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h2 className="text-2xl md:text-3xl font-black text-white">Content Library</h2>
+                    <p className="text-gray-500 text-sm">{filteredContent.length} titles</p>
+                </div>
+                <button onClick={() => { resetForm(); setIsEditing(true); }} className="bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-2.5 rounded-lg font-bold flex items-center gap-2 hover:opacity-90 transition shadow-lg shadow-purple-600/30">
                     <Plus size={20} /> Add Content
                 </button>
             </div>
 
-            <div className="flex gap-2">
+            {/* Filter Pills - Hotstar Style */}
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                 {['ALL', 'movie', 'tv'].map(type => (
                     <button key={type} onClick={() => setFilter(type as any)}
-                        className={`px-4 py-1.5 rounded-full text-sm font-bold border transition ${filter === type ? 'bg-white text-black border-white' : 'border-gray-700 text-gray-400 hover:border-gray-500'}`}>
-                        {type.toUpperCase()}
+                        className={`px-5 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${filter === type
+                            ? 'bg-gradient-to-r from-blue-500 to-cyan-400 text-white shadow-lg shadow-blue-500/30'
+                            : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
+                            }`}>
+                        {type === 'ALL' ? '🎬 All' : type === 'movie' ? '🎥 Movies' : '📺 TV Shows'}
                     </button>
                 ))}
             </div>
 
-            <div className="bg-[#141414] rounded-xl border border-white/5 overflow-hidden">
-                <table className="w-full text-left text-sm">
-                    <thead className="bg-white/5 text-gray-400 font-bold uppercase text-xs">
-                        <tr>
-                            <th className="p-4">Title</th>
-                            <th className="p-4">Type</th>
-                            <th className="p-4 text-center">Hero</th>
-                            <th className="p-4">Status</th>
-                            <th className="p-4 text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5">
-                        {filteredContent.map(item => (
-                            <tr key={item.id} className="hover:bg-white/5 transition">
-                                <td className="p-4 flex items-center gap-3">
-                                    <img src={item.poster_path} className="w-10 h-14 object-cover rounded" />
-                                    <div>
-                                        <div className="font-bold text-white">{item.title}</div>
-                                        <div className="text-[10px] text-gray-500">{item.release_date}</div>
-                                    </div>
-                                </td>
-                                <td className="p-4"><span className="px-2 py-0.5 rounded bg-white/10 text-xs font-bold uppercase">{item.type}</span></td>
-                                <td className="p-4 text-center">
-                                    <button onClick={() => toggleHero(item.id)} className={`transition ${settings.heroContentId === item.id ? 'text-yellow-400' : 'text-gray-600 hover:text-gray-400'}`}>
-                                        <Star size={20} fill={settings.heroContentId === item.id ? "currentColor" : "none"} />
-                                    </button>
-                                </td>
-                                <td className="p-4">
-                                    <span className={`font-bold text-xs ${item.isPublished ? 'text-green-400' : 'text-gray-500'}`}>
-                                        {item.isPublished ? 'PUBLISHED' : 'DRAFT'}
+            {/* Card Grid - Hotstar Style */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {filteredContent.map(item => (
+                    <div
+                        key={item.id}
+                        className="group relative rounded-xl overflow-hidden bg-gradient-to-b from-gray-800 to-gray-900 cursor-pointer transform hover:scale-105 hover:z-10 transition-all duration-300 shadow-lg hover:shadow-2xl hover:shadow-blue-500/20"
+                        onClick={() => { setFormData(item); setIsEditing(true); }}
+                    >
+                        {/* Thumbnail */}
+                        <div className="aspect-[2/3] relative">
+                            <img
+                                src={item.poster_path}
+                                alt={item.title}
+                                className="w-full h-full object-cover"
+                            />
+
+                            {/* Gradient Overlay */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-60 group-hover:opacity-90 transition-opacity" />
+
+                            {/* Status Badges */}
+                            <div className="absolute top-2 left-2 flex flex-col gap-1">
+                                {settings.heroContentId === item.id && (
+                                    <span className="px-2 py-0.5 rounded bg-gradient-to-r from-yellow-500 to-orange-500 text-[10px] font-black uppercase shadow-lg">
+                                        ⭐ HERO
                                     </span>
-                                </td>
-                                <td className="p-4 text-right space-x-2">
-                                    <button onClick={() => { setFormData(item); setIsEditing(true); }} className="p-2 hover:bg-white/10 rounded text-blue-400"><Edit size={16} /></button>
-                                    <button onClick={() => handleDelete(item.id)} className="p-2 hover:bg-white/10 rounded text-red-500"><Trash2 size={16} /></button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                                )}
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${item.isPublished
+                                    ? 'bg-gradient-to-r from-green-500 to-emerald-400 text-white'
+                                    : 'bg-gray-700 text-gray-300'
+                                    }`}>
+                                    {item.isPublished ? '● LIVE' : '○ DRAFT'}
+                                </span>
+                            </div>
+
+                            {/* Type Badge */}
+                            <div className="absolute top-2 right-2">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${item.type === 'movie'
+                                    ? 'bg-blue-600/90 text-white'
+                                    : 'bg-purple-600/90 text-white'
+                                    }`}>
+                                    {item.type === 'movie' ? '🎬' : '📺'} {item.type}
+                                </span>
+                            </div>
+
+                            {/* Hover Actions */}
+                            <div className="absolute inset-0 flex flex-col justify-end p-3 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0">
+                                <div className="flex gap-2 mb-2">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); toggleHero(item.id); }}
+                                        className={`p-2 rounded-full backdrop-blur-md transition ${settings.heroContentId === item.id
+                                            ? 'bg-yellow-500 text-black'
+                                            : 'bg-white/20 text-white hover:bg-white/30'
+                                            }`}
+                                        title="Set as Hero"
+                                    >
+                                        <Star size={16} fill={settings.heroContentId === item.id ? "currentColor" : "none"} />
+                                    </button>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
+                                        className="p-2 rounded-full bg-red-500/80 text-white hover:bg-red-600 backdrop-blur-md transition"
+                                        title="Delete"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Content Info */}
+                        <div className="p-3 space-y-1">
+                            <h3 className="font-bold text-white text-sm truncate group-hover:text-blue-400 transition-colors">
+                                {item.title}
+                            </h3>
+                            <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                                <span>{item.release_date?.split('-')[0] || '2024'}</span>
+                                {item.duration && <span>• {item.duration}</span>}
+                                {item.rating && <span className="px-1 py-0.5 rounded border border-gray-600 text-[8px]">{item.rating}</span>}
+                            </div>
+                            {item.genres?.length > 0 && (
+                                <div className="text-[10px] text-gray-500 truncate">
+                                    {item.genres.slice(0, 2).join(' • ')}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                ))}
             </div>
+
+            {/* Empty State */}
+            {filteredContent.length === 0 && (
+                <div className="text-center py-20 text-gray-500">
+                    <div className="text-6xl mb-4">🎬</div>
+                    <div className="text-xl font-bold mb-2">No content yet</div>
+                    <div className="text-sm">Click "Add Content" to get started</div>
+                </div>
+            )}
         </div>
     );
 };

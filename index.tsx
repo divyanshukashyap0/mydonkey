@@ -21,8 +21,6 @@ root.render(
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then((registration) => {
-      console.log('SW registered: ', registration);
-
       // Check for updates every minute
       setInterval(() => {
         registration.update();
@@ -37,22 +35,21 @@ if ('serviceWorker' in navigator) {
           if (installingWorker.state === 'installed') {
             if (navigator.serviceWorker.controller) {
               // New content is available; force a reload
-              console.log('New content available; refreshing...');
-              // The SW will send a message or we can rely on verifying controller change, 
-              // but since our SW calls skipWaiting(), it should activate immediately.
             } else {
-              console.log('Content is cached for offline use.');
+              // Content is cached for offline use.
             }
           }
         };
       };
     }).catch((registrationError) => {
-      console.log('SW registration failed: ', registrationError);
+      // SW registration failed: registrationError
     });
   });
 
   // Reload page when new SW takes control
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    window.location.reload();
+    // New content available. Refresh to see changes.
+    // User requested NO auto-refresh.
+    // window.location.reload(); 
   });
 }

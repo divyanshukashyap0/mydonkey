@@ -1,0 +1,22 @@
+{
+    "name": "My Donkey OTT",
+    "short_name": "MyDonkey",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0a0a0a",
+    "theme_color": "#0a0a0a",
+    "orientation": "any",
+    "icons": [
+        {
+            "src": "https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ],
+    "description": "Premium OTT Streaming Platform. Watch movies, series, and originals."
+}

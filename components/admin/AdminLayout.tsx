@@ -11,17 +11,41 @@ import ComingSoonManager from './modules/ComingSoonManager';
 
 export default function AdminLayout({ onExit }: { onExit: () => void }) {
   const [activeModule, setActiveModule] = useState<'dashboard' | 'content' | 'users' | 'home' | 'settings' | 'plans' | 'coming_soon'>('dashboard');
+  const [isSidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white flex">
+    <div className="min-h-screen bg-[#0a0a0a] text-white flex relative">
+
+      {/* Mobile Header */}
+      <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-[#141414] border-b border-white/10 z-50 flex items-center justify-between px-4">
+        <div className="flex items-center gap-3">
+          <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="p-2 -ml-2">
+            <LayoutDashboard size={24} />
+          </button>
+          <span className="font-bold">Admin Panel</span>
+        </div>
+        <img src="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png" className="h-6 w-auto" alt="Logo" />
+      </div>
+
+      {/* Sidebar Overlay (Mobile) */}
+      {isSidebarOpen && (
+        <div className="fixed inset-0 bg-black/80 z-[60] md:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-64 bg-[#141414] border-r border-white/10 flex flex-col h-screen sticky top-0">
-        <div className="p-6">
+      <aside className={`fixed md:sticky top-0 left-0 h-screen w-64 bg-[#141414] border-r border-white/10 flex flex-col z-[70] transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <div className="p-6 hidden md:block">
           <img src="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png" className="h-10 w-auto object-contain mb-1" alt="DONKEY ADMIN Logo" />
           <p className="text-xs text-gray-500">Super Admin Console</p>
         </div>
 
-        <nav className="flex-1 px-4 space-y-2 overflow-y-auto no-scrollbar">
+        {/* Mobile Sidebar Header */}
+        <div className="md:hidden p-6 flex justify-between items-center border-b border-white/10">
+          <span className="font-bold text-lg">Menu</span>
+          <button onClick={() => setSidebarOpen(false)}><LogOut size={20} className="rotate-180" /></button>
+        </div>
+
+        <nav className="flex-1 px-4 space-y-2 overflow-y-auto no-scrollbar pt-4 md:pt-0">
           {[
             { id: 'dashboard', label: 'Analytics & Overview', icon: LayoutDashboard },
             { id: 'content', label: 'Content Manager', icon: Film },
@@ -33,7 +57,7 @@ export default function AdminLayout({ onExit }: { onExit: () => void }) {
           ].map((item) => (
             <button
               key={item.id}
-              onClick={() => setActiveModule(item.id as any)}
+              onClick={() => { setActiveModule(item.id as any); setSidebarOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeModule === item.id
                 ? 'bg-brand-red text-white font-bold shadow-lg shadow-brand-red/20'
                 : 'text-gray-400 hover:bg-white/5 hover:text-white'
@@ -54,7 +78,7 @@ export default function AdminLayout({ onExit }: { onExit: () => void }) {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto bg-black/50 p-8 h-screen">
+      <main className="flex-1 overflow-y-auto bg-black/50 p-4 md:p-8 h-screen pt-20 md:pt-8 w-full">
         {activeModule === 'dashboard' && <AnalyticsManager />}
         {activeModule === 'content' && <ContentManager />}
         {activeModule === 'home' && <SectionManager />}
