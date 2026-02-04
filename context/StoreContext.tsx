@@ -10,7 +10,8 @@ import {
     Subscription,
     PaymentMethod,
     Invoice,
-    Device
+    Device,
+    ContentRequest
 } from '../types';
 import { auth, db } from '../firebase';
 import { sendSubscriptionEmail } from '../utils/emailService';
@@ -87,6 +88,9 @@ interface StoreContextType {
     isInstallable: boolean;
     isIOS: boolean;
     installPwa: () => void;
+    contentRequests: ContentRequest[];
+    submitContentRequest: (title: string) => Promise<void>;
+    updateContentRequest: (id: string, updates: Partial<ContentRequest>) => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -114,6 +118,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
     const [isInstallable, setIsInstallable] = useState(false);
     const [isIOS, setIsIOS] = useState(false);
+    const [contentRequests, setContentRequests] = useState<ContentRequest[]>([]);
 
     // --- PWA Installation Logic ---
     useEffect(() => {
@@ -500,9 +505,48 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
 
     const updateProfileAvatar = async (url: string) => {
-        if (!fbUser || !currentProfile) return;
-        await updateDoc(doc(db, 'users', fbUser.uid, 'profiles', currentProfile.id), { avatarUrl: url });
+        if (!currentProfile || !fbUser) return;
+        const profileRef = doc(db, 'users', fbUser.uid, 'profiles', currentProfile.id);
+        await updateDoc(profileRef, { avatarUrl: url });
+        setCurrentProfile({ ...currentProfile, avatarUrl: url });
     };
+
+    const submitContentRequest = async (title: string) => {
+        if (!fbUser || !currentUser) return;
+        const newRequestRef = doc(collection(db, 'requests'));
+        const now = new Date().toISOString();
+        const request: ContentRequest = {
+            id: newRequestRef.id,
+            userId: fbUser.uid,
+            userEmail: fbUser.email || '',
+            userName: currentUser.email.split('@')[0], // Fallback if name not available
+            contentTitle: title,
+            status: 'pending',
+            createdAt: now,
+            updatedAt: now
+        };
+        await setDoc(newRequestRef, request);
+    };
+
+    const updateContentRequest = async (id: string, updates: Partial<ContentRequest>) => {
+        const reqRef = doc(db, 'requests', id);
+        await updateDoc(reqRef, { ...updates, updatedAt: new Date().toISOString() });
+    };
+
+    useEffect(() => {
+        if (currentUser?.role !== 'admin') {
+            setContentRequests([]);
+            return;
+        }
+
+        const q = query(collection(db, 'requests'), orderBy('createdAt', 'desc'));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const reqs = snapshot.docs.map(doc => ({ ...doc.data() } as ContentRequest));
+            setContentRequests(reqs);
+        });
+
+        return () => unsubscribe();
+    }, [currentUser]);
 
     const unlockContent = async (code: string): Promise<{ success: boolean; contentId?: string; message: string }> => {
         if (!fbUser || !currentProfile) return { success: false, message: 'Please sign in first.' };
@@ -598,7 +642,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         markNotificationAsRead,
         isInstallable,
         isIOS,
-        installPwa
+        installPwa,
+        contentRequests,
+        submitContentRequest,
+        updateContentRequest
     }), [
         isAuthenticated,
         isLoading,
@@ -610,7 +657,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         settings,
         sections,
         plans,
-        processedNotifications
+        processedNotifications,
+        isInstallable,
+        isIOS,
+        contentRequests,
+        submitContentRequest,
+        updateContentRequest
     ]);
 
     return (

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Film, Users, Settings, Home, LogOut, Tags, CreditCard, Calendar } from 'lucide-react';
+import { LayoutDashboard, Film, Users, Settings, Home, LogOut, Tags, CreditCard, Calendar, MessageSquare } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import UsersModule from './UsersModule';
 import ContentManager from './modules/ContentManager';
@@ -8,9 +8,10 @@ import SettingsManager from './modules/SettingsManager';
 import AnalyticsManager from './modules/AnalyticsManager';
 import PlanManager from './modules/PlanManager';
 import ComingSoonManager from './modules/ComingSoonManager';
+import RequestsManager from './modules/RequestsManager';
 
 export default function AdminLayout({ onExit }: { onExit: () => void }) {
-  const [activeModule, setActiveModule] = useState<'dashboard' | 'content' | 'users' | 'home' | 'settings' | 'plans' | 'coming_soon'>('dashboard');
+  const [activeModule, setActiveModule] = useState<'dashboard' | 'content' | 'users' | 'home' | 'settings' | 'plans' | 'coming_soon' | 'requests'>('dashboard');
   const [isSidebarOpen, setSidebarOpen] = useState(false);
 
   return (
@@ -51,6 +52,7 @@ export default function AdminLayout({ onExit }: { onExit: () => void }) {
             { id: 'content', label: 'Content Manager', icon: Film },
             { id: 'home', label: 'Sections & Layout', icon: Home },
             { id: 'coming_soon', label: 'Upcoming Releases', icon: Calendar },
+            { id: 'requests', label: 'Content Requests', icon: MessageSquare },
             { id: 'plans', label: 'Subscription Plans', icon: CreditCard },
             { id: 'users', label: 'User Management', icon: Users },
             { id: 'settings', label: 'System Settings', icon: Settings },
@@ -86,6 +88,7 @@ export default function AdminLayout({ onExit }: { onExit: () => void }) {
         {activeModule === 'plans' && <PlanManager />}
         {activeModule === 'users' && <UsersModule />}
         {activeModule === 'settings' && <SettingsManager />}
+        {activeModule === 'requests' && <RequestsManager />}
       </main>
     </div>
   );

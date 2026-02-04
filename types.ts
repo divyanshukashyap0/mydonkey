@@ -228,3 +228,15 @@ export enum ContentType {
 
 export type UserPlan = Plan;
 export type ContentItem = Content;
+
+export interface ContentRequest {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  contentTitle: string;
+  status: 'pending' | 'processing' | 'fulfilled' | 'rejected';
+  createdAt: string;
+  updatedAt: string;
+  adminNote?: string;
+}
