@@ -232,9 +232,25 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 }
             } catch (error) {
                 console.error("Error fetching user data:", error);
-                // Fallback: If DB fails, try to logout or show error state?
-                // For now, allow auth but maybe incomplete data, or force logout
-                setIsAuthenticated(false);
+
+                // CRITICAL FIX: If we have a firebaseUser but DB failed, 
+                // we should STILL treat them as authenticated to avoid login loops.
+                // We'll just have incomplete data until a retry or reload happens.
+                if (firebaseUser) {
+                    // Create a temporary fallback user object so the app doesn't crash
+                    const fallbackUser: AppUser = {
+                        uid: firebaseUser.uid,
+                        email: firebaseUser.email || '',
+                        plan: 'Free',
+                        role: 'user',
+                        status: 'active',
+                        lastLoginAt: new Date().toISOString()
+                    };
+                    setCurrentUser(fallbackUser);
+                    setIsAuthenticated(true);
+                } else {
+                    setIsAuthenticated(false);
+                }
             } finally {
                 setIsLoading(false);
             }
@@ -318,10 +334,17 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         const provider = new GoogleAuthProvider();
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
 
-        if (isMobile) {
-            await signInWithRedirect(auth, provider);
-        } else {
+        // on mobile: typically redirect is preferred, but for local debugging/PWA contexts, popup often works better 
+        // or avoids domain mismatch errors.
+        try {
             await signInWithPopup(auth, provider);
+        } catch (error: any) {
+            console.error("Popup login failed, trying redirect override:", error);
+            if (isMobile && error.code === 'auth/popup-blocked') {
+                await signInWithRedirect(auth, provider);
+            } else {
+                throw error;
+            }
         }
     };
 
@@ -665,9 +688,27 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         updateContentRequest
     ]);
 
+    // Safeguard: Force loading to end after 5 seconds if auth hangs
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (isLoading) {
+                console.warn("Auth initialization timed out, forcing app load.");
+                setIsLoading(false);
+            }
+        }, 5000);
+        return () => clearTimeout(timer);
+    }, [isLoading]);
+
     return (
         <StoreContext.Provider value={contextValue}>
-            {!isLoading && children}
+            {isLoading ? (
+                <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white">
+                    <div className="w-12 h-12 border-4 border-brand-red/30 border-t-brand-red rounded-full animate-spin mb-4" />
+                    <p className="text-gray-400 text-sm animate-pulse">Initializing...</p>
+                </div>
+            ) : (
+                children
+            )}
         </StoreContext.Provider>
     );
 };
