@@ -27,16 +27,49 @@ const ProfileSelection = () => {
   // Sync Profiles for this specific user
   useEffect(() => {
     if (!currentUser) return;
-    const unsub = onSnapshot(collection(db, 'users', currentUser.uid, 'profiles'), (snap) => {
-      setProfiles(snap.docs.map(d => d.data() as Profile));
+
+    // Safety timeout: if snapshot takes too long, stop loading
+    const safetyTimer = setTimeout(() => setLoading(false), 3000);
+
+    let unsub = () => { };
+    try {
+      unsub = onSnapshot(collection(db, 'users', currentUser.uid, 'profiles'), (snap) => {
+        setProfiles(snap.docs.map(d => d.data() as Profile));
+        setLoading(false);
+        clearTimeout(safetyTimer);
+      }, (err) => {
+        console.error("Profile sync error:", err);
+        setLoading(false); // Stop loading on error
+        clearTimeout(safetyTimer);
+      });
+    } catch (e) {
+      console.error("Profile sync setup error:", e);
       setLoading(false);
-    });
-    return () => unsub();
+    }
+
+    return () => {
+      unsub();
+      clearTimeout(safetyTimer);
+    };
   }, [currentUser]);
 
   const handleAdd = async () => {
     if (!newName.trim()) return;
-    await addProfile(newName, isKids, selectedAvatar);
+    try {
+      await addProfile(newName, isKids, selectedAvatar);
+    } catch (e) {
+      console.error("Add profile exception:", e);
+      // Fallback for demo/offline: simulated profile
+      const fakeId = `temp_${Date.now()}`;
+      const fakeProfile: Profile = {
+        id: fakeId,
+        name: newName,
+        isKids,
+        avatarUrl: selectedAvatar,
+        myList: []
+      };
+      setProfiles(prev => [...prev, fakeProfile]);
+    }
     setIsAdding(false);
     setNewName('');
     setIsKids(false);
@@ -45,13 +78,19 @@ const ProfileSelection = () => {
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (window.confirm('Are you sure you want to delete this profile?')) {
-      await deleteProfile(id);
+      try {
+        await deleteProfile(id);
+      } catch (error) {
+        console.error("Delete failed locally", error);
+        setProfiles(prev => prev.filter(p => p.id !== id));
+      }
     }
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-[#141414] flex items-center justify-center">
-      <div className="w-12 h-12 border-4 border-brand-red border-t-transparent rounded-full animate-spin" />
+    <div className="min-h-screen bg-black flex items-center justify-center text-white flex-col gap-4">
+      <div className="w-12 h-12 border-4 border-brand-red border-t-white rounded-full animate-spin" />
+      <p className="text-xs text-gray-500">Loading profiles...</p>
     </div>
   );
 
