@@ -183,6 +183,19 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
             try {
                 if (firebaseUser) {
+                    // OPTIMISTIC UPDATE: Prevent "Login Page" flash by setting auth state immediately
+                    // This ensures that even if DB fetch is slow/times out, we show ProfileSelection (loading) instead of Login
+                    const tempUser: AppUser = {
+                        uid: firebaseUser.uid,
+                        email: firebaseUser.email || '',
+                        plan: 'Free',
+                        role: 'user',
+                        status: 'active',
+                        lastLoginAt: new Date().toISOString()
+                    };
+                    setCurrentUser(tempUser);
+                    setIsAuthenticated(true);
+
                     const userRef = doc(db, 'users', firebaseUser.uid);
                     const userSnap = await getDoc(userRef);
 
@@ -196,7 +209,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                             lastLoginAt: new Date().toISOString()
                         };
                         await setDoc(userRef, newAppUser);
-                        setCurrentUser(newAppUser);
+                        // setDoc is enough, we already optimistically set currentUser
 
                         // Create default profile
                         const profileId = 'main';
@@ -223,7 +236,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
                         setCurrentUser(userData);
                     }
-                    setIsAuthenticated(true);
+                    // setIsAuthenticated(true); // Already set optimistically
                 } else {
                     setCurrentUser(null);
                     setCurrentProfile(null);

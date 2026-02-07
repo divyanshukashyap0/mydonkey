@@ -409,7 +409,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     useEffect(() => {
         const handleMobileOrientation = async () => {
             const isMobile = window.innerWidth <= 768; // Simple mobile check
-            if (!isMobile) return;
+
+            // ONLY rotate for Main Movies (not trailers)
+            if (!isMobile || content.playMode !== 'movie') return;
 
             try {
                 // 1. Request Fullscreen first (required for orientation lock on many browsers)
@@ -449,7 +451,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 }
             }
         };
-    }, []);
+    }, [content.playMode]);
 
     // Gesture State
     const [brightness, setBrightness] = useState(100);
