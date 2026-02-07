@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, CreditCard, Monitor, User as UserIcon, Plus, Calendar, Camera, Wifi, Settings, PlayCircle, Smartphone, Download, Send } from 'lucide-react';
+import { ChevronDown, ChevronUp, CreditCard, Monitor, User as UserIcon, Plus, Calendar, Camera, Wifi, Settings, PlayCircle, Smartphone, Download, Send, Maximize } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import PlanSelectionModal from './account/PlanSelectionModal';
 import PaymentMethodsModal from './account/PaymentMethodsModal';
@@ -253,7 +252,7 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                             </div>
                         </button>
 
-                        <button onClick={() => updateUser({ autoplayEnabled: !currentUser.autoplayEnabled })} className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition">
+                        <button onClick={() => updateUser({ autoplayEnabled: !currentUser.autoplayEnabled })} className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition border-b border-white/5">
                             <div className="flex items-center gap-4">
                                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center">
                                     <PlayCircle size={18} />
@@ -267,112 +266,126 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                                 <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-all ${currentUser.autoplayEnabled ? 'left-6' : 'left-1'}`} />
                             </div>
                         </button>
-                    </div>
 
-                    {/* App Install Section */}
-                    {isInstallable && (
-                        <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl overflow-hidden border border-white/10 shadow-xl">
-                            <div className="px-5 py-3 border-b border-white/5">
-                                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Device Experience</span>
+                        <button onClick={() => updateUser({ autoFullscreen: !currentUser.autoFullscreen })} className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
+                                    <Maximize size={18} />
+                                </div>
+                                <div className="text-left">
+                                    <div className="font-medium">Auto Fullscreen</div>
+                                    <div className="text-xs text-gray-500">Go fullscreen when video starts</div>
+                                </div>
                             </div>
-                            <button
-                                onClick={installPwa}
-                                className="w-full flex items-center justify-between px-5 py-5 hover:bg-white/5 transition group"
-                            >
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-brand-red flex items-center justify-center shadow-lg shadow-brand-red/20 group-hover:scale-110 transition-transform">
-                                        <Smartphone size={24} className="text-white" />
-                                    </div>
-                                    <div className="text-left">
-                                        <div className="font-bold text-lg">{isIOS ? 'Add to Home Screen' : 'Download My Donkey App'}</div>
-                                        <div className="text-xs text-gray-400">{isIOS ? 'Install via Safari Share menu' : 'Get the best experience on your home screen'}</div>
-                                    </div>
-                                </div>
-                                <div className="bg-white/10 p-2 rounded-full group-hover:bg-brand-red group-hover:text-white transition-colors">
-                                    <Download size={20} />
-                                </div>
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Profiles Section */}
-                    <div className="bg-white/5 rounded-xl overflow-hidden">
-                        <div className="px-5 py-3 border-b border-white/5 flex justify-between items-center">
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Profiles</span>
-                            <button onClick={handleAddProfile} className="text-cyan-400 text-sm font-bold hover:text-cyan-300 transition flex items-center gap-1">
-                                <Plus size={16} /> Add
-                            </button>
-                        </div>
-
-                        <div className="p-4 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
-                            {userProfiles.map(profile => (
-                                <div key={profile.id} className="group text-center cursor-pointer" onClick={() => toggleProfile(profile.id)}>
-                                    <div className="relative mb-2">
-                                        <img
-                                            src={profile.avatarUrl}
-                                            className="w-14 h-14 md:w-16 md:h-16 mx-auto rounded-lg object-cover ring-2 ring-transparent group-hover:ring-cyan-500 transition"
-                                        />
-                                        {profile.isKids && (
-                                            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 bg-yellow-500 text-black text-[8px] font-bold rounded">KIDS</span>
-                                        )}
-                                    </div>
-                                    <div className="text-xs font-medium truncate">{profile.name}</div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Content Request Section */}
-                    <div className="bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-xl overflow-hidden border border-cyan-500/20 shadow-2xl">
-                        <div className="px-5 py-3 border-b border-white/5 bg-cyan-500/5">
-                            <span className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.2em]">Request Content</span>
-                        </div>
-                        <div className="p-5">
-                            <h3 className="text-lg font-bold mb-1">Didn't find what you wanted?</h3>
-                            <p className="text-xs text-gray-400 mb-4">Tell us the show or movie title. Our team ensures that in <span className="text-cyan-400 font-bold">48 hours</span> content will be there!</p>
-
-                            <form onSubmit={handleRequestSubmit} className="flex gap-2">
-                                <input
-                                    type="text"
-                                    value={requestTitle}
-                                    onChange={(e) => setRequestTitle(e.target.value)}
-                                    placeholder="Enter show or movie name..."
-                                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-cyan-500/50 transition-colors"
-                                    required
-                                />
-                                <button
-                                    type="submit"
-                                    disabled={isRequesting}
-                                    className="bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-700 text-white px-5 py-3 rounded-lg flex items-center gap-2 transition shadow-lg shadow-cyan-600/20"
-                                >
-                                    {isRequesting ? (
-                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    ) : (
-                                        <>
-                                            <Send size={18} />
-                                            <span className="hidden sm:inline font-bold uppercase tracking-wider text-xs">Submit Request</span>
-                                        </>
-                                    )}
-                                </button>
-                            </form>
-                            <p className="mt-4 text-[10px] text-gray-500 text-center italic">"Our team will try hard to get requested content for you."</p>
-                        </div>
-                    </div>
-
-                    {/* Sign Out */}
-                    <button
-                        onClick={logout}
-                        className="w-full py-4 bg-white/5 hover:bg-red-500/20 rounded-xl text-gray-400 hover:text-red-400 font-bold transition flex items-center justify-center gap-2"
-                    >
-                        Sign Out
-                    </button>
-
-                    <div className="text-center text-xs text-gray-600 pt-2">
-                        Member since {getMemberSinceDate()} • Version 2.0
+                            <div className={`w-12 h-7 rounded-full relative transition-colors ${currentUser.autoFullscreen ? 'bg-cyan-500' : 'bg-gray-700'}`}>
+                                <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-all ${currentUser.autoFullscreen ? 'left-6' : 'left-1'}`} />
+                            </div>
+                        </button>
                     </div>
                 </div>
-            </div>
 
+                {/* App Install Section */}
+                {isInstallable && (
+                    <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl overflow-hidden border border-white/10 shadow-xl">
+                        <div className="px-5 py-3 border-b border-white/5">
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Device Experience</span>
+                        </div>
+                        <button
+                            onClick={installPwa}
+                            className="w-full flex items-center justify-between px-5 py-5 hover:bg-white/5 transition group"
+                        >
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-2xl bg-brand-red flex items-center justify-center shadow-lg shadow-brand-red/20 group-hover:scale-110 transition-transform">
+                                    <Smartphone size={24} className="text-white" />
+                                </div>
+                                <div className="text-left">
+                                    <div className="font-bold text-lg">{isIOS ? 'Add to Home Screen' : 'Download My Donkey App'}</div>
+                                    <div className="text-xs text-gray-400">{isIOS ? 'Install via Safari Share menu' : 'Get the best experience on your home screen'}</div>
+                                </div>
+                            </div>
+                            <div className="bg-white/10 p-2 rounded-full group-hover:bg-brand-red group-hover:text-white transition-colors">
+                                <Download size={20} />
+                            </div>
+                        </button>
+                    </div>
+                )}
+
+                {/* Profiles Section */}
+                <div className="bg-white/5 rounded-xl overflow-hidden">
+                    <div className="px-5 py-3 border-b border-white/5 flex justify-between items-center">
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Profiles</span>
+                        <button onClick={handleAddProfile} className="text-cyan-400 text-sm font-bold hover:text-cyan-300 transition flex items-center gap-1">
+                            <Plus size={16} /> Add
+                        </button>
+                    </div>
+
+                    <div className="p-4 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
+                        {userProfiles.map(profile => (
+                            <div key={profile.id} className="group text-center cursor-pointer" onClick={() => toggleProfile(profile.id)}>
+                                <div className="relative mb-2">
+                                    <img
+                                        src={profile.avatarUrl}
+                                        className="w-14 h-14 md:w-16 md:h-16 mx-auto rounded-lg object-cover ring-2 ring-transparent group-hover:ring-cyan-500 transition"
+                                    />
+                                    {profile.isKids && (
+                                        <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 bg-yellow-500 text-black text-[8px] font-bold rounded">KIDS</span>
+                                    )}
+                                </div>
+                                <div className="text-xs font-medium truncate">{profile.name}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Content Request Section */}
+                <div className="bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-xl overflow-hidden border border-cyan-500/20 shadow-2xl">
+                    <div className="px-5 py-3 border-b border-white/5 bg-cyan-500/5">
+                        <span className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.2em]">Request Content</span>
+                    </div>
+                    <div className="p-5">
+                        <h3 className="text-lg font-bold mb-1">Didn't find what you wanted?</h3>
+                        <p className="text-xs text-gray-400 mb-4">Tell us the show or movie title. Our team ensures that in <span className="text-cyan-400 font-bold">48 hours</span> content will be there!</p>
+
+                        <form onSubmit={handleRequestSubmit} className="flex gap-2">
+                            <input
+                                type="text"
+                                value={requestTitle}
+                                onChange={(e) => setRequestTitle(e.target.value)}
+                                placeholder="Enter show or movie name..."
+                                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-cyan-500/50 transition-colors"
+                                required
+                            />
+                            <button
+                                type="submit"
+                                disabled={isRequesting}
+                                className="bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-700 text-white px-5 py-3 rounded-lg flex items-center gap-2 transition shadow-lg shadow-cyan-600/20"
+                            >
+                                {isRequesting ? (
+                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                ) : (
+                                    <>
+                                        <Send size={18} />
+                                        <span className="hidden sm:inline font-bold uppercase tracking-wider text-xs">Submit Request</span>
+                                    </>
+                                )}
+                            </button>
+                        </form>
+                        <p className="mt-4 text-[10px] text-gray-500 text-center italic">"Our team will try hard to get requested content for you."</p>
+                    </div>
+                </div>
+
+                {/* Sign Out */}
+                <button
+                    onClick={logout}
+                    className="w-full py-4 bg-white/5 hover:bg-red-500/20 rounded-xl text-gray-400 hover:text-red-400 font-bold transition flex items-center justify-center gap-2"
+                >
+                    Sign Out
+                </button>
+
+                <div className="text-center text-xs text-gray-600 pt-2">
+                    Member since {getMemberSinceDate()} • Version 2.0
+                </div>
+            </div>
             {/* Modals */}
             {showPlanModal && <PlanSelectionModal onClose={() => setShowPlanModal(false)} />}
             {showPaymentModal && <PaymentMethodsModal onClose={() => setShowPaymentModal(false)} />}

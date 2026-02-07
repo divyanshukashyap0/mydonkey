@@ -18,7 +18,7 @@ declare global {
 }
 
 const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
-    const { updatePlaybackProgress, currentUser } = useStore();
+    const { updatePlaybackProgress, currentUser, updateContentDuration } = useStore();
 
     // Extract IDs locally for safety
     const getDriveId = (url: string) => {
@@ -300,10 +300,23 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 setProgress(prog);
                 progressRef.current = prog;
                 setShowSkipIntro(curr > 30 && curr < 120 && content.type === 'tv');
+
+                // Auto-Duration Update (Admin Only Check)
+                if (currentUser?.role === 'admin' && (!content.duration || content.duration === '0m')) {
+                    const mins = Math.floor(dur / 60);
+                    const durationStr = `${mins}m`;
+                    // Simple check to avoid repeated calls
+                    if (mins > 0 && content.duration !== durationStr) {
+                        console.log(`[AutoDuration] Updating ${content.title} (${content.id}) to ${durationStr}`);
+                        updateContentDuration(content.id, durationStr)
+                            .then(() => console.log('[AutoDuration] Update success'))
+                            .catch(e => console.error('[AutoDuration] Update failed', e));
+                    }
+                }
             }
         }, 500);
         return () => clearInterval(interval);
-    }, [playing, isDriveVideo]);
+    }, [playing, isDriveVideo, currentUser?.role, content.duration]);
 
     // Save Progress Store
     useEffect(() => {
@@ -407,31 +420,38 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     // Mobile Auto-Rotate & Fullscreen Logic
     useEffect(() => {
-        const handleMobileOrientation = async () => {
-            const isMobile = window.innerWidth <= 768; // Simple mobile check
+        const handleAutoFullscreen = async () => {
+            const isMobile = window.innerWidth <= 768;
 
-            // ONLY rotate for Main Movies (not trailers)
-            if (!isMobile || content.playMode !== 'movie') return;
+            // 1. Mobile Auto-Rotate (Existing Logic)
+            if (isMobile && content.playMode === 'movie') {
+                try {
+                    if (!document.fullscreenElement) {
+                        await document.documentElement.requestFullscreen();
+                        setIsFullscreen(true);
+                    }
+                    // @ts-ignore
+                    if (screen.orientation && screen.orientation.lock) {
+                        // @ts-ignore
+                        await screen.orientation.lock('landscape');
+                    }
+                } catch (err) {
+                    console.warn("Auto-rotate failed:", err);
+                }
+            }
 
-            try {
-                // 1. Request Fullscreen first (required for orientation lock on many browsers)
-                if (!document.fullscreenElement) {
+            // 2. Desktop/Global Auto-Fullscreen Preference
+            else if (currentUser?.autoFullscreen && !document.fullscreenElement) {
+                try {
                     await document.documentElement.requestFullscreen();
                     setIsFullscreen(true);
+                } catch (err) {
+                    console.warn("Auto-fullscreen failed:", err);
                 }
-
-                // 2. Lock Orientation to Landscape
-                // @ts-ignore - screen.orientation might not be typed in all environments
-                if (screen.orientation && screen.orientation.lock) {
-                    // @ts-ignore
-                    await screen.orientation.lock('landscape');
-                }
-            } catch (err) {
-                console.warn("Auto-rotate/fullscreen failed:", err);
             }
         };
 
-        handleMobileOrientation();
+        handleAutoFullscreen();
 
         // Cleanup: Unlock and exit fullscreen on unmount
         return () => {
@@ -443,15 +463,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                         // @ts-ignore
                         screen.orientation.unlock();
                     }
-                    if (document.fullscreenElement && document.exitFullscreen) {
-                        document.exitFullscreen();
-                    }
-                } catch (e) {
-                    // Orientation/Fullscreen exit failed - silent
-                }
+                } catch (e) { }
+            }
+
+            if (document.fullscreenElement && document.exitFullscreen) {
+                document.exitFullscreen().catch(() => { });
             }
         };
-    }, [content.playMode]);
+    }, [content.playMode, currentUser?.autoFullscreen]);
 
     // Gesture State
     const [brightness, setBrightness] = useState(100);

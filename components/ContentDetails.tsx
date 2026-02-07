@@ -60,7 +60,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
 
             {/* Modal Container */}
             {/* Added max-w-full and h-full for mobile to ensure full intersection */}
-            <div className="relative w-full h-full md:h-auto md:max-w-5xl md:max-h-[90vh] bg-[#181818] md:rounded-xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-500 flex flex-col md:block">
+            <div className="relative w-full h-full md:h-auto md:max-w-5xl md:max-h-[90vh] bg-[#181818] md:rounded-xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-500 flex flex-col">
 
                 {/* Close Button */}
                 <button
@@ -97,6 +97,10 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                 <span className="border border-white/30 px-1 rounded text-[10px]">{content.rating || 'U/A 13+'}</span>
                                 <span>•</span>
                                 <span>{content.genres?.[0]}</span>
+                            </div>
+                            {/* TEMP DEBUG */}
+                            <div className="text-[10px] text-red-500 font-mono mt-1 bg-black/50 p-1 rounded inline-block">
+                                DEBUG: Type=[{content.type}] Dur=[{content.duration}]
                             </div>
                         </div>
 
@@ -249,12 +253,19 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
 
                             <div className="flex flex-wrap items-center gap-4">
                                 {isPlayable ? (
-                                    isMovie && (
+                                    isMovie ? (
                                         <button
                                             onClick={() => { onPlay(content, 'movie'); onClose(); }}
                                             className="bg-white text-black px-8 py-3 rounded font-bold text-lg flex items-center gap-2 hover:bg-gray-200 transition-transform active:scale-95"
                                         >
                                             <Play size={24} fill="black" /> Play Movie
+                                        </button>
+                                    ) : (
+                                        // TV Show - Show "Select Episode" to guide user
+                                        <button
+                                            className="bg-white text-black px-8 py-3 rounded font-bold text-lg flex items-center gap-2 cursor-default opacity-80"
+                                        >
+                                            <Check size={24} /> Select Episode Below
                                         </button>
                                     )
                                 ) : (
@@ -336,7 +347,11 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                     <span className="text-green-400 font-bold">{(content.vote_average * 10).toFixed(0)}% Match</span>
                                     <span className="text-gray-400">{content.release_date?.split('-')[0]}</span>
                                     <span className="border border-gray-600 px-2 py-0.5 rounded text-xs">{content.rating || 'U/A 13+'}</span>
-                                    <span className="text-gray-400">{content.duration}</span>
+                                    {(content.type?.toLowerCase() === 'tv' || (content.seasons && content.seasons.length > 0)) ? (
+                                        <span className="text-gray-400">{content.seasons?.length || 1} Season{(content.seasons?.length || 1) !== 1 ? 's' : ''}</span>
+                                    ) : (
+                                        <span className="text-gray-400">{content.duration || '0m'}</span>
+                                    )}
                                     <span className="border border-white/30 px-1.5 rounded text-[10px] font-black tracking-tighter">{content.resolution || 'HD'}</span>
                                 </div>
                                 <p className="text-xl leading-relaxed text-gray-200">{content.overview}</p>

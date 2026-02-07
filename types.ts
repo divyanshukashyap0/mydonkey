@@ -127,6 +127,7 @@ export interface User {
   lowDataMode?: boolean;
   autoplayEnabled?: boolean; // Controls hero video autoplay - default false on mobile
   readNotifications?: string[];
+  autoFullscreen?: boolean; // User preference for auto-fullscreen
 }
 
 export interface ContinueWatchingItem {

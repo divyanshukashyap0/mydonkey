@@ -85,7 +85,7 @@ const ContentManager = () => {
             episodeNumber: (season.episodes.length || 0) + 1,
             title: `Episode ${(season.episodes.length || 0) + 1}`,
             driveId: '',
-            duration: '45m'
+            duration: ''
         };
 
         const updatedSeason = { ...season, episodes: [...season.episodes, newEpisode] };
@@ -211,7 +211,10 @@ const ContentManager = () => {
         return (
             <div className="bg-[#141414] p-6 rounded-xl border border-white/5 animate-in fade-in max-h-[90vh] overflow-y-auto">
                 <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold">{formData.id ? 'Edit Content' : 'Add New Content'}</h2>
+                    <h2 className="text-2xl font-bold flex items-center gap-2">
+                        {formData.id ? 'Edit Content' : 'Add New Content'}
+                        <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded text-gray-500 font-mono">v1.1</span>
+                    </h2>
                     <button onClick={resetForm} className="p-2 hover:bg-white/10 rounded"><X /></button>
                 </div>
 
@@ -243,12 +246,17 @@ const ContentManager = () => {
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="text-xs text-gray-500 uppercase font-bold">Duration</label>
-                                <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none font-mono placeholder:text-gray-700"
-                                    value={formData.duration || ''} onChange={e => setFormData({ ...formData, duration: e.target.value })}
-                                    placeholder="e.g. 2h 15m" />
-                            </div>
+                            {formData.type?.toLowerCase() === 'movie' && (
+                                <div>
+                                    <label className="text-xs text-gray-500 uppercase font-bold flex justify-between">
+                                        Duration
+                                        <span className="text-[10px] text-blue-400 font-normal normal-case">Auto-calcs on play</span>
+                                    </label>
+                                    <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none font-mono placeholder:text-gray-700"
+                                        value={formData.duration || ''} onChange={e => setFormData({ ...formData, duration: e.target.value })}
+                                        placeholder="Auto (or type manually)" />
+                                </div>
+                            )}
                             <div>
                                 <label className="text-xs text-gray-500 uppercase font-bold">Age Rating</label>
                                 <select className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none"
@@ -478,7 +486,10 @@ const ContentManager = () => {
                                                         />
 
                                                         <input value={ep.duration} onChange={e => updateEpisode(season.id, ep.id, { duration: e.target.value })}
-                                                            className="bg-black/50 border border-white/10 rounded p-1.5 text-sm w-20" placeholder="Dur (45m)" />
+                                                            className="bg-black/50 border border-white/10 rounded p-1.5 text-sm w-20 text-center"
+                                                            placeholder="Auto"
+                                                            title="Auto-calcs on play"
+                                                        />
                                                         <button onClick={() => deleteEpisode(season.id, ep.id)} className="text-red-500 p-1 hover:bg-white/5 rounded">
                                                             <Trash2 size={14} />
                                                         </button>

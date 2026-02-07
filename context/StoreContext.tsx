@@ -91,6 +91,7 @@ interface StoreContextType {
     contentRequests: ContentRequest[];
     submitContentRequest: (title: string) => Promise<void>;
     updateContentRequest: (id: string, updates: Partial<ContentRequest>) => Promise<void>;
+    updateContentDuration: (id: string, duration: string) => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -681,7 +682,14 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         installPwa,
         contentRequests,
         submitContentRequest,
-        updateContentRequest
+        updateContentRequest,
+        updateContentDuration: async (id: string, duration: string) => {
+            if (!currentUser || currentUser.role !== 'admin') return;
+            // Only update if it's a valid duration string
+            if (duration && duration.length > 0) {
+                await updateDoc(doc(db, 'content', id), { duration });
+            }
+        }
     }), [
         isAuthenticated,
         isLoading,
