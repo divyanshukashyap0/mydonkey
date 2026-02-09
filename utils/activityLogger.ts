@@ -19,7 +19,8 @@ export const logUserActivity = async (
     userId: string | undefined,
     email: string | undefined,
     action: ActivityType,
-    details: any = {}
+    details: any = {},
+    isGuest: boolean = false
 ) => {
     if (!userId) return;
 
@@ -29,6 +30,7 @@ export const logUserActivity = async (
             email: email || 'unknown',
             action,
             details,
+            isGuest, // Tagging guest logs
             timestamp: serverTimestamp(),
             // Helper for sorting/filtering
             userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
@@ -36,10 +38,13 @@ export const logUserActivity = async (
         });
 
         // Update 'lastActiveAt' on user profile for quick Online/Offline status
-        const userRef = doc(db, 'users', userId);
-        updateDoc(userRef, {
-            lastActiveAt: serverTimestamp()
-        }).catch(err => console.error("Failed to update lastActiveAt", err));
+        // Skip for guests as they don't have a permanent user doc
+        if (!isGuest) {
+            const userRef = doc(db, 'users', userId);
+            updateDoc(userRef, {
+                lastActiveAt: serverTimestamp()
+            }).catch(err => console.error("Failed to update lastActiveAt", err));
+        }
 
     } catch (error) {
         console.error("Error logging activity:", error);

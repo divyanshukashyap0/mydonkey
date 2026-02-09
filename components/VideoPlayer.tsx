@@ -263,23 +263,23 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
         if (playing) {
             playerRef.current.playVideo();
-            logUserActivity(currentUser?.uid, currentUser?.email, 'video_play', { contentId: content.id, title: content.title });
+            logUserActivity(currentUser?.uid, currentUser?.email, 'video_play', { contentId: content.id, title: content.title }, currentUser?.isGuest);
         } else {
             playerRef.current.pauseVideo();
-            logUserActivity(currentUser?.uid, currentUser?.email, 'video_pause', { contentId: content.id, title: content.title });
+            logUserActivity(currentUser?.uid, currentUser?.email, 'video_pause', { contentId: content.id, title: content.title }, currentUser?.isGuest);
         }
     }, [playing, isDriveVideo]);
 
     // Real Screentime Heartbeat (Every 10 seconds)
     useEffect(() => {
-        if (!playing || !currentUser?.uid) return;
+        if (!playing || !currentUser?.uid || currentUser?.isGuest) return;
 
         const heartbeat = setInterval(() => {
             incrementWatchTime(currentUser.uid, 10);
         }, 10000);
 
         return () => clearInterval(heartbeat);
-    }, [playing, currentUser?.uid]);
+    }, [playing, currentUser?.uid, currentUser?.isGuest]);
 
     useEffect(() => {
         if (isDriveVideo) return;
@@ -476,6 +476,18 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         };
     }, [content.playMode, currentUser?.autoFullscreen]);
 
+    // Fullscreen Event Listener
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            const isFull = !!document.fullscreenElement;
+            setIsFullscreen(isFull);
+            if (isFull) setShowControls(false);
+        };
+
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }, []);
+
     // Gesture State
     const [brightness, setBrightness] = useState(100);
     const touchStartRef = useRef<{ x: number, y: number, time: number } | null>(null);
@@ -641,7 +653,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             )}
 
             {/* Header - Transparent Floating Pill Style */}
-            <div className={`absolute top-0 left-0 w-full p-6 transition-opacity duration-300 pointer-events-none z-[120] ${showControls || isDriveVideo ? 'opacity-100' : 'opacity-0'}`}>
+            <div className={`absolute top-0 left-0 w-full p-6 transition-opacity duration-300 pointer-events-none z-[120] ${showControls ? 'opacity-100' : 'opacity-0'}`}>
                 <div className="bg-black/40 backdrop-blur-md border border-white/5 inline-flex items-center gap-4 px-6 py-3 rounded-full pointer-events-auto hover:bg-black/60 transition-colors">
                     <button onClick={onClose} className="text-white hover:text-brand-red transition-colors group">
                         <ArrowLeft size={24} className="group-hover:-translate-x-1 transition-transform" />
