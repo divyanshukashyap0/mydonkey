@@ -57,7 +57,7 @@ const ContentRail: React.FC<ContentRailProps> = ({
 
                 <div
                     ref={scrollRef}
-                    className="flex overflow-x-auto gap-2 md:gap-4 px-4 md:px-12 no-scrollbar scroll-smooth"
+                    className="flex overflow-x-auto gap-2 md:gap-4 px-4 md:px-12 no-scrollbar scroll-smooth touch-pan-y"
                 >
                     {(!items || items.length === 0) ? (
                         // Show Skeletons if no items (assuming loading context, or just fallback)
@@ -72,7 +72,7 @@ const ContentRail: React.FC<ContentRailProps> = ({
                             return (
                                 <div
                                     key={item.id}
-                                    className={`flex-shrink-0 transition-all duration-500 hover:scale-110 hover:z-20 cursor-pointer ${layout === 'landscape' ? 'w-36 md:w-80' : 'w-24 md:w-48'
+                                    className={`flex-shrink-0 transition-all duration-500 hover:scale-110 hover:z-20 cursor-pointer select-none ${layout === 'landscape' ? 'w-36 md:w-80' : 'w-24 md:w-48'
                                         }`}
                                     onClick={() => {
                                         if (navigator.vibrate) navigator.vibrate(10);
@@ -83,12 +83,12 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                         {layout === 'landscape' ? (
                                             <picture>
                                                 {item.backdrop_path_mobile && <source media="(max-width: 767px)" srcSet={item.backdrop_path_mobile} />}
-                                                <img src={item.backdrop_path} className="w-full h-full object-cover aspect-video" alt={item.title} />
+                                                <img src={item.backdrop_path} className="w-full h-full object-cover aspect-video" alt={item.title} draggable={false} />
                                             </picture>
                                         ) : (
                                             <picture>
                                                 {item.poster_path_mobile && <source media="(max-width: 767px)" srcSet={item.poster_path_mobile} />}
-                                                <img src={item.poster_path} className="w-full h-full object-cover" alt={item.title} />
+                                                <img src={item.poster_path} className="w-full h-full object-cover" alt={item.title} draggable={false} />
                                             </picture>
                                         )}
 

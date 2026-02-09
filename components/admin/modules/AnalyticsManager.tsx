@@ -11,6 +11,7 @@ const AnalyticsManager = () => {
     const [calculatedWatchTime, setCalculatedWatchTime] = useState(0);
     const [activeUsersCount, setActiveUsersCount] = useState(0);
     const [topContentData, setTopContentData] = useState<any[]>([]);
+    const [globalHistory, setGlobalHistory] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -64,6 +65,31 @@ const AnalyticsManager = () => {
                         return { title: c?.title || 'Unknown Content', count, poster: c?.poster_path };
                     });
                 setTopContentData(sortedContent);
+
+                // Global Watch History from all users
+                const historyData: any[] = [];
+                allUsers.forEach(u => {
+                    if (u.continueWatching && u.continueWatching.length > 0) {
+                        u.continueWatching.forEach(cw => {
+                            const c = content.find(x => x.id === cw.movieId);
+                            if (c) {
+                                historyData.push({
+                                    userEmail: u.email,
+                                    userId: u.uid,
+                                    contentTitle: c.title,
+                                    poster: c.backdrop_path || c.poster_path, // Prefer backdrop for wide view
+                                    progress: cw.progress,
+                                    duration: cw.duration,
+                                    lastWatchedAt: cw.lastWatchedAt,
+                                    percent: Math.min(100, Math.round((cw.progress / cw.duration) * 100)) || 0
+                                });
+                            }
+                        });
+                    }
+                });
+                // Sort by last watched desc
+                historyData.sort((a, b) => new Date(b.lastWatchedAt).getTime() - new Date(a.lastWatchedAt).getTime());
+                setGlobalHistory(historyData.slice(0, 50)); // Top 50 recent checks
 
             } catch (e) {
                 console.error("Analytics error:", e);
@@ -126,26 +152,53 @@ const AnalyticsManager = () => {
             </div>
 
             {/* Live Activity Feed */}
-            <div className="bg-[#141414] rounded-xl border border-white/5 overflow-hidden">
-                <div className="p-4 border-b border-white/5 flex items-center gap-2">
-                    <Clock size={20} className="text-brand-red" />
-                    <h3 className="font-bold text-lg">Live User Activity</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-[#141414] rounded-xl border border-white/5 overflow-hidden">
+                    <div className="p-4 border-b border-white/5 flex items-center gap-2">
+                        <Clock size={20} className="text-brand-red" />
+                        <h3 className="font-bold text-lg">Live User Activity</h3>
+                    </div>
+                    <div className="max-h-96 overflow-y-auto custom-scrollbar">
+                        {recentActivity.map((log) => (
+                            <div key={log.id} className="p-4 border-b border-white/5 hover:bg-white/5 transition flex items-center gap-4">
+                                <div className={`w-2 h-2 rounded-full ${log.action.includes('play') ? 'bg-green-500' : 'bg-gray-500'}`} />
+                                <div className="flex-1">
+                                    <span className="font-bold text-white mr-2">{log.email}</span>
+                                    <span className="text-gray-400 text-sm italic">{log.action === 'page_view' ? `Viewed ${log.details?.path}` : log.action}</span>
+                                    {log.details?.title && <span className="text-brand-red text-sm ml-2 font-bold">({log.details.title})</span>}
+                                </div>
+                                <div className="text-xs text-gray-500 font-mono">
+                                    {log.timestamp?.toDate ? log.timestamp.toDate().toLocaleTimeString() : 'Just now'}
+                                </div>
+                            </div>
+                        ))}
+                        {recentActivity.length === 0 && <div className="p-8 text-center text-gray-500">No recent activity found.</div>}
+                    </div>
                 </div>
-                <div className="max-h-96 overflow-y-auto custom-scrollbar">
-                    {recentActivity.map((log) => (
-                        <div key={log.id} className="p-4 border-b border-white/5 hover:bg-white/5 transition flex items-center gap-4">
-                            <div className={`w-2 h-2 rounded-full ${log.action.includes('play') ? 'bg-green-500' : 'bg-gray-500'}`} />
-                            <div className="flex-1">
-                                <span className="font-bold text-white mr-2">{log.email}</span>
-                                <span className="text-gray-400 text-sm italic">{log.action === 'page_view' ? `Viewed ${log.details?.path}` : log.action}</span>
-                                {log.details?.title && <span className="text-brand-red text-sm ml-2 font-bold">({log.details.title})</span>}
+
+                <div className="bg-[#141414] rounded-xl border border-white/5 overflow-hidden">
+                    <div className="p-4 border-b border-white/5 flex items-center gap-2">
+                        <Play size={20} className="text-blue-500" />
+                        <h3 className="font-bold text-lg">Global Watch History</h3>
+                    </div>
+                    <div className="max-h-96 overflow-y-auto custom-scrollbar">
+                        {globalHistory.map((item, i) => (
+                            <div key={i} className="p-4 border-b border-white/5 hover:bg-white/5 transition flex gap-4">
+                                <img src={item.poster} className="w-16 h-10 object-cover rounded bg-gray-800" alt={item.contentTitle} />
+                                <div className="flex-1">
+                                    <div className="flex justify-between items-start">
+                                        <h4 className="font-bold text-sm text-white">{item.contentTitle}</h4>
+                                        <span className="text-[10px] text-gray-500 font-mono">{new Date(item.lastWatchedAt).toLocaleDateString()}</span>
+                                    </div>
+                                    <div className="text-xs text-gray-400 mt-0.5">User: <span className="text-white">{item.userEmail}</span></div>
+                                    <div className="mt-2 h-1 bg-gray-700 rounded-full overflow-hidden w-full max-w-[150px]">
+                                        <div className="h-full bg-blue-500" style={{ width: `${item.percent}%` }} />
+                                    </div>
+                                </div>
                             </div>
-                            <div className="text-xs text-gray-500 font-mono">
-                                {log.timestamp?.toDate ? log.timestamp.toDate().toLocaleTimeString() : 'Just now'}
-                            </div>
-                        </div>
-                    ))}
-                    {recentActivity.length === 0 && <div className="p-8 text-center text-gray-500">No recent activity found.</div>}
+                        ))}
+                        {globalHistory.length === 0 && <div className="p-8 text-center text-gray-500">No watch history found.</div>}
+                    </div>
                 </div>
             </div>
         </div>

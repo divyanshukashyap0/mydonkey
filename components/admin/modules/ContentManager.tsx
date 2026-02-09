@@ -616,7 +616,7 @@ const ContentManager = () => {
                                 {item.title}
                             </h3>
                             <div className="flex items-center gap-2 text-[10px] text-gray-400">
-                                <span>{item.release_date?.split('-')[0] || '2024'}</span>
+                                <span>{item.release_date?.split('-')[0] || '2026'}</span>
                                 {item.duration && <span>• {item.duration}</span>}
                                 {item.rating && <span className="px-1 py-0.5 rounded border border-gray-600 text-[8px]">{item.rating}</span>}
                             </div>

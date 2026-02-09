@@ -30,7 +30,8 @@ import {
     updateEmail,
     deleteUser,
     setPersistence,
-    browserLocalPersistence
+    browserLocalPersistence,
+    signInAnonymously
 } from 'firebase/auth';
 import {
     collection,
@@ -52,6 +53,7 @@ interface StoreContextType {
     signup: (email: string, password: string) => Promise<void>;
     loginWithGoogle: () => Promise<void>;
     loginWithApple: () => Promise<void>;
+    loginAsGuest: () => Promise<void>;
     logout: () => void;
     content: Content[];
     users: AppUser[];
@@ -100,6 +102,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
     siteName: "MY DONKEY",
     heroVideoQuality: 'hd1080',
     maintenanceMode: false,
+    theme: 'default'
 };
 
 export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -120,6 +123,15 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const [isInstallable, setIsInstallable] = useState(false);
     const [isIOS, setIsIOS] = useState(false);
     const [contentRequests, setContentRequests] = useState<ContentRequest[]>([]);
+
+    // --- Theme Application ---
+    useEffect(() => {
+        if (settings.theme === 'luxury') {
+            document.body.classList.add('theme-luxury');
+        } else {
+            document.body.classList.remove('theme-luxury');
+        }
+    }, [settings.theme]);
 
     // --- PWA Installation Logic ---
     useEffect(() => {
@@ -184,6 +196,33 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
             try {
                 if (firebaseUser) {
+                    // Check for Anonymous Guest
+                    if (firebaseUser.isAnonymous) {
+                        const guestUser: AppUser = {
+                            uid: firebaseUser.uid,
+                            email: 'guest@mydonkey.in',
+                            plan: 'Free',
+                            role: 'user',
+                            status: 'active',
+                            lastLoginAt: new Date().toISOString(),
+                            isGuest: true
+                        };
+                        setCurrentUser(guestUser);
+
+                        // Create temporary profile for Guest
+                        const guestProfile: Profile = {
+                            id: 'guest',
+                            name: 'Guest',
+                            avatarUrl: 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png',
+                            isKids: false,
+                            myList: []
+                        };
+                        setCurrentProfile(guestProfile);
+                        setIsAuthenticated(true);
+                        setIsLoading(false);
+                        return;
+                    }
+
                     // OPTIMISTIC UPDATE: Prevent "Login Page" flash by setting auth state immediately
                     // This ensures that even if DB fetch is slow/times out, we show ProfileSelection (loading) instead of Login
                     const tempUser: AppUser = {
@@ -364,11 +403,32 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     const loginWithApple = async () => {
         const provider = new OAuthProvider('apple.com');
-        await signInWithPopup(auth, provider);
+        provider.addScope('email');
+        provider.addScope('name');
+
+        try {
+            await signInWithPopup(auth, provider);
+        } catch (error: any) {
+            console.error("Apple login failed:", error);
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
+
+            // Fallback to redirect if popup is blocked (common on mobile)
+            if (isMobile && (error.code === 'auth/popup-blocked' || error.code === 'auth/operation-not-supported-in-this-environment')) {
+                await signInWithRedirect(auth, provider);
+            } else if (error.code === 'auth/operation-not-allowed') {
+                throw new Error("Apple Sign-In is not enabled in the database. Please contact support.");
+            } else {
+                throw error;
+            }
+        }
+    };
+
+    const loginAsGuest = async () => {
+        await signInAnonymously(auth);
     };
 
     const logout = async () => {
-        if (fbUser) {
+        if (fbUser && !fbUser.isAnonymous) {
             await updateDoc(doc(db, 'users', fbUser.uid), { lastLogoutAt: new Date().toISOString() });
         }
         await signOut(auth);
@@ -644,6 +704,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         signup,
         loginWithGoogle,
         loginWithApple,
+        loginAsGuest,
         logout,
         content,
         users,

@@ -32,7 +32,7 @@ const SettingsManager = () => {
                             value={settings.contactEmail || ''}
                             onChange={(e) => updateSettings({ contactEmail: e.target.value })}
                             className="w-full bg-black/50 border border-white/10 rounded px-3 py-2 outline-none focus:border-brand-red transition"
-                            placeholder="support@mydonkey.com"
+                            placeholder="support@mydonkey.in"
                         />
                     </div>
 
@@ -67,6 +67,19 @@ const SettingsManager = () => {
                         ) : (
                             <div className="text-gray-500 italic text-sm">No hero content selected. Use the star icon in Content Manager.</div>
                         )}
+                    </div>
+
+                    <div>
+                        <label className="text-xs text-gray-500 uppercase font-bold block mb-2">Website Theme</label>
+                        <select
+                            value={settings.theme || 'default'}
+                            onChange={(e) => updateSettings({ theme: e.target.value as any })}
+                            className="w-full bg-black/50 border border-white/10 rounded px-3 py-2 outline-none focus:border-brand-red transition mb-4"
+                        >
+                            <option value="default">Default Dark (Netflix Style)</option>
+                            <option value="luxury">Luxury Gold (Premium)</option>
+                        </select>
+                        <p className="text-[10px] text-gray-500 mb-6">Select the global visual theme for the website.</p>
                     </div>
 
                     <div>

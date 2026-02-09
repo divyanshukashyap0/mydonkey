@@ -7,12 +7,12 @@ import { db, auth } from '../../firebase';
 import { sendPasswordResetEmail } from 'firebase/auth';
 
 const UsersModule = () => {
-    const { users, plans } = useStore();
+    const { users, plans, content } = useStore();
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [userInvoices, setUserInvoices] = useState<Invoice[]>([]);
     const [userActivity, setUserActivity] = useState<any[]>([]);
     const [loadingInvoices, setLoadingInvoices] = useState(false);
-    const [activeTab, setActiveTab] = useState<'details' | 'activity'>('details');
+    const [activeTab, setActiveTab] = useState<'details' | 'activity' | 'history'>('details');
 
     const handleEditClick = async (user: User) => {
         setEditingUser(user);
@@ -118,11 +118,12 @@ const UsersModule = () => {
 
                         <div className="flex border-b border-white/10">
                             <button onClick={() => setActiveTab('details')} className={`flex-1 py-3 text-sm font-bold border-b-2 transition ${activeTab === 'details' ? 'border-brand-red text-white' : 'border-transparent text-gray-400 hover:text-white'}`}>Details</button>
-                            <button onClick={() => setActiveTab('activity')} className={`flex-1 py-3 text-sm font-bold border-b-2 transition ${activeTab === 'activity' ? 'border-brand-red text-white' : 'border-transparent text-gray-400 hover:text-white'}`}>Activity History</button>
+                            <button onClick={() => setActiveTab('history')} className={`flex-1 py-3 text-sm font-bold border-b-2 transition ${activeTab === 'history' ? 'border-brand-red text-white' : 'border-transparent text-gray-400 hover:text-white'}`}>Watch History</button>
+                            <button onClick={() => setActiveTab('activity')} className={`flex-1 py-3 text-sm font-bold border-b-2 transition ${activeTab === 'activity' ? 'border-brand-red text-white' : 'border-transparent text-gray-400 hover:text-white'}`}>Activity Logs</button>
                         </div>
 
                         <div className="p-6 overflow-y-auto space-y-8 max-h-[60vh]">
-                            {activeTab === 'details' ? (
+                            {activeTab === 'details' && (
                                 <>
                                     {/* Plan & Status */}
                                     <div className="grid grid-cols-2 gap-6">
@@ -182,8 +183,55 @@ const UsersModule = () => {
                                         )}
                                     </div>
                                 </>
-                            ) : (
-                                // Activity Tab
+                            )}
+
+                            {activeTab === 'history' && (
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-center">
+                                        <h3 className="font-bold text-lg">Watch History</h3>
+                                        <span className="text-xs text-gray-500 bg-white/10 px-2 py-1 rounded">Continue Watching</span>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        {editingUser.continueWatching && editingUser.continueWatching.length > 0 ? (
+                                            editingUser.continueWatching.map((item, index) => {
+                                                const movie = content.find(c => c.id === item.movieId);
+                                                if (!movie) return null;
+                                                const percent = Math.min(100, Math.round((item.progress / item.duration) * 100)) || 0;
+
+                                                return (
+                                                    <div key={index} className="bg-[#111] p-3 rounded-lg border border-white/5 flex gap-4 hover:border-white/20 transition">
+                                                        <div className="w-24 h-14 bg-gray-800 rounded overflow-hidden flex-shrink-0 relative">
+                                                            <img
+                                                                src={movie.backdrop_path}
+                                                                alt={movie.title}
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-700">
+                                                                <div className="h-full bg-brand-red" style={{ width: `${percent}%` }} />
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex-1 flex flex-col justify-center">
+                                                            <h4 className="font-bold text-sm text-white">{movie.title}</h4>
+                                                            <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
+                                                                <span>{percent}% Completed</span>
+                                                                <span>•</span>
+                                                                <span>Last watched: {new Date(item.lastWatchedAt).toLocaleDateString()}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })
+                                        ) : (
+                                            <div className="text-gray-500 italic p-8 text-center bg-[#111] rounded-xl border border-white/5">
+                                                No watch history available.
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'activity' && (
                                 <div className="space-y-4">
                                     <div className="flex justify-between items-center">
                                         <h3 className="font-bold text-lg">Recent Activity</h3>

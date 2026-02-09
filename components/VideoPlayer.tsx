@@ -42,8 +42,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
 
     // Resume Logic
-    const savedState = currentUser?.continueWatching?.find(i => i.movieId === content.id);
-    const initialProgress = savedState?.progress || content.progress || 0;
+    const isTrailer = content.type === 'trailer' || content.playMode === 'trailer';
+    const savedState = isTrailer ? undefined : currentUser?.continueWatching?.find(i => i.movieId === content.id);
+    const initialProgress = savedState?.progress || (isTrailer ? 0 : (content.progress || 0));
     const initialDuration = savedState?.duration || 0;
 
     // State
@@ -139,6 +140,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         if (initialProgress > 0) {
             const seekTime = (initialProgress / 100) * playerDuration;
             event.target.seekTo(seekTime, true);
+        } else {
+            // Force high quality start for new playbacks
+            event.target.setPlaybackQuality('hd1080');
         }
         if (playing) event.target.playVideo();
         event.target.loadModule('captions');
@@ -320,7 +324,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     // Save Progress Store
     useEffect(() => {
-        if (isDriveVideo) return;
+        if (isDriveVideo || isTrailer) return;
         const saveInterval = setInterval(() => {
             if (duration > 0) updatePlaybackProgress(content.id, progressRef.current, currentTime, duration);
         }, 5000);
@@ -328,7 +332,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             clearInterval(saveInterval);
             if (duration > 0) updatePlaybackProgress(content.id, progressRef.current, currentTime, duration);
         };
-    }, [content.id, duration, isDriveVideo]);
+    }, [content.id, duration, isDriveVideo, isTrailer]);
 
 
     // Controls Visibility Timer

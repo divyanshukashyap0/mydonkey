@@ -47,7 +47,7 @@ export const MOCK_CONTENT: (ContentItem & { rank?: number })[] = [
     backdrop_path: 'https://picsum.photos/1920/1080?random=1',
     type: ContentType.SERIES,
     rating: 'U/A 16+',
-    year: 2024,
+    year: 2026,
     tags: ['Drama', 'Crime', 'Thriller'],
     isOriginal: true,
     progress: 45,
@@ -60,7 +60,7 @@ export const MOCK_CONTENT: (ContentItem & { rank?: number })[] = [
     ],
     youtubeId: 'dummy_yt_1',
     genres: ['Crime', 'Thriller'],
-    release_date: '2024-01-01',
+    release_date: '2026-01-01',
     vote_average: 8.5,
     createdAt: new Date().toISOString()
   },
@@ -181,7 +181,7 @@ export const MOCK_CONTENT: (ContentItem & { rank?: number })[] = [
     tags: ['Comedy', 'Viral'],
     youtubeId: 'dummy_yt_6',
     genres: ['Comedy'],
-    release_date: '2024-01-01',
+    release_date: '2026-01-01',
     vote_average: 9.2,
     createdAt: new Date().toISOString()
   },
@@ -195,7 +195,7 @@ export const MOCK_CONTENT: (ContentItem & { rank?: number })[] = [
     tags: ['Food', 'DIY'],
     youtubeId: 'dummy_yt_7',
     genres: ['DIY'],
-    release_date: '2024-01-01',
+    release_date: '2026-01-01',
     vote_average: 8.5,
     createdAt: new Date().toISOString()
   },
@@ -321,9 +321,9 @@ export const MOCK_CONTENT: (ContentItem & { rank?: number })[] = [
     tags: ['F1', 'Highlights'],
     youtubeId: 'dummy_yt_14',
     genres: ['Sports', 'Racing'],
-    release_date: '2024-05-26',
+    release_date: '2026-05-26',
     vote_average: 9.5,
-    createdAt: '2024-05-26T14:00:00Z'
+    createdAt: '2026-05-26T14:00:00Z'
   },
   {
     id: '15',
@@ -335,9 +335,9 @@ export const MOCK_CONTENT: (ContentItem & { rank?: number })[] = [
     tags: ['Chess', 'Strategy'],
     youtubeId: 'dummy_yt_15',
     genres: ['Sports', 'Strategy'],
-    release_date: '2024-11-20',
+    release_date: '2026-11-20',
     vote_average: 8.8,
-    createdAt: '2024-11-20T10:00:00Z'
+    createdAt: '2026-11-20T10:00:00Z'
   },
   {
     id: '16',
@@ -349,9 +349,9 @@ export const MOCK_CONTENT: (ContentItem & { rank?: number })[] = [
     tags: ['UFC', 'Fighting'],
     youtubeId: 'dummy_yt_16',
     genres: ['Sports', 'Fighting'],
-    release_date: '2024-04-13',
+    release_date: '2026-04-13',
     vote_average: 9.2,
-    createdAt: '2024-04-13T22:00:00Z'
+    createdAt: '2026-04-13T22:00:00Z'
   },
   {
     id: 'mov_1',
@@ -512,9 +512,9 @@ export const FOOTER_PAGE_CONTENT: Record<string, InfoPageData> = {
       },
       {
         heading: 'Our Journey',
-        content: 'Founded in 2024, My Donkey started as a small project to highlight regional Indian cinema and has quickly grown into a global powerhouse featuring international content, live sports, and cutting-edge interactive features.',
+        content: 'Founded in 2026, My Donkey started as a small project to highlight regional Indian cinema and has quickly grown into a global powerhouse featuring international content, live sports, and cutting-edge interactive features.',
         steps: [
-          '2024: Founded in Mumbai',
+          '2026: Founded in Mumbai',
           '2025: Launched Global Streaming',
           '2025: Reached 10 Million Subscribers'
         ]
@@ -563,14 +563,14 @@ export const FOOTER_PAGE_CONTENT: Record<string, InfoPageData> = {
     sections: [
       {
         heading: 'Media Inquiries',
-        content: 'For press related questions, please contact press@mydonkey.com'
+        content: 'For press related questions, please contact press@mydonkey.in'
       },
       {
         heading: 'Recent News',
         listItems: [
           'My Donkey acquires rights to IPL 2026',
           'New partnership with Major Hollywood Studios',
-          'Quarterly Earnings Report: Q4 2024'
+          'Quarterly Earnings Report: Q4 2026'
         ]
       }
     ]
@@ -601,7 +601,7 @@ export const FOOTER_PAGE_CONTENT: Record<string, InfoPageData> = {
       },
       {
         heading: 'Financial Reports',
-        listItems: ['Annual Report 2024', 'Q3 2024 Earnings Call Transcript']
+        listItems: ['Annual Report 2026', 'Q3 2026 Earnings Call Transcript']
       }
     ]
   },
@@ -621,7 +621,7 @@ export const FOOTER_PAGE_CONTENT: Record<string, InfoPageData> = {
       },
       {
         heading: 'Contact Support',
-        content: 'Our team is available 24/7. Call us at 1-800-DONKEY-HELP or email support@mydonkey.com'
+        content: 'Our team is available 24/7. Call us at 1-800-DONKEY-HELP or email support@mydonkey.in'
       }
     ]
   },

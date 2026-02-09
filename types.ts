@@ -82,6 +82,7 @@ export interface SiteSettings {
   heroVideoQuality?: 'auto' | 'hd720' | 'hd1080' | 'highres';
   maintenanceMode: boolean;
   contactEmail?: string;
+  theme?: 'default' | 'luxury';
 }
 
 export interface Plan {
@@ -128,6 +129,7 @@ export interface User {
   autoplayEnabled?: boolean; // Controls hero video autoplay - default false on mobile
   readNotifications?: string[];
   autoFullscreen?: boolean; // User preference for auto-fullscreen
+  isGuest?: boolean;
 }
 
 export interface ContinueWatchingItem {

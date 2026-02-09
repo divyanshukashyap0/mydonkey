@@ -121,7 +121,7 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
 
                     <div className="flex flex-wrap items-center gap-2 md:gap-4 text-white font-medium text-sm md:text-base animate-fade-up delay-100 opacity-0">
                         <span className="text-green-400 font-bold">{(item.vote_average * 10).toFixed(0)}% Match</span>
-                        <span>{item.release_date ? item.release_date.split('-')[0] : '2024'}</span>
+                        <span>{item.release_date ? item.release_date.split('-')[0] : '2026'}</span>
                         <span className="bg-gray-800 px-2 py-0.5 rounded border border-gray-600 text-xs">{item.rating || 'U/A 13+'}</span>
                         <span className="bg-brand-red/20 text-brand-red border border-brand-red px-2 py-0.5 rounded text-xs">{item.resolution || '4K'}</span>
                     </div>

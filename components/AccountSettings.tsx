@@ -116,6 +116,51 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
         }
     };
 
+    if (currentUser.isGuest) {
+        return (
+            <div className="min-h-screen bg-[#0f0617] text-white font-sans flex items-center justify-center p-4">
+                <div className="max-w-md w-full bg-white/5 border border-white/10 rounded-2xl p-8 text-center shadow-2xl">
+                    <div className="w-20 h-20 bg-gradient-to-br from-gray-700 to-gray-900 rounded-full mx-auto flex items-center justify-center mb-6 shadow-lg shadow-black/50">
+                        <UserIcon size={40} className="text-gray-400" />
+                    </div>
+                    <h1 className="text-2xl font-bold mb-2">Guest Access</h1>
+                    <p className="text-gray-400 mb-8 text-sm">You are currently browsing as a Guest. Some features are limited to protect our content and community.</p>
+
+                    <div className="bg-white/5 rounded-xl p-4 mb-8 text-left space-y-3 border border-white/5">
+                        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Restrictions</h3>
+                        <div className="flex items-center gap-3 text-sm text-gray-300">
+                            <Download size={16} className="text-red-400" />
+                            <span>Downloads are disabled</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-sm text-gray-300">
+                            <Settings size={16} className="text-red-400" />
+                            <span>Watch history is not saved</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-sm text-gray-300">
+                            <CreditCard size={16} className="text-red-400" />
+                            <span>Cannot subscribe to plans</span>
+                        </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        <button
+                            onClick={logout}
+                            className="w-full py-3 bg-brand-red hover:bg-red-700 text-white font-bold rounded-xl transition shadow-lg shadow-brand-red/20"
+                        >
+                            Create Account / Sign In
+                        </button>
+                        <button
+                            onClick={logout}
+                            className="w-full py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl transition"
+                        >
+                            Exit Guest Session
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen bg-[#0f0617] text-white font-sans">
 

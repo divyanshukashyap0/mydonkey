@@ -8,16 +8,31 @@ interface DeviceManagementModalProps {
 }
 
 const DeviceManagementModal: React.FC<DeviceManagementModalProps> = ({ onClose }) => {
-    const { getDevices, logoutAllDevices } = useStore();
+    const { getDevices, logoutAllDevices, currentUser } = useStore();
     const [devices, setDevices] = useState<Device[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        if (currentUser?.isGuest) return;
         getDevices().then(data => {
             setDevices(data);
             setLoading(false);
         });
-    }, [getDevices]);
+    }, [getDevices, currentUser]);
+
+    if (currentUser?.isGuest) {
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+                <div className="bg-[#181818] rounded-2xl w-full max-w-md p-6 border border-white/10 text-center">
+                    <h2 className="text-xl font-bold mb-4">Device Management</h2>
+                    <p className="text-gray-400 mb-6">Guest users cannot manage devices. Please sign in to access this feature.</p>
+                    <button onClick={onClose} className="px-6 py-2 bg-white text-black font-bold rounded-lg hover:bg-gray-200 transition">
+                        Close
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     const handleSignOutAll = async () => {
         if (confirm("Are you sure you want to sign out of all devices? You will be signed out immediately.")) {

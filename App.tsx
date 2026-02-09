@@ -114,11 +114,12 @@ const CategoryGrid = ({ title, items, onPlay, onDetails, withHero = false }: any
             <h1 className="text-3xl md:text-5xl font-black mb-8 animate-in slide-in-from-left">{title}</h1>
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6 animate-in slide-in-from-bottom-8 duration-500">
                 {items.map((item: Content) => (
-                    <div key={item.id} className="group cursor-pointer" onClick={() => onDetails(item)}>
+                    <div key={item.id} className="group cursor-pointer select-none" onClick={() => onDetails(item)}>
                         <div className="aspect-[2/3] rounded-lg overflow-hidden relative shadow-lg border border-transparent hover:border-white/20 transition-all">
                             <img
                                 src={item.poster_path}
                                 className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                                draggable={false}
                             />
                             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex flex-col justify-end p-4 transition-opacity">
                                 <div className="flex items-center gap-2 mb-2">

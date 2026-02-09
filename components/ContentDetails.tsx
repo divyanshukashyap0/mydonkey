@@ -10,7 +10,7 @@ interface ContentDetailsProps {
 }
 
 const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPlay }) => {
-    const { currentProfile, toggleWatchlist } = useStore();
+    const { currentProfile, toggleWatchlist, currentUser } = useStore();
     const isAdded = currentProfile?.myList.includes(content.id);
 
     // State for Season Selection (TV Shows)
@@ -92,7 +92,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                             <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-gray-300">
                                 <span className="text-green-400 font-bold">{(content.vote_average * 10).toFixed(0)}% Match</span>
                                 <span>•</span>
-                                <span>{content.release_date?.split('-')[0] || '2024'}</span>
+                                <span>{content.release_date?.split('-')[0] || '2026'}</span>
                                 <span>•</span>
                                 <span className="border border-white/30 px-1 rounded text-[10px]">{content.rating || 'U/A 13+'}</span>
                                 <span>•</span>
@@ -175,6 +175,10 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                 <span className="text-[10px] text-gray-400">Share</span>
                             </div>
                             <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-90 transition" onClick={() => {
+                                if (currentUser?.isGuest) {
+                                    alert('Guest mode download is not allowed. Please log in with your credentials to download this content.');
+                                    return;
+                                }
                                 if (content.allowDownload && content.movieDriveId) {
                                     window.open(`https://drive.google.com/uc?id=${content.movieDriveId}&export=download`, '_blank');
                                 } else {
@@ -325,6 +329,10 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                 </button>
                                 <button
                                     onClick={() => {
+                                        if (currentUser?.isGuest) {
+                                            alert('Guest mode download is not allowed. Please log in with your credentials to download this content.');
+                                            return;
+                                        }
                                         if (content.allowDownload && content.movieDriveId) {
                                             window.open(`https://drive.google.com/uc?id=${content.movieDriveId}&export=download`, '_blank');
                                         } else {
