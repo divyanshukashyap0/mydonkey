@@ -38,13 +38,11 @@ export const logUserActivity = async (
         });
 
         // Update 'lastActiveAt' on user profile for quick Online/Offline status
-        // Skip for guests as they don't have a permanent user doc
-        if (!isGuest) {
-            const userRef = doc(db, 'users', userId);
-            updateDoc(userRef, {
-                lastActiveAt: serverTimestamp()
-            }).catch(err => console.error("Failed to update lastActiveAt", err));
-        }
+        // Now that guests are persisted, we can update them too!
+        const userRef = doc(db, 'users', userId);
+        updateDoc(userRef, {
+            lastActiveAt: serverTimestamp()
+        }).catch(err => console.error("Failed to update lastActiveAt", err));
 
     } catch (error) {
         console.error("Error logging activity:", error);
