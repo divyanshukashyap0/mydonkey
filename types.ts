@@ -117,7 +117,7 @@ export interface User {
   razorpayCustomerId?: string;
   plan: string;
   subscriptionStatus?: 'active' | 'inactive' | 'canceled';
-  role?: 'user' | 'admin';
+  role?: 'user' | 'admin' | 'guest';
   status?: 'active' | 'blocked';
   lastLoginAt?: string;
   lastLogoutAt?: string;

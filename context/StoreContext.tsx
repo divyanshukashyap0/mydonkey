@@ -39,11 +39,14 @@ import {
     getDoc,
     getDocs,
     setDoc,
+    addDoc,
     updateDoc,
     deleteDoc,
     onSnapshot,
     query,
-    orderBy
+    orderBy,
+    where,
+    serverTimestamp
 } from 'firebase/firestore';
 
 interface StoreContextType {
@@ -259,6 +262,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                         };
                         await setDoc(doc(db, 'users', firebaseUser.uid, 'profiles', profileId), defaultProfile);
                         setCurrentProfile(defaultProfile); // Set immediately for guests
+                        setCurrentUser(newAppUser);
                     } else {
                         const userData = userSnap.data() as AppUser;
                         // Check token version to force logout if needed
@@ -282,537 +286,522 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                             }
                         }
                     }
-                    const userData = userSnap.data() as AppUser;
-                    // Check token version to force logout if needed
-                    const localTokenVersion = localStorage.getItem('tokenVersion');
-                    if (userData.tokenVersion && localTokenVersion && parseInt(localTokenVersion) < userData.tokenVersion) {
-                        await signOut(auth);
-                        // Cleanup happens via auth listener
-                        return;
-                    }
-                    if (userData.tokenVersion) {
-                        localStorage.setItem('tokenVersion', userData.tokenVersion.toString());
-                    }
 
-                    setCurrentUser(userData);
+                    // setIsAuthenticated(true); // Already set optimistically
+                } else {
+                    setCurrentUser(null);
+                    setCurrentProfile(null);
+                    setUserProfiles([]);
+                    setIsAuthenticated(false);
                 }
-                // setIsAuthenticated(true); // Already set optimistically
-            } else {
-                setCurrentUser(null);
-                setCurrentProfile(null);
-                setUserProfiles([]);
-                setIsAuthenticated(false);
+            } catch (error) {
+                console.error("Error fetching user data:", error);
+
+                // CRITICAL FIX: If we have a firebaseUser but DB failed, 
+                // we should STILL treat them as authenticated to avoid login loops.
+                // We'll just have incomplete data until a retry or reload happens.
+                if (firebaseUser) {
+                    // Create a temporary fallback user object so the app doesn't crash
+                    const fallbackUser: AppUser = {
+                        uid: firebaseUser.uid,
+                        email: firebaseUser.email || '',
+                        plan: 'Free',
+                        role: 'user',
+                        status: 'active',
+                        lastLoginAt: new Date().toISOString()
+                    };
+                    setCurrentUser(fallbackUser);
+                    setIsAuthenticated(true);
+                } else {
+                    setIsAuthenticated(false);
+                }
+            } finally {
+                setIsLoading(false);
             }
-        } catch (error) {
-            console.error("Error fetching user data:", error);
-
-            // CRITICAL FIX: If we have a firebaseUser but DB failed, 
-            // we should STILL treat them as authenticated to avoid login loops.
-            // We'll just have incomplete data until a retry or reload happens.
-            if (firebaseUser) {
-                // Create a temporary fallback user object so the app doesn't crash
-                const fallbackUser: AppUser = {
-                    uid: firebaseUser.uid,
-                    email: firebaseUser.email || '',
-                    plan: 'Free',
-                    role: 'user',
-                    status: 'active',
-                    lastLoginAt: new Date().toISOString()
-                };
-                setCurrentUser(fallbackUser);
-                setIsAuthenticated(true);
-            } else {
-                setIsAuthenticated(false);
-            }
-        } finally {
-            setIsLoading(false);
-        }
-    });
-    return () => unsubscribe();
-}, []);
-
-// 2. Data Sync Listeners
-useEffect(() => {
-    const unsubContent = onSnapshot(collection(db, 'content'), (snap) => {
-        setContent(snap.docs.map(d => ({ ...d.data(), id: d.id } as Content)));
-    });
-
-    const unsubSettings = onSnapshot(doc(db, 'settings', 'global'), (doc) => {
-        if (doc.exists()) setSettings(doc.data() as SiteSettings);
-    });
-
-    const unsubSections = onSnapshot(query(collection(db, 'sections'), orderBy('order')), (snap) => {
-        setSections(snap.docs.map(d => ({ ...d.data(), id: d.id } as Section)));
-    });
-
-    const unsubPlans = onSnapshot(collection(db, 'plans'), (snap) => {
-        setPlans(snap.docs.map(d => ({ ...d.data(), id: d.id } as Plan)));
-    });
-
-    const unsubNotifs = onSnapshot(query(collection(db, 'notifications'), orderBy('createdAt', 'desc')), (snap) => {
-        setNotifications(snap.docs.map(d => ({ ...d.data(), id: d.id } as Notification)));
-    });
-
-    let unsubUsers = () => { };
-    if (currentUser?.role === 'admin') {
-        unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-            setUsers(snap.docs.map(d => d.data() as AppUser));
         });
-    }
+        return () => unsubscribe();
+    }, []);
 
-    return () => {
-        unsubContent();
-        unsubSettings();
-        unsubSections();
-        unsubPlans();
-        unsubNotifs();
-        unsubUsers();
-    };
-}, [currentUser?.role]);
+    // 2. Data Sync Listeners
+    useEffect(() => {
+        const unsubContent = onSnapshot(collection(db, 'content'), (snap) => {
+            setContent(snap.docs.map(d => ({ ...d.data(), id: d.id } as Content)));
+        });
 
-// 3. User Specific Sync
-useEffect(() => {
-    if (!fbUser) return;
+        const unsubSettings = onSnapshot(doc(db, 'settings', 'global'), (doc) => {
+            if (doc.exists()) setSettings(doc.data() as SiteSettings);
+        });
 
-    const unsubUserDoc = onSnapshot(doc(db, 'users', fbUser.uid), (doc) => {
-        if (doc.exists()) setCurrentUser(doc.data() as AppUser);
-    });
+        const unsubSections = onSnapshot(query(collection(db, 'sections'), orderBy('order')), (snap) => {
+            setSections(snap.docs.map(d => ({ ...d.data(), id: d.id } as Section)));
+        });
 
-    const unsubProfiles = onSnapshot(collection(db, 'users', fbUser.uid, 'profiles'), (snap) => {
-        const profiles = snap.docs.map(d => d.data() as Profile);
-        setUserProfiles(profiles);
+        const unsubPlans = onSnapshot(collection(db, 'plans'), (snap) => {
+            setPlans(snap.docs.map(d => ({ ...d.data(), id: d.id } as Plan)));
+        });
 
-        if (currentProfile) {
-            const updated = profiles.find(p => p.id === currentProfile.id);
-            if (updated) setCurrentProfile(updated);
+        const unsubNotifs = onSnapshot(query(collection(db, 'notifications'), orderBy('createdAt', 'desc')), (snap) => {
+            setNotifications(snap.docs.map(d => ({ ...d.data(), id: d.id } as Notification)));
+        });
+
+        let unsubUsers = () => { };
+        if (currentUser?.role === 'admin') {
+            unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
+                setUsers(snap.docs.map(d => d.data() as AppUser));
+            });
         }
-    });
 
-    return () => {
-        unsubUserDoc();
-        unsubProfiles();
+        return () => {
+            unsubContent();
+            unsubSettings();
+            unsubSections();
+            unsubPlans();
+            unsubNotifs();
+            unsubUsers();
+        };
+    }, [currentUser?.role]);
+
+    // 3. User Specific Sync
+    useEffect(() => {
+        if (!fbUser) return;
+
+        const unsubUserDoc = onSnapshot(doc(db, 'users', fbUser.uid), (doc) => {
+            if (doc.exists()) setCurrentUser(doc.data() as AppUser);
+        });
+
+        const unsubProfiles = onSnapshot(collection(db, 'users', fbUser.uid, 'profiles'), (snap) => {
+            const profiles = snap.docs.map(d => d.data() as Profile);
+            setUserProfiles(profiles);
+
+            if (currentProfile) {
+                const updated = profiles.find(p => p.id === currentProfile.id);
+                if (updated) setCurrentProfile(updated);
+            }
+        });
+
+        return () => {
+            unsubUserDoc();
+            unsubProfiles();
+        };
+    }, [fbUser, currentProfile?.id]);
+
+    // Methods
+    const login = async (email: string, password: string) => {
+        await signInWithEmailAndPassword(auth, email, password);
     };
-}, [fbUser, currentProfile?.id]);
 
-// Methods
-const login = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
-};
+    const signup = async (email: string, password: string) => {
+        await createUserWithEmailAndPassword(auth, email, password);
+    };
 
-const signup = async (email: string, password: string) => {
-    await createUserWithEmailAndPassword(auth, email, password);
-};
-
-const loginWithGoogle = async () => {
-    const provider = new GoogleAuthProvider();
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
-
-    // on mobile: typically redirect is preferred, but for local debugging/PWA contexts, popup often works better 
-    // or avoids domain mismatch errors.
-    try {
-        await signInWithPopup(auth, provider);
-    } catch (error: any) {
-        console.error("Popup login failed, trying redirect override:", error);
-        if (isMobile && error.code === 'auth/popup-blocked') {
-            await signInWithRedirect(auth, provider);
-        } else {
-            throw error;
-        }
-    }
-};
-
-const loginWithApple = async () => {
-    const provider = new OAuthProvider('apple.com');
-    provider.addScope('email');
-    provider.addScope('name');
-
-    try {
-        await signInWithPopup(auth, provider);
-    } catch (error: any) {
-        console.error("Apple login failed:", error);
+    const loginWithGoogle = async () => {
+        const provider = new GoogleAuthProvider();
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
 
-        // Fallback to redirect if popup is blocked (common on mobile)
-        if (isMobile && (error.code === 'auth/popup-blocked' || error.code === 'auth/operation-not-supported-in-this-environment')) {
-            await signInWithRedirect(auth, provider);
-        } else if (error.code === 'auth/operation-not-allowed') {
-            throw new Error("Apple Sign-In is not enabled in the database. Please contact support.");
-        } else {
-            throw error;
+        // on mobile: typically redirect is preferred, but for local debugging/PWA contexts, popup often works better 
+        // or avoids domain mismatch errors.
+        try {
+            await signInWithPopup(auth, provider);
+        } catch (error: any) {
+            console.error("Popup login failed, trying redirect override:", error);
+            if (isMobile && error.code === 'auth/popup-blocked') {
+                await signInWithRedirect(auth, provider);
+            } else {
+                throw error;
+            }
         }
-    }
-};
+    };
 
-const loginAsGuest = async () => {
-    await signInAnonymously(auth);
-};
+    const loginWithApple = async () => {
+        const provider = new OAuthProvider('apple.com');
+        provider.addScope('email');
+        provider.addScope('name');
 
-const logout = async () => {
-    if (fbUser && !fbUser.isAnonymous) {
-        await updateDoc(doc(db, 'users', fbUser.uid), { lastLogoutAt: new Date().toISOString() });
-    }
-    await signOut(auth);
-    setCurrentProfile(null);
-    // window.location.reload(); // Removed to prevent full page refresh
-};
+        try {
+            await signInWithPopup(auth, provider);
+        } catch (error: any) {
+            console.error("Apple login failed:", error);
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
 
-const addContent = async (item: Content) => {
-    await setDoc(doc(db, 'content', item.id), item);
-};
+            // Fallback to redirect if popup is blocked (common on mobile)
+            if (isMobile && (error.code === 'auth/popup-blocked' || error.code === 'auth/operation-not-supported-in-this-environment')) {
+                await signInWithRedirect(auth, provider);
+            } else if (error.code === 'auth/operation-not-allowed') {
+                throw new Error("Apple Sign-In is not enabled in the database. Please contact support.");
+            } else {
+                throw error;
+            }
+        }
+    };
 
-const updateContent = async (id: string, updates: Partial<Content>) => {
-    await updateDoc(doc(db, 'content', id), updates);
-};
+    const loginAsGuest = async () => {
+        await signInAnonymously(auth);
+    };
 
-const deleteContent = async (id: string) => {
-    await deleteDoc(doc(db, 'content', id));
-};
-
-const updateSettings = async (updates: Partial<SiteSettings>) => {
-    await setDoc(doc(db, 'settings', 'global'), updates, { merge: true });
-};
-
-const updateSections = async (newSections: Section[]) => {
-    for (const s of newSections) {
-        await setDoc(doc(db, 'sections', s.id), s);
-    }
-};
-
-const toggleSectionVisibility = async (id: string) => {
-    const section = sections.find(s => s.id === id);
-    if (section) {
-        await updateDoc(doc(db, 'sections', id), { enabled: !section.enabled });
-    }
-};
-
-const updateUser = async (updates: Partial<AppUser>) => {
-    if (fbUser) {
-        await updateDoc(doc(db, 'users', fbUser.uid), updates);
-    }
-};
-
-const switchProfile = (profileId: string | null) => {
-    if (!profileId) {
+    const logout = async () => {
+        if (fbUser && !fbUser.isAnonymous) {
+            await updateDoc(doc(db, 'users', fbUser.uid), { lastLogoutAt: new Date().toISOString() });
+        }
+        await signOut(auth);
         setCurrentProfile(null);
-        return;
-    }
-    const profile = userProfiles.find(p => p.id === profileId);
-    if (profile) setCurrentProfile(profile);
-};
-
-const addProfile = async (name: string, isKids: boolean, avatarUrl: string) => {
-    if (!fbUser) return;
-    const id = `profile_${Date.now()}`;
-    const newProfile: Profile = { id, name, isKids, avatarUrl, myList: [] };
-    await setDoc(doc(db, 'users', fbUser.uid, 'profiles', id), newProfile);
-};
-
-const deleteProfile = async (profileId: string) => {
-    if (!fbUser) return;
-    await deleteDoc(doc(db, 'users', fbUser.uid, 'profiles', profileId));
-    if (currentProfile?.id === profileId) setCurrentProfile(null);
-};
-
-const toggleWatchlist = async (contentId: string) => {
-    if (!fbUser || !currentProfile) return;
-    const isAdded = currentProfile.myList.includes(contentId);
-    const newList = isAdded
-        ? currentProfile.myList.filter(id => id !== contentId)
-        : [...currentProfile.myList, contentId];
-
-    await updateDoc(doc(db, 'users', fbUser.uid, 'profiles', currentProfile.id), { myList: newList });
-};
-
-const updatePlaybackProgress = async (movieId: string, progress: number, stoppedAt: number, duration: number) => {
-    if (!fbUser || !currentUser) return;
-    const history = currentUser.continueWatching || [];
-    const existingIdx = history.findIndex(h => h.movieId === movieId);
-    const newEntry = {
-        movieId,
-        progress,
-        stoppedAt,
-        duration,
-        lastWatchedAt: new Date().toISOString()
+        // window.location.reload(); // Removed to prevent full page refresh
     };
-    let updatedHistory = [...history];
-    if (existingIdx > -1) updatedHistory[existingIdx] = newEntry;
-    else updatedHistory.unshift(newEntry);
-    updatedHistory = updatedHistory.slice(0, 20);
-    await updateUser({ continueWatching: updatedHistory });
-};
 
-// --- New Account Management Methods ---
-
-const updateUserEmail = async (newEmail: string) => {
-    if (!fbUser) return;
-    await updateEmail(fbUser, newEmail);
-    await updateUser({ email: newEmail });
-};
-
-const triggerPasswordReset = async () => {
-    if (!fbUser || !fbUser.email) return;
-    await sendPasswordResetEmail(auth, fbUser.email);
-};
-
-
-
-// ... existing imports
-
-// Inside StoreProvider logic (find updateSubscriptionPlan)
-
-const updateSubscriptionPlan = async (planId: string, paymentResponse?: any) => {
-    if (!fbUser) return;
-    const plan = plans.find(p => p.id === planId);
-    if (!plan) throw new Error("Plan not found");
-
-    await updateUser({ plan: plan.name, subscriptionStatus: 'active' });
-
-    const invoice: Invoice = {
-        id: `inv_${Date.now()}`,
-        amount: plan.price,
-        currency: 'INR', // Assuming INR based on mock data
-        date: new Date().toISOString(),
-        status: 'paid',
-        planName: plan.name,
-        periodStart: new Date().toISOString(),
-        periodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        pdfUrl: paymentResponse?.razorpay_payment_id ? `Ref: ${paymentResponse.razorpay_payment_id}` : undefined
+    const addContent = async (item: Content) => {
+        await setDoc(doc(db, 'content', item.id), item);
     };
-    await setDoc(doc(db, 'users', fbUser.uid, 'billing', invoice.id), invoice);
 
-    // Send Email Notification
-    await sendSubscriptionEmail(fbUser.email || '', plan.name, plan.price.toString());
-};
-
-const addPaymentMethod = async (method: Omit<PaymentMethod, 'id'>) => {
-    if (!fbUser) return;
-    const id = `pm_${Date.now()}`;
-    await setDoc(doc(db, 'users', fbUser.uid, 'paymentMethods', id), { ...method, id });
-};
-
-const deletePaymentMethod = async (id: string) => {
-    if (!fbUser) return;
-    await deleteDoc(doc(db, 'users', fbUser.uid, 'paymentMethods', id));
-};
-
-const getBillingHistory = async (): Promise<Invoice[]> => {
-    if (!fbUser) return [];
-    const snap = await getDocs(collection(db, 'users', fbUser.uid, 'billing'));
-    return snap.docs.map(d => d.data() as Invoice);
-};
-
-const getDevices = async (): Promise<Device[]> => {
-    if (!fbUser) return [];
-    const currentDevice: Device = {
-        id: 'current',
-        name: 'Current Browser',
-        type: 'desktop',
-        lastActiveAt: new Date().toISOString(),
-        isCurrent: true
+    const updateContent = async (id: string, updates: Partial<Content>) => {
+        await updateDoc(doc(db, 'content', id), updates);
     };
-    const snap = await getDocs(collection(db, 'users', fbUser.uid, 'devices'));
-    const storedDevices = snap.docs.map(d => d.data() as Device);
-    return [currentDevice, ...storedDevices];
-};
 
-const logoutAllDevices = async () => {
-    if (!fbUser) return;
-    await updateUser({ tokenVersion: Date.now() });
-    await logout();
-};
-
-const updateProfileAvatar = async (url: string) => {
-    if (!currentProfile || !fbUser) return;
-    const profileRef = doc(db, 'users', fbUser.uid, 'profiles', currentProfile.id);
-    await updateDoc(profileRef, { avatarUrl: url });
-    setCurrentProfile({ ...currentProfile, avatarUrl: url });
-};
-
-const submitContentRequest = async (title: string) => {
-    if (!fbUser || !currentUser) return;
-    const newRequestRef = doc(collection(db, 'requests'));
-    const now = new Date().toISOString();
-    const request: ContentRequest = {
-        id: newRequestRef.id,
-        userId: fbUser.uid,
-        userEmail: fbUser.email || '',
-        userName: currentUser.email.split('@')[0], // Fallback if name not available
-        contentTitle: title,
-        status: 'pending',
-        createdAt: now,
-        updatedAt: now
+    const deleteContent = async (id: string) => {
+        await deleteDoc(doc(db, 'content', id));
     };
-    await setDoc(newRequestRef, request);
-};
 
-const updateContentRequest = async (id: string, updates: Partial<ContentRequest>) => {
-    const reqRef = doc(db, 'requests', id);
-    await updateDoc(reqRef, { ...updates, updatedAt: new Date().toISOString() });
-};
+    const updateSettings = async (updates: Partial<SiteSettings>) => {
+        await setDoc(doc(db, 'settings', 'global'), updates, { merge: true });
+    };
 
-useEffect(() => {
-    if (currentUser?.role !== 'admin') {
-        setContentRequests([]);
-        return;
-    }
-
-    const q = query(collection(db, 'requests'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-        const reqs = snapshot.docs.map(doc => ({ ...doc.data() } as ContentRequest));
-        setContentRequests(reqs);
-    });
-
-    return () => unsubscribe();
-}, [currentUser]);
-
-const unlockContent = async (code: string): Promise<{ success: boolean; contentId?: string; message: string }> => {
-    if (!fbUser || !currentProfile) return { success: false, message: 'Please sign in first.' };
-
-    // 1. Find content with this code
-    // Note: In a real app with large DB, this should be a query. For now, client-side filter is okay or query.
-    // Let's use the local content state for speed, then verify with server if needed.
-    // Actually, for security, the code should ideally not be exposed in public 'content' if we didn't want users to inspect it. 
-    // But assumed 'content' collection is readable.
-
-    const targetContent = content.find(c => c.accessCode === code);
-
-    if (!targetContent) {
-        return { success: false, message: 'Invalid Access Code.' };
-    }
-
-    if (currentProfile.unlockedContent?.includes(targetContent.id)) {
-        return { success: true, contentId: targetContent.id, message: 'Content already unlocked!' };
-    }
-
-    // 2. Unlock it
-    const newUnlockedList = [...(currentProfile.unlockedContent || []), targetContent.id];
-    await updateDoc(doc(db, 'users', fbUser.uid, 'profiles', currentProfile.id), {
-        unlockedContent: newUnlockedList
-    });
-
-    // 3. Update local state immediately for responsiveness
-    setCurrentProfile({ ...currentProfile, unlockedContent: newUnlockedList });
-
-    return { success: true, contentId: targetContent.id, message: `Unlocked: ${targetContent.title}` };
-};
-
-const markNotificationAsRead = async (notificationId: string) => {
-    if (!fbUser || !currentUser) return;
-    const currentRead = currentUser.readNotifications || [];
-    if (currentRead.includes(notificationId)) return;
-
-    const newReadList = [...currentRead, notificationId];
-    // Optimistic update
-    setCurrentUser({ ...currentUser, readNotifications: newReadList });
-
-    await updateUser({ readNotifications: newReadList });
-};
-
-// Compute notifications with read status
-const processedNotifications = useMemo(() => {
-    if (!currentUser) return notifications;
-    return notifications.map(n => ({
-        ...n,
-        read: currentUser.readNotifications?.includes(n.id) || false
-    }));
-}, [notifications, currentUser?.readNotifications]);
-
-const contextValue = useMemo(() => ({
-    isAuthenticated,
-    isLoading,
-    login,
-    signup,
-    loginWithGoogle,
-    loginWithApple,
-    loginAsGuest,
-    logout,
-    content,
-    users,
-    currentUser,
-    currentProfile,
-    userProfiles,
-    settings,
-    sections,
-    plans,
-    notifications: processedNotifications,
-    addContent,
-    updateContent,
-    deleteContent,
-    updateSettings,
-    updateSections,
-    toggleSectionVisibility,
-    updateUser,
-    toggleWatchlist,
-    switchProfile,
-    addProfile,
-    deleteProfile,
-    updatePlaybackProgress,
-    updateUserEmail,
-    triggerPasswordReset,
-    updateSubscriptionPlan,
-    addPaymentMethod,
-    deletePaymentMethod,
-    getBillingHistory,
-    getDevices,
-    logoutAllDevices,
-    updateProfileAvatar,
-    unlockContent,
-    markNotificationAsRead,
-    isInstallable,
-    isIOS,
-    installPwa,
-    contentRequests,
-    submitContentRequest,
-    updateContentRequest,
-    updateContentDuration: async (id: string, duration: string) => {
-        if (!currentUser || currentUser.role !== 'admin') return;
-        // Only update if it's a valid duration string
-        if (duration && duration.length > 0) {
-            await updateDoc(doc(db, 'content', id), { duration });
+    const updateSections = async (newSections: Section[]) => {
+        for (const s of newSections) {
+            await setDoc(doc(db, 'sections', s.id), s);
         }
-    }
-}), [
-    isAuthenticated,
-    isLoading,
-    content,
-    users,
-    currentUser,
-    currentProfile,
-    userProfiles,
-    settings,
-    sections,
-    plans,
-    processedNotifications,
-    isInstallable,
-    isIOS,
-    contentRequests,
-    submitContentRequest,
-    updateContentRequest
-]);
+    };
 
-// Safeguard: Force loading to end after 5 seconds if auth hangs
-useEffect(() => {
-    const timer = setTimeout(() => {
-        if (isLoading) {
-            console.warn("Auth initialization timed out, forcing app load.");
-            setIsLoading(false);
+    const toggleSectionVisibility = async (id: string) => {
+        const section = sections.find(s => s.id === id);
+        if (section) {
+            await updateDoc(doc(db, 'sections', id), { enabled: !section.enabled });
         }
-    }, 5000);
-    return () => clearTimeout(timer);
-}, [isLoading]);
+    };
 
-return (
-    <StoreContext.Provider value={contextValue}>
-        {isLoading ? (
-            <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white">
-                <div className="w-12 h-12 border-4 border-brand-red/30 border-t-brand-red rounded-full animate-spin mb-4" />
-                <p className="text-gray-400 text-sm animate-pulse">Initializing...</p>
-            </div>
-        ) : (
-            children
-        )}
-    </StoreContext.Provider>
-);
+    const updateUser = async (updates: Partial<AppUser>) => {
+        if (fbUser) {
+            await updateDoc(doc(db, 'users', fbUser.uid), updates);
+        }
+    };
+
+    const switchProfile = (profileId: string | null) => {
+        if (!profileId) {
+            setCurrentProfile(null);
+            return;
+        }
+        const profile = userProfiles.find(p => p.id === profileId);
+        if (profile) setCurrentProfile(profile);
+    };
+
+    const addProfile = async (name: string, isKids: boolean, avatarUrl: string) => {
+        if (!fbUser) return;
+        const id = `profile_${Date.now()}`;
+        const newProfile: Profile = { id, name, isKids, avatarUrl, myList: [] };
+        await setDoc(doc(db, 'users', fbUser.uid, 'profiles', id), newProfile);
+    };
+
+    const deleteProfile = async (profileId: string) => {
+        if (!fbUser) return;
+        await deleteDoc(doc(db, 'users', fbUser.uid, 'profiles', profileId));
+        if (currentProfile?.id === profileId) setCurrentProfile(null);
+    };
+
+    const toggleWatchlist = async (contentId: string) => {
+        if (!fbUser || !currentProfile) return;
+        const isAdded = currentProfile.myList.includes(contentId);
+        const newList = isAdded
+            ? currentProfile.myList.filter(id => id !== contentId)
+            : [...currentProfile.myList, contentId];
+
+        await updateDoc(doc(db, 'users', fbUser.uid, 'profiles', currentProfile.id), { myList: newList });
+    };
+
+    const updatePlaybackProgress = async (movieId: string, progress: number, stoppedAt: number, duration: number) => {
+        if (!fbUser || !currentUser) return;
+        const history = currentUser.continueWatching || [];
+        const existingIdx = history.findIndex(h => h.movieId === movieId);
+        const newEntry = {
+            movieId,
+            progress,
+            stoppedAt,
+            duration,
+            lastWatchedAt: new Date().toISOString()
+        };
+        let updatedHistory = [...history];
+        if (existingIdx > -1) updatedHistory[existingIdx] = newEntry;
+        else updatedHistory.unshift(newEntry);
+        updatedHistory = updatedHistory.slice(0, 20);
+        await updateUser({ continueWatching: updatedHistory });
+    };
+
+    // --- New Account Management Methods ---
+
+    const updateUserEmail = async (newEmail: string) => {
+        if (!fbUser) return;
+        await updateEmail(fbUser, newEmail);
+        await updateUser({ email: newEmail });
+    };
+
+    const triggerPasswordReset = async () => {
+        if (!fbUser || !fbUser.email) return;
+        await sendPasswordResetEmail(auth, fbUser.email);
+    };
+
+
+
+    // ... existing imports
+
+    // Inside StoreProvider logic (find updateSubscriptionPlan)
+
+    const updateSubscriptionPlan = async (planId: string, paymentResponse?: any) => {
+        if (!fbUser) return;
+        const plan = plans.find(p => p.id === planId);
+        if (!plan) throw new Error("Plan not found");
+
+        await updateUser({ plan: plan.name, subscriptionStatus: 'active' });
+
+        const invoice: Invoice = {
+            id: `inv_${Date.now()}`,
+            amount: plan.price,
+            currency: 'INR', // Assuming INR based on mock data
+            date: new Date().toISOString(),
+            status: 'paid',
+            planName: plan.name,
+            periodStart: new Date().toISOString(),
+            periodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            pdfUrl: paymentResponse?.razorpay_payment_id ? `Ref: ${paymentResponse.razorpay_payment_id}` : undefined
+        };
+        await setDoc(doc(db, 'users', fbUser.uid, 'billing', invoice.id), invoice);
+
+        // Send Email Notification
+        await sendSubscriptionEmail(fbUser.email || '', plan.name, plan.price.toString());
+    };
+
+    const addPaymentMethod = async (method: Omit<PaymentMethod, 'id'>) => {
+        if (!fbUser) return;
+        const id = `pm_${Date.now()}`;
+        await setDoc(doc(db, 'users', fbUser.uid, 'paymentMethods', id), { ...method, id });
+    };
+
+    const deletePaymentMethod = async (id: string) => {
+        if (!fbUser) return;
+        await deleteDoc(doc(db, 'users', fbUser.uid, 'paymentMethods', id));
+    };
+
+    const getBillingHistory = async (): Promise<Invoice[]> => {
+        if (!fbUser) return [];
+        const snap = await getDocs(collection(db, 'users', fbUser.uid, 'billing'));
+        return snap.docs.map(d => d.data() as Invoice);
+    };
+
+    const getDevices = async (): Promise<Device[]> => {
+        if (!fbUser) return [];
+        const currentDevice: Device = {
+            id: 'current',
+            name: 'Current Browser',
+            type: 'desktop',
+            lastActiveAt: new Date().toISOString(),
+            isCurrent: true
+        };
+        const snap = await getDocs(collection(db, 'users', fbUser.uid, 'devices'));
+        const storedDevices = snap.docs.map(d => d.data() as Device);
+        return [currentDevice, ...storedDevices];
+    };
+
+    const logoutAllDevices = async () => {
+        if (!fbUser) return;
+        await updateUser({ tokenVersion: Date.now() });
+        await logout();
+    };
+
+    const updateProfileAvatar = async (url: string) => {
+        if (!currentProfile || !fbUser) return;
+        const profileRef = doc(db, 'users', fbUser.uid, 'profiles', currentProfile.id);
+        await updateDoc(profileRef, { avatarUrl: url });
+        setCurrentProfile({ ...currentProfile, avatarUrl: url });
+    };
+
+
+
+    const updateContentRequest = async (id: string, updates: Partial<ContentRequest>) => {
+        const reqRef = doc(db, 'requests', id);
+        await updateDoc(reqRef, { ...updates, updatedAt: new Date().toISOString() });
+    };
+
+    const submitContentRequest = async (title: string) => {
+        if (!currentUser) throw new Error("Must be logged in");
+        await addDoc(collection(db, 'requests'), {
+            userId: currentUser.uid,
+            userEmail: currentUser.email,
+            userName: currentProfile?.name || 'User',
+            contentTitle: title,
+            status: 'pending',
+            createdAt: new Date().toISOString()
+        });
+    };
+
+    useEffect(() => {
+        if (currentUser?.role !== 'admin') {
+            setContentRequests([]);
+            return;
+        }
+
+        const q = query(collection(db, 'requests'), orderBy('createdAt', 'desc'));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const reqs = snapshot.docs.map(doc => ({ ...doc.data() } as ContentRequest));
+            setContentRequests(reqs);
+        });
+
+        return () => unsubscribe();
+    }, [currentUser]);
+
+    const unlockContent = async (code: string): Promise<{ success: boolean; contentId?: string; message: string }> => {
+        if (!fbUser || !currentProfile) return { success: false, message: 'Please sign in first.' };
+
+        // 1. Find content with this code
+        // Note: In a real app with large DB, this should be a query. For now, client-side filter is okay or query.
+        // Let's use the local content state for speed, then verify with server if needed.
+        // Actually, for security, the code should ideally not be exposed in public 'content' if we didn't want users to inspect it. 
+        // But assumed 'content' collection is readable.
+
+        const targetContent = content.find(c => c.accessCode === code);
+
+        if (!targetContent) {
+            return { success: false, message: 'Invalid Access Code.' };
+        }
+
+        if (currentProfile.unlockedContent?.includes(targetContent.id)) {
+            return { success: true, contentId: targetContent.id, message: 'Content already unlocked!' };
+        }
+
+        // 2. Unlock it
+        const newUnlockedList = [...(currentProfile.unlockedContent || []), targetContent.id];
+        await updateDoc(doc(db, 'users', fbUser.uid, 'profiles', currentProfile.id), {
+            unlockedContent: newUnlockedList
+        });
+
+        // 3. Update local state immediately for responsiveness
+        setCurrentProfile({ ...currentProfile, unlockedContent: newUnlockedList });
+
+        return { success: true, contentId: targetContent.id, message: `Unlocked: ${targetContent.title}` };
+    };
+
+    const markNotificationAsRead = async (notificationId: string) => {
+        if (!fbUser || !currentUser) return;
+        const currentRead = currentUser.readNotifications || [];
+        if (currentRead.includes(notificationId)) return;
+
+        const newReadList = [...currentRead, notificationId];
+        // Optimistic update
+        setCurrentUser({ ...currentUser, readNotifications: newReadList });
+
+        await updateUser({ readNotifications: newReadList });
+    };
+
+    // Compute notifications with read status
+    const processedNotifications = useMemo(() => {
+        if (!currentUser) return notifications;
+        return notifications.map(n => ({
+            ...n,
+            read: currentUser.readNotifications?.includes(n.id) || false
+        }));
+    }, [notifications, currentUser?.readNotifications]);
+
+    const contextValue = useMemo(() => ({
+        isAuthenticated,
+        isLoading,
+        login,
+        signup,
+        loginWithGoogle,
+        loginWithApple,
+        loginAsGuest,
+        logout,
+        content,
+        users,
+        currentUser,
+        currentProfile,
+        userProfiles,
+        settings,
+        sections,
+        plans,
+        notifications: processedNotifications,
+        addContent,
+        updateContent,
+        deleteContent,
+        updateSettings,
+        updateSections,
+        toggleSectionVisibility,
+        updateUser,
+        toggleWatchlist,
+        switchProfile,
+        addProfile,
+        deleteProfile,
+        updatePlaybackProgress,
+        updateUserEmail,
+        triggerPasswordReset,
+        updateSubscriptionPlan,
+        addPaymentMethod,
+        deletePaymentMethod,
+        getBillingHistory,
+        getDevices,
+        logoutAllDevices,
+        updateProfileAvatar,
+        unlockContent,
+        markNotificationAsRead,
+        isInstallable,
+        isIOS,
+        installPwa,
+        updateContentRequest,
+        submitContentRequest,
+        contentRequests,
+
+        updateContentDuration: async (id: string, duration: string) => {
+            if (!currentUser || currentUser.role !== 'admin') return;
+            // Only update if it's a valid duration string
+            if (duration && duration.length > 0) {
+                await updateDoc(doc(db, 'content', id), { duration });
+            }
+        }
+    }), [
+        isAuthenticated,
+        isLoading,
+        content,
+        users,
+        currentUser,
+        currentProfile,
+        userProfiles,
+        settings,
+        sections,
+        plans,
+        processedNotifications,
+        isInstallable,
+        isIOS,
+        contentRequests,
+        submitContentRequest,
+        updateContentRequest
+    ]);
+
+    // Safeguard: Force loading to end after 5 seconds if auth hangs
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (isLoading) {
+                console.warn("Auth initialization timed out, forcing app load.");
+                setIsLoading(false);
+            }
+        }, 5000);
+        return () => clearTimeout(timer);
+    }, [isLoading]);
+
+    return (
+        <StoreContext.Provider value={contextValue}>
+            {isLoading ? (
+                <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white">
+                    <div className="w-12 h-12 border-4 border-brand-red/30 border-t-brand-red rounded-full animate-spin mb-4" />
+                    <p className="text-gray-400 text-sm animate-pulse">Initializing...</p>
+                </div>
+            ) : (
+                children
+            )}
+        </StoreContext.Provider>
+    );
 };
 
 export const useStore = () => {
