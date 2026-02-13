@@ -25,7 +25,7 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
     },
     {
       title: 'Connect',
-      links: ['Ways to Watch', 'Speed Test', `Only on ${siteName}`, 'Account']
+      links: ['Ways to Watch', 'Speed Test', 'Request a Movie', `Only on ${siteName}`, 'Account']
     }
   ];
 

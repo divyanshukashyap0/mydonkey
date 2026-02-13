@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Youtube, HardDrive, Star, Check, X, Bell, ChevronDown, ChevronRight, Play, Lock } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Plus, Edit, Trash2, Youtube, HardDrive, Star, Check, X, Bell, ChevronDown, ChevronRight, Play, Lock, Search, Filter, MoreVertical, Archive } from 'lucide-react';
 import { useStore } from '../../../context/StoreContext';
 import { Content, Season, Episode } from '../../../types';
-import { doc, setDoc, deleteDoc, updateDoc, collection, addDoc, deleteField } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, updateDoc, collection, addDoc, deleteField, writeBatch } from 'firebase/firestore';
 import { db } from '../../../firebase';
 
 const MOVIE_GENRES = ["Action", "Adventure", "Comedy", "Drama", "Horror", "Sci-Fi", "Thriller", "Romance", "Documentary", "Animation"];
@@ -11,29 +11,36 @@ const TV_GENRES = ["Drama", "Comedy", "Reality", "Action", "Sci-Fi", "Documentar
 const ContentManager = () => {
     const { content, settings, updateSettings } = useStore();
     const [isEditing, setIsEditing] = useState(false);
-    const [filter, setFilter] = useState<'ALL' | 'movie' | 'tv'>('ALL');
+
+    // Filters & Search
+    const [filterType, setFilterType] = useState<'ALL' | 'movie' | 'tv'>('ALL');
+    const [filterStatus, setFilterStatus] = useState<'ALL' | 'published' | 'draft'>('ALL');
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Bulk Selection
+    const [selectedItems, setSelectedItems] = useState<string[]>([]);
+
     const [formData, setFormData] = useState<Partial<Content>>({});
 
     // Manage expanded season in UI
     const [expandedSeasonId, setExpandedSeasonId] = useState<string | null>(null);
 
     // Reset Form
-    const resetForm = () => {
+    const resetForm = (type: 'movie' | 'tv' = 'movie') => {
         setFormData({
-            type: 'movie',
+            type,
             genres: [],
             isPublished: false,
             allowDownload: true,
             allowPlayback: true,
             comingSoon: false,
             vote_average: 0,
-
             duration: '',
             rating: 'U/A 13+',
             resolution: 'HD',
             seasons: []
         });
-        setIsEditing(false);
+        setIsEditing(true);
         setExpandedSeasonId(null);
     };
 
@@ -166,7 +173,7 @@ const ContentManager = () => {
                 })) : []
             };
 
-            // Sanitize data (remove undefined fields which Firestore hates)
+            // Sanitize data
             const dataToSave = JSON.parse(JSON.stringify(finalData));
             await setDoc(doc(db, 'content', id), dataToSave);
 
@@ -184,7 +191,8 @@ const ContentManager = () => {
             }
 
             alert("Content saved successfully!");
-            resetForm();
+            setIsEditing(false);
+            setFormData({});
         } catch (e: any) {
             console.error(e);
             alert("Error saving content: " + e.message);
@@ -205,17 +213,61 @@ const ContentManager = () => {
         }
     };
 
-    const filteredContent = filter === 'ALL' ? content : content.filter(c => c.type === filter);
+    // --- Bulk Actions ---
+    const toggleSelection = (id: string) => {
+        setSelectedItems(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    };
+
+    const handleBulkDelete = async () => {
+        if (!confirm(`Delete ${selectedItems.length} items? This cannot be undone.`)) return;
+        const batch = writeBatch(db);
+        selectedItems.forEach(id => {
+            batch.delete(doc(db, 'content', id));
+        });
+        await batch.commit();
+        setSelectedItems([]);
+    };
+
+    const handleBulkPublish = async (status: boolean) => {
+        const batch = writeBatch(db);
+        selectedItems.forEach(id => {
+            batch.update(doc(db, 'content', id), { isPublished: status });
+        });
+        await batch.commit();
+        setSelectedItems([]);
+    };
+
+    // --- Filtering Logic ---
+    const filteredContent = useMemo(() => {
+        return content.filter(item => {
+            // Type Filter
+            if (filterType !== 'ALL' && item.type !== filterType) return false;
+
+            // Status Filter
+            if (filterStatus === 'published' && !item.isPublished) return false;
+            if (filterStatus === 'draft' && item.isPublished) return false;
+
+            // Search Filter
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                return item.title.toLowerCase().includes(q) ||
+                    item.genres.some(g => g.toLowerCase().includes(q)) ||
+                    item.tags?.some(t => t.toLowerCase().includes(q));
+            }
+            return true;
+        });
+    }, [content, filterType, filterStatus, searchQuery]);
 
     if (isEditing) {
         return (
             <div className="bg-[#141414] p-6 rounded-xl border border-white/5 animate-in fade-in max-h-[90vh] overflow-y-auto">
+                {/* Form Header */}
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-2xl font-bold flex items-center gap-2">
                         {formData.id ? 'Edit Content' : 'Add New Content'}
                         <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded text-gray-500 font-mono">v1.1</span>
                     </h2>
-                    <button onClick={resetForm} className="p-2 hover:bg-white/10 rounded"><X /></button>
+                    <button onClick={() => setIsEditing(false)} className="p-2 hover:bg-white/10 rounded"><X /></button>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -508,47 +560,89 @@ const ContentManager = () => {
                 )}
 
                 <div className="flex justify-end gap-4 mt-8 border-t border-white/10 pt-4">
-                    <button onClick={resetForm} className="px-6 py-2 rounded text-gray-400 font-bold hover:text-white">Cancel</button>
+                    <button onClick={() => setIsEditing(false)} className="px-6 py-2 rounded text-gray-400 font-bold hover:text-white">Cancel</button>
                     <button onClick={handleSave} className="px-6 py-2 rounded bg-red-600 text-white font-bold hover:bg-red-700">Save Content</button>
                 </div>
             </div>
         );
     }
 
-    // ... Render Hotstar-style card grid ...
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h2 className="text-2xl md:text-3xl font-black text-white">Content Library</h2>
-                    <p className="text-gray-500 text-sm">{filteredContent.length} titles</p>
+        <div className="space-y-6 pb-20">
+            {/* Header & Controls */}
+            <div className="flex flex-col gap-6">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h2 className="text-2xl md:text-3xl font-black text-white">Content Library</h2>
+                        <p className="text-gray-500 text-sm">{filteredContent.length} titles found</p>
+                    </div>
+                    <div className="flex gap-2">
+                        <button onClick={() => resetForm('movie')} className="bg-blue-600 px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-700 transition">
+                            <Plus size={18} /> Add Movie
+                        </button>
+                        <button onClick={() => resetForm('tv')} className="bg-purple-600 px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-purple-700 transition">
+                            <Plus size={18} /> Add TV Show
+                        </button>
+                    </div>
                 </div>
-                <button onClick={() => { resetForm(); setIsEditing(true); }} className="bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-2.5 rounded-lg font-bold flex items-center gap-2 hover:opacity-90 transition shadow-lg shadow-purple-600/30">
-                    <Plus size={20} /> Add Content
-                </button>
+
+                {/* Filters Bar */}
+                <div className="flex flex-wrap items-center gap-3 bg-[#141414] p-3 rounded-xl border border-white/5">
+
+                    {/* Search */}
+                    <div className="relative flex-1 min-w-[200px]">
+                        <Search className="absolute left-3 top-2.5 text-gray-500" size={18} />
+                        <input
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Search by title, genre, tag..."
+                            className="w-full bg-black/50 border border-white/10 rounded pl-10 pr-4 py-2 outline-none focus:border-white/30 text-sm"
+                        />
+                    </div>
+
+                    <div className="w-px h-8 bg-white/10 hidden md:block" />
+
+                    {/* Quick Filters */}
+                    <div className="flex gap-2 text-sm font-medium overflow-x-auto">
+                        <select
+                            value={filterType}
+                            onChange={(e) => setFilterType(e.target.value as any)}
+                            className="bg-black/50 pl-3 pr-8 py-2 rounded border border-white/10 outline-none appearance-none cursor-pointer hover:bg-white/5"
+                        >
+                            <option value="ALL">All Content</option>
+                            <option value="movie">Movies Only</option>
+                            <option value="tv">TV Shows Only</option>
+                        </select>
+
+                        <select
+                            value={filterStatus}
+                            onChange={(e) => setFilterStatus(e.target.value as any)}
+                            className="bg-black/50 pl-3 pr-8 py-2 rounded border border-white/10 outline-none appearance-none cursor-pointer hover:bg-white/5"
+                        >
+                            <option value="ALL">All Status</option>
+                            <option value="published">Published</option>
+                            <option value="draft">Drafts</option>
+                        </select>
+                    </div>
+
+                </div>
             </div>
 
-            {/* Filter Pills - Hotstar Style */}
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                {['ALL', 'movie', 'tv'].map(type => (
-                    <button key={type} onClick={() => setFilter(type as any)}
-                        className={`px-5 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${filter === type
-                            ? 'bg-gradient-to-r from-blue-500 to-cyan-400 text-white shadow-lg shadow-blue-500/30'
-                            : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
-                            }`}>
-                        {type === 'ALL' ? '🎬 All' : type === 'movie' ? '🎥 Movies' : '📺 TV Shows'}
-                    </button>
-                ))}
-            </div>
-
-            {/* Card Grid - Hotstar Style */}
+            {/* Content Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                 {filteredContent.map(item => (
                     <div
                         key={item.id}
-                        className="group relative rounded-xl overflow-hidden bg-gradient-to-b from-gray-800 to-gray-900 cursor-pointer transform hover:scale-105 hover:z-10 transition-all duration-300 shadow-lg hover:shadow-2xl hover:shadow-blue-500/20"
-                        onClick={() => { setFormData(item); setIsEditing(true); }}
+                        className={`group relative rounded-xl overflow-hidden bg-[#141414] cursor-pointer transform transition-all duration-300 ${selectedItems.includes(item.id) ? 'ring-2 ring-red-500 scale-[0.98]' : 'hover:scale-105 hover:z-10 hover:shadow-xl'
+                            }`}
+                        onClick={() => {
+                            if (selectedItems.length > 0) {
+                                toggleSelection(item.id);
+                            } else {
+                                setFormData(item);
+                                setIsEditing(true);
+                            }
+                        }}
                     >
                         {/* Thumbnail */}
                         <div className="aspect-[2/3] relative">
@@ -558,73 +652,64 @@ const ContentManager = () => {
                                 className="w-full h-full object-cover"
                             />
 
+                            {/* Selection Checkbox Overlay */}
+                            <div className={`absolute top-2 right-2 z-20 transition-all ${selectedItems.length > 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); toggleSelection(item.id); }}
+                                    className={`w-6 h-6 rounded-md border flex items-center justify-center transition-colors ${selectedItems.includes(item.id) ? 'bg-red-600 border-red-600 text-white' : 'bg-black/50 border-white/50 text-transparent hover:border-white'
+                                        }`}
+                                >
+                                    <Check size={14} />
+                                </button>
+                            </div>
+
                             {/* Gradient Overlay */}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-60 group-hover:opacity-90 transition-opacity" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-60 group-hover:opacity-90 transition-opacity" />
 
                             {/* Status Badges */}
                             <div className="absolute top-2 left-2 flex flex-col gap-1">
                                 {settings.heroContentId === item.id && (
-                                    <span className="px-2 py-0.5 rounded bg-gradient-to-r from-yellow-500 to-orange-500 text-[10px] font-black uppercase shadow-lg">
+                                    <span className="px-2 py-0.5 rounded bg-amber-500 text-black text-[10px] font-black uppercase shadow-lg">
                                         ⭐ HERO
                                     </span>
                                 )}
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${item.isPublished
-                                    ? 'bg-gradient-to-r from-green-500 to-emerald-400 text-white'
-                                    : 'bg-gray-700 text-gray-300'
+                                    ? 'bg-green-500 text-white'
+                                    : 'bg-gray-600 text-gray-300'
                                     }`}>
-                                    {item.isPublished ? '● LIVE' : '○ DRAFT'}
-                                </span>
-                            </div>
-
-                            {/* Type Badge */}
-                            <div className="absolute top-2 right-2">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${item.type === 'movie'
-                                    ? 'bg-blue-600/90 text-white'
-                                    : 'bg-purple-600/90 text-white'
-                                    }`}>
-                                    {item.type === 'movie' ? '🎬' : '📺'} {item.type}
+                                    {item.isPublished ? 'LIVE' : 'DRAFT'}
                                 </span>
                             </div>
 
                             {/* Hover Actions */}
-                            <div className="absolute inset-0 flex flex-col justify-end p-3 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0">
-                                <div className="flex gap-2 mb-2">
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); toggleHero(item.id); }}
-                                        className={`p-2 rounded-full backdrop-blur-md transition ${settings.heroContentId === item.id
-                                            ? 'bg-yellow-500 text-black'
-                                            : 'bg-white/20 text-white hover:bg-white/30'
-                                            }`}
-                                        title="Set as Hero"
-                                    >
-                                        <Star size={16} fill={settings.heroContentId === item.id ? "currentColor" : "none"} />
-                                    </button>
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
-                                        className="p-2 rounded-full bg-red-500/80 text-white hover:bg-red-600 backdrop-blur-md transition"
-                                        title="Delete"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                </div>
+                            <div className="absolute inset-x-0 bottom-0 p-3 translate-y-full group-hover:translate-y-0 transition-transform duration-300 flex justify-center gap-3 pb-8">
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setFormData(item); setIsEditing(true); }}
+                                    className="p-2 rounded-full bg-white text-black hover:scale-110 transition shadow-lg"
+                                    title="Edit"
+                                >
+                                    <Edit size={16} />
+                                </button>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); toggleHero(item.id); }}
+                                    className={`p-2 rounded-full bg-black/60 backdrop-blur-md text-white border border-white/20 hover:scale-110 transition ${settings.heroContentId === item.id ? 'text-amber-400 border-amber-400' : ''}`}
+                                    title="Set as Hero"
+                                >
+                                    <Star size={16} fill={settings.heroContentId === item.id ? "currentColor" : "none"} />
+                                </button>
                             </div>
                         </div>
 
                         {/* Content Info */}
                         <div className="p-3 space-y-1">
-                            <h3 className="font-bold text-white text-sm truncate group-hover:text-blue-400 transition-colors">
+                            <h3 className="font-bold text-white text-sm truncate group-hover:text-red-500 transition-colors">
                                 {item.title}
                             </h3>
                             <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                                <span className="uppercase">{item.type}</span>
+                                <span>•</span>
                                 <span>{item.release_date?.split('-')[0] || '2026'}</span>
-                                {item.duration && <span>• {item.duration}</span>}
-                                {item.rating && <span className="px-1 py-0.5 rounded border border-gray-600 text-[8px]">{item.rating}</span>}
                             </div>
-                            {item.genres?.length > 0 && (
-                                <div className="text-[10px] text-gray-500 truncate">
-                                    {item.genres.slice(0, 2).join(' • ')}
-                                </div>
-                            )}
                         </div>
                     </div>
                 ))}
@@ -633,9 +718,34 @@ const ContentManager = () => {
             {/* Empty State */}
             {filteredContent.length === 0 && (
                 <div className="text-center py-20 text-gray-500">
-                    <div className="text-6xl mb-4">🎬</div>
-                    <div className="text-xl font-bold mb-2">No content yet</div>
-                    <div className="text-sm">Click "Add Content" to get started</div>
+                    <div className="bg-white/5 inline-block p-6 rounded-full mb-4">
+                        <Search size={48} className="opacity-20" />
+                    </div>
+                    <div className="text-xl font-bold mb-2">No content found</div>
+                    <div className="text-sm max-w-xs mx-auto">Try adjusting your filters or search query to find what you're looking for.</div>
+                </div>
+            )}
+
+            {/* Bulk Actions Bar */}
+            {selectedItems.length > 0 && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#181818] border border-white/10 shadow-2xl rounded-full px-6 py-3 flex items-center gap-6 animate-in slide-in-from-bottom-6">
+                    <span className="font-bold text-sm">{selectedItems.length} selected</span>
+                    <div className="h-4 w-px bg-white/10" />
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => handleBulkPublish(true)} className="p-2 hover:bg-green-500/20 text-green-500 rounded-full transition" title="Publish Selected">
+                            <Check size={18} />
+                        </button>
+                        <button onClick={() => handleBulkPublish(false)} className="p-2 hover:bg-gray-500/20 text-gray-400 rounded-full transition" title="Unpublish Selected">
+                            <Archive size={18} />
+                        </button>
+                        <button onClick={handleBulkDelete} className="p-2 hover:bg-red-500/20 text-red-500 rounded-full transition" title="Delete Selected">
+                            <Trash2 size={18} />
+                        </button>
+                    </div>
+                    <div className="h-4 w-px bg-white/10" />
+                    <button onClick={() => setSelectedItems([])} className="text-xs font-bold text-gray-500 hover:text-white">
+                        CANCEL
+                    </button>
                 </div>
             )}
         </div>

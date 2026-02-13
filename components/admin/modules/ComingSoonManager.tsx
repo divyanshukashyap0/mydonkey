@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Calendar, Youtube } from 'lucide-react';
+import { Plus, Edit, Trash2, Calendar, Youtube, Bell, Play, HardDrive, X, AlertCircle } from 'lucide-react';
 import { useStore } from '../../../context/StoreContext';
 import { Content } from '../../../types';
-import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, addDoc, collection } from 'firebase/firestore';
 import { db } from '../../../firebase';
 
 const ComingSoonManager = () => {
@@ -16,10 +16,27 @@ const ComingSoonManager = () => {
         setFormData({
             type: 'movie',
             comingSoon: true,
-            isPublished: true, // Usually published so users can see it in "Coming Soon" list
-            genres: []
+            isPublished: true,
+            genres: [],
+            allowDownload: false,
+            allowPlayback: false, // Usually false for coming soon
         });
         setIsEditing(false);
+    };
+
+    // ID Extractors (Shared logic)
+    const extractYoutubeId = (url: string) => {
+        if (!url) return '';
+        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+        const match = url.match(regExp);
+        return (match && match[2].length === 11) ? match[2] : url;
+    };
+
+    const extractDriveId = (url: string) => {
+        if (!url) return '';
+        const regExp = /[-\w]{25,}/;
+        const match = url.match(regExp);
+        return match ? match[0] : url;
     };
 
     const handleSave = async () => {
@@ -33,11 +50,34 @@ const ComingSoonManager = () => {
             ...formData as Content,
             id,
             comingSoon: true,
-            createdAt: new Date().toISOString()
+            youtubeId: extractYoutubeId(formData.youtubeId || ''),
+            createdAt: formData.createdAt || new Date().toISOString()
         };
 
         try {
             await setDoc(doc(db, 'content', id), finalData);
+
+            // Auto Notification Logic
+            if (!formData.id) {
+                // Determine if we should notify
+                const releaseDate = new Date(finalData.release_date);
+                const today = new Date();
+                const diffTime = Math.abs(releaseDate.getTime() - today.getTime());
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                if (diffDays <= 7) {
+                    await addDoc(collection(db, 'notifications'), {
+                        title: `Coming Soon: ${finalData.title}`,
+                        message: `Mark your calendars! ${finalData.title} is arriving on ${new Date(finalData.release_date).toLocaleDateString()}.`,
+                        image: finalData.poster_path,
+                        type: 'content',
+                        link: `/browse/${id}`,
+                        createdAt: new Date().toISOString(),
+                        read: false
+                    });
+                }
+            }
+
             alert("Coming Soon item saved!");
             resetForm();
         } catch (e: any) {
@@ -49,47 +89,110 @@ const ComingSoonManager = () => {
         if (confirm("Remove from Coming Soon?")) await deleteDoc(doc(db, 'content', id));
     };
 
+    const sendNotificationNow = async (item: Content) => {
+        if (!confirm(`Send push notification for "${item.title}" to all users?`)) return;
+        try {
+            await addDoc(collection(db, 'notifications'), {
+                title: `Coming Soon: ${item.title}`,
+                message: `Get ready! ${item.title} releases on ${new Date(item.release_date).toLocaleDateString()}.`,
+                image: item.poster_path,
+                type: 'content',
+                link: `/browse/${item.id}`,
+                createdAt: new Date().toISOString(),
+                read: false
+            });
+            alert("Notification sent!");
+        } catch (e: any) {
+            alert("Error sending notification: " + e.message);
+        }
+    };
+
     if (isEditing) {
         return (
             <div className="bg-[#141414] p-6 rounded-xl border border-white/5 animate-in fade-in max-w-2xl mx-auto">
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-2xl font-bold">{formData.id ? 'Edit Entry' : 'Add Upcoming Title'}</h2>
+                    <button onClick={resetForm} className="p-2 hover:bg-white/10 rounded"><X /></button>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-6">
                     <div>
                         <label className="text-xs text-gray-500 uppercase font-bold">Title</label>
-                        <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none"
-                            value={formData.title || ''} onChange={e => setFormData({ ...formData, title: e.target.value })} />
-                    </div>
-                    <div>
-                        <label className="text-xs text-gray-500 uppercase font-bold">Overview</label>
-                        <textarea className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none h-20"
-                            value={formData.overview || ''} onChange={e => setFormData({ ...formData, overview: e.target.value })} />
+                        <input className="w-full bg-black/50 border border-white/10 rounded p-3 outline-none focus:border-blue-500 text-lg font-bold"
+                            value={formData.title || ''} onChange={e => setFormData({ ...formData, title: e.target.value })}
+                            placeholder="e.g. Inception 2"
+                        />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="text-xs text-gray-500 uppercase font-bold">Release Date</label>
-                            <input type="date" className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none"
+                            <input type="date" className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none focus:border-blue-500"
                                 value={formData.release_date || ''} onChange={e => setFormData({ ...formData, release_date: e.target.value })} />
                         </div>
                         <div>
-                            <label className="text-xs text-gray-500 uppercase font-bold">Trailer (YouTube ID)</label>
+                            <label className="text-xs text-gray-500 uppercase font-bold">Genres (comma sep)</label>
                             <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none"
-                                value={formData.youtubeId || ''} onChange={e => setFormData({ ...formData, youtubeId: e.target.value })} />
+                                value={formData.genres?.join(', ') || ''}
+                                onChange={e => setFormData({ ...formData, genres: e.target.value.split(',').map(s => s.trim()) })}
+                                placeholder="Action, Sci-Fi"
+                            />
                         </div>
                     </div>
 
                     <div>
-                        <label className="text-xs text-gray-500 uppercase font-bold">Poster URL</label>
-                        <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none"
-                            value={formData.poster_path || ''} onChange={e => setFormData({ ...formData, poster_path: e.target.value })} />
+                        <label className="text-xs text-gray-500 uppercase font-bold">Overview</label>
+                        <textarea className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none h-24 focus:border-blue-500"
+                            value={formData.overview || ''} onChange={e => setFormData({ ...formData, overview: e.target.value })}
+                            placeholder="Brief description..."
+                        />
                     </div>
 
-                    <div className="flex justify-end gap-4 mt-8 border-t border-white/10 pt-4">
-                        <button onClick={resetForm} className="px-6 py-2 rounded text-gray-400 font-bold hover:text-white">Cancel</button>
-                        <button onClick={handleSave} className="px-6 py-2 rounded bg-red-600 text-white font-bold hover:bg-red-700">Save</button>
+                    {/* Smart Source Input */}
+                    <div>
+                        <label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2">Trailer Source</label>
+                        <div className="relative">
+                            <input className="w-full bg-black/50 border border-white/10 rounded p-2 pl-8 outline-none focus:border-blue-500"
+                                value={formData.youtubeId || ''}
+                                onChange={e => setFormData({ ...formData, youtubeId: e.target.value })}
+                                placeholder="Paste YouTube Link or ID"
+                            />
+                            <Youtube className="absolute left-2.5 top-2.5 text-gray-500" size={16} />
+                        </div>
+                    </div>
+
+                    {/* Preview Player */}
+                    {extractYoutubeId(formData.youtubeId || '').length === 11 && (
+                        <div className="aspect-video bg-black rounded-lg overflow-hidden border border-white/10">
+                            <iframe className="w-full h-full" src={`https://www.youtube.com/embed/${extractYoutubeId(formData.youtubeId || '')}`} title="Preview" allowFullScreen />
+                        </div>
+                    )}
+
+                    <div className="space-y-2">
+                        <label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2">
+                            Poster Image
+                        </label>
+                        <div className="flex gap-4">
+                            <input
+                                className="flex-1 bg-black/50 border border-white/10 rounded p-2 outline-none focus:border-blue-500"
+                                placeholder="Image URL"
+                                value={formData.poster_path || ''}
+                                onChange={e => setFormData({ ...formData, poster_path: e.target.value, backdrop_path: e.target.value })}
+                            />
+                            {formData.poster_path && (
+                                <img src={formData.poster_path} className="w-12 h-16 object-cover rounded border border-white/10 bg-gray-800" alt="" />
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-4 border-t border-white/10">
+                        <div className="text-xs text-gray-500">
+                            * Notification will be sent if release is within 7 days.
+                        </div>
+                        <div className="flex gap-3">
+                            <button onClick={resetForm} className="px-6 py-2 rounded text-gray-400 font-bold hover:text-white transition">Cancel</button>
+                            <button onClick={handleSave} className="px-6 py-2 rounded bg-blue-600 text-white font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-600/20">Save Release</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -97,10 +200,13 @@ const ComingSoonManager = () => {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 max-w-5xl">
             <div className="flex justify-between items-center">
-                <h2 className="text-3xl font-bold">Upcoming Releases</h2>
-                <button onClick={() => { resetForm(); setIsEditing(true); }} className="bg-white/10 px-4 py-2 rounded font-bold flex items-center gap-2 hover:bg-white/20 transition text-blue-400">
+                <div>
+                    <h2 className="text-3xl font-bold">Upcoming Releases</h2>
+                    <p className="text-gray-400 mt-1">Manage coming soon content and notify users.</p>
+                </div>
+                <button onClick={() => { resetForm(); setIsEditing(true); }} className="bg-blue-600 px-5 py-2.5 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-700 transition shadow-lg shadow-blue-600/20">
                     <Plus size={20} /> Add Upcoming
                 </button>
             </div>
@@ -112,27 +218,74 @@ const ComingSoonManager = () => {
                             <th className="p-4">Content</th>
                             <th className="p-4">Release Date</th>
                             <th className="p-4">Trailer</th>
+                            <th className="p-4 text-center">Notification</th>
                             <th className="p-4 text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
                         {comingSoonContent.map(item => (
-                            <tr key={item.id} className="hover:bg-white/5 transition">
-                                <td className="p-4 flex items-center gap-3">
-                                    <img src={item.poster_path} className="w-10 h-14 object-cover rounded" />
-                                    <span className="font-bold text-white">{item.title}</span>
-                                </td>
-                                <td className="p-4 font-mono text-yellow-500"><Calendar size={14} className="inline mr-2" />{item.release_date}</td>
+                            <tr key={item.id} className="group hover:bg-white/5 transition">
                                 <td className="p-4">
-                                    {item.youtubeId ? <span className="text-green-500 flex items-center gap-1"><Youtube size={14} /> Ready</span> : <span className="text-red-500 text-xs">Missing</span>}
+                                    <div className="flex items-center gap-3">
+                                        <div className="relative w-10 h-14 rounded overflow-hidden">
+                                            <img src={item.poster_path} className="w-full h-full object-cover" alt="" />
+                                            <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition" />
+                                        </div>
+                                        <div>
+                                            <div className="font-bold text-white text-base">{item.title}</div>
+                                            <div className="text-xs text-gray-500">{item.genres?.slice(0, 2).join(', ')}</div>
+                                        </div>
+                                    </div>
                                 </td>
-                                <td className="p-4 text-right space-x-2">
-                                    <button onClick={() => { setFormData(item); setIsEditing(true); }} className="p-2 hover:bg-white/10 rounded text-blue-400"><Edit size={16} /></button>
-                                    <button onClick={() => handleDelete(item.id)} className="p-2 hover:bg-white/10 rounded text-red-500"><Trash2 size={16} /></button>
+                                <td className="p-4">
+                                    <div className="flex items-center gap-2 text-yellow-500 font-mono font-bold">
+                                        <Calendar size={14} />
+                                        {new Date(item.release_date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+                                    </div>
+                                    <div className="text-[10px] text-gray-500 mt-1">
+                                        {Math.ceil((new Date(item.release_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days to go
+                                    </div>
+                                </td>
+                                <td className="p-4">
+                                    {item.youtubeId ? (
+                                        <a href={`https://youtu.be/${item.youtubeId}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-gray-400 hover:text-red-500 transition">
+                                            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                                                <Play size={12} fill="currentColor" />
+                                            </div>
+                                            <span className="text-xs underline decoration-dotted">Watch</span>
+                                        </a>
+                                    ) : (
+                                        <span className="text-red-500 text-xs flex items-center gap-1"><AlertCircle size={12} /> Missing</span>
+                                    )}
+                                </td>
+                                <td className="p-4 text-center">
+                                    <button
+                                        onClick={() => sendNotificationNow(item)}
+                                        className="p-2 hover:bg-blue-500/20 text-gray-500 hover:text-blue-400 rounded-full transition"
+                                        title="Send Notification Now"
+                                    >
+                                        <Bell size={18} />
+                                    </button>
+                                </td>
+                                <td className="p-4 text-right">
+                                    <div className="flex justify-end gap-2">
+                                        <button onClick={() => { setFormData(item); setIsEditing(true); }} className="p-2 hover:bg-white/10 rounded text-gray-400 hover:text-white transition"><Edit size={16} /></button>
+                                        <button onClick={() => handleDelete(item.id)} className="p-2 hover:bg-red-500/10 rounded text-gray-400 hover:text-red-500 transition"><Trash2 size={16} /></button>
+                                    </div>
                                 </td>
                             </tr>
                         ))}
-                        {comingSoonContent.length === 0 && <tr><td colSpan={4} className="p-8 text-center text-gray-500">No upcoming titles found.</td></tr>}
+                        {comingSoonContent.length === 0 && (
+                            <tr>
+                                <td colSpan={5} className="p-12 text-center text-gray-500">
+                                    <div className="inline-block p-4 rounded-full bg-white/5 mb-3">
+                                        <Calendar size={32} className="opacity-50" />
+                                    </div>
+                                    <div className="font-bold">No upcoming releases</div>
+                                    <div className="text-xs mt-1">Add content here to build hype before release.</div>
+                                </td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
             </div>

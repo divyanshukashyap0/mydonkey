@@ -19,34 +19,34 @@ import ProfileSelection from './components/ProfileSelection';
 import ActivateDevice from './components/ActivateDevice';
 import UnlockContentModal from './components/UnlockContentModal';
 
-// --- Mobile Bottom Nav ---
-const MobileNav = ({ activeTab, setTab, currentProfile }: any) => (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0a0a0a] border-t border-white/10 z-[60] pb-safe shadow-[0_-10px_40px_rgba(0,0,0,0.8)]">
-        <div className="flex justify-around items-center h-16">
-            <button onClick={() => setTab('home')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'home' ? 'text-white' : 'text-gray-400 hover:text-gray-200'}`}>
-                <Home size={20} strokeWidth={activeTab === 'home' ? 3 : 2} />
-                <span className="text-[10px] font-medium">Home</span>
-            </button>
-            <button onClick={() => setTab('search')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'search' ? 'text-white' : 'text-gray-400 hover:text-gray-200'}`}>
-                <Search size={20} strokeWidth={activeTab === 'search' ? 3 : 2} />
-                <span className="text-[10px] font-medium">Search</span>
-            </button>
-            <button onClick={() => setTab('downloads')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'downloads' ? 'text-white' : 'text-gray-400 hover:text-gray-200'}`}>
-                <Download size={20} strokeWidth={activeTab === 'downloads' ? 3 : 2} />
-                <span className="text-[10px] font-medium">My List</span>
-            </button>
-            <button onClick={() => setTab('account')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'account' ? 'text-white' : 'text-gray-400 hover:text-gray-200'}`}>
-                <img src={currentProfile?.avatarUrl || "https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg"} className={`w-5 h-5 rounded object-cover ${activeTab === 'account' ? 'border-2 border-white' : 'opacity-80'}`} />
-                <span className="text-[10px] font-medium">Profile</span>
-            </button>
-        </div>
-    </div>
-);
+import MobileNav from './components/MobileNav';
 
 // --- Search Component ---
 const SearchOverlay = ({ isOpen, onClose, onPlay, onDetails }: any) => {
     const { content } = useStore();
     const [query, setQuery] = useState('');
+    const [visibleCount, setVisibleCount] = useState(12);
+    const [recentSearches, setRecentSearches] = useState<string[]>([]);
+
+    useEffect(() => {
+        const cached = localStorage.getItem('recent_searches');
+        if (cached) setRecentSearches(JSON.parse(cached));
+    }, []);
+
+    const handleSearch = (q: string) => {
+        setQuery(q);
+        if (q && !recentSearches.includes(q)) {
+            const updated = [q, ...recentSearches].slice(0, 5);
+            setRecentSearches(updated);
+            localStorage.setItem('recent_searches', JSON.stringify(updated));
+        }
+    };
+
+    const removeRecent = (item: string) => {
+        const updated = recentSearches.filter(i => i !== item);
+        setRecentSearches(updated);
+        localStorage.setItem('recent_searches', JSON.stringify(updated));
+    }
 
     if (!isOpen) return null;
 
@@ -69,36 +69,71 @@ const SearchOverlay = ({ isOpen, onClose, onPlay, onDetails }: any) => {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch(query)}
                 placeholder="Movies, Shows, Genres, Cast..."
                 className="bg-gray-800 text-white text-2xl p-6 rounded-lg outline-none focus:ring-2 ring-brand-red placeholder:text-gray-500 w-full"
             />
 
             <div className="mt-8 flex-1 overflow-y-auto no-scrollbar pb-20">
                 {query && results.length === 0 && (
-                    <div className="text-center text-gray-500 mt-10 text-xl">No results found for "{query}"</div>
-                )}
-                {query && results.length > 0 && (
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                        {results.map(item => (
-                            <div key={item.id} className="group relative cursor-pointer" onClick={() => onDetails(item)}>
-                                <div className="aspect-[2/3] rounded-lg overflow-hidden border border-white/10 group-hover:border-white/50 transition">
-                                    <img src={item.poster_path} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                        <PlayCircle size={40} />
-                                    </div>
-                                </div>
-                                <h4 className="mt-2 text-sm font-bold text-gray-300 group-hover:text-white">{item.title}</h4>
-                            </div>
-                        ))}
+                    <div className="text-center text-gray-500 mt-10">
+                        <div className="text-xl mb-4">No results found for "{query}"</div>
+                        <div className="text-sm">Try searching for:</div>
+                        <div className="flex justify-center gap-2 mt-2">
+                            {['Action', 'Comedy', 'Drama', 'Romance'].map(g => (
+                                <button key={g} onClick={() => setQuery(g)} className="text-brand-red font-bold hover:underline">{g}</button>
+                            ))}
+                        </div>
                     </div>
                 )}
-                {!query && (
-                    <div className="text-gray-500 mt-10">
-                        <h3 className="font-bold text-lg mb-4 text-white">Top Genres</h3>
-                        <div className="flex flex-wrap gap-2">
-                            {['Action', 'Comedy', 'Thriller', 'Drama', 'Originals'].map(tag => (
-                                <button key={tag} onClick={() => setQuery(tag)} className="px-4 py-2 bg-white/10 rounded-full hover:bg-white/20 text-sm">{tag}</button>
+                {query && results.length > 0 && (
+                    <>
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                            {results.slice(0, visibleCount).map(item => (
+                                <div key={item.id} className="group relative cursor-pointer" onClick={() => onDetails(item)}>
+                                    <div className="aspect-[2/3] rounded-lg overflow-hidden border border-white/10 group-hover:border-white/50 transition">
+                                        <img src={item.poster_path} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                            <PlayCircle size={40} />
+                                        </div>
+                                    </div>
+                                    <h4 className="mt-2 text-sm font-bold text-gray-300 group-hover:text-white">{item.title}</h4>
+                                </div>
                             ))}
+                        </div>
+                        {results.length > visibleCount && (
+                            <div className="text-center mt-8">
+                                <button onClick={() => setVisibleCount(p => p + 12)} className="bg-white/10 hover:bg-white/20 px-8 py-3 rounded-full font-bold transition">Load More Results</button>
+                            </div>
+                        )}
+                    </>
+                )}
+                {!query && (
+                    <div className="space-y-8">
+                        {recentSearches.length > 0 && (
+                            <div>
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="font-bold text-lg text-white">Recent Searches</h3>
+                                    <button onClick={() => { setRecentSearches([]); localStorage.removeItem('recent_searches'); }} className="text-xs text-gray-500 hover:text-white">Clear All</button>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {recentSearches.map((term, i) => (
+                                        <div key={i} className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full hover:bg-white/10 border border-white/5 group">
+                                            <button onClick={() => setQuery(term)} className="text-sm text-gray-300 group-hover:text-white">{term}</button>
+                                            <button onClick={() => removeRecent(term)} className="text-gray-600 hover:text-white"><X size={14} /></button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <div>
+                            <h3 className="font-bold text-lg mb-4 text-white">Top Genres</h3>
+                            <div className="flex flex-wrap gap-2">
+                                {['Action', 'Comedy', 'Thriller', 'Drama', 'Originals'].map(tag => (
+                                    <button key={tag} onClick={() => setQuery(tag)} className="px-4 py-2 bg-white/10 rounded-full hover:bg-white/20 text-sm border border-white/5">{tag}</button>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 )}
@@ -381,6 +416,22 @@ const AppContent = () => {
 
                             <div className="relative z-10 space-y-4 px-4 md:px-12 pb-10">
                                 {renderScopedSections('home')}
+
+                                {/* Default / Fallback Sections */}
+                                <ContentRail
+                                    title="Trending Now"
+                                    items={availableContent.sort((a, b) => b.vote_average - a.vote_average).slice(0, 10)}
+                                    onDetails={setViewingItem}
+                                    layout="portrait"
+                                    isTop10={true}
+                                />
+                                <ContentRail
+                                    title="Top Rated"
+                                    items={availableContent.filter(c => c.vote_average > 8).slice(0, 10)}
+                                    onDetails={setViewingItem}
+                                    layout="landscape"
+                                />
+
                                 {currentUser?.continueWatching && currentUser.continueWatching.length > 0 && (
                                     <ContentRail
                                         title="Continue Watching"
@@ -389,6 +440,18 @@ const AppContent = () => {
                                         layout="landscape"
                                     />
                                 )}
+
+                                <ContentRail
+                                    title="Action Movies"
+                                    items={movieItems.filter(c => c.genres.includes('Action') || c.tags?.includes('Action'))}
+                                    onDetails={setViewingItem}
+                                />
+                                <ContentRail
+                                    title="Comedy Hits"
+                                    items={availableContent.filter(c => c.genres.includes('Comedy') || c.tags?.includes('Comedy'))}
+                                    onDetails={setViewingItem}
+                                />
+
                                 {/* Fallback Rail for Recently Added (All Published Content) */}
                                 <ContentRail
                                     title="Recently Added"
@@ -425,6 +488,34 @@ const AppContent = () => {
 
                     <Route path="/sparks" element={<SparksFeed items={availableContent.filter(c => c.tags?.includes('Spark'))} />} />
 
+                    <Route path="/new" element={
+                        <div className="min-h-screen pt-24 px-4 md:px-12 pb-20">
+                            <h1 className="text-3xl md:text-5xl font-black mb-8 animate-in slide-in-from-left">New & Popular</h1>
+                            <div className="space-y-8">
+                                <ContentRail
+                                    title="Trending Now"
+                                    items={availableContent.sort((a, b) => b.vote_average - a.vote_average).slice(0, 10)}
+                                    onDetails={setViewingItem}
+                                    layout="landscape"
+                                    isTop10={true}
+                                />
+                                <ContentRail
+                                    title="New Releases"
+                                    items={availableContent.filter(c => c.year === new Date().getFullYear() || c.year === new Date().getFullYear() - 1)}
+                                    onDetails={setViewingItem}
+                                    layout="portrait"
+                                />
+                                <ContentRail
+                                    title="Coming Soon"
+                                    items={availableContent.filter(c => c.comingSoon)}
+                                    onDetails={setViewingItem}
+                                    layout="landscape"
+                                />
+                            </div>
+                            <Footer onNavigate={handleFooterNavigate} />
+                        </div>
+                    } />
+
                     <Route path="/downloads" element={
                         <div className="min-h-screen flex flex-col justify-between pt-24 px-4 md:px-12">
                             <div>
@@ -440,7 +531,14 @@ const AppContent = () => {
                                         ))}
                                     </div>
                                 ) : (
-                                    <div className="text-gray-500 text-lg mb-12">Your list is empty.</div>
+                                    <div className="text-center py-20">
+                                        <div className="bg-white/5 inline-block p-6 rounded-full mb-4">
+                                            <Download size={48} className="text-gray-500" />
+                                        </div>
+                                        <h3 className="text-xl font-bold text-gray-300 mb-2">Your list is empty</h3>
+                                        <p className="text-gray-500 max-w-md mx-auto mb-8">Add movies and shows to your list so you can easily find them later.</p>
+                                        <button onClick={() => setTab('home')} className="bg-white text-black px-6 py-2 rounded font-bold hover:bg-gray-200 transition">Browse Content</button>
+                                    </div>
                                 )}
                             </div>
                             <Footer onNavigate={handleFooterNavigate} />

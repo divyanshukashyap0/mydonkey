@@ -1,17 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Play, Plus, X, ThumbsUp, Volume2, Check, Download, Share2 } from 'lucide-react';
 import { Content, Season, Episode } from '../types';
 import { useStore } from '../context/StoreContext';
+import ContentRail from './ContentRail';
 
 interface ContentDetailsProps {
     content: Content;
     onClose: () => void;
     onPlay: (item: Content, mode?: 'trailer' | 'movie') => void;
+    onDetails?: (item: Content) => void;
 }
 
-const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPlay }) => {
-    const { currentProfile, toggleWatchlist, currentUser } = useStore();
+const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPlay, onDetails }) => {
+    const { currentProfile, toggleWatchlist, currentUser, content: allContent } = useStore();
     const isAdded = currentProfile?.myList.includes(content.id);
+
+    // Filter Related Content
+    const relatedContent = useMemo(() => {
+        if (!allContent) return [];
+        return allContent
+            .filter(c => c.id !== content.id && c.genres?.some(g => content.genres?.includes(g)))
+            .slice(0, 10);
+    }, [content, allContent]);
 
     // State for Season Selection (TV Shows)
     const [selectedSeasonId, setSelectedSeasonId] = useState<string>("");
@@ -418,10 +428,31 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
 
                             </div>
                             <div className="space-y-4 text-sm">
+                                {content.director && (
+                                    <div><span className="text-gray-500">Director: </span><span className="text-white">{content.director}</span></div>
+                                )}
+                                {content.creators && content.creators.length > 0 && (
+                                    <div><span className="text-gray-500">Creators: </span><span className="text-white">{content.creators.join(', ')}</span></div>
+                                )}
                                 <div><span className="text-gray-500">Cast: </span><span className="text-gray-300">{content.cast?.join(', ')}</span></div>
                                 <div><span className="text-gray-500">Genres: </span><span className="text-gray-300">{content.genres?.join(', ')}</span></div>
                             </div>
                         </div>
+
+                        {/* Related Content */}
+                        {relatedContent.length > 0 && (
+                            <div className="mt-12 pt-8 border-t border-white/10">
+                                <ContentRail
+                                    title="More Like This"
+                                    items={relatedContent}
+                                    onDetails={(item) => {
+                                        if (onDetails) onDetails(item);
+                                        // Scroll to top if we stay in same modal, but here we likely switch item props
+                                        // The parent viewingItem changes, so this component re-renders with new content.
+                                    }}
+                                />
+                            </div>
+                        )}
                     </div>
                 </div>
 

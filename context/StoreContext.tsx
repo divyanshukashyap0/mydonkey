@@ -376,6 +376,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             if (currentProfile) {
                 const updated = profiles.find(p => p.id === currentProfile.id);
                 if (updated) setCurrentProfile(updated);
+            } else {
+                // Auto-select from localStorage if available
+                const savedProfileId = localStorage.getItem('selectedProfileId');
+                if (savedProfileId) {
+                    const saved = profiles.find(p => p.id === savedProfileId);
+                    if (saved) setCurrentProfile(saved);
+                }
             }
         });
 
@@ -444,6 +451,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
         await signOut(auth);
         setCurrentProfile(null);
+        localStorage.removeItem('selectedProfileId');
         // window.location.reload(); // Removed to prevent full page refresh
     };
 
@@ -485,10 +493,14 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const switchProfile = (profileId: string | null) => {
         if (!profileId) {
             setCurrentProfile(null);
+            localStorage.removeItem('selectedProfileId');
             return;
         }
         const profile = userProfiles.find(p => p.id === profileId);
-        if (profile) setCurrentProfile(profile);
+        if (profile) {
+            setCurrentProfile(profile);
+            localStorage.setItem('selectedProfileId', profileId);
+        }
     };
 
     const addProfile = async (name: string, isKids: boolean, avatarUrl: string) => {
@@ -501,7 +513,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const deleteProfile = async (profileId: string) => {
         if (!fbUser) return;
         await deleteDoc(doc(db, 'users', fbUser.uid, 'profiles', profileId));
-        if (currentProfile?.id === profileId) setCurrentProfile(null);
+        if (currentProfile?.id === profileId) {
+            setCurrentProfile(null);
+            localStorage.removeItem('selectedProfileId');
+        }
     };
 
     const toggleWatchlist = async (contentId: string) => {

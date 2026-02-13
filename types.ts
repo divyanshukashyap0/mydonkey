@@ -33,6 +33,9 @@ export interface Content {
   resolution?: 'HD' | '4K' | 'SD';
   isOriginal?: boolean;
   episodes?: Episode[];
+  director?: string; // Single director for movies
+  creators?: string[]; // Multiple creators/showrunners for TV
+  reviews?: { userId: string; rating: number; comment: string; date: string }[];
 }
 
 export interface Episode {
@@ -130,6 +133,7 @@ export interface User {
   readNotifications?: string[];
   autoFullscreen?: boolean; // User preference for auto-fullscreen
   isGuest?: boolean;
+  createdAt?: string;
 }
 
 export interface ContinueWatchingItem {
@@ -238,7 +242,8 @@ export interface ContentRequest {
   userEmail: string;
   userName: string;
   contentTitle: string;
-  status: 'pending' | 'processing' | 'fulfilled' | 'rejected';
+  status: 'pending' | 'approved' | 'processing' | 'fulfilled' | 'rejected';
+  priority?: 'low' | 'normal' | 'high';
   createdAt: string;
   updatedAt: string;
   adminNote?: string;

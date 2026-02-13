@@ -44,13 +44,13 @@ const ContentRail: React.FC<ContentRailProps> = ({
                 {/* Navigation Buttons */}
                 <button
                     onClick={() => scroll('left')}
-                    className="absolute left-0 top-0 bottom-0 w-12 bg-black/50 z-30 opacity-0 group-hover/rail:opacity-100 transition-opacity hidden md:flex items-center justify-center hover:bg-black/70"
+                    className="absolute left-0 top-0 bottom-0 w-12 bg-black/50 z-30 hidden md:flex items-center justify-center hover:bg-black/70 transition-colors"
                 >
                     <ChevronLeft size={40} />
                 </button>
                 <button
                     onClick={() => scroll('right')}
-                    className="absolute right-0 top-0 bottom-0 w-12 bg-black/50 z-30 opacity-0 group-hover/rail:opacity-100 transition-opacity hidden md:flex items-center justify-center hover:bg-black/70"
+                    className="absolute right-0 top-0 bottom-0 w-12 bg-black/50 z-30 hidden md:flex items-center justify-center hover:bg-black/70 transition-colors"
                 >
                     <ChevronRight size={40} />
                 </button>

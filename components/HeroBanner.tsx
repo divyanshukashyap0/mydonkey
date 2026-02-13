@@ -5,94 +5,7 @@ import { useStore } from '../context/StoreContext';
 
 import { MessageSquarePlus, Send, X, CheckCircle } from 'lucide-react';
 
-const RequestOverlay = () => {
-    const { submitContentRequest, currentUser } = useStore();
-    const [isOpen, setIsOpen] = useState(false);
-    const [query, setQuery] = useState('');
-    const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'guest_error'>('idle');
-
-    if (!currentUser) return null;
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!query.trim()) return;
-
-        if (currentUser.isGuest) {
-            setStatus('guest_error');
-            return;
-        }
-
-        setStatus('loading');
-        try {
-            await submitContentRequest(query);
-            setStatus('success');
-            setTimeout(() => {
-                setIsOpen(false);
-                setStatus('idle');
-                setQuery('');
-            }, 3000);
-        } catch (error) {
-            console.error(error);
-            setStatus('error');
-        }
-    };
-
-    return (
-        <div className="flex flex-col items-end">
-            {!isOpen ? (
-                <button
-                    onClick={() => setIsOpen(true)}
-                    className="group flex items-center gap-2 bg-black/40 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full text-xs font-medium text-gray-400 hover:text-white hover:border-white/30 transition-all hover:pr-5"
-                >
-                    <span className="opacity-0 group-hover:opacity-100 w-0 group-hover:w-auto overflow-hidden transition-all duration-300 whitespace-nowrap">
-                        Request a Movie
-                    </span>
-                    <MessageSquarePlus size={16} />
-                </button>
-            ) : (
-                <div className="bg-black/80 backdrop-blur-xl border border-white/20 p-4 rounded-xl shadow-2xl w-72 animate-in slide-in-from-bottom-2 fade-in duration-300">
-                    <div className="flex justify-between items-center mb-3">
-                        <h3 className="text-sm font-bold text-white">Request Content</h3>
-                        <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-white"><X size={14} /></button>
-                    </div>
-
-                    {status === 'success' ? (
-                        <div className="flex flex-col items-center justify-center py-4 text-green-400 gap-2">
-                            <CheckCircle size={32} />
-                            <span className="text-sm font-medium">Request Sent!</span>
-                        </div>
-                    ) : status === 'guest_error' ? (
-                        <div className="flex flex-col items-center justify-center py-4 text-center gap-2 animate-in fade-in">
-                            <p className="text-red-400 font-bold text-sm">Login Required</p>
-                            <p className="text-gray-400 text-xs">Guest users cannot request content. Please login with a real account.</p>
-                            <button onClick={() => setStatus('idle')} className="text-xs bg-white/10 hover:bg-white/20 px-4 py-1.5 rounded mt-2 transition-colors">Okay</button>
-                        </div>
-                    ) : (
-                        <form onSubmit={handleSubmit} className="relative">
-                            <input
-                                autoFocus
-                                type="text"
-                                value={query}
-                                onChange={(e) => setQuery(e.target.value)}
-                                placeholder="e.g. Inception..."
-                                className="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-red placeholder:text-gray-600"
-                                disabled={status === 'loading'}
-                            />
-                            <button
-                                type="submit"
-                                disabled={status === 'loading' || !query.trim()}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-brand-red disabled:text-gray-600 hover:text-white transition-colors"
-                            >
-                                <Send size={16} />
-                            </button>
-                        </form>
-                    )}
-                    {status === 'idle' && <p className="text-[10px] text-gray-500 mt-2">We'll try to add it within 48h.</p>}
-                </div>
-            )}
-        </div>
-    );
-};
+// RequestOverlay removed
 
 interface HeroBannerProps {
     item: Content;
@@ -166,6 +79,7 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
 
     if (!item) return null;
     const isOriginal = item.tags?.includes('Original');
+    const ratingScore = item.vote_average ? item.vote_average.toFixed(1) : '';
 
     return (
         <div className="relative w-full overflow-hidden group bg-cinema-black h-[70vh] lg:h-[85vh]">
@@ -211,8 +125,10 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
                     </h1>
 
                     <div className="flex flex-wrap items-center gap-2 md:gap-4 text-white font-medium text-sm md:text-base animate-fade-up delay-100 opacity-0">
-                        <span className="text-green-400 font-bold">{(item.vote_average * 10).toFixed(0)}% Match</span>
-                        <span>{item.release_date ? item.release_date.split('-')[0] : '2026'}</span>
+                        {ratingScore && (
+                            <span className="text-green-400 font-bold">{ratingScore}/10 Rating</span>
+                        )}
+                        <span>{item.release_date ? item.release_date.split('-')[0] : ''}</span>
                         <span className="bg-gray-800 px-2 py-0.5 rounded border border-gray-600 text-xs">{item.rating || 'U/A 13+'}</span>
                         <span className="bg-brand-red/20 text-brand-red border border-brand-red px-2 py-0.5 rounded text-xs">{item.resolution || '4K'}</span>
                     </div>
@@ -238,12 +154,6 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
                     </div>
                 </div>
             </div>
-
-            {/* Content Request Overlay */}
-            <div className="absolute bottom-6 right-6 z-50 flex flex-col items-end gap-2 animate-in fade-in slide-in-from-right duration-1000 delay-1000">
-                <RequestOverlay />
-            </div>
-
 
             {/* Mute Toggle (Only if video is active) */}
             {videoLoaded && (
