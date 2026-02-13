@@ -253,6 +253,3 @@ const TopNav: React.FC<TopNavProps> = ({ activeTab, setTab, onSearch, onUnlock }
 };
 
 export default TopNav;
-};
-
-export default TopNav;
