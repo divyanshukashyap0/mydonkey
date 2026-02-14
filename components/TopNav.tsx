@@ -207,11 +207,20 @@ const TopNav: React.FC<TopNavProps> = ({ activeTab, setTab, onSearch, onUnlock }
             {/* Mobile Sidebar Navigation */}
             {isMobileMenuOpen && (
                 <div className="fixed inset-0 z-[200] lg:hidden animate-in slide-in-from-right duration-300">
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
-                    <div className="absolute right-0 top-0 bottom-0 w-[85%] max-w-sm bg-[#141414] border-l border-white/10 p-6 flex flex-col shadow-2xl">
+                    <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
+                    <div className="absolute right-0 top-0 bottom-0 w-[85%] max-w-sm bg-black border-l border-white/10 p-6 flex flex-col shadow-2xl overflow-y-auto">
                         <div className="flex justify-between items-center mb-10">
                             <span className="font-black text-brand-red text-2xl tracking-tighter">MY DONKEY</span>
-                            <button onClick={() => setMobileMenuOpen(false)} className="text-gray-400 hover:text-white"><X size={32} /></button>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setMobileMenuOpen(false);
+                                }}
+                                className="text-gray-400 hover:text-white p-2 -mr-2 transition-colors duration-200"
+                                aria-label="Close menu"
+                            >
+                                <X size={32} />
+                            </button>
                         </div>
 
                         <div className="flex-1 space-y-2">

@@ -356,8 +356,16 @@ const AppContent = () => {
 
     if (activeTab === 'admin') return <AdminLayout onExit={() => setTab('home')} />;
 
-    // Content Filtering for Kids Mode
-    const availableContent = currentProfile.isKids ? content.filter(c => c.tags?.includes('Kids')) : content;
+    // Content Filtering for Kids Mode & Exclusive Content
+    const availableContent = currentProfile.isKids
+        ? content.filter(c => c.tags?.includes('Kids'))
+        : content.filter(c => {
+            // Hide exclusive content (with accessCode) unless unlocked
+            if (c.accessCode && !currentProfile.unlockedContent?.includes(c.id)) {
+                return false;
+            }
+            return true;
+        });
 
     // Derived Lists
     const movieItems = availableContent.filter(c => c.type === 'movie');
@@ -399,6 +407,34 @@ const AppContent = () => {
             });
     };
 
+    // --- HOME PAGE CONTENT PRE-CALCULATION (DEDUPLICATION FIX) ---
+    // 1. Trending Now (Top 10) - Spread to avoid mutation
+    const homeTrendingItems = [...availableContent].sort((a, b) => b.vote_average - a.vote_average).slice(0, 10);
+
+    // 2. Continue Watching
+    const homeContinueWatchingItems = currentUser?.continueWatching && currentUser.continueWatching.length > 0
+        ? content.filter(c => currentUser.continueWatching?.some(h => h.movieId === c.id))
+        : [];
+
+    // 3. Action Movies
+    const homeActionItems = movieItems.filter(c => c.genres.includes('Action') || c.tags?.includes('Action'));
+
+    // 4. Comedy Hits
+    const homeComedyItems = availableContent.filter(c => c.genres.includes('Comedy') || c.tags?.includes('Comedy'));
+
+    // 5. Deduplication Integration
+    const homeDedupSet = new Set<string>();
+    homeTrendingItems.forEach(i => homeDedupSet.add(i.id));
+    homeContinueWatchingItems.forEach(i => homeDedupSet.add(i.id));
+    homeActionItems.forEach(i => homeDedupSet.add(i.id));
+    homeComedyItems.forEach(i => homeDedupSet.add(i.id));
+
+    // 6. Recently Added (Excluded already shown)
+    const homeRecentlyAddedItems = availableContent
+        .filter(c => c.isPublished && !homeDedupSet.has(c.id))
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 20);
+
     return (
         <div className="min-h-screen font-sans selection:bg-brand-red selection:text-white bg-cinema-black text-white overflow-x-hidden">
             <TopNav activeTab={activeTab} setTab={setTab} onSearch={() => setSearchOpen(true)} onUnlock={() => setUnlockOpen(true)} />
@@ -420,22 +456,16 @@ const AppContent = () => {
                                 {/* Default / Fallback Sections */}
                                 <ContentRail
                                     title="Trending Now"
-                                    items={availableContent.sort((a, b) => b.vote_average - a.vote_average).slice(0, 10)}
+                                    items={homeTrendingItems}
                                     onDetails={setViewingItem}
                                     layout="portrait"
                                     isTop10={true}
                                 />
-                                <ContentRail
-                                    title="Top Rated"
-                                    items={availableContent.filter(c => c.vote_average > 8).slice(0, 10)}
-                                    onDetails={setViewingItem}
-                                    layout="landscape"
-                                />
 
-                                {currentUser?.continueWatching && currentUser.continueWatching.length > 0 && (
+                                {homeContinueWatchingItems.length > 0 && (
                                     <ContentRail
                                         title="Continue Watching"
-                                        items={content.filter(c => currentUser.continueWatching?.some(h => h.movieId === c.id))}
+                                        items={homeContinueWatchingItems}
                                         onDetails={setViewingItem}
                                         layout="landscape"
                                     />
@@ -443,22 +473,24 @@ const AppContent = () => {
 
                                 <ContentRail
                                     title="Action Movies"
-                                    items={movieItems.filter(c => c.genres.includes('Action') || c.tags?.includes('Action'))}
+                                    items={homeActionItems}
                                     onDetails={setViewingItem}
                                 />
                                 <ContentRail
                                     title="Comedy Hits"
-                                    items={availableContent.filter(c => c.genres.includes('Comedy') || c.tags?.includes('Comedy'))}
+                                    items={homeComedyItems}
                                     onDetails={setViewingItem}
                                 />
 
-                                {/* Fallback Rail for Recently Added (All Published Content) */}
-                                <ContentRail
-                                    title="Recently Added"
-                                    items={availableContent.filter(c => c.isPublished).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 20)}
-                                    onDetails={setViewingItem}
-                                    layout="landscape"
-                                />
+                                {/* Fallback Rail for Recently Added - Deduplicated */}
+                                {homeRecentlyAddedItems.length > 0 && (
+                                    <ContentRail
+                                        title="Recently Added"
+                                        items={homeRecentlyAddedItems}
+                                        onDetails={setViewingItem}
+                                        layout="landscape"
+                                    />
+                                )}
                             </div>
                             <Footer onNavigate={handleFooterNavigate} />
                         </>

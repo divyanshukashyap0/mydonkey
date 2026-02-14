@@ -9,7 +9,9 @@ service cloud.firestore {
       return request.auth.uid == userId; 
     }
     function isAdmin() {
+      // CRITICAL: Check if user doc exists first to avoid errors for new users
       return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
@@ -20,10 +22,21 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read, write: if isOwner(userId) || isAdmin();
+      // SIMPLIFIED: Allow users to read/create their own data
+      // Don't check isAdmin() on read to avoid circular dependency for new users
+      allow read, create: if isOwner(userId);
+      
+      // Admins can read any user
+      allow read: if isAdmin();
+      
+      // Allow users to update their own data or admin can update any
+      allow update: if isOwner(userId) || isAdmin();
+      
+      // Only admin can delete users
+      allow delete: if isAdmin();
 
       match /profiles/{profileId} {
-        allow read, write: if isOwner(userId) || isAdmin();
+        allow read, write, create: if isOwner(userId) || isAdmin();
       }
 
       match /billing/{invoiceId} {
