@@ -177,6 +177,7 @@ export interface InfoPageData {
     buttonLabel?: string;
     buttonLink?: string;
   }[];
+  category?: 'Company' | 'Support' | 'Legal' | 'Connect';
   lastUpdated?: string;
 }
 
@@ -224,6 +225,7 @@ export interface Profile {
   isKids: boolean;
   myList: string[];
   unlockedContent?: string[];
+  subscription?: Subscription;
 }
 
 export enum ContentType {
@@ -247,4 +249,21 @@ export interface ContentRequest {
   createdAt: string;
   updatedAt: string;
   adminNote?: string;
+}
+
+export interface Page {
+  id: string; // url slug, e.g. 'about-us'
+  title: string;
+  category: 'Company' | 'Support' | 'Legal' | 'Connect';
+  description: string;
+  sections: {
+    heading: string;
+    content?: string;
+    listItems?: string[];
+    steps?: string[];
+    buttonLabel?: string;
+    buttonLink?: string;
+  }[];
+  lastUpdated?: string;
+  isHidden?: boolean;
 }

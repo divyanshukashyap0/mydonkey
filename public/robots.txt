@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /browse/*
+Disallow: /watch/*
+Disallow: /admin/*
+Disallow: /account/*
+Disallow: /activate/*
+
+Sitemap: https://mydonkey.in/sitemap.xml

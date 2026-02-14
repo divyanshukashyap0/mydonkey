@@ -5,6 +5,7 @@ import PlanSelectionModal from './account/PlanSelectionModal';
 import PaymentMethodsModal from './account/PaymentMethodsModal';
 import BillingHistoryModal from './account/BillingHistoryModal';
 import DeviceManagementModal from './account/DeviceManagementModal';
+import ContentRequestInline from './ContentRequestInline';
 
 const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) => {
     const {
@@ -21,7 +22,8 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
         isInstallable,
         isIOS,
         installPwa,
-        submitContentRequest
+        submitContentRequest,
+        addPage
     } = useStore();
 
     const [expandedProfile, setExpandedProfile] = useState<string | null>(null);
@@ -86,22 +88,6 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
 
     const toggleLowDataMode = async () => {
         await updateUser({ lowDataMode: !currentUser.lowDataMode });
-    };
-
-    const handleRequestSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!requestTitle.trim() || isRequesting) return;
-
-        setIsRequesting(true);
-        try {
-            await submitContentRequest(requestTitle.trim());
-            alert("Request received! Our team will try hard to ensure the content is there within 48 hours.");
-            setRequestTitle('');
-        } catch (error: any) {
-            alert("Failed to submit request: " + error.message);
-        } finally {
-            setIsRequesting(false);
-        }
     };
 
     // Safe Date Formatting
@@ -383,41 +369,7 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                 </div>
 
                 {/* Content Request Section */}
-                <div className="bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-xl overflow-hidden border border-cyan-500/20 shadow-2xl">
-                    <div className="px-5 py-3 border-b border-white/5 bg-cyan-500/5">
-                        <span className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.2em]">Request Content</span>
-                    </div>
-                    <div className="p-5">
-                        <h3 className="text-lg font-bold mb-1">Didn't find what you wanted?</h3>
-                        <p className="text-xs text-gray-400 mb-4">Tell us the show or movie title. Our team ensures that in <span className="text-cyan-400 font-bold">48 hours</span> content will be there!</p>
-
-                        <form onSubmit={handleRequestSubmit} className="flex gap-2">
-                            <input
-                                type="text"
-                                value={requestTitle}
-                                onChange={(e) => setRequestTitle(e.target.value)}
-                                placeholder="Enter show or movie name..."
-                                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-cyan-500/50 transition-colors"
-                                required
-                            />
-                            <button
-                                type="submit"
-                                disabled={isRequesting}
-                                className="bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-700 text-white px-5 py-3 rounded-lg flex items-center gap-2 transition shadow-lg shadow-cyan-600/20"
-                            >
-                                {isRequesting ? (
-                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                ) : (
-                                    <>
-                                        <Send size={18} />
-                                        <span className="hidden sm:inline font-bold uppercase tracking-wider text-xs">Submit Request</span>
-                                    </>
-                                )}
-                            </button>
-                        </form>
-                        <p className="mt-4 text-[10px] text-gray-500 text-center italic">"Our team will try hard to get requested content for you."</p>
-                    </div>
-                </div>
+                <ContentRequestInline />
 
                 {/* Sign Out */}
                 <button
@@ -430,6 +382,35 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                 <div className="text-center text-xs text-gray-600 pt-2">
                     Member since {getMemberSinceDate()} • Version 2.0
                 </div>
+
+                {/* Admin Only: Seed Footer Content */}
+                {currentUser.role === 'admin' && (
+                    <div className="mt-8 pt-8 border-t border-white/5 text-center">
+                        <button
+                            onClick={async () => {
+                                if (!confirm("Overwrite all footer content with local data?")) return;
+                                const { footerContent } = await import('../footerContent');
+
+                                let count = 0;
+                                for (const [title, data] of Object.entries(footerContent)) {
+                                    const pageId = title.replace(/\s+/g, '-');
+                                    // @ts-ignore
+                                    const pageData = {
+                                        id: pageId,
+                                        ...data,
+                                        title: data.title // ensuring title is mapped
+                                    };
+                                    await addPage(pageData);
+                                    count++;
+                                }
+                                alert(`Seeded ${count} footer pages! Refresh to see changes.`);
+                            }}
+                            className="text-xs text-gray-600 hover:text-cyan-500 transition underline"
+                        >
+                            [Admin] Seed Footer Content
+                        </button>
+                    </div>
+                )}
             </div>
             {/* Modals */}
             {showPlanModal && <PlanSelectionModal onClose={() => setShowPlanModal(false)} />}

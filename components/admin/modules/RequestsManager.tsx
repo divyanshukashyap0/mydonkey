@@ -54,7 +54,7 @@ export default function RequestsManager() {
 
     const handleDelete = async (id: string) => {
         if (confirm("Permanently delete this request?")) {
-            await deleteDoc(doc(db, 'content_requests', id));
+            await deleteDoc(doc(db, 'requests', id));
         }
     }
 
@@ -237,9 +237,9 @@ export default function RequestsManager() {
                         <div className="h-0.5 w-full bg-white/5">
                             <div
                                 className={`h-full transition-all duration-500 ${req.status === 'fulfilled' ? 'w-full bg-green-500' :
-                                        req.status === 'processing' ? 'w-2/3 bg-blue-500' :
-                                            req.status === 'approved' ? 'w-1/3 bg-purple-500' :
-                                                req.status === 'rejected' ? 'w-full bg-red-900' : 'w-0'
+                                    req.status === 'processing' ? 'w-2/3 bg-blue-500' :
+                                        req.status === 'approved' ? 'w-1/3 bg-purple-500' :
+                                            req.status === 'rejected' ? 'w-full bg-red-900' : 'w-0'
                                     }`}
                             />
                         </div>

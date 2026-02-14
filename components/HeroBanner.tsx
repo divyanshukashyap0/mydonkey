@@ -86,10 +86,7 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
 
             {/* Background Layer: Image (Always visible initially, fades out when video ready) */}
             <div className={`absolute inset-0 transition-opacity duration-1000 z-10 ${videoLoaded ? 'opacity-0' : 'opacity-100'} animate-slow-zoom`}>
-                <picture>
-                    {item.backdrop_path_mobile && <source media="(max-width: 767px)" srcSet={item.backdrop_path_mobile} />}
-                    <img src={item.backdrop_path} className="w-full h-full object-cover" alt="Hero Backdrop" />
-                </picture>
+                <img src={item.backdrop_path} className="w-full h-full object-cover" alt="Hero Backdrop" />
                 <div className="absolute inset-0 bg-gradient-to-r from-black via-black/40 to-transparent" />
             </div>
 

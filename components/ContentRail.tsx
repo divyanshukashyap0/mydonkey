@@ -79,17 +79,19 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                         onDetails(item);
                                     }}
                                 >
-                                    <div className="relative aspect-[2/3] group/card rounded-md overflow-hidden bg-gray-900 shadow-xl border border-white/5">
+                                    <div className={`relative ${layout === 'landscape' ? 'aspect-video' : 'aspect-[2/3]'} group/card rounded-md overflow-hidden bg-gray-900 shadow-xl border border-white/5`}>
                                         {layout === 'landscape' ? (
                                             <picture>
                                                 {item.backdrop_path_mobile && <source media="(max-width: 767px)" srcSet={item.backdrop_path_mobile} />}
                                                 <img src={item.backdrop_path} className="w-full h-full object-cover aspect-video" alt={item.title} draggable={false} />
                                             </picture>
                                         ) : (
-                                            <picture>
-                                                {item.poster_path_mobile && <source media="(max-width: 767px)" srcSet={item.poster_path_mobile} />}
-                                                <img src={item.poster_path} className="w-full h-full object-cover" alt={item.title} draggable={false} />
-                                            </picture>
+                                            <img
+                                                src={item.poster_path_mobile || item.poster_path}
+                                                className="w-full h-full object-cover"
+                                                alt={item.title}
+                                                draggable={false}
+                                            />
                                         )}
 
                                         {/* Overlay on hover */}

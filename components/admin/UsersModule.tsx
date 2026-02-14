@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Edit, Trash2, Check, X, CreditCard, Lock, Ban, Search, Filter, Eye, Clock, Calendar, Mail, User as UserIcon } from 'lucide-react';
+import { Edit, Trash2, Check, X, CreditCard, Lock, Ban, Search, Filter, Eye, Clock, Calendar, Mail, User as UserIcon, Play } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import { User, Invoice } from '../../types';
 import { doc, updateDoc, collection, getDocs, orderBy, query, where, limit } from 'firebase/firestore';
@@ -20,8 +20,10 @@ const UsersModule = () => {
 
     // Filter Logic
     const filteredUsers = users.filter(user => {
-        const matchesSearch = user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            user.uid.toLowerCase().includes(searchTerm.toLowerCase());
+        const email = user.email || '';
+        const uid = user.uid || '';
+        const matchesSearch = email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            uid.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesFilter = statusFilter === 'all' || (user.status || 'active') === statusFilter;
         return matchesSearch && matchesFilter;
     });
@@ -140,11 +142,11 @@ const UsersModule = () => {
                                 <td className="p-4">
                                     <div className="flex items-center gap-3">
                                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center text-xs font-bold text-gray-400 border border-white/10">
-                                            {user.email.substring(0, 2).toUpperCase()}
+                                            {(user.email || '??').substring(0, 2).toUpperCase()}
                                         </div>
                                         <div>
                                             <div className="font-bold text-white group-hover:text-blue-400 transition-colors">{user.email}</div>
-                                            <div className="text-[10px] text-gray-600 font-mono flex items-center gap-1"><CreditCard size={10} /> {user.uid.substring(0, 8)}...</div>
+                                            <div className="text-[10px] text-gray-600 font-mono flex items-center gap-1"><CreditCard size={10} /> {(user.uid || 'unknown').substring(0, 8)}...</div>
                                         </div>
                                     </div>
                                 </td>
@@ -195,7 +197,7 @@ const UsersModule = () => {
                         <div className="p-6 border-b border-white/10 flex justify-between items-center bg-[#141414]">
                             <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-lg font-bold text-white shadow-lg">
-                                    {editingUser.email.substring(0, 2).toUpperCase()}
+                                    {(editingUser.email || '??').substring(0, 2).toUpperCase()}
                                 </div>
                                 <div>
                                     <h2 className="text-xl font-bold text-white">{editingUser.email}</h2>

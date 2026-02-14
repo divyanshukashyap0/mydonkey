@@ -7,25 +7,28 @@ interface FooterProps {
 }
 
 const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
-  const { settings } = useStore();
+  const { settings, pages } = useStore();
   const siteName = settings?.siteName || 'My Donkey';
 
-  const footerLinks = [
+  const footerSections = [
     {
       title: 'Company',
-      links: ['About Us', 'Careers', 'Press', 'Blog', 'Investors']
+      links: pages.filter(p => p.category === 'Company').map(p => ({ label: p.title, action: p.id }))
     },
     {
       title: 'Support',
-      links: ['Help Center', 'Supported Devices', 'Contact Us', 'Activate Device']
+      links: pages.filter(p => p.category === 'Support').map(p => ({ label: p.title, action: p.id }))
     },
     {
       title: 'Legal',
-      links: ['Terms of Use', 'Privacy Policy', 'Cookie Preferences', 'Corporate Information']
+      links: pages.filter(p => p.category === 'Legal').map(p => ({ label: p.title, action: p.id }))
     },
     {
       title: 'Connect',
-      links: ['Ways to Watch', 'Speed Test', 'Request a Movie', `Only on ${siteName}`, 'Account']
+      links: [
+        ...pages.filter(p => p.category === 'Connect').map(p => ({ label: p.title, action: p.id })),
+        { label: 'Account', action: 'Account' }
+      ]
     }
   ];
 
@@ -40,7 +43,7 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
-          {footerLinks.map((section, idx) => (
+          {footerSections.map((section, idx) => (
             <div key={idx}>
               <h4 className="font-bold text-gray-200 mb-4 uppercase text-xs tracking-wider hidden md:block">{section.title}</h4>
               <ul className="space-y-3">
@@ -48,9 +51,9 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                   <li
                     key={lIdx}
                     className="hover:underline cursor-pointer transition-colors hover:text-white"
-                    onClick={() => onNavigate(link)}
+                    onClick={() => onNavigate(link.action)}
                   >
-                    {link}
+                    {link.label}
                   </li>
                 ))}
               </ul>

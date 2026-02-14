@@ -11,7 +11,8 @@ import {
     PaymentMethod,
     Invoice,
     Device,
-    ContentRequest
+    ContentRequest,
+    Page
 } from '../types';
 import { auth, db } from '../firebase';
 import { sendSubscriptionEmail } from '../utils/emailService';
@@ -97,6 +98,10 @@ interface StoreContextType {
     submitContentRequest: (title: string) => Promise<void>;
     updateContentRequest: (id: string, updates: Partial<ContentRequest>) => Promise<void>;
     updateContentDuration: (id: string, duration: string) => Promise<void>;
+    pages: Page[];
+    addPage: (page: Page) => Promise<void>;
+    updatePage: (id: string, updates: Partial<Page>) => Promise<void>;
+    deletePage: (id: string) => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -126,6 +131,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const [isInstallable, setIsInstallable] = useState(false);
     const [isIOS, setIsIOS] = useState(false);
     const [contentRequests, setContentRequests] = useState<ContentRequest[]>([]);
+    const [pages, setPages] = useState<Page[]>([]);
 
     // --- Theme Application ---
     useEffect(() => {
@@ -344,10 +350,16 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             setNotifications(snap.docs.map(d => ({ ...d.data(), id: d.id } as Notification)));
         });
 
+        const unsubPages = onSnapshot(collection(db, 'pages'), (snap) => {
+            setPages(snap.docs.map(d => ({ ...d.data(), id: d.id } as Page)));
+        });
+
         let unsubUsers = () => { };
         if (currentUser?.role === 'admin') {
             unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-                setUsers(snap.docs.map(d => d.data() as AppUser));
+                setUsers(snap.docs.map(d => ({ uid: d.id, ...d.data() } as AppUser)));
+            }, (error) => {
+                console.error("Error fetching users:", error);
             });
         }
 
@@ -357,6 +369,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             unsubSections();
             unsubPlans();
             unsubNotifs();
+            unsubPages();
             unsubUsers();
         };
     }, [currentUser?.role]);
@@ -391,6 +404,40 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             unsubProfiles();
         };
     }, [fbUser, currentProfile?.id]);
+
+    // 4. Activity Tracker (Throttled)
+    useEffect(() => {
+        if (!fbUser) return;
+
+        const updateActivity = async () => {
+            const now = Date.now();
+            const lastUpdate = parseInt(localStorage.getItem('lastActivityUpdate') || '0');
+            // Update only if more than 5 minutes have passed
+            if (now - lastUpdate > 5 * 60 * 1000) {
+                await updateDoc(doc(db, 'users', fbUser.uid), {
+                    lastActiveAt: new Date().toISOString()
+                });
+                localStorage.setItem('lastActivityUpdate', now.toString());
+            }
+        };
+
+        const handleActivity = () => {
+            updateActivity();
+        };
+
+        window.addEventListener('click', handleActivity);
+        window.addEventListener('keydown', handleActivity);
+        window.addEventListener('touchstart', handleActivity);
+
+        // Initial update
+        updateActivity();
+
+        return () => {
+            window.removeEventListener('click', handleActivity);
+            window.removeEventListener('keydown', handleActivity);
+            window.removeEventListener('touchstart', handleActivity);
+        };
+    }, [fbUser]);
 
     // Methods
     const login = async (email: string, password: string) => {
@@ -661,7 +708,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
         const q = query(collection(db, 'requests'), orderBy('createdAt', 'desc'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const reqs = snapshot.docs.map(doc => ({ ...doc.data() } as ContentRequest));
+            const reqs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContentRequest));
             setContentRequests(reqs);
         });
 
@@ -767,6 +814,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         updateContentRequest,
         submitContentRequest,
         contentRequests,
+        pages,
 
         updateContentDuration: async (id: string, duration: string) => {
             if (!currentUser || currentUser.role !== 'admin') return;
@@ -774,11 +822,22 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             if (duration && duration.length > 0) {
                 await updateDoc(doc(db, 'content', id), { duration });
             }
+        },
+
+        addPage: async (page: Page) => {
+            await setDoc(doc(db, 'pages', page.id), page);
+        },
+        updatePage: async (id: string, updates: Partial<Page>) => {
+            await updateDoc(doc(db, 'pages', id), updates);
+        },
+        deletePage: async (id: string) => {
+            await deleteDoc(doc(db, 'pages', id));
         }
     }), [
         isAuthenticated,
         isLoading,
         content,
+        pages,
         users,
         currentUser,
         currentProfile,
@@ -791,7 +850,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         isIOS,
         contentRequests,
         submitContentRequest,
-        updateContentRequest
+        updateContentRequest,
+        pages
     ]);
 
     // Safeguard: Force loading to end after 5 seconds if auth hangs

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   LayoutDashboard, Film, Users, Settings, Home, LogOut,
-  Tags, CreditCard, Calendar, MessageSquare, ChevronDown, ChevronRight, Menu, X
+  Tags, CreditCard, Calendar, MessageSquare, ChevronDown, ChevronRight, Menu, X, FileText
 } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import UsersModule from './UsersModule';
@@ -12,9 +12,10 @@ import AnalyticsManager from './modules/AnalyticsManager';
 import PlanManager from './modules/PlanManager';
 import ComingSoonManager from './modules/ComingSoonManager';
 import RequestsManager from './modules/RequestsManager';
+import PagesManager from './modules/PagesManager';
 
 // --- Types ---
-type ModuleType = 'dashboard' | 'content' | 'home' | 'coming_soon' | 'requests' | 'plans' | 'users' | 'settings';
+type ModuleType = 'dashboard' | 'content' | 'home' | 'coming_soon' | 'requests' | 'plans' | 'users' | 'settings' | 'pages';
 
 interface SidebarGroup {
   title: string;
@@ -34,6 +35,7 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
     items: [
       { id: 'content', label: 'Content Library', icon: Film },
       { id: 'home', label: 'Sections & Layout', icon: Home },
+      { id: 'pages', label: 'Pages & Footer', icon: FileText },
       { id: 'coming_soon', label: 'Upcoming Releases', icon: Calendar },
       { id: 'requests', label: 'User Requests', icon: MessageSquare },
     ]
@@ -176,6 +178,7 @@ export default function AdminLayout({ onExit }: { onExit: () => void }) {
             {activeModule === 'users' && <UsersModule />}
             {activeModule === 'settings' && <SettingsManager />}
             {activeModule === 'requests' && <RequestsManager />}
+            {activeModule === 'pages' && <PagesManager />}
           </div>
         </main>
       </div>
