@@ -147,11 +147,47 @@ const MainLayout = () => {
                         />
                     )}
                     <div className="pb-24 bg-[#141414] relative z-10 pl-4 md:pl-12 space-y-8">
-                        <ContentRail title="Trending Now" items={trending} onDetails={handleDetails} />
-                        <ContentRail title="My Donkey Originals" items={originals} isOriginal onDetails={handleDetails} layout="portrait" />
-                        <ContentRail title="New Releases" items={movies.slice(0, 10)} onDetails={handleDetails} />
-                        <ContentRail title="TV Shows" items={tvShows.slice(0, 10)} onDetails={handleDetails} />
+                        {/* Dynamic Sections from Admin */}
+                        {sections
+                            .filter(s => s.enabled && s.scopes?.includes('home'))
+                            .sort((a, b) => a.order - b.order)
+                            .map(section => {
+                                let autoItems: Content[] = [];
 
+                                // Auto-population logic
+                                if (section.type === 'trending') {
+                                    autoItems = content.filter(c => c.featured || (c.vote_average && c.vote_average > 7.5)).slice(0, 10);
+                                } else if (section.type === 'genre' && section.genreFilter) {
+                                    autoItems = content.filter(c => c.genres?.includes(section.genreFilter!)).slice(0, 10);
+                                } else if (section.type === 'originals') {
+                                    autoItems = content.filter(c => c.isOriginal).slice(0, 10);
+                                } else if (section.type === 'new_movies') {
+                                    autoItems = content.filter(c => c.type === 'movie').slice(0, 10);
+                                } else if (section.type === 'new_tv') {
+                                    autoItems = content.filter(c => c.type === 'tv').slice(0, 10);
+                                }
+
+                                // Manual items
+                                const manualItems = (section.contentIds || []).map(id => content.find(c => c.id === id)).filter(Boolean) as Content[];
+
+                                // Merge: Manual first, then Auto. Deduplicate.
+                                const items = [...manualItems, ...autoItems].filter((item, index, self) =>
+                                    index === self.findIndex(t => t.id === item.id)
+                                );
+
+                                if (items.length === 0) return null;
+
+                                return (
+                                    <ContentRail
+                                        key={section.id}
+                                        title={section.title}
+                                        items={items}
+                                        onDetails={handleDetails}
+                                        isTop10={section.showRanking} // Use specific ranking style if enabled
+                                        showRanking={section.showRanking}
+                                    />
+                                );
+                            })}
                         <div className="pr-4 md:pr-12 pt-8">
                             <ContentRequestInline />
                         </div>

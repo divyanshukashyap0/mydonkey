@@ -10,6 +10,7 @@ interface ContentRailProps {
     isTop10?: boolean;
     isOriginal?: boolean;
     layout?: 'portrait' | 'landscape';
+    showRanking?: boolean;
 }
 
 const ContentRail: React.FC<ContentRailProps> = ({
@@ -18,7 +19,8 @@ const ContentRail: React.FC<ContentRailProps> = ({
     onDetails,
     isTop10 = false,
     isOriginal = false,
-    layout = 'portrait'
+    layout = 'portrait',
+    showRanking = false
 }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
     const { currentProfile, toggleWatchlist } = useStore();
@@ -57,29 +59,49 @@ const ContentRail: React.FC<ContentRailProps> = ({
 
                 <div
                     ref={scrollRef}
-                    className="flex overflow-x-auto gap-2 md:gap-4 px-4 md:px-12 no-scrollbar scroll-smooth touch-pan-y"
+                    className={`flex overflow-x-auto px-4 md:px-12 no-scrollbar scroll-smooth touch-pan-y ${showRanking ? 'gap-0 md:gap-0' : 'gap-2 md:gap-4'}`}
                 >
                     {(!items || items.length === 0) ? (
-                        // Show Skeletons if no items (assuming loading context, or just fallback)
-                        // Ideally we'd pass a 'loading' prop, but for now we can infer or just render nothing if truly empty after load.
-                        // Let's assume this component is only rendered when data SHOULD exist. 
-                        // Actually, better to handle empty state gracefully.
-                        <div className="text-gray-500 text-sm italic p-4">Bi content available completely.</div>
+                        <div className="text-gray-500 text-sm italic p-4">No content available.</div>
                     ) : (
                         items.map((item, idx) => {
                             const isAdded = currentProfile?.myList.includes(item.id);
+                            // Ranking logic
+                            const rank = idx + 1;
 
                             return (
                                 <div
                                     key={item.id}
-                                    className={`flex-shrink-0 transition-all duration-500 hover:scale-110 hover:z-20 cursor-pointer select-none ${layout === 'landscape' ? 'w-36 md:w-80' : 'w-24 md:w-48'
-                                        }`}
+                                    className={`flex-shrink-0 transition-all duration-500 hover:z-20 cursor-pointer select-none relative flex items-center ${showRanking ? 'w-48 md:w-96' : (layout === 'landscape' ? 'w-36 md:w-80' : 'w-24 md:w-48')}`}
                                     onClick={() => {
                                         if (navigator.vibrate) navigator.vibrate(10);
                                         onDetails(item);
                                     }}
                                 >
-                                    <div className={`relative ${layout === 'landscape' ? 'aspect-video' : 'aspect-[2/3]'} group/card rounded-md overflow-hidden bg-gray-900 shadow-xl border border-white/5`}>
+                                    {showRanking && (
+                                        <div className="flex-shrink-0 relative z-10 -mr-8 md:-mr-16 translate-y-0 flex items-end pb-4">
+                                            <svg
+                                                viewBox="0 0 100 150"
+                                                className="h-32 md:h-64 w-auto fill-black stroke-white stroke-[2px]"
+                                                style={{ filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.5))' }}
+                                            >
+                                                <text
+                                                    x="85"
+                                                    y="140"
+                                                    textAnchor="end"
+                                                    fontSize="160"
+                                                    fontWeight="900"
+                                                    fontFamily="Anton, Impact, sans-serif"
+                                                    className="fill-black stroke-[#595959]"
+                                                    strokeWidth="4px"
+                                                >
+                                                    {rank}
+                                                </text>
+                                            </svg>
+                                        </div>
+                                    )}
+
+                                    <div className={`relative flex-1 ${layout === 'landscape' ? 'aspect-video' : 'aspect-[2/3]'} group/card rounded-md overflow-hidden bg-gray-900 shadow-xl border border-white/5 hover:scale-110 transition-transform duration-300 z-20`}>
                                         {layout === 'landscape' ? (
                                             <picture>
                                                 {item.backdrop_path_mobile && <source media="(max-width: 767px)" srcSet={item.backdrop_path_mobile} />}
@@ -119,25 +141,13 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                             </div>
                                         )}
 
-                                        {/* Top 10 Badge */}
-                                        {isTop10 && (
+                                        {/* Top 10 Badge (if explicit top 10 but not using numbered raking, or both) */}
+                                        {isTop10 && !showRanking && (
                                             <div className="absolute top-0 left-0 bg-brand-red text-white text-[10px] font-black px-1.5 py-0.5 rounded-br uppercase tracking-tighter">
                                                 TOP 10
                                             </div>
                                         )}
                                     </div>
-
-                                    {/* Movie Title Below Thumbnail */}
-                                    <h3 className="mt-2 text-xs md:text-sm font-medium text-gray-200 truncate text-center px-1">
-                                        {item.title}
-                                    </h3>
-
-                                    {/* Original Label Below */}
-                                    {isOriginal && (
-                                        <div className="text-[10px] text-brand-red font-bold tracking-widest uppercase text-center">
-                                            My Donkey Original
-                                        </div>
-                                    )}
                                 </div>
                             );
                         })

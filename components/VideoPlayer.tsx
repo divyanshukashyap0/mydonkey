@@ -603,7 +603,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     return (
         <div
-            className="fixed inset-0 z-[100] bg-black flex flex-col justify-center items-center overflow-hidden font-sans select-none"
+            className={`fixed inset-0 z-[100] bg-black flex flex-col justify-center items-center overflow-hidden font-sans select-none ${!showControls ? 'cursor-none' : ''}`}
         >
             {/* Strict Right-Click Block Overlay 
                 - For YouTube: pointer-events 'auto' when controls hidden (blocks all clicks to iframe).
@@ -840,20 +840,31 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                 {/* Quality Settings */}
                                 <div className="relative">
                                     <button onClick={(e) => { e.stopPropagation(); setShowQualityMenu(!showQualityMenu); setShowAudioSubMenu(false); }}
-                                        className={`hover:text-white transition-all p-2.5 rounded-xl hover:bg-white/5 ${showQualityMenu ? 'bg-white/10 text-white' : ''}`}>
+                                        className={`hover:text-white transition-all p-2.5 rounded-xl hover:bg-white/5 ${showQualityMenu ? 'bg-white/10 text-white' : ''}`}
+                                        title="Quality & Speed">
                                         <Settings size={22} />
                                     </button>
+
                                     {showQualityMenu && (
-                                        <div className="absolute bottom-full right-0 mb-6 bg-[#0f0f0f]/95 backdrop-blur-xl border border-white/10 rounded-xl p-2 min-w-[140px] shadow-2xl animate-in slide-in-from-bottom-4 z-[150] ring-1 ring-white/5">
-                                            <h3 className="text-gray-500 font-bold text-[10px] uppercase tracking-widest px-4 py-2 mb-1 border-b border-white/5">Quality</h3>
-                                            <div className="max-h-48 overflow-y-auto custom-scrollbar p-1">
-                                                {qualities.map(q => (
-                                                    <button key={q} onClick={() => handleQualityChange(q)}
-                                                        className={`block w-full text-left px-4 py-2 text-xs hover:bg-white/10 rounded-lg transition-colors ${currentQuality === q ? 'text-brand-red font-bold bg-brand-red/5' : 'text-gray-400 hover:text-white'}`}>
-                                                        {q.toUpperCase()}
-                                                    </button>
-                                                ))}
+                                        <div className="absolute bottom-full right-0 mb-6 bg-[#0f0f0f]/95 backdrop-blur-xl border border-white/10 rounded-xl p-0 min-w-[200px] flex flex-col shadow-2xl animate-in slide-in-from-bottom-4 z-[150] ring-1 ring-white/5 overflow-hidden">
+
+                                            {/* Quality Section */}
+                                            <div>
+                                                <h3 className="text-gray-500 font-bold text-[10px] uppercase tracking-widest px-4 py-2 bg-white/5">Quality</h3>
+                                                <div className="max-h-48 overflow-y-auto custom-scrollbar p-1">
+                                                    {qualities.length > 0 ? qualities.map(q => (
+                                                        <button key={q} onClick={() => handleQualityChange(q)}
+                                                            className={`w-full text-left px-4 py-2 text-xs hover:bg-white/10 rounded-lg transition-colors flex justify-between items-center ${currentQuality === q ? 'text-brand-red font-bold bg-brand-red/5' : 'text-gray-400 hover:text-white'}`}>
+                                                            <span>{q.toUpperCase()}</span>
+                                                            {currentQuality === q && <Check size={12} strokeWidth={3} />}
+                                                        </button>
+                                                    )) : (
+                                                        <div className="px-4 py-2 text-xs text-gray-500 italic">Auto (Default)</div>
+                                                    )}
+                                                </div>
                                             </div>
+
+                                            {/* Playback Speed (Bonus Feature integration if space permits, otherwise just Quality) */}
                                         </div>
                                     )}
                                 </div>

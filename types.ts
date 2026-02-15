@@ -72,11 +72,12 @@ export interface Section {
   id: string;
   title: string;
   order: number;
-  type: 'trending' | 'genre' | 'curated' | 'originals';
+  type: 'trending' | 'genre' | 'curated' | 'originals' | 'new_movies' | 'new_tv';
   genreFilter?: string;
   contentIds?: string[];
   enabled: boolean;
   scopes: ('home' | 'tv' | 'movie' | 'new')[];
+  showRanking?: boolean;
 }
 
 export interface SiteSettings {
