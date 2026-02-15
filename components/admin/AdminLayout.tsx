@@ -13,9 +13,10 @@ import PlanManager from './modules/PlanManager';
 import ComingSoonManager from './modules/ComingSoonManager';
 import RequestsManager from './modules/RequestsManager';
 import PagesManager from './modules/PagesManager';
+import AppearanceManager from './modules/AppearanceManager';
 
 // --- Types ---
-type ModuleType = 'dashboard' | 'content' | 'home' | 'coming_soon' | 'requests' | 'plans' | 'users' | 'settings' | 'pages';
+type ModuleType = 'dashboard' | 'content' | 'home' | 'coming_soon' | 'requests' | 'plans' | 'users' | 'settings' | 'pages' | 'appearance';
 
 interface SidebarGroup {
   title: string;
@@ -50,6 +51,7 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
   {
     title: 'System',
     items: [
+      { id: 'appearance', label: 'Appearance & Theme', icon: Tags },
       { id: 'settings', label: 'Settings', icon: Settings },
     ]
   }
@@ -179,6 +181,7 @@ export default function AdminLayout({ onExit }: { onExit: () => void }) {
             {activeModule === 'settings' && <SettingsManager />}
             {activeModule === 'requests' && <RequestsManager />}
             {activeModule === 'pages' && <PagesManager />}
+            {activeModule === 'appearance' && <AppearanceManager />}
           </div>
         </main>
       </div>

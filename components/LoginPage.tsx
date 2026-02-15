@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 // import { AppleLogo } from './AppleLogo';
 import { useStore } from '../context/StoreContext';
 
 const LoginPage = () => {
     const { login, signup, loginWithGoogle, loginWithApple, loginAsGuest } = useStore();
+    const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [step, setStep] = useState<'email' | 'password'>('email');
@@ -24,6 +26,7 @@ const LoginPage = () => {
                 } else {
                     await login(email, password);
                 }
+                navigate('/');
             } catch (err: any) {
                 console.error(err);
                 setError(err.message || 'Authentication failed. Check your credentials.');
@@ -102,6 +105,7 @@ const LoginPage = () => {
                         onClick={async () => {
                             try {
                                 await loginAsGuest();
+                                navigate('/');
                             } catch (err: any) {
                                 setError(err.message);
                             }
@@ -121,6 +125,7 @@ const LoginPage = () => {
                             onClick={async () => {
                                 try {
                                     await loginWithGoogle();
+                                    navigate('/');
                                 } catch (err: any) {
                                     setError(err.message);
                                 }

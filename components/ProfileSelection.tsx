@@ -87,6 +87,13 @@ const ProfileSelection = () => {
     }
   };
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 18) return 'Good Afternoon';
+    return 'Good Evening';
+  };
+
   if (loading) return (
     <div className="min-h-screen bg-black flex items-center justify-center text-white flex-col gap-4">
       <div className="w-12 h-12 border-4 border-brand-red border-t-white rounded-full animate-spin" />
@@ -96,8 +103,13 @@ const ProfileSelection = () => {
 
   return (
     <div className="min-h-screen bg-[#141414] flex flex-col items-center justify-center text-white animate-in zoom-in-95 duration-500">
-      <div className="mb-12">
-        <img src="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png" className="h-16 md:h-20 w-auto object-contain" alt="MY DONKEY Logo" />
+      <div className="mb-8 flex flex-col items-center">
+        <img src="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png" className="h-16 md:h-20 w-auto object-contain mb-8" alt="MY DONKEY Logo" />
+
+        <div className="text-center mb-2 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
+          <h2 className="text-xl md:text-2xl font-light text-brand-red mb-1">{getGreeting()}, <span className="font-bold text-white">{currentUser?.name || 'Guest'}</span></h2>
+          <p className="text-gray-400 text-sm md:text-base">Welcome Back to My Donkey</p>
+        </div>
       </div>
 
       <h1 className="text-3xl md:text-5xl font-medium mb-8 md:mb-12">Who's watching?</h1>

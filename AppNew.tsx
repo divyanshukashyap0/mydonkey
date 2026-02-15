@@ -14,6 +14,8 @@ import RequestContent from './components/RequestContent';
 import AdminLayout from './components/admin/AdminLayout';
 import ContentRequestInline from './components/ContentRequestInline';
 import SearchPage from './components/SearchPage';
+import ScrollToTop from './components/ScrollToTop';
+import ProfileSelection from './components/ProfileSelection';
 import { Content } from './types';
 import { StoreProvider } from './context/StoreContext';
 import { db, auth } from './firebase';
@@ -27,12 +29,29 @@ const MainLayout = () => {
     // Derived activeTab from URL
     // Remove leading slash, default to 'home' if empty (though we redirect empty to home below)
     // Decode URI component for paths like "About%20Us"
+    // Derived activeTab from URL
     const path = location.pathname.substring(1);
-    const activeTab = path ? decodeURIComponent(path) : 'home';
+    let activeTab = path ? decodeURIComponent(path) : 'home';
+    if (activeTab.startsWith('browse/')) {
+        activeTab = 'home';
+    }
 
     const [viewingContent, setViewingContent] = useState<Content | null>(null);
     const [playingContent, setPlayingContent] = useState<Content | null>(null);
     const [showLoginModal, setShowLoginModal] = useState(false);
+
+    // Deep Link Handler (e.g. /browse/content_123)
+    useEffect(() => {
+        if (location.pathname.startsWith('/browse/')) {
+            const contentId = location.pathname.split('/')[2];
+            if (contentId && content.length > 0) {
+                const item = content.find(c => c.id === contentId);
+                if (item) {
+                    setViewingContent(item);
+                }
+            }
+        }
+    }, [location.pathname, content]);
 
     // Redirect root and /features to /home
     useEffect(() => {
@@ -64,7 +83,7 @@ const MainLayout = () => {
             if (isAuthenticated && currentUser) {
                 setPlayingContent({ ...item, playMode: 'movie' });
             } else {
-                setShowLoginModal(true);
+                navigate('/login');
             }
         }
     };
@@ -75,7 +94,7 @@ const MainLayout = () => {
 
     const handleTabChange = (tabId: string) => {
         if (tabId === 'my-list' && !isAuthenticated) {
-            setShowLoginModal(true);
+            navigate('/login');
             return;
         }
         // Navigate to the new URL
@@ -86,7 +105,7 @@ const MainLayout = () => {
     const handleNavigate = (page: string) => {
         if (page === 'Account') {
             if (!isAuthenticated) {
-                setShowLoginModal(true);
+                navigate('/login');
             } else {
                 navigate('/account');
                 window.scrollTo(0, 0);
@@ -302,28 +321,25 @@ const MainLayout = () => {
         );
     }
 
-    if (showLoginModal) {
+    // Force Profile Selection if logged in but no profile selected
+    if (isAuthenticated && !currentProfile) {
         return (
-            <div className="fixed inset-0 z-[200] bg-black">
-                <button
-                    onClick={() => setShowLoginModal(false)}
-                    className="absolute top-4 right-4 text-white z-50 p-2 bg-black/50 rounded-full hover:bg-white/20"
-                >
-                    ✕
-                </button>
-                <LoginPage />
-            </div>
+            <>
+                <ScrollToTop />
+                <ProfileSelection />
+            </>
         );
     }
 
     return (
         <div className="bg-[#141414] min-h-screen text-white font-sans selection:bg-red-600 selection:text-white">
+            <ScrollToTop />
             <TopNav
                 activeTab={activeTab}
                 setTab={handleTabChange}
                 onSearch={() => handleTabChange('search')}
                 onUnlock={() => { }}
-                onLoginClick={() => setShowLoginModal(true)}
+                onLoginClick={() => navigate('/login')}
             />
 
             <main>
@@ -357,6 +373,7 @@ const AppRoutes = () => {
 
     return (
         <Routes>
+            <Route path="/login" element={<LoginPage />} />
             <Route
                 path="/admin/*"
                 element={
@@ -376,9 +393,12 @@ const AppRoutes = () => {
     );
 };
 
+import FontLoader from './components/FontLoader';
+
 export default function AppNew() {
     return (
         <StoreProvider>
+            <FontLoader />
             <AppRoutes />
         </StoreProvider>
     );

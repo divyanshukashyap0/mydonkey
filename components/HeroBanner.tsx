@@ -16,16 +16,13 @@ interface HeroBannerProps {
 const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
     const { settings, currentUser } = useStore();
     const [showVideo, setShowVideo] = useState(false);
-    const [videoLoaded, setVideoLoaded] = useState(false);
+    const [videoPlaying, setVideoPlaying] = useState(false);
     const [isMuted, setIsMuted] = useState(true);
-    const iframeRef = useRef<HTMLIFrameElement>(null);
+    const playerRef = useRef<any>(null);
 
     // Detect mobile device
     const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
-    // Check if autoplay should be enabled
-    // On mobile: disabled by default, unless user explicitly enables it
-    // On desktop: enabled by default
     const shouldAutoplay = isMobile
         ? (currentUser?.autoplayEnabled === true)
         : (currentUser?.autoplayEnabled !== false);
@@ -34,46 +31,89 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
     useEffect(() => {
         if (!item) return;
         setShowVideo(false);
-        setVideoLoaded(false);
+        setVideoPlaying(false);
         setIsMuted(true);
+        if (playerRef.current) {
+            playerRef.current.destroy();
+            playerRef.current = null;
+        }
 
-        // Only start autoplay timer if autoplay is enabled
         if (!shouldAutoplay) return;
 
         const timer = setTimeout(() => {
             setShowVideo(true);
-        }, 5000); // 5s delay before trying to show video
+        }, 3000); // reduced delay to 3s for faster start if ready
 
         return () => clearTimeout(timer);
     }, [item?.id, shouldAutoplay]);
 
+    // Initialize Player when showVideo is true
     useEffect(() => {
         if (!showVideo || !item?.youtubeId) return;
 
-        // Post-message to set quality once loaded (rough approx of onReady)
-        const qualityTimer = setTimeout(() => {
-            if (iframeRef.current) {
-                iframeRef.current.contentWindow?.postMessage(JSON.stringify({
-                    event: 'command',
-                    func: 'setPlaybackQuality',
-                    args: [settings.heroVideoQuality || 'hd1080']
-                }), '*');
-                setVideoLoaded(true);
-            }
-        }, 2000); // Give iframe 2s to init
+        const initPlayer = () => {
+            if (window.YT && window.YT.Player) {
+                // Destroy existing if any
+                if (playerRef.current) {
+                    try { playerRef.current.destroy(); } catch (e) { }
+                }
 
-        return () => clearTimeout(qualityTimer);
-    }, [showVideo, item?.youtubeId, settings.heroVideoQuality]);
+                playerRef.current = new window.YT.Player('hero-player', {
+                    videoId: item.youtubeId,
+                    playerVars: {
+                        autoplay: 1,
+                        controls: 0,
+                        mute: 1,
+                        start: 10,
+                        loop: 1,
+                        playlist: item.youtubeId,
+                        modestbranding: 1,
+                        playsinline: 1,
+                        rel: 0,
+                        iv_load_policy: 3,
+                        disablekb: 1,
+                        fs: 0
+                    },
+                    events: {
+                        onReady: (event: any) => {
+                            event.target.playVideo();
+                            event.target.mute();
+                        },
+                        onStateChange: (event: any) => {
+                            // YT.PlayerState.PLAYING = 1
+                            if (event.data === 1) {
+                                setVideoPlaying(true);
+                            }
+                            // Loop manually if needed
+                            if (event.data === 0) {
+                                event.target.playVideo();
+                            }
+                        }
+                    }
+                });
+            }
+        };
+
+        if (window.YT && window.YT.Player) {
+            initPlayer();
+        } else {
+            // Retry once if API not ready
+            setTimeout(initPlayer, 1000);
+        }
+
+        return () => {
+            if (playerRef.current) {
+                try { playerRef.current.destroy(); } catch (e) { }
+            }
+        };
+    }, [showVideo, item?.youtubeId]);
 
     const handleMuteToggle = () => {
         const newMuteState = !isMuted;
         setIsMuted(newMuteState);
-        if (iframeRef.current) {
-            iframeRef.current.contentWindow?.postMessage(JSON.stringify({
-                event: 'command',
-                func: newMuteState ? 'mute' : 'unMute',
-                args: []
-            }), '*');
+        if (playerRef.current && playerRef.current.mute) {
+            if (newMuteState) playerRef.current.mute();
+            else playerRef.current.unMute();
         }
     };
 
@@ -84,21 +124,18 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
     return (
         <div className="relative w-full overflow-hidden group bg-cinema-black h-[70vh] lg:h-[85vh]">
 
-            {/* Background Layer: Image (Always visible initially, fades out when video ready) */}
-            <div className={`absolute inset-0 transition-opacity duration-1000 z-10 ${videoLoaded ? 'opacity-0' : 'opacity-100'} animate-slow-zoom`}>
+            {/* Background Layer: Image (Always visible initially, fades out when video playing) */}
+            <div className={`absolute inset-0 transition-opacity duration-1000 z-10 ${videoPlaying ? 'opacity-0' : 'opacity-100'}`}>
                 <img src={item.backdrop_path} className="w-full h-full object-cover" alt="Hero Backdrop" />
                 <div className="absolute inset-0 bg-gradient-to-r from-black via-black/40 to-transparent" />
             </div>
 
             {/* Background Layer: Video (Oversized for cinematic fill) */}
             {showVideo && item.youtubeId && (
-                <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-                    <iframe
-                        ref={iframeRef}
-                        className={`w-[150%] h-[150%] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-60 transition-opacity duration-1000 ${videoLoaded ? 'opacity-100' : 'opacity-0'}`}
-                        src={`https://www.youtube.com/embed/${item.youtubeId}?autoplay=1&mute=1&loop=1&playlist=${item.youtubeId}&controls=0&showinfo=0&rel=0&modestbranding=1&iv_load_policy=3&start=10&enablejsapi=1&origin=${window.location.origin}`}
-                        allow="autoplay; encrypted-media"
-                        title="Hero Video"
+                <div className={`absolute inset-0 z-0 overflow-hidden pointer-events-none transition-opacity duration-1000 ${videoPlaying ? 'opacity-100' : 'opacity-0'}`}>
+                    <div
+                        id="hero-player"
+                        className="w-[135%] h-[135%] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-60"
                     />
                 </div>
             )}
@@ -153,7 +190,7 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
             </div>
 
             {/* Mute Toggle (Only if video is active) */}
-            {videoLoaded && (
+            {videoPlaying && (
                 <button
                     onClick={handleMuteToggle}
                     className="absolute bottom-24 right-6 md:bottom-32 md:right-12 z-40 bg-black/40 border border-white/20 p-2.5 md:p-3 rounded-full text-white hover:bg-white/10 transition animate-in fade-in"

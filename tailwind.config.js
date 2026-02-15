@@ -22,7 +22,7 @@ export default {
                 },
             },
             fontFamily: {
-                sans: ['Inter', 'sans-serif'],
+                sans: ['var(--font-body)', 'Inter', 'sans-serif'],
             },
             animation: {
                 'slow-zoom': 'zoom 20s infinite alternate',

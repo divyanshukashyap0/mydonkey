@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
-import { Send, Film, Tv, MessageSquare, CheckCircle, AlertCircle } from 'lucide-react';
+import { Send, Film, Tv, MessageSquare, CheckCircle, AlertCircle, Play } from 'lucide-react';
+import { Content } from '../types';
 
 const RequestContent = () => {
-    const { submitContentRequest, isAuthenticated } = useStore();
+    const { submitContentRequest, isAuthenticated, content } = useStore();
     const navigate = useNavigate();
 
     const [formData, setFormData] = useState({
@@ -15,6 +16,19 @@ const RequestContent = () => {
     });
     const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
     const [errorMessage, setErrorMessage] = useState('');
+    const [matches, setMatches] = useState<Content[]>([]);
+
+    const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setFormData({ ...formData, title: val });
+
+        if (val.length > 2 && content) {
+            const found = content.filter(c => c.title.toLowerCase().includes(val.toLowerCase()));
+            setMatches(found.slice(0, 3));
+        } else {
+            setMatches([]);
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -99,10 +113,36 @@ const RequestContent = () => {
                             <input
                                 type="text"
                                 value={formData.title}
-                                onChange={e => setFormData({ ...formData, title: e.target.value })}
+                                onChange={handleTitleChange}
                                 placeholder="e.g. Inception, Breaking Bad"
                                 className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-red-600 focus:outline-none transition-colors placeholder-gray-600"
                             />
+                            {matches.length > 0 && (
+                                <div className="mt-2 space-y-2 animate-in slide-in-from-top-2">
+                                    <p className="text-xs font-bold text-green-400 uppercase tracking-widest flex items-center gap-2">
+                                        <CheckCircle size={12} /> Desired content is already available:
+                                    </p>
+                                    {matches.map(match => (
+                                        <div key={match.id} className="flex items-center gap-3 bg-white/5 p-2 rounded-lg border border-green-500/30 hover:bg-white/10 transition">
+                                            <img src={match.poster_path} className="w-10 h-14 object-cover rounded bg-gray-800" alt={match.title} />
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="font-bold text-sm text-white line-clamp-1">{match.title}</h4>
+                                                <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                                                    <span>{match.release_date?.split('-')[0] || 'N/A'}</span>
+                                                    <span className="border border-white/20 px-1 rounded">{match.type === 'movie' ? 'Movie' : 'TV'}</span>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => navigate(`/watch/${match.id}`)} // Assuming /watch/:id route exists or handle play
+                                                className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-500 flex items-center gap-1"
+                                            >
+                                                <Play size={12} fill="currentColor" /> Play
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">

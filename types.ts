@@ -87,6 +87,8 @@ export interface SiteSettings {
   maintenanceMode: boolean;
   contactEmail?: string;
   theme?: 'default' | 'luxury';
+  websiteFont?: string;
+  rankFont?: string;
 }
 
 export interface Plan {
@@ -118,6 +120,7 @@ export interface Subscription {
 export interface User {
   uid: string;
   email: string;
+  name?: string;
   razorpayCustomerId?: string;
   plan: string;
   subscriptionStatus?: 'active' | 'inactive' | 'canceled';

@@ -231,6 +231,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     const tempUser: AppUser = {
                         uid: firebaseUser.uid,
                         email: userEmail,
+                        name: firebaseUser.displayName || userEmail.split('@')[0],
                         plan: 'Free',
                         role: isGuest ? 'guest' : 'user',
                         status: 'active',
@@ -247,6 +248,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                         const newAppUser: AppUser = {
                             uid: firebaseUser.uid,
                             email: userEmail,
+                            name: firebaseUser.displayName || userEmail.split('@')[0],
                             plan: 'Free',
                             role: isGuest ? 'guest' : 'user',
                             status: 'active',
@@ -270,7 +272,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                         setCurrentProfile(defaultProfile); // Set immediately for guests
                         setCurrentUser(newAppUser);
                     } else {
+                        // Backfill name if missing for existing users
                         const userData = userSnap.data() as AppUser;
+                        if (!userData.name) {
+                            await setDoc(userRef, {
+                                name: firebaseUser.displayName || userEmail.split('@')[0]
+                            }, { merge: true });
+                        }
                         // Check token version to force logout if needed
                         const localTokenVersion = localStorage.getItem('tokenVersion');
                         if (userData.tokenVersion && localTokenVersion && parseInt(localTokenVersion) < userData.tokenVersion) {
@@ -391,11 +399,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 if (updated) setCurrentProfile(updated);
             } else {
                 // Auto-select from localStorage if available
-                const savedProfileId = localStorage.getItem('selectedProfileId');
-                if (savedProfileId) {
-                    const saved = profiles.find(p => p.id === savedProfileId);
-                    if (saved) setCurrentProfile(saved);
-                }
+                // Auto-select from localStorage if available
+                // REMOVED for "Select Profile on Refresh" feature
+                // const savedProfileId = localStorage.getItem('selectedProfileId');
+                // if (savedProfileId) {
+                //     const saved = profiles.find(p => p.id === savedProfileId);
+                //     if (saved) setCurrentProfile(saved);
+                // }
             }
         });
 

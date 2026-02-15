@@ -63,23 +63,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const [volume, setVolume] = useState(100);
     const [isMuted, setIsMuted] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const [isApiReady, setIsApiReady] = useState(!!window.YT && !!window.YT.Player);
     const [isPlayerReady, setIsPlayerReady] = useState(false);
     const [isBuffering, setIsBuffering] = useState(false);
+    const [initialLoad, setInitialLoad] = useState(true); // New state to track first play
     const [isBoosted, setIsBoosted] = useState(false);
 
     // Player Options
     const [qualities, setQualities] = useState<string[]>([]);
 
-    // Debug: Log qualities when they change
-    // useEffect(() => {
-    //     console.log('VideoPlayer State Debug:', {
-    //         isMovieMode,
-    //         isDriveVideo,
-    //         youtubeVideoId,
-    //         availableQualities: qualities
-    //     });
-    // }, [qualities, isMovieMode, isDriveVideo, youtubeVideoId]);
+    const [isApiReady, setIsApiReady] = useState(!!window.YT && !!window.YT.Player);
     const [currentQuality, setCurrentQuality] = useState('auto');
     const [subtitleTracks, setSubtitleTracks] = useState<any[]>([]);
     const [selectedSubtitle, setSelectedSubtitle] = useState<any>(null); // null = off
@@ -96,32 +88,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         { id: 'eng_stereo', label: 'English', format: 'Stereo' },
         { id: 'hin_5.1', label: 'Hindi', format: '5.1' }
     ];
-
-    // Load YouTube API
-    useEffect(() => {
-        if (isDriveVideo) return;
-
-        if (window.YT && window.YT.Player) {
-            setIsApiReady(true);
-            return;
-        }
-
-        // Global callback for YT API
-        window.onYouTubeIframeAPIReady = () => {
-            console.log('YouTube API Ready');
-            setIsApiReady(true);
-        };
-
-        const existingScript = document.querySelector('script[src*="youtube.com/iframe_api"]');
-        if (!existingScript) {
-            const tag = document.createElement('script');
-            tag.src = "https://www.youtube.com/iframe_api";
-            const firstScriptTag = document.getElementsByTagName('script')[0];
-            firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
-        } else if (window.YT && window.YT.Player) {
-            setIsApiReady(true);
-        }
-    }, [isDriveVideo]);
 
     const onPlayerReady = (event: any) => {
         console.log('Player Ready');
@@ -152,6 +118,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         if (event.data === window.YT.PlayerState.PLAYING) {
             setPlaying(true);
             setIsBuffering(false);
+            setInitialLoad(false); // Content has started
             setDuration(event.target.getDuration());
         } else if (event.data === window.YT.PlayerState.PAUSED) {
             setPlaying(false);
@@ -627,10 +594,21 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 ) : (
                     <div className="w-full h-full relative overflow-hidden pointer-events-none">
                         {/* Scale up YouTube to hide top title bar and bottom branding */}
-                        <div ref={playerContainerRef} id="youtube-player" className="w-full h-[300%] -mt-[50%] md:h-[140%] md:-mt-[10%] scale-150 md:scale-125 origin-center pointer-events-none" />
+                        <div ref={playerContainerRef} id="youtube-player" className="w-full h-full origin-center pointer-events-none" />
                     </div>
                 )}
             </div>
+
+            {/* Loading Overlay */}
+            {(initialLoad || isBuffering) && !isDriveVideo && (
+                <div className="absolute inset-0 z-[50] flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm pointer-events-none transition-opacity duration-300">
+                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-brand-red border-t-transparent mb-6 shadow-[0_0_15px_rgba(229,9,20,0.5)]"></div>
+                    <div className="text-white font-bold text-xl tracking-wide animate-pulse">Loading Content...</div>
+                    <div className="text-gray-400 text-sm mt-3 font-medium bg-white/10 px-4 py-1.5 rounded-full backdrop-blur-md border border-white/5">
+                        Please wait for up to 1 minute
+                    </div>
+                </div>
+            )}
 
             {/* Click to Toggle Controls */}
             {!isDriveVideo && <div className="absolute inset-0 z-10" onClick={() => setShowControls(!showControls)}></div>}

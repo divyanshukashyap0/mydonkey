@@ -81,17 +81,17 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                     {showRanking && (
                                         <div className="flex-shrink-0 relative z-10 -mr-8 md:-mr-16 translate-y-0 flex items-end pb-4">
                                             <svg
-                                                viewBox="0 0 100 150"
+                                                viewBox="0 0 140 150"
                                                 className="h-32 md:h-64 w-auto fill-black stroke-white stroke-[2px]"
                                                 style={{ filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.5))' }}
                                             >
                                                 <text
-                                                    x="85"
+                                                    x="125"
                                                     y="140"
                                                     textAnchor="end"
                                                     fontSize="160"
                                                     fontWeight="900"
-                                                    fontFamily="Anton, Impact, sans-serif"
+                                                    style={{ fontFamily: "var(--font-rank, 'Anton'), Impact, sans-serif" }}
                                                     className="fill-black stroke-[#595959]"
                                                     strokeWidth="4px"
                                                 >

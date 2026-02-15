@@ -517,10 +517,13 @@ const ContentManager = () => {
                                             {/* Episodes List */}
                                             <div className="space-y-2 pl-4 border-l-2 border-white/10">
                                                 {season.episodes.map((ep, epIdx) => (
-                                                    <div key={ep.id} className="grid grid-cols-1 md:grid-cols-[auto_1fr_1fr_1fr_auto] gap-2 items-center bg-black/20 p-2 rounded">
+                                                    <div key={ep.id} className="grid grid-cols-1 md:grid-cols-[auto_1.5fr_1.5fr_1.5fr_0.5fr_auto] gap-2 items-center bg-black/20 p-2 rounded">
                                                         <span className="text-xs font-mono text-gray-500 px-2">{epIdx + 1}</span>
                                                         <input value={ep.title} onChange={e => updateEpisode(season.id, ep.id, { title: e.target.value })}
                                                             className="bg-black/50 border border-white/10 rounded p-1.5 text-sm" placeholder="Ep Title" />
+
+                                                        <input value={ep.stillUrl || ''} onChange={e => updateEpisode(season.id, ep.id, { stillUrl: e.target.value })}
+                                                            className="bg-black/50 border border-white/10 rounded p-1.5 text-sm" placeholder="Thumbnail URL" />
 
                                                         {/* Smart Episode Source Input */}
                                                         <input
@@ -538,7 +541,7 @@ const ContentManager = () => {
                                                         />
 
                                                         <input value={ep.duration} onChange={e => updateEpisode(season.id, ep.id, { duration: e.target.value })}
-                                                            className="bg-black/50 border border-white/10 rounded p-1.5 text-sm w-20 text-center"
+                                                            className="bg-black/50 border border-white/10 rounded p-1.5 text-sm w-full text-center"
                                                             placeholder="Auto"
                                                             title="Auto-calcs on play"
                                                         />
