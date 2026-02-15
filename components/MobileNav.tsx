@@ -15,10 +15,7 @@ const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setTab, currentProfile
                     <Home size={20} strokeWidth={activeTab === 'home' ? 3 : 2} />
                     <span className="text-[10px] font-medium">Home</span>
                 </button>
-                <button onClick={() => setTab('new')} className={`flex flex-col items-center gap-1 transition-colors min-w-[3.5rem] ${activeTab === 'new' ? 'text-white' : 'text-gray-400 hover:text-gray-200'}`}>
-                    <PlayCircle size={20} strokeWidth={activeTab === 'new' ? 3 : 2} />
-                    <span className="text-[10px] font-medium">New & Hot</span>
-                </button>
+
                 <button onClick={() => setTab('search')} className={`flex flex-col items-center gap-1 transition-colors min-w-[3.5rem] ${activeTab === 'search' ? 'text-white' : 'text-gray-400 hover:text-gray-200'}`}>
                     <Search size={20} strokeWidth={activeTab === 'search' ? 3 : 2} />
                     <span className="text-[10px] font-medium">Search</span>

@@ -13,13 +13,14 @@ import AccountSettings from './components/AccountSettings';
 import RequestContent from './components/RequestContent';
 import AdminLayout from './components/admin/AdminLayout';
 import ContentRequestInline from './components/ContentRequestInline';
+import SearchPage from './components/SearchPage';
 import { Content } from './types';
 import { StoreProvider } from './context/StoreContext';
 import { db, auth } from './firebase';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 
 const MainLayout = () => {
-    const { content, currentUser, currentProfile, isLoading, isAuthenticated, sections, pages } = useStore();
+    const { content, currentUser, currentProfile, isLoading, isAuthenticated, sections, pages, settings } = useStore();
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -133,7 +134,8 @@ const MainLayout = () => {
         }
 
         if (activeTab === 'home') {
-            const heroItem = trending.length > 0 ? trending[0] : (content.length > 0 ? content[0] : null);
+            const heroItem = (settings?.heroContentId && content.find(c => c.id === settings.heroContentId))
+                || (trending.length > 0 ? trending[0] : (content.length > 0 ? content[0] : null));
 
             return (
                 <>
@@ -229,6 +231,10 @@ const MainLayout = () => {
             );
         }
 
+        if (activeTab === 'search') {
+            return <SearchPage onDetails={handleDetails} />;
+        }
+
         if (activeTab === 'account') {
             if (!isAuthenticated) return <Navigate to="/home" />;
             return <AccountSettings setActiveTab={handleTabChange} />;
@@ -279,7 +285,7 @@ const MainLayout = () => {
             <TopNav
                 activeTab={activeTab}
                 setTab={handleTabChange}
-                onSearch={() => { }}
+                onSearch={() => handleTabChange('search')}
                 onUnlock={() => { }}
                 onLoginClick={() => setShowLoginModal(true)}
             />

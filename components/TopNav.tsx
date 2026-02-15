@@ -74,7 +74,6 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                             { id: 'home', label: 'Home' },
                             { id: 'tv', label: 'TV Shows' },
                             { id: 'movies', label: 'Movies' },
-                            { id: 'new', label: 'New & Popular' },
                             { id: 'my-list', label: 'My List' },
                         ].map(item => (
                             <button
@@ -240,7 +239,6 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                                 { id: 'home', label: 'Home' },
                                 { id: 'movies', label: 'Movies' },
                                 { id: 'tv', label: 'TV Shows' },
-                                { id: 'new', label: 'New & Popular' },
                                 { id: 'my-list', label: 'My List' }, // Note: My List will trigger login catch in AppNew
                             ].map(item => (
                                 <button
