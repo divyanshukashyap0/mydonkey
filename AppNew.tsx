@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from './context/StoreContext';
 import TopNav from './components/TopNav';
 import HeroBanner from './components/HeroBanner';
+import HeroSkeleton from './components/HeroSkeleton';
 import ContentRail from './components/ContentRail';
 import ContentDetails from './components/ContentDetails';
 import VideoPlayer from './components/VideoPlayer';
@@ -16,9 +17,9 @@ import ContentRequestInline from './components/ContentRequestInline';
 import SearchPage from './components/SearchPage';
 import ScrollToTop from './components/ScrollToTop';
 import ProfileSelection from './components/ProfileSelection';
+import FontLoader from './components/FontLoader';
 import { Content } from './types';
 import { StoreProvider } from './context/StoreContext';
-import { db, auth } from './firebase';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 
 const MainLayout = () => {
@@ -26,9 +27,6 @@ const MainLayout = () => {
     const location = useLocation();
     const navigate = useNavigate();
 
-    // Derived activeTab from URL
-    // Remove leading slash, default to 'home' if empty (though we redirect empty to home below)
-    // Decode URI component for paths like "About%20Us"
     // Derived activeTab from URL
     const path = location.pathname.substring(1);
     let activeTab = path ? decodeURIComponent(path) : 'home';
@@ -38,7 +36,6 @@ const MainLayout = () => {
 
     const [viewingContent, setViewingContent] = useState<Content | null>(null);
     const [playingContent, setPlayingContent] = useState<Content | null>(null);
-    const [showLoginModal, setShowLoginModal] = useState(false);
 
     // Deep Link Handler (e.g. /browse/content_123)
     useEffect(() => {
@@ -169,12 +166,14 @@ const MainLayout = () => {
 
             return (
                 <>
-                    {heroItem && (
+                    {heroItem ? (
                         <HeroBanner
                             item={heroItem}
                             onPlay={(item) => handlePlay(item, 'movie')}
                             onDetails={handleDetails}
                         />
+                    ) : (
+                        <HeroSkeleton />
                     )}
                     <div className="pb-24 bg-[#141414] relative z-10 pl-4 md:pl-12 space-y-8">
                         {/* Dynamic Sections from Admin */}
@@ -403,8 +402,6 @@ const AppRoutes = () => {
         </Routes>
     );
 };
-
-import FontLoader from './components/FontLoader';
 
 export default function AppNew() {
     return (
