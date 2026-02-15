@@ -60,6 +60,17 @@ const MainLayout = () => {
         }
     }, [location.pathname, navigate]);
 
+    // Load YouTube API
+    useEffect(() => {
+        if (!document.getElementById('youtube-iframe-api')) {
+            const tag = document.createElement('script');
+            tag.id = 'youtube-iframe-api';
+            tag.src = "https://www.youtube.com/iframe_api";
+            const firstScriptTag = document.getElementsByTagName('script')[0];
+            firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+        }
+    }, []);
+
     // Derived Content Lists
     const { originals, trending, movies, tvShows } = useMemo(() => {
         if (!content) return { originals: [], trending: [], movies: [], tvShows: [] };

@@ -110,7 +110,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             // Force high quality start for new playbacks
             event.target.setPlaybackQuality('hd1080');
         }
-        if (playing) event.target.playVideo();
+        if (playing) {
+            event.target.playVideo();
+        } else {
+            // If not auto-playing, we must clear initialLoad so the poster/controls are visible
+            setInitialLoad(false);
+        }
         event.target.loadModule('captions');
     };
 
@@ -122,6 +127,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             setDuration(event.target.getDuration());
         } else if (event.data === window.YT.PlayerState.PAUSED) {
             setPlaying(false);
+            setInitialLoad(false); // Ensure loading screen is gone if paused
         } else if (event.data === window.YT.PlayerState.BUFFERING) {
             setIsBuffering(true);
         } else if (event.data === window.YT.PlayerState.ENDED) {

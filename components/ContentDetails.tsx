@@ -108,10 +108,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                 <span>•</span>
                                 <span>{content.genres?.[0]}</span>
                             </div>
-                            {/* TEMP DEBUG */}
-                            <div className="text-[10px] text-red-500 font-mono mt-1 bg-black/50 p-1 rounded inline-block">
-                                DEBUG: Type=[{content.type}] Dur=[{content.duration}]
-                            </div>
+
                         </div>
 
                         {/* Description - Line Clamp to prevent scrolling, user can expand if absolutely needed but goal is compact */}

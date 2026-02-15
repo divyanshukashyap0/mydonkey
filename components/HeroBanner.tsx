@@ -60,11 +60,13 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
 
                 playerRef.current = new window.YT.Player('hero-player', {
                     videoId: item.youtubeId,
+                    width: '100%',
+                    height: '100%',
                     playerVars: {
                         autoplay: 1,
                         controls: 0,
                         mute: 1,
-                        start: 10,
+                        start: 0, // Start from beginning to avoid seeking issues
                         loop: 1,
                         playlist: item.youtubeId,
                         modestbranding: 1,
@@ -72,14 +74,18 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
                         rel: 0,
                         iv_load_policy: 3,
                         disablekb: 1,
-                        fs: 0
+                        fs: 0,
+                        origin: window.location.origin,
+                        enablejsapi: 1
                     },
                     events: {
                         onReady: (event: any) => {
+                            console.log('Hero Player Ready - Attempting to play');
+                            event.target.mute(); // Ensure mute first
                             event.target.playVideo();
-                            event.target.mute();
                         },
                         onStateChange: (event: any) => {
+                            console.log('Hero Player State Change:', event.data);
                             // YT.PlayerState.PLAYING = 1
                             if (event.data === 1) {
                                 setVideoPlaying(true);
@@ -88,6 +94,9 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
                             if (event.data === 0) {
                                 event.target.playVideo();
                             }
+                        },
+                        onError: (e: any) => {
+                            console.error('Hero Player Error:', e.data);
                         }
                     }
                 });
@@ -133,10 +142,9 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
             {/* Background Layer: Video (Oversized for cinematic fill) */}
             {showVideo && item.youtubeId && (
                 <div className={`absolute inset-0 z-0 overflow-hidden pointer-events-none transition-opacity duration-1000 ${videoPlaying ? 'opacity-100' : 'opacity-0'}`}>
-                    <div
-                        id="hero-player"
-                        className="w-[135%] h-[135%] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-60"
-                    />
+                    <div className="w-[135%] h-[135%] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-60">
+                        <div id="hero-player" className="w-full h-full" />
+                    </div>
                 </div>
             )}
 
