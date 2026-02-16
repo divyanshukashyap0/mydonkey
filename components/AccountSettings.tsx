@@ -98,8 +98,11 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
     // Safe Date Formatting
     const getMemberSinceDate = () => {
         try {
-            if (!currentUser.lastLoginAt) return new Date().toLocaleDateString();
-            const d = new Date(currentUser.lastLoginAt);
+            // Prioritize createdAt if available, otherwise fallback to lastLoginAt
+            const dateStr = currentUser.createdAt || currentUser.lastLoginAt;
+            if (!dateStr) return new Date().toLocaleDateString();
+
+            const d = new Date(dateStr);
             if (isNaN(d.getTime())) return 'Recently';
             return d.toLocaleDateString();
         } catch (e) {
@@ -396,34 +399,7 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                     Member since {getMemberSinceDate()} • Version 2.0
                 </div>
 
-                {/* Admin Only: Seed Footer Content */}
-                {currentUser.role === 'admin' && (
-                    <div className="mt-8 pt-8 border-t border-white/5 text-center">
-                        <button
-                            onClick={async () => {
-                                if (!confirm("Overwrite all footer content with local data?")) return;
-                                const { footerContent } = await import('../footerContent');
 
-                                let count = 0;
-                                for (const [title, data] of Object.entries(footerContent)) {
-                                    const pageId = title.replace(/\s+/g, '-');
-                                    const pageData = {
-                                        id: pageId,
-                                        ...data,
-                                        title: data.title, // ensuring title is mapped
-                                        category: (data as any).category || 'Company'
-                                    };
-                                    await addPage(pageData);
-                                    count++;
-                                }
-                                alert(`Seeded ${count} footer pages! Refresh to see changes.`);
-                            }}
-                            className="text-xs text-gray-600 hover:text-cyan-500 transition underline"
-                        >
-                            [Admin] Seed Footer Content
-                        </button>
-                    </div>
-                )}
             </div>
 
             {/* Profile Edit/Add Modal */}

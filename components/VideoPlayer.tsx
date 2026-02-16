@@ -67,6 +67,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const [isBuffering, setIsBuffering] = useState(false);
     const [initialLoad, setInitialLoad] = useState(true); // New state to track first play
     const [isBoosted, setIsBoosted] = useState(false);
+    const [showDataWarning, setShowDataWarning] = useState(false);
+
+    // Data Usage Warning
+    useEffect(() => {
+        if (!currentUser?.lowDataMode && !isDriveVideo) {
+            setShowDataWarning(true);
+            const timer = setTimeout(() => setShowDataWarning(false), 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [currentUser?.lowDataMode, isDriveVideo]);
 
     // Player Options
     const [qualities, setQualities] = useState<string[]>([]);
@@ -612,6 +622,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     <div className="text-white font-bold text-xl tracking-wide animate-pulse">Loading Content...</div>
                     <div className="text-gray-400 text-sm mt-3 font-medium bg-white/10 px-4 py-1.5 rounded-full backdrop-blur-md border border-white/5">
                         Please wait for up to 1 minute
+                    </div>
+                </div>
+            )}
+
+            {/* Data Usage Warning Toast */}
+            {showDataWarning && (
+                <div className="absolute top-24 left-1/2 -translate-x-1/2 z-[130] animate-in slide-in-from-top-4 fade-in duration-300">
+                    <div className="bg-yellow-500/10 backdrop-blur-md border border-yellow-500/20 text-yellow-200 px-6 py-3 rounded-full flex items-center gap-3 shadow-lg max-w-sm text-center">
+                        <Wifi size={20} className="text-yellow-400 shrink-0" />
+                        <span className="text-sm font-medium">High data usage warning during playback</span>
                     </div>
                 </div>
             )}
