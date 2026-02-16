@@ -514,6 +514,46 @@ const ContentManager = () => {
                                                     className="bg-black/50 border border-white/10 rounded p-2 text-sm" placeholder="Season Trailer (YouTube ID)" />
                                             </div>
 
+                                            {/* Bulk Add Episodes */}
+                                            <div className="bg-white/5 p-4 rounded-lg mb-4 border border-white/10">
+                                                <h4 className="text-sm font-bold mb-2 flex items-center gap-2">
+                                                    <Archive size={14} /> Bulk Add Episodes containing Links
+                                                </h4>
+                                                <textarea
+                                                    placeholder="Paste multiple YouTube or Drive links here (one per line). We'll auto-create episodes for them."
+                                                    className="w-full bg-black/50 border border-white/10 rounded p-2 text-xs font-mono h-24 mb-2 focus:border-blue-500 outline-none"
+                                                    id={`bulk-input-${season.id}`}
+                                                />
+                                                <button
+                                                    onClick={() => {
+                                                        const doc = document.getElementById(`bulk-input-${season.id}`) as HTMLTextAreaElement;
+                                                        if (!doc || !doc.value.trim()) return;
+
+                                                        const lines = doc.value.split('\n').filter(l => l.trim());
+                                                        const newEpisodes: Episode[] = lines.map((line, idx) => {
+                                                            const url = line.trim();
+                                                            const isYt = extractYoutubeId(url).length === 11;
+                                                            const isDrive = extractDriveId(url).length > 20; // Basic check
+
+                                                            return {
+                                                                id: `ep_${Date.now()}_${idx}`,
+                                                                episodeNumber: (season.episodes.length || 0) + idx + 1,
+                                                                title: `Episode ${(season.episodes.length || 0) + idx + 1}`,
+                                                                driveId: isDrive ? extractDriveId(url) : '',
+                                                                youtubeId: isYt ? extractYoutubeId(url) : '',
+                                                                duration: ''
+                                                            };
+                                                        });
+
+                                                        updateSeason(season.id, { episodes: [...season.episodes, ...newEpisodes] });
+                                                        doc.value = ''; // Clear input
+                                                    }}
+                                                    className="text-xs bg-blue-600/20 text-blue-400 border border-blue-600 px-3 py-1.5 rounded hover:bg-blue-600 hover:text-white transition"
+                                                >
+                                                    Process & Add Links
+                                                </button>
+                                            </div>
+
                                             {/* Episodes List */}
                                             <div className="space-y-2 pl-4 border-l-2 border-white/10">
                                                 {season.episodes.map((ep, epIdx) => (
