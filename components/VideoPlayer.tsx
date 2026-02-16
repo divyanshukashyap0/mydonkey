@@ -836,13 +836,23 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                             <div>
                                                 <h3 className="text-gray-500 font-bold text-[10px] uppercase tracking-widest px-4 py-2 bg-white/5">Quality</h3>
                                                 <div className="max-h-48 overflow-y-auto custom-scrollbar p-1">
-                                                    {qualities.length > 0 ? qualities.map(q => (
-                                                        <button key={q} onClick={() => handleQualityChange(q)}
-                                                            className={`w-full text-left px-4 py-2 text-xs hover:bg-white/10 rounded-lg transition-colors flex justify-between items-center ${currentQuality === q ? 'text-brand-red font-bold bg-brand-red/5' : 'text-gray-400 hover:text-white'}`}>
-                                                            <span>{q.toUpperCase()}</span>
-                                                            {currentQuality === q && <Check size={12} strokeWidth={3} />}
-                                                        </button>
-                                                    )) : (
+                                                    {qualities.length > 0 ? qualities.map(q => {
+                                                        let usage = '';
+                                                        if (q.includes('1080') || q.includes('highres')) usage = 'Late Data (3GB/hr)';
+                                                        else if (q.includes('720')) usage = 'Med Data (1GB/hr)';
+                                                        else if (q !== 'auto') usage = 'Low Data (<0.5GB/hr)';
+
+                                                        return (
+                                                            <button key={q} onClick={() => handleQualityChange(q)}
+                                                                className={`w-full text-left px-4 py-2 text-xs hover:bg-white/10 rounded-lg transition-colors flex justify-between items-center ${currentQuality === q ? 'text-brand-red font-bold bg-brand-red/5' : 'text-gray-400 hover:text-white'}`}>
+                                                                <div className="flex flex-col">
+                                                                    <span>{q.toUpperCase()}</span>
+                                                                    {usage && <span className="text-[9px] opacity-60 font-normal">{usage}</span>}
+                                                                </div>
+                                                                {currentQuality === q && <Check size={12} strokeWidth={3} />}
+                                                            </button>
+                                                        );
+                                                    }) : (
                                                         <div className="px-4 py-2 text-xs text-gray-500 italic">Auto (Default)</div>
                                                     )}
                                                 </div>

@@ -47,7 +47,7 @@ const UnlockContentModal: React.FC<UnlockContentModalProps> = ({ isOpen, onClose
     };
 
     return (
-        <div className="fixed inset-0 z-[70] bg-black/80 flex items-center justify-center p-4 animate-in fade-in">
+        <div className="fixed inset-0 z-[300] bg-black/80 flex items-center justify-center p-4 animate-in fade-in">
             <div className="bg-[#141414] border border-white/10 p-8 rounded-2xl max-w-md w-full relative">
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white">
                     <X size={24} />

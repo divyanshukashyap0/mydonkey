@@ -29,8 +29,10 @@ service cloud.firestore {
       // Admins can read any user
       allow read: if isAdmin();
       
-      // Allow users to update their own data or admin can update any
-      allow update: if isOwner(userId) || isAdmin();
+      // Allow users to update their own data EXCEPT critical fields (role, plan, status)
+      allow update: if (isOwner(userId) && 
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'plan', 'subscriptionStatus', 'email']))
+      ) || isAdmin();
       
       // Only admin can delete users
       allow delete: if isAdmin();

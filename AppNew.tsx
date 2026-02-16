@@ -14,6 +14,7 @@ import AccountSettings from './components/AccountSettings';
 import RequestContent from './components/RequestContent';
 import AdminLayout from './components/admin/AdminLayout';
 import ContentRequestInline from './components/ContentRequestInline';
+import UnlockContentModal from './components/UnlockContentModal';
 import SearchPage from './components/SearchPage';
 import ScrollToTop from './components/ScrollToTop';
 import ProfileSelection from './components/ProfileSelection';
@@ -36,6 +37,7 @@ const MainLayout = () => {
 
     const [viewingContent, setViewingContent] = useState<Content | null>(null);
     const [playingContent, setPlayingContent] = useState<Content | null>(null);
+    const [showUnlockModal, setShowUnlockModal] = useState(false);
 
     // Deep Link Handler (e.g. /browse/content_123)
     useEffect(() => {
@@ -89,6 +91,11 @@ const MainLayout = () => {
             setPlayingContent({ ...item, playMode: 'trailer' });
         } else {
             if (isAuthenticated && currentUser) {
+                // Check for Exclusive Content
+                if (item.accessCode && !currentProfile?.unlockedContent?.includes(item.id)) {
+                    setShowUnlockModal(true);
+                    return;
+                }
                 setPlayingContent({ ...item, playMode: 'movie' });
             } else {
                 navigate('/login');
@@ -348,7 +355,7 @@ const MainLayout = () => {
                 activeTab={activeTab}
                 setTab={handleTabChange}
                 onSearch={() => handleTabChange('search')}
-                onUnlock={() => { }}
+                onUnlock={() => setShowUnlockModal(true)}
                 onLoginClick={() => navigate('/login')}
             />
 
@@ -364,6 +371,7 @@ const MainLayout = () => {
                     content={viewingContent}
                     onClose={() => setViewingContent(null)}
                     onPlay={handlePlay}
+                    onDetails={handleDetails}
                 />
             )}
 
@@ -373,6 +381,10 @@ const MainLayout = () => {
                     onClose={() => setPlayingContent(null)}
                 />
             )}
+            <UnlockContentModal
+                isOpen={showUnlockModal}
+                onClose={() => setShowUnlockModal(false)}
+            />
         </div>
     );
 };

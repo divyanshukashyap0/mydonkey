@@ -1,17 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Check, X, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Check, X, Trash2, Camera } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { Profile } from '../types';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const ProfileSelection = () => {
-  const { currentUser, switchProfile, addProfile, deleteProfile } = useStore();
+  const { currentUser, switchProfile, addProfile, deleteProfile, updateProfile } = useStore();
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [isAdding, setIsAdding] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [newName, setNewName] = useState('');
+  const [mode, setMode] = useState<'select' | 'manage' | 'edit' | 'add'>('select');
+  const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
+
+  // Form State
+  const [name, setName] = useState('');
   const [isKids, setIsKids] = useState(false);
+  const [selectedAvatar, setSelectedAvatar] = useState('');
   const [loading, setLoading] = useState(true);
 
   const avatars = [
@@ -22,67 +25,51 @@ const ProfileSelection = () => {
     'https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-v7a31y8sq5tky68b.jpg',
   ];
 
-  const [selectedAvatar, setSelectedAvatar] = useState(avatars[0]);
-
-  // Sync Profiles for this specific user
   useEffect(() => {
     if (!currentUser) return;
-
-    // Safety timeout: if snapshot takes too long, stop loading
     const safetyTimer = setTimeout(() => setLoading(false), 3000);
-
-    let unsub = () => { };
-    try {
-      unsub = onSnapshot(collection(db, 'users', currentUser.uid, 'profiles'), (snap) => {
-        setProfiles(snap.docs.map(d => d.data() as Profile));
-        setLoading(false);
-        clearTimeout(safetyTimer);
-      }, (err) => {
-        console.error("Profile sync error:", err);
-        setLoading(false); // Stop loading on error
-        clearTimeout(safetyTimer);
-      });
-    } catch (e) {
-      console.error("Profile sync setup error:", e);
+    const unsub = onSnapshot(collection(db, 'users', currentUser.uid, 'profiles'), (snap) => {
+      setProfiles(snap.docs.map(d => d.data() as Profile));
       setLoading(false);
-    }
-
-    return () => {
-      unsub();
       clearTimeout(safetyTimer);
-    };
+    }, (err) => {
+      console.error("Profile sync error:", err);
+      setLoading(false);
+    });
+    return () => { unsub(); clearTimeout(safetyTimer); };
   }, [currentUser]);
 
-  const handleAdd = async () => {
-    if (!newName.trim()) return;
-    try {
-      await addProfile(newName, isKids, selectedAvatar);
-    } catch (e) {
-      console.error("Add profile exception:", e);
-      // Fallback for demo/offline: simulated profile
-      const fakeId = `temp_${Date.now()}`;
-      const fakeProfile: Profile = {
-        id: fakeId,
-        name: newName,
-        isKids,
-        avatarUrl: selectedAvatar,
-        myList: []
-      };
-      setProfiles(prev => [...prev, fakeProfile]);
-    }
-    setIsAdding(false);
-    setNewName('');
+  const startAdd = () => {
+    setMode('add');
+    setName('');
     setIsKids(false);
+    setSelectedAvatar(avatars[0]);
   };
 
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    if (window.confirm('Are you sure you want to delete this profile?')) {
-      try {
-        await deleteProfile(id);
-      } catch (error) {
-        console.error("Delete failed locally", error);
-        setProfiles(prev => prev.filter(p => p.id !== id));
+  const startEdit = (profile: Profile) => {
+    setMode('edit');
+    setEditingProfileId(profile.id);
+    setName(profile.name);
+    setIsKids(profile.isKids);
+    setSelectedAvatar(profile.avatarUrl);
+  };
+
+  const handleSave = async () => {
+    if (!name.trim()) return;
+
+    if (mode === 'add') {
+      await addProfile(name, isKids, selectedAvatar);
+    } else if (mode === 'edit' && editingProfileId) {
+      await updateProfile(editingProfileId, { name, isKids, avatarUrl: selectedAvatar });
+    }
+    setMode('manage');
+  };
+
+  const handleDelete = async () => {
+    if (mode === 'edit' && editingProfileId) {
+      if (window.confirm('Are you sure you want to delete this profile?')) {
+        await deleteProfile(editingProfileId);
+        setMode('manage');
       }
     }
   };
@@ -97,40 +84,122 @@ const ProfileSelection = () => {
   if (loading) return (
     <div className="min-h-screen bg-black flex items-center justify-center text-white flex-col gap-4">
       <div className="w-12 h-12 border-4 border-brand-red border-t-white rounded-full animate-spin" />
-      <p className="text-xs text-gray-500">Loading profiles...</p>
     </div>
   );
 
+  // Render Modal for Add/Edit
+  if (mode === 'add' || mode === 'edit') {
+    return (
+      <div className="min-h-screen bg-[#141414] flex items-center justify-center text-white animate-in fade-in zoom-in-95 duration-300">
+        <div className="w-full max-w-2xl p-4 md:p-8">
+          <h1 className="text-3xl md:text-5xl font-medium mb-4">{mode === 'add' ? 'Add Profile' : 'Edit Profile'}</h1>
+          <div className="border-t border-gray-600 mb-6" />
+
+          <div className="flex flex-col md:flex-row gap-6 md:gap-8">
+            {/* Avatar Section */}
+            <div className="relative group w-32 h-32 md:w-40 md:h-40 mx-auto md:mx-0">
+              <img src={selectedAvatar} className="w-full h-full rounded shadow-lg object-cover" />
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded cursor-pointer opacity-0 group-hover:opacity-100 transition">
+                <Edit2 className="text-white" />
+              </div>
+              {/* Simple Avatar Picker Popup could go here, for now just use the default set cycling or internal logic if expanded */}
+            </div>
+
+            {/* Form Section */}
+            <div className="flex-1 space-y-4">
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Name"
+                className="w-full bg-[#666] text-white px-4 py-2 text-lg rounded placeholder-gray-300 focus:outline-none focus:bg-[#555]"
+              />
+
+              <div className="order-t border-gray-600 py-4">
+                <h3 className="text-lg text-gray-200 mb-2">Maturity Settings:</h3>
+                <div className="flex items-center gap-3 p-3 bg-[#333] rounded cursor-pointer" onClick={() => setIsKids(!isKids)}>
+                  <div className={`w-6 h-6 border-2 flex items-center justify-center ${isKids ? 'bg-brand-red border-transparent' : 'border-gray-400'}`}>
+                    {isKids && <Check size={16} />}
+                  </div>
+                  <span className="font-bold">{isKids ? 'Kid Protocol Enabled' : 'Standard Protocol'}</span>
+                </div>
+              </div>
+
+              {/* Avatar Selection Grid (Mini) */}
+              <div className="py-2">
+                <p className="text-sm text-gray-400 mb-2">Choose Avatar:</p>
+                <div className="flex gap-2">
+                  {avatars.map(url => (
+                    <img
+                      key={url}
+                      src={url}
+                      onClick={() => setSelectedAvatar(url)}
+                      className={`w-10 h-10 rounded cursor-pointer transition ${selectedAvatar === url ? 'ring-2 ring-white scale-110' : 'opacity-70 hover:opacity-100'}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-600 mt-8 pt-8 flex gap-4">
+            <button
+              onClick={handleSave}
+              className="bg-white text-black px-8 py-2 font-bold text-lg hover:bg-brand-red hover:text-white transition"
+            >
+              Save
+            </button>
+            <button
+              onClick={() => setMode('manage')}
+              className="border border-gray-500 text-gray-500 px-8 py-2 font-bold text-lg hover:border-white hover:text-white transition"
+            >
+              Cancel
+            </button>
+            {mode === 'edit' && (
+              <button
+                onClick={handleDelete}
+                className="ml-auto border border-gray-500 text-gray-500 px-8 py-2 font-bold text-lg hover:border-brand-red hover:text-brand-red transition"
+              >
+                Delete Profile
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Main Selection / Manage View
   return (
     <div className="min-h-screen bg-[#141414] flex flex-col items-center justify-center text-white animate-in zoom-in-95 duration-500">
       <div className="mb-8 flex flex-col items-center">
         <img src="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png" className="h-16 md:h-20 w-auto object-contain mb-8" alt="MY DONKEY Logo" />
-
-        <div className="text-center mb-2 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
-          <h2 className="text-xl md:text-2xl font-light text-brand-red mb-1">{getGreeting()}, <span className="font-bold text-white">{currentUser?.name || 'Guest'}</span></h2>
-          <p className="text-gray-400 text-sm md:text-base">Welcome Back to My Donkey</p>
-        </div>
+        {mode === 'select' && (
+          <div className="text-center mb-2 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
+            <h2 className="text-xl md:text-2xl font-light text-brand-red mb-1">{getGreeting()}, <span className="font-bold text-white">{currentUser?.name || 'Guest'}</span></h2>
+          </div>
+        )}
       </div>
 
-      <h1 className="text-3xl md:text-5xl font-medium mb-8 md:mb-12">Who's watching?</h1>
+      <h1 className="text-3xl md:text-5xl font-medium mb-8 md:mb-12">
+        {mode === 'manage' ? 'Manage Profiles' : "Who's watching?"}
+      </h1>
 
       <div className="flex flex-wrap justify-center gap-4 md:gap-8 px-4 max-w-4xl">
         {profiles.map((profile) => (
           <div
             key={profile.id}
             className="group flex flex-col items-center gap-4 cursor-pointer relative"
-            onClick={() => !isEditing && switchProfile(profile.id)}
+            onClick={() => mode === 'manage' ? startEdit(profile) : switchProfile(profile.id)}
           >
-            <div className={`w-24 h-24 md:w-32 md:h-32 rounded overflow-hidden border-2 transition-all duration-300 ${isEditing ? 'border-gray-500 scale-95 opacity-50' : 'border-transparent group-hover:border-white group-hover:scale-105'}`}>
-              <img src={profile.avatarUrl} alt={profile.name} className="w-full h-full object-cover" />
-              {isEditing && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                  <button
-                    onClick={(e) => handleDelete(e, profile.id)}
-                    className="p-2 bg-black/60 rounded-full hover:bg-brand-red transition-colors"
-                  >
-                    <Trash2 size={24} />
-                  </button>
+            <div className="relative">
+              <div className={`w-24 h-24 md:w-32 md:h-32 rounded overflow-hidden border-2 transition-all duration-300 ${mode === 'manage' ? 'opacity-50' : 'border-transparent group-hover:border-white group-hover:scale-105'}`}>
+                <img src={profile.avatarUrl} alt={profile.name} className="w-full h-full object-cover" />
+              </div>
+              {mode === 'manage' && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="bg-black/60 p-2 rounded-full border border-white">
+                    <Edit2 size={24} />
+                  </div>
                 </div>
               )}
             </div>
@@ -141,10 +210,10 @@ const ProfileSelection = () => {
           </div>
         ))}
 
-        {profiles.length < 5 && !isAdding && (
+        {profiles.length < 5 && (
           <div
             className="group flex flex-col items-center gap-4 cursor-pointer"
-            onClick={() => setIsAdding(true)}
+            onClick={startAdd}
           >
             <div className="w-24 h-24 md:w-32 md:h-32 rounded flex items-center justify-center border-2 border-transparent group-hover:bg-white transition-all duration-300">
               <Plus size={48} className="text-gray-500 group-hover:text-[#141414]" />
@@ -156,80 +225,12 @@ const ProfileSelection = () => {
 
       <div className="mt-16 md:mt-24 space-x-4">
         <button
-          onClick={() => setIsEditing(!isEditing)}
-          className="px-6 md:px-8 py-2 border border-gray-500 text-gray-500 text-lg md:text-xl hover:text-white hover:border-white transition-colors tracking-widest uppercase"
+          onClick={() => setMode(mode === 'manage' ? 'select' : 'manage')}
+          className={`px-6 md:px-8 py-2 border text-lg md:text-xl transition-colors tracking-widest uppercase ${mode === 'manage' ? 'bg-white text-black font-bold border-white' : 'border-gray-500 text-gray-500 hover:text-white hover:border-white'}`}
         >
-          {isEditing ? 'Done' : 'Manage Profiles'}
+          {mode === 'manage' ? 'Done' : 'Manage Profiles'}
         </button>
       </div>
-
-      {/* Add Profile Modal */}
-      {isAdding && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 animate-in fade-in zoom-in-95 duration-300">
-          <div className="w-full max-w-xl bg-[#141414] p-8 md:p-12 rounded-lg relative border border-white/5">
-            <button onClick={() => setIsAdding(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white"><X size={32} /></button>
-
-            <h2 className="text-3xl md:text-5xl font-bold mb-8">Add Profile</h2>
-            <p className="text-gray-400 mb-8 border-b border-white/10 pb-4">Add a profile for another person watching on My Donkey.</p>
-
-            <div className="flex flex-col md:flex-row gap-8 items-start">
-              <div className="flex flex-col gap-4">
-                <div className="w-24 h-24 md:w-32 md:h-32 rounded overflow-hidden">
-                  <img src={selectedAvatar} className="w-full h-full object-cover" />
-                </div>
-                <div className="flex gap-2">
-                  {avatars.map(url => (
-                    <button
-                      key={url}
-                      onClick={() => setSelectedAvatar(url)}
-                      className={`w-6 h-6 rounded-full overflow-hidden border-2 transition ${selectedAvatar === url ? 'border-brand-red scale-110' : 'border-transparent opacity-50'}`}
-                    >
-                      <img src={url} className="w-full h-full object-cover" />
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex-1 w-full space-y-6">
-                <input
-                  autoFocus
-                  type="text"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  placeholder="Name"
-                  className="w-full bg-gray-600 p-3 outline-none focus:ring-1 ring-white placeholder:text-gray-300"
-                />
-
-                <div className="flex items-center gap-4 py-4 border-t border-b border-white/10">
-                  <input
-                    type="checkbox"
-                    id="kids-check"
-                    checked={isKids}
-                    onChange={(e) => setIsKids(e.target.checked)}
-                    className="w-6 h-6 rounded bg-gray-600 border-none outline-none focus:ring-1 ring-brand-red"
-                  />
-                  <label htmlFor="kids-check" className="text-xl">Kid?</label>
-                </div>
-
-                <div className="flex gap-4 pt-4">
-                  <button
-                    onClick={handleAdd}
-                    className="px-8 py-2 bg-white text-black font-bold uppercase tracking-widest hover:bg-brand-red hover:text-white transition"
-                  >
-                    Continue
-                  </button>
-                  <button
-                    onClick={() => setIsAdding(false)}
-                    className="px-8 py-2 border border-gray-500 text-gray-500 font-bold uppercase tracking-widest hover:border-white hover:text-white transition"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

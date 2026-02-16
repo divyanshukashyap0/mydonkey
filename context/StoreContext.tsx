@@ -78,6 +78,7 @@ interface StoreContextType {
     toggleWatchlist: (contentId: string) => Promise<void>;
     switchProfile: (profileId: string | null) => void;
     addProfile: (name: string, isKids: boolean, avatarUrl: string) => Promise<void>;
+    updateProfile: (profileId: string, updates: Partial<Profile>) => Promise<void>;
     deleteProfile: (profileId: string) => Promise<void>;
     updatePlaybackProgress: (movieId: string, progress: number, stoppedAt: number, duration: number) => Promise<void>;
     updateUserEmail: (newEmail: string) => Promise<void>;
@@ -567,6 +568,16 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         await setDoc(doc(db, 'users', fbUser.uid, 'profiles', id), newProfile);
     };
 
+    const updateProfile = async (profileId: string, updates: Partial<Profile>) => {
+        if (!fbUser) return;
+        await updateDoc(doc(db, 'users', fbUser.uid, 'profiles', profileId), updates);
+
+        // Update local state if it's the current profile
+        if (currentProfile?.id === profileId) {
+            setCurrentProfile({ ...currentProfile, ...updates });
+        }
+    };
+
     const deleteProfile = async (profileId: string) => {
         if (!fbUser) return;
         await deleteDoc(doc(db, 'users', fbUser.uid, 'profiles', profileId));
@@ -805,6 +816,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         toggleWatchlist,
         switchProfile,
         addProfile,
+        updateProfile,
         deleteProfile,
         updatePlaybackProgress,
         updateUserEmail,

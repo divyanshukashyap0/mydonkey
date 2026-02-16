@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, CreditCard, Monitor, User as UserIcon, Plus, Calendar, Camera, Wifi, Settings, PlayCircle, Smartphone, Download, Send, Maximize } from 'lucide-react';
+import { ChevronDown, ChevronUp, CreditCard, Monitor, User as UserIcon, Plus, Calendar, Camera, Wifi, Settings, PlayCircle, Smartphone, Download, Send, Maximize, X, Trash2 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import PlanSelectionModal from './account/PlanSelectionModal';
 import PaymentMethodsModal from './account/PaymentMethodsModal';
@@ -13,6 +13,7 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
         userProfiles,
         logout,
         addProfile,
+        updateProfile,
         deleteProfile,
         plans,
         updateUserEmail,
@@ -33,6 +34,10 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
     const [showDeviceModal, setShowDeviceModal] = useState(false);
     const [requestTitle, setRequestTitle] = useState('');
     const [isRequesting, setIsRequesting] = useState(false);
+
+    // Profile Management State
+    const [editingProfile, setEditingProfile] = useState<any | null>(null);
+    const [isAddingProfile, setIsAddingProfile] = useState(false);
 
     if (!currentUser) return null;
 
@@ -275,7 +280,7 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                                 </div>
                                 <div className="text-left">
                                     <div className="font-medium">Low Data Mode</div>
-                                    <div className="text-xs text-gray-500">Reduce streaming quality</div>
+                                    <div className="text-xs text-gray-500">Reduce quality to save data. <span className="text-red-400">High Quality uses up to 3GB/hr.</span></div>
                                 </div>
                             </div>
                             <div className={`w-12 h-7 rounded-full relative transition-colors ${currentUser.lowDataMode ? 'bg-cyan-500' : 'bg-gray-700'}`}>
@@ -342,22 +347,30 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                 )}
 
                 {/* Profiles Section */}
-                <div className="bg-white/5 rounded-xl overflow-hidden">
+                <div className="bg-white/5 rounded-xl overflow-hidden mb-8">
                     <div className="px-5 py-3 border-b border-white/5 flex justify-between items-center">
                         <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Profiles</span>
-                        <button onClick={handleAddProfile} className="text-cyan-400 text-sm font-bold hover:text-cyan-300 transition flex items-center gap-1">
+                        <button
+                            onClick={() => { setEditingProfile(null); setIsAddingProfile(true); }}
+                            className="text-cyan-400 text-sm font-bold hover:text-cyan-300 transition flex items-center gap-1"
+                        >
                             <Plus size={16} /> Add
                         </button>
                     </div>
 
                     <div className="p-4 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
                         {userProfiles.map(profile => (
-                            <div key={profile.id} className="group text-center cursor-pointer" onClick={() => toggleProfile(profile.id)}>
+                            <div key={profile.id} className="group text-center cursor-pointer relative" onClick={() => setEditingProfile(profile)}>
                                 <div className="relative mb-2">
                                     <img
                                         src={profile.avatarUrl}
                                         className="w-14 h-14 md:w-16 md:h-16 mx-auto rounded-lg object-cover ring-2 ring-transparent group-hover:ring-cyan-500 transition"
                                     />
+                                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition rounded-lg">
+                                        <div className="bg-black/60 p-1.5 rounded-full">
+                                            <Settings size={14} />
+                                        </div>
+                                    </div>
                                     {profile.isKids && (
                                         <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 bg-yellow-500 text-black text-[8px] font-bold rounded">KIDS</span>
                                     )}
@@ -394,11 +407,11 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                                 let count = 0;
                                 for (const [title, data] of Object.entries(footerContent)) {
                                     const pageId = title.replace(/\s+/g, '-');
-                                    // @ts-ignore
                                     const pageData = {
                                         id: pageId,
                                         ...data,
-                                        title: data.title // ensuring title is mapped
+                                        title: data.title, // ensuring title is mapped
+                                        category: (data as any).category || 'Company'
                                     };
                                     await addPage(pageData);
                                     count++;
@@ -412,12 +425,102 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                     </div>
                 )}
             </div>
+
+            {/* Profile Edit/Add Modal */}
+            {
+                (isAddingProfile || editingProfile) && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 animate-in fade-in zoom-in-95 duration-300">
+                        <div className="w-full max-w-md bg-[#141414] p-8 rounded-2xl relative border border-white/10 shadow-2xl">
+                            <button
+                                onClick={() => { setIsAddingProfile(false); setEditingProfile(null); }}
+                                className="absolute top-4 right-4 text-gray-400 hover:text-white"
+                            >
+                                <X size={24} />
+                            </button>
+
+                            <h2 className="text-2xl font-bold mb-6">{isAddingProfile ? 'Add Profile' : 'Edit Profile'}</h2>
+
+                            <div className="flex flex-col items-center mb-6">
+                                <img
+                                    src={editingProfile?.avatarUrl || "https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg"}
+                                    className="w-24 h-24 rounded-lg object-cover mb-4 shadow-lg"
+                                />
+                                {/* Avatar picker could go here */}
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Name</label>
+                                    <input
+                                        type="text"
+                                        defaultValue={editingProfile?.name}
+                                        id="profileNameInput"
+                                        placeholder="Profile Name"
+                                        className="w-full bg-gray-800 text-white px-4 py-3 rounded-lg focus:ring-2 ring-cyan-500 outline-none"
+                                    />
+                                </div>
+
+                                <div className="flex items-center gap-3 p-3 bg-gray-800 rounded-lg cursor-pointer" onClick={() => {
+                                    const cb = document.getElementById('isKidsInput') as HTMLInputElement;
+                                    if (cb) cb.checked = !cb.checked;
+                                }}>
+                                    <input
+                                        type="checkbox"
+                                        id="isKidsInput"
+                                        defaultChecked={editingProfile?.isKids}
+                                        className="w-5 h-5 rounded bg-gray-600 border-none focus:ring-cyan-500"
+                                        onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <label className="font-medium cursor-pointer">Kid's Profile?</label>
+                                </div>
+
+                                <div className="flex gap-3 pt-4">
+                                    <button
+                                        onClick={async () => {
+                                            const nameInput = document.getElementById('profileNameInput') as HTMLInputElement;
+                                            const kidsInput = document.getElementById('isKidsInput') as HTMLInputElement;
+                                            const name = nameInput.value;
+                                            const isKids = kidsInput.checked;
+
+                                            if (!name) return;
+
+                                            if (isAddingProfile) {
+                                                await addProfile(name, isKids, "https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg");
+                                            } else if (editingProfile) {
+                                                await updateProfile(editingProfile.id, { name, isKids });
+                                            }
+                                            setIsAddingProfile(false);
+                                            setEditingProfile(null);
+                                        }}
+                                        className="flex-1 py-3 bg-white text-black font-bold rounded-lg hover:bg-gray-200 transition"
+                                    >
+                                        Save
+                                    </button>
+                                    {editingProfile && (
+                                        <button
+                                            onClick={async () => {
+                                                if (confirm("Delete this profile?")) {
+                                                    await deleteProfile(editingProfile.id);
+                                                    setEditingProfile(null);
+                                                }
+                                            }}
+                                            className="px-4 py-3 border border-red-500/50 text-red-500 hover:bg-red-500/10 font-bold rounded-lg transition"
+                                        >
+                                            <Trash2 size={20} />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
             {/* Modals */}
             {showPlanModal && <PlanSelectionModal onClose={() => setShowPlanModal(false)} />}
             {showPaymentModal && <PaymentMethodsModal onClose={() => setShowPaymentModal(false)} />}
             {showBillingModal && <BillingHistoryModal onClose={() => setShowBillingModal(false)} />}
             {showDeviceModal && <DeviceManagementModal onClose={() => setShowDeviceModal(false)} />}
-        </div>
+        </div >
     );
 };
 
