@@ -51,7 +51,7 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
         const name = prompt("Enter profile name:");
         if (name) {
             const isKids = window.confirm("Is this a kid's profile?");
-            await addProfile(name, isKids, "https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg");
+            await addProfile(name, isKids, "/Mydonkey%20user.jpg");
         }
     };
 
@@ -85,7 +85,7 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
     };
 
     const handleChangeAvatar = async () => {
-        const url = prompt("Enter image URL for avatar:", "https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg");
+        const url = prompt("Enter image URL for avatar:", "/Mydonkey%20user.jpg");
         if (url) {
             await updateProfileAvatar(url);
         }
@@ -165,7 +165,7 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                 <div className="flex items-center gap-4 mb-8">
                     <div className="relative group">
                         <img
-                            src={userProfiles[0]?.avatarUrl || 'https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg'}
+                            src={userProfiles[0]?.avatarUrl || '/Mydonkey%20user.jpg'}
                             className="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover ring-2 ring-cyan-500/50 shadow-lg shadow-cyan-500/20"
                         />
                         <button
@@ -418,7 +418,7 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
 
                             <div className="flex flex-col items-center mb-6">
                                 <img
-                                    src={editingProfile?.avatarUrl || "https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg"}
+                                    src={editingProfile?.avatarUrl || "/Mydonkey%20user.jpg"}
                                     className="w-24 h-24 rounded-lg object-cover mb-4 shadow-lg"
                                 />
                                 {/* Avatar picker could go here */}
@@ -461,7 +461,7 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                                             if (!name) return;
 
                                             if (isAddingProfile) {
-                                                await addProfile(name, isKids, "https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg");
+                                                await addProfile(name, isKids, "/Mydonkey%20user.jpg");
                                             } else if (editingProfile) {
                                                 await updateProfile(editingProfile.id, { name, isKids });
                                             }

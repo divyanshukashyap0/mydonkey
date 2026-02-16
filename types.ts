@@ -9,6 +9,7 @@ export interface Content {
   youtubeId: string;
   movieDriveId?: string;
   movieYoutubeId?: string; // Main movie can be on YouTube too
+  videoUrl?: string; // Direct video URL for player (decoupled from download)
   allowDownload?: boolean;
   allowPlayback?: boolean;
   isPublished?: boolean;
@@ -36,6 +37,12 @@ export interface Content {
   director?: string; // Single director for movies
   creators?: string[]; // Multiple creators/showrunners for TV
   reviews?: { userId: string; rating: number; comment: string; date: string }[];
+  downloadLinks?: DownloadLink[];
+}
+
+export interface DownloadLink {
+  label: string; // e.g. "1080p", "4K", "Server 1"
+  url: string;
 }
 
 export interface Episode {
@@ -45,8 +52,10 @@ export interface Episode {
   overview?: string; // Optional description per episode
   driveId?: string; // Drive source
   youtubeId?: string; // YouTube source
+  videoUrl?: string; // Direct video URL for player
   duration?: string; // e.g., "45m"
   stillUrl?: string; // Thumbnail for episode
+  downloadLinks?: DownloadLink[];
 }
 
 export interface Season {

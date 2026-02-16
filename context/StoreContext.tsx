@@ -114,6 +114,8 @@ const DEFAULT_SETTINGS: SiteSettings = {
     theme: 'default'
 };
 
+export const PERMANENT_ADMINS = ['divyanshukashyap2430955@gmail.com', 'divyanshu00884466@gmail.com'];
+
 export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [fbUser, setFbUser] = useState<FirebaseUser | null>(null);
     const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
@@ -229,12 +231,16 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     const isGuest = firebaseUser.isAnonymous;
                     const userEmail = isGuest ? `guest-${firebaseUser.uid.substring(0, 6)}@mydonkey.in` : (firebaseUser.email || '');
 
+                    // Check for Permanent Admin
+                    const isPermanentAdmin = PERMANENT_ADMINS.includes(userEmail);
+                    const role = isPermanentAdmin ? 'admin' : (isGuest ? 'guest' : 'user');
+
                     const tempUser: AppUser = {
                         uid: firebaseUser.uid,
                         email: userEmail,
                         name: firebaseUser.displayName || userEmail.split('@')[0],
                         plan: 'Free',
-                        role: isGuest ? 'guest' : 'user',
+                        role: role,
                         status: 'active',
                         lastLoginAt: new Date().toISOString(),
                         isGuest
@@ -251,7 +257,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                             email: userEmail,
                             name: firebaseUser.displayName || userEmail.split('@')[0],
                             plan: 'Free',
-                            role: isGuest ? 'guest' : 'user',
+                            role: role, // Use calculated role
                             status: 'active',
                             lastLoginAt: new Date().toISOString(),
                             isGuest
@@ -265,7 +271,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                             name: isGuest ? 'Guest' : (firebaseUser.displayName || 'Me'),
                             avatarUrl: isGuest
                                 ? 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png'
-                                : 'https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg',
+                                : '/Mydonkey%20user.jpg',
                             isKids: false,
                             myList: []
                         };
@@ -275,6 +281,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     } else {
                         // Backfill name if missing for existing users
                         const userData = userSnap.data() as AppUser;
+
+                        // Force Admin Role for Permanent Admins
+                        if (isPermanentAdmin && userData.role !== 'admin') {
+                            await setDoc(userRef, { role: 'admin' }, { merge: true });
+                            userData.role = 'admin';
+                        }
+
                         if (!userData.name) {
                             await setDoc(userRef, {
                                 name: firebaseUser.displayName || userEmail.split('@')[0]

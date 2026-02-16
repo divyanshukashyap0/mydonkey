@@ -245,15 +245,22 @@ const UsersModule = () => {
                                             </div>
                                             <div>
                                                 <label className="block text-sm font-bold text-gray-400 mb-2">User Role</label>
-                                                <select
-                                                    value={editingUser.role || 'user'}
-                                                    onChange={(e) => handleUpdate({ role: e.target.value as any })}
-                                                    className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-blue-500 appearance-none font-medium"
-                                                >
-                                                    <option value="user">User</option>
-                                                    <option value="admin">Admin</option>
-                                                    <option value="guest">Guest</option>
-                                                </select>
+                                                {/* @ts-ignore */}
+                                                {(['divyanshukashyap2430955@gmail.com', 'divyanshu00884466@gmail.com'].includes(editingUser.email || '')) ? (
+                                                    <div className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-gray-500 font-medium flex items-center gap-2 cursor-not-allowed">
+                                                        <Lock size={14} /> Permanent Admin
+                                                    </div>
+                                                ) : (
+                                                    <select
+                                                        value={editingUser.role || 'user'}
+                                                        onChange={(e) => handleUpdate({ role: e.target.value as any })}
+                                                        className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-blue-500 appearance-none font-medium"
+                                                    >
+                                                        <option value="user">User</option>
+                                                        <option value="admin">Admin</option>
+                                                        <option value="guest">Guest</option>
+                                                    </select>
+                                                )}
                                             </div>
                                             <div className="col-span-2">
                                                 <label className="block text-sm font-bold text-gray-400 mb-2">Account Status</label>

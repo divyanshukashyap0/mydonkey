@@ -42,6 +42,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
             title: `${content.title} - ${season.title} | ${episode.title}`, // "Show Name - S1 | Ep1"
             movieDriveId: episode.driveId,
             movieYoutubeId: episode.youtubeId,
+            videoUrl: episode.videoUrl, // Pass the direct video URL
             playMode: 'movie' as const,
             duration: episode.duration
         };
@@ -60,8 +61,67 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
     const currentSeason = content.seasons?.find(s => s.id === selectedSeasonId);
 
 
+    // Download Options State
+    const [downloadOptions, setDownloadOptions] = useState<Content | Episode | null>(null);
+
+    const handleDownload = (item: Content | Episode) => {
+        if (currentUser?.isGuest) {
+            alert('Guest mode download is not allowed. Please log in with your credentials to download this content.');
+            return;
+        }
+
+        const links = item.downloadLinks || [];
+        // Check legacy drive ID if no links
+        const legacyId = 'movieDriveId' in item ? item.movieDriveId : (item as Episode).driveId;
+        // Check for direct video URL as last resort
+        const videoUrl = 'videoUrl' in item ? item.videoUrl : (item as Episode).videoUrl;
+
+        if (links.length > 0) {
+            setDownloadOptions(item);
+        } else if (legacyId) {
+            window.open(`https://drive.google.com/uc?id=${legacyId}&export=download`, '_blank');
+        } else if (videoUrl) {
+            // Fallback: Download the streaming URL directly
+            window.open(videoUrl, '_blank');
+        } else {
+            alert('Download not available for this content');
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-[200] flex items-center justify-center md:p-8 animate-in fade-in duration-300">
+            {/* Download Options Modal */}
+            {downloadOptions && (
+                <div className="absolute inset-0 z-[210] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
+                    <div className="bg-[#181818] border border-white/10 p-6 rounded-xl w-full max-w-sm shadow-2xl relative">
+                        <button
+                            onClick={() => setDownloadOptions(null)}
+                            className="absolute top-2 right-2 text-gray-400 hover:text-white"
+                        >
+                            <X size={20} />
+                        </button>
+                        <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                            <Download size={20} /> Select Quality
+                        </h3>
+                        <div className="space-y-2">
+                            {downloadOptions.downloadLinks?.map((link, idx) => (
+                                <a
+                                    key={idx}
+                                    href={link.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="block p-4 bg-white/5 hover:bg-white/10 border border-white/5 rounded-lg text-center font-bold text-white transition flex justify-between items-center group"
+                                    onClick={() => setDownloadOptions(null)}
+                                >
+                                    <span>{link.label}</span>
+                                    <Download size={16} className="text-gray-400 group-hover:text-white" />
+                                </a>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Backdrop Overlay (Desktop) */}
             <div
                 className="absolute inset-0 bg-black/80 backdrop-blur-sm hidden md:block"
@@ -71,6 +131,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
             {/* Modal Container */}
             {/* Added max-w-full and h-full for mobile to ensure full intersection */}
             <div className="relative w-full h-full md:h-auto md:max-w-5xl md:max-h-[90vh] bg-[#181818] md:rounded-xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-500 flex flex-col">
+
 
                 {/* Close Button */}
                 <button
@@ -181,17 +242,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                 <Share2 size={20} className="text-white" />
                                 <span className="text-[10px] text-gray-400">Share</span>
                             </div>
-                            <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-90 transition" onClick={() => {
-                                if (currentUser?.isGuest) {
-                                    alert('Guest mode download is not allowed. Please log in with your credentials to download this content.');
-                                    return;
-                                }
-                                if (content.allowDownload && content.movieDriveId) {
-                                    window.open(`https://drive.google.com/uc?id=${content.movieDriveId}&export=download`, '_blank');
-                                } else {
-                                    alert('Download not available for this content');
-                                }
-                            }}>
+                            <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-90 transition" onClick={() => handleDownload(content)}>
                                 <Download size={20} className={content.allowDownload ? "text-white" : "text-gray-600"} />
                                 <span className="text-[10px] text-gray-400">Download</span>
                             </div>
@@ -235,11 +286,21 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                                 )}
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <div className="flex justify-between items-start">
-                                                    <h4 className="font-bold text-sm text-gray-200 line-clamp-1">{idx + 1}. {ep.title}</h4>
-                                                    <span className="text-[10px] text-gray-500">{ep.duration}</span>
+                                                <div className="flex justify-between items-center">
+                                                    <div className="flex-1">
+                                                        <div className="flex justify-between items-start">
+                                                            <h4 className="font-bold text-sm text-gray-200 line-clamp-1">{idx + 1}. {ep.title}</h4>
+                                                            <span className="text-[10px] text-gray-500">{ep.duration}</span>
+                                                        </div>
+                                                        <p className="text-[10px] text-gray-400 mt-1 line-clamp-2">{ep.overview || ""}</p>
+                                                    </div>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleDownload(ep); }}
+                                                        className="ml-3 p-2 bg-white/10 rounded-full hover:bg-white/20 active:scale-95 transition"
+                                                    >
+                                                        <Download size={14} className="text-gray-300" />
+                                                    </button>
                                                 </div>
-                                                <p className="text-[10px] text-gray-400 mt-1 line-clamp-2">{ep.overview || ""}</p>
                                             </div>
                                         </div>
                                     ))}
@@ -335,17 +396,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                     <Share2 size={24} />
                                 </button>
                                 <button
-                                    onClick={() => {
-                                        if (currentUser?.isGuest) {
-                                            alert('Guest mode download is not allowed. Please log in with your credentials to download this content.');
-                                            return;
-                                        }
-                                        if (content.allowDownload && content.movieDriveId) {
-                                            window.open(`https://drive.google.com/uc?id=${content.movieDriveId}&export=download`, '_blank');
-                                        } else {
-                                            alert('Download not available for this content');
-                                        }
-                                    }}
+                                    onClick={() => handleDownload(content)}
                                     className={`backdrop-blur-md p-3 rounded-full border transition ${content.allowDownload ? 'bg-gray-600/40 border-white/20 hover:border-white' : 'bg-gray-800/40 border-gray-700 cursor-not-allowed'}`}
                                     title="Download"
                                 >
@@ -413,7 +464,16 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                                     <div className="flex-1 flex flex-col justify-center">
                                                         <div className="flex justify-between items-start mb-2">
                                                             <h4 className="font-bold text-lg text-white group-hover:text-brand-red transition-colors">{idx + 1}. {ep.title}</h4>
-                                                            <span className="text-sm text-gray-400 font-mono">{ep.duration}</span>
+                                                            <div className="flex items-center gap-4">
+                                                                <span className="text-sm text-gray-400 font-mono">{ep.duration}</span>
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleDownload(ep); }}
+                                                                    className="p-2 hover:bg-white/20 rounded-full transition relative z-20"
+                                                                    title="Download Episode"
+                                                                >
+                                                                    <Download size={18} className="text-gray-400 hover:text-white" />
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                         <p className="text-gray-400 text-sm line-clamp-2">{ep.overview || `Episode ${idx + 1} of ${currentSeason.title}`}</p>
                                                     </div>

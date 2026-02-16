@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, Volume2, VolumeX, Maximize, Settings, SkipForward, ArrowLeft, RotateCcw, RotateCw, Subtitles, Layers, BarChart2, Minimize, Headphones, Check, MessageSquare } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Settings, SkipForward, ArrowLeft, RotateCcw, RotateCw, Subtitles, Layers, BarChart2, Minimize, Headphones, Check, MessageSquare, Wifi, ExternalLink } from 'lucide-react';
 import { Content } from '../types';
 import StatsPanel from './StatsPanel';
 import { useStore } from '../context/StoreContext';
@@ -36,9 +36,72 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     // Determine play mode
     const isMovieMode = content.playMode === 'movie';
-    const driveIdToUse = isMovieMode ? getDriveId(content.movieDriveId || '') : getDriveId(content.youtubeId || '');
-    const isDriveVideo = (isMovieMode && !!content.movieDriveId) || (!isMovieMode && !!content.youtubeId && content.youtubeId.length > 20);
-    const youtubeVideoId = isMovieMode ? getYoutubeId(content.movieYoutubeId || '') : getYoutubeId(content.youtubeId || '');
+
+    // Source Resolution Logic
+    // 1. Check for overrides in videoUrl (New Decoupled Field)
+    const overrideUrl = content.videoUrl;
+    const overrideYoutubeId = overrideUrl ? getYoutubeId(overrideUrl) : '';
+    const overrideDriveId = overrideUrl ? getDriveId(overrideUrl) : '';
+
+    // 2. Determine IDs based on override or legacy fields
+
+    // YouTube ID Calculation
+    // Priority: Override YT ID > Legacy Movie YT ID > Legacy Standard YT ID
+    let finalYoutubeId = '';
+    if (overrideYoutubeId && overrideYoutubeId.length === 11) {
+        finalYoutubeId = overrideYoutubeId;
+    } else if (isMovieMode) {
+        finalYoutubeId = getYoutubeId(content.movieYoutubeId || '');
+    } else {
+        // Legacy content.youtubeId could be Drive or YT
+        const rawId = content.youtubeId || '';
+        if (rawId.length <= 20) finalYoutubeId = getYoutubeId(rawId);
+    }
+
+    // Drive ID Calculation
+    // Priority: Override Drive ID > Legacy Movie Drive ID > Legacy Standard Drive ID
+    let finalDriveId = '';
+    if (overrideDriveId) {
+        finalDriveId = overrideDriveId;
+    } else if (isMovieMode) {
+        finalDriveId = getDriveId(content.movieDriveId || '');
+    } else {
+        const rawId = content.youtubeId || '';
+        if (rawId.length > 20) finalDriveId = getDriveId(rawId);
+    }
+
+    // Direct Video URL Calculation
+    // Only used if Override exists AND it's not YT AND it's not Drive
+    const directVideoUrl = (overrideUrl && !overrideYoutubeId && !overrideDriveId) ? overrideUrl : null;
+
+    // 3. Final Player Mode Determination
+    const useDirect = !!directVideoUrl;
+    // We use Drive mode if we have a Drive ID AND (No Direct URL) AND (No YouTube ID OR Logic Dictates Drive)
+    // Logic: If Override was Drive, use Drive. If Override was YT, use YT.
+    // If NO Override: Legacy rules apply (Movies often prefer Drive if both exist? Code suggests Drive checked first).
+    // Let's simplified: If `finalDriveId` is valid, checks if we should prefer it.
+    // Use Drive if:
+    // 1. driveId exists
+    // 2. Not using Direct URL
+    // 3. AND (No YouTube ID OR (It's a Movie Mode without Override, where we prefer Drive?))
+    // Actually, simple rule: If overrideUrl was Drive, `finalYoutubeId` is empty (from logic above). So Drive wins.
+    // If overrideUrl was YT, `finalDriveId` is empty. So YT wins.
+    // Conflict only happens if NO OVERRIDE and BOTH Legacy IDs exist.
+    // Original logic: `isDriveVideo = (isMovieMode && !!content.movieDriveId) || ...`
+    // So for Movies, checks Drive first.
+
+    const isLegacyMovieDriveScale = isMovieMode && !overrideUrl && !!content.movieDriveId;
+    const isLegacyStandardDrive = !isMovieMode && !overrideUrl && (content.youtubeId || '').length > 20;
+
+    // We use Drive Player if:
+    // A. We have an explicit Drive Override
+    // B. We are in legacy mode and matched Drive criteria
+    const useDrive = (!!overrideDriveId) || isLegacyMovieDriveScale || isLegacyStandardDrive;
+
+    // Export usage vars (mapping to existing component variables)
+    const youtubeVideoId = finalYoutubeId;
+    const driveIdToUse = finalDriveId;
+    const isDriveVideo = useDrive && !useDirect; // Direct takes precedence if valid (though logic ensures mutually exclusive)
 
 
     // Resume Logic
@@ -595,7 +658,18 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
             {/* Player Container */}
             <div className="absolute inset-0 z-0 bg-black pointer-events-none overflow-hidden">
-                {isDriveVideo ? (
+                {directVideoUrl ? (
+                    <div className="w-full h-full relative pointer-events-auto">
+                        <iframe
+                            className="w-full h-full"
+                            src={directVideoUrl}
+                            allowFullScreen
+                            allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                            sandbox="allow-forms allow-scripts allow-pointer-lock allow-same-origin allow-top-navigation allow-presentation"
+                            title={content.title}
+                        />
+                    </div>
+                ) : isDriveVideo ? (
                     <div className="w-full h-full relative">
                         {/* Mask the top bar (filename) of Google Drive Player */}
                         {driveIdToUse && (
@@ -603,9 +677,26 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                 className="absolute top-[-64px] left-0 w-full h-[calc(100%+64px)] pointer-events-auto"
                                 src={`https://drive.google.com/file/d/${driveIdToUse}/preview`}
                                 allowFullScreen
-                                allow="autoplay"
+                                allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                                sandbox="allow-forms allow-scripts allow-pointer-lock allow-same-origin allow-top-navigation allow-presentation"
+                                loading="eager"
+                                title="Video Content"
                             ></iframe>
                         )}
+
+                        {/* Fallback Play Button for Large Files */}
+                        <div className={`absolute top-4 right-4 z-[60] pointer-events-auto transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
+                            <a
+                                href={`https://drive.google.com/file/d/${driveIdToUse}/view`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="bg-black/60 hover:bg-black/80 text-white/80 hover:text-white p-2 rounded-full backdrop-blur-md border border-white/10 flex items-center gap-2 text-xs font-bold transition-all group"
+                                title="Trouble playing? Open in Drive"
+                            >
+                                <ExternalLink size={14} />
+                                <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 whitespace-nowrap">Open External</span>
+                            </a>
+                        </div>
                     </div>
                 ) : (
                     <div className="w-full h-full relative overflow-hidden pointer-events-none">
@@ -616,7 +707,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             </div>
 
             {/* Loading Overlay */}
-            {(initialLoad || isBuffering) && !isDriveVideo && (
+            {(initialLoad || isBuffering) && !isDriveVideo && !directVideoUrl && (
                 <div className="absolute inset-0 z-[50] flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm pointer-events-none transition-opacity duration-300">
                     <div className="animate-spin rounded-full h-12 w-12 border-4 border-brand-red border-t-transparent mb-6 shadow-[0_0_15px_rgba(229,9,20,0.5)]"></div>
                     <div className="text-white font-bold text-xl tracking-wide animate-pulse">Loading Content...</div>
@@ -637,7 +728,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             )}
 
             {/* Click to Toggle Controls */}
-            {!isDriveVideo && <div className="absolute inset-0 z-10" onClick={() => setShowControls(!showControls)}></div>}
+            {!isDriveVideo && !directVideoUrl && <div className="absolute inset-0 z-10" onClick={() => setShowControls(!showControls)}></div>}
 
             {/* Skip Intro */}
             {!isDriveVideo && showSkipIntro && (
@@ -692,8 +783,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 </div>
             )}
 
-            {/* Controls - Floating Glass Bar (Hide for Drive Video) */}
-            {!isDriveVideo && (
+            {/* Controls - Floating Glass Bar (Hide for Drive Video and Direct Video) */}
+            {!isDriveVideo && !directVideoUrl && (
                 <div className={`absolute bottom-0 left-0 right-0 p-4 md:p-8 transition-all duration-500 pointer-events-none z-[120] ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
 
                     {/* Main Control Bar */}

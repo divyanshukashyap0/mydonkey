@@ -161,7 +161,7 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                                     onClick={() => setProfileMenuOpen(!isProfileMenuOpen)}
                                     className="flex items-center gap-2 group"
                                 >
-                                    <img src={currentProfile?.avatarUrl || "https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg"} className="w-8 h-8 rounded border-2 border-transparent group-hover:border-white transition object-cover" />
+                                    <img src={currentProfile?.avatarUrl || "/Mydonkey%20user.jpg"} className="w-8 h-8 rounded border-2 border-transparent group-hover:border-white transition object-cover" />
                                 </button>
 
                                 {isProfileMenuOpen && (
