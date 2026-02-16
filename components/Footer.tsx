@@ -17,7 +17,10 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
     },
     {
       title: 'Support',
-      links: pages.filter(p => p.category === 'Support').map(p => ({ label: p.title, action: p.id }))
+      links: [
+        ...pages.filter(p => p.category === 'Support').map(p => ({ label: p.title, action: p.id })),
+        { label: 'User Manual', action: '/MyDonkey.pdf' }
+      ]
     },
     {
       title: 'Legal',
@@ -51,7 +54,13 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                   <li
                     key={lIdx}
                     className="hover:underline cursor-pointer transition-colors hover:text-white"
-                    onClick={() => onNavigate(link.action)}
+                    onClick={() => {
+                      if (link.action.endsWith('.pdf')) {
+                        window.open(link.action, '_blank');
+                      } else {
+                        onNavigate(link.action);
+                      }
+                    }}
                   >
                     {link.label}
                   </li>

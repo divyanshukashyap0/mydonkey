@@ -59,7 +59,7 @@ const ContentRail: React.FC<ContentRailProps> = ({
 
                 <div
                     ref={scrollRef}
-                    className={`flex overflow-x-auto px-4 md:px-12 no-scrollbar scroll-smooth touch-pan-y ${showRanking ? 'gap-0 md:gap-0' : 'gap-2 md:gap-4'}`}
+                    className={`flex overflow-x-auto px-4 md:px-12 no-scrollbar scroll-smooth ${showRanking ? 'gap-0 md:gap-0' : 'gap-2 md:gap-4'}`}
                 >
                     {(!items || items.length === 0) ? (
                         <div className="text-gray-500 text-sm italic p-4">No content available.</div>
