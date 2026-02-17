@@ -193,14 +193,20 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                         <Play size={18} fill="black" /> Play
                                     </button>
                                 ) : (
-                                    // TV Show - No main play button, maybe "Resume" later
-                                    <button className="bg-white/20 text-white/50 py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 cursor-default">
-                                        Select Episode
+                                    // TV Show - Scroll to episodes
+                                    <button
+                                        onClick={() => {
+                                            const mobileEpisodes = document.getElementById('episodes-mobile');
+                                            if (mobileEpisodes) mobileEpisodes.scrollIntoView({ behavior: 'smooth' });
+                                        }}
+                                        className="bg-white/20 text-white py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-white/30 transition"
+                                    >
+                                        <Check size={18} /> Select Episode
                                     </button>
                                 )
                             ) : (
                                 <button className="bg-white/20 text-white/50 py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 cursor-not-allowed">
-                                    Coming Soon
+                                    {content.comingSoon ? 'Coming Soon' : 'Not Available'}
                                 </button>
                             )}
 
@@ -255,7 +261,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
 
                         {/* Season & Episodes (Mobile) */}
                         {content.type === 'tv' && content.seasons && content.seasons.length > 0 && (
-                            <div className="mt-6 pb-20">
+                            <div id="episodes-mobile" className="mt-6 pb-20">
                                 {/* Season Selector */}
                                 {content.seasons.length > 1 && (
                                     <div className="mb-4">
@@ -340,16 +346,21 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                     ) : (
                                         // TV Show - Show "Select Episode" to guide user
                                         <button
-                                            className="bg-white text-black px-8 py-3 rounded font-bold text-lg flex items-center gap-2 cursor-default opacity-80"
+                                            onClick={() => {
+                                                const episodesSection = document.getElementById('episodes-section');
+                                                if (episodesSection) episodesSection.scrollIntoView({ behavior: 'smooth' });
+                                            }}
+                                            className="bg-white text-black px-8 py-3 rounded font-bold text-lg flex items-center gap-2 cursor-pointer hover:bg-gray-200 transition"
                                         >
                                             <Check size={24} /> Select Episode Below
                                         </button>
                                     )
                                 ) : (
+                                    // Only show Coming Soon if truly coming soon, otherwise Not Available
                                     <button
                                         className="bg-white/20 text-white/50 px-8 py-3 rounded font-bold text-lg flex items-center gap-2 cursor-not-allowed"
                                     >
-                                        Coming Soon
+                                        {content.comingSoon ? 'Coming Soon' : 'Not Available'}
                                     </button>
                                 )}
 
@@ -429,7 +440,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
 
                                 {/* Episodes Section (Desktop) */}
                                 {content.type === 'tv' && content.seasons && content.seasons.length > 0 && (
-                                    <div className="mt-8 pt-8 border-t border-white/10">
+                                    <div id="episodes-section" className="mt-8 pt-8 border-t border-white/10">
                                         <div className="flex items-center justify-between mb-6">
                                             <h3 className="text-2xl font-bold text-white">Episodes</h3>
                                             {content.seasons.length > 1 && (

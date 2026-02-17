@@ -43,14 +43,24 @@ const MainLayout = () => {
     useEffect(() => {
         if (location.pathname.startsWith('/browse/')) {
             const contentId = location.pathname.split('/')[2];
-            if (contentId && content.length > 0) {
-                const item = content.find(c => c.id === contentId);
-                if (item) {
-                    setViewingContent(item);
+            if (content.length > 0) {
+                if (contentId) {
+                    const item = content.find(c => c.id === contentId);
+                    if (item) {
+                        setViewingContent(item);
+                    } else {
+                        // Content loaded but ID not found
+                        console.warn(`Deep link content not found: ${contentId}`);
+                        // Optional: Use a toast here if available in future
+                        // alert("Content not found"); // Removed to be less intrusive, just redirect
+                        navigate('/home', { replace: true });
+                    }
+                } else {
+                    navigate('/home', { replace: true });
                 }
             }
         }
-    }, [location.pathname, content]);
+    }, [location.pathname, content, navigate]);
 
     // Redirect root and /features to /home
     useEffect(() => {

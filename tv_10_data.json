@@ -1,0 +1,139 @@
+{
+  "id": "tv_10",
+  "poster_path_mobile": "https://wallpaperaccess.com/full/6392568.jpg",
+  "allowPlayback": true,
+  "allowDownload": true,
+  "vote_average": 0,
+  "seasons": [
+    {
+      "title": "Season 1",
+      "episodes": [
+        {
+          "title": "Episode 1",
+          "stillUrl": "https://wallpaperaccess.com/full/8639383.jpg",
+          "youtubeId": "",
+          "driveId": "10stWHuDBwJyMU5axyZKoOIvk5U6rwMuK",
+          "id": "ep_1771260745956",
+          "episodeNumber": 1,
+          "duration": ""
+        },
+        {
+          "id": "ep_1771260879581",
+          "stillUrl": "https://wallpaperaccess.com/full/8639383.jpg",
+          "title": "Episode 2",
+          "duration": "",
+          "youtubeId": "",
+          "driveId": "1IZy3qcdUVJgk6AoNUeeH4koZ4efTEB2D",
+          "episodeNumber": 2
+        },
+        {
+          "duration": "",
+          "youtubeId": "",
+          "stillUrl": "https://wallpaperaccess.com/full/8639383.jpg",
+          "episodeNumber": 3,
+          "title": "Episode 3",
+          "driveId": "1EE0xQ84Znhmuv4M82dSsVtCv94Wbf_l_",
+          "id": "ep_1771260881889"
+        },
+        {
+          "youtubeId": "",
+          "driveId": "1aU_STDFMKKSVvnY32gxRexPaw3CzoAln",
+          "stillUrl": "https://wallpaperaccess.com/full/8639383.jpg",
+          "duration": "",
+          "episodeNumber": 4,
+          "title": "Episode 4",
+          "id": "ep_1771260884455"
+        },
+        {
+          "stillUrl": "https://wallpaperaccess.com/full/8639383.jpg",
+          "episodeNumber": 5,
+          "title": "Episode 5",
+          "driveId": "1m-0x2ubDabD0ahSn6YOaJONlGX_LjtNv",
+          "duration": "",
+          "id": "ep_1771260886686",
+          "youtubeId": ""
+        },
+        {
+          "id": "ep_1771260888695",
+          "title": "Episode 6",
+          "driveId": "1rsqshg7-pEFgYVjXK921vkLWGoJNKnOq",
+          "stillUrl": "https://wallpaperaccess.com/full/8639383.jpg",
+          "duration": "",
+          "episodeNumber": 6,
+          "youtubeId": ""
+        },
+        {
+          "id": "ep_1771260891441",
+          "title": "Episode 7",
+          "stillUrl": "https://wallpaperaccess.com/full/8639383.jpg",
+          "youtubeId": "",
+          "episodeNumber": 7,
+          "duration": "",
+          "driveId": "1D63wtYm1_8PxsO7Cpe5BUe5FPW7kt1Re"
+        },
+        {
+          "stillUrl": "https://wallpaperaccess.com/full/8639383.jpg",
+          "driveId": "1D63wtYm1_8PxsO7Cpe5BUe5FPW7kt1Re",
+          "duration": "",
+          "id": "ep_1771260893622",
+          "title": "Episode 8",
+          "episodeNumber": 8,
+          "youtubeId": ""
+        },
+        {
+          "youtubeId": "",
+          "stillUrl": "https://wallpaperaccess.com/full/8639383.jpg",
+          "duration": "",
+          "id": "ep_1771260895703",
+          "driveId": "1vnUaawhlmzwi40V5ze4Hyp1nRTgQ038M",
+          "episodeNumber": 9,
+          "title": "Episode 9"
+        },
+        {
+          "episodeNumber": 10,
+          "driveId": "1LLsUg3LyqPd7iEVozFpu8WHu5rIEVAIr",
+          "youtubeId": "",
+          "stillUrl": "https://wallpaperaccess.com/full/8639383.jpg",
+          "id": "ep_1771260897736",
+          "duration": "",
+          "title": "Episode 10"
+        }
+      ],
+      "trailerYoutubeId": "",
+      "id": "season_1771260742409",
+      "seasonNumber": 1
+    }
+  ],
+  "type": "tv",
+  "backdrop_path_mobile": "https://wallpaperaccess.com/full/6392568.jpg",
+  "comingSoon": true,
+  "title": "Game of Thrones",
+  "backdrop_path": "https://wallpaperaccess.com/full/3401371.jpg",
+  "isPublished": true,
+  "genres": [
+    "Drama",
+    "Sci-Fi",
+    "Mystery"
+  ],
+  "tags": [
+    "Fantasy",
+    "Drana"
+  ],
+  "resolution": "HD",
+  "release_date": "2011-04-17",
+  "cast": [
+    "Peter Dinklage",
+    "Lena Headey",
+    "Nikolaj Coster-Waldau",
+    "Emilia Clarke",
+    "Kit Harington",
+    "Sophie Turner",
+    "Maisie Williams"
+  ],
+  "poster_path": "https://wallpaperaccess.com/full/3401371.jpg",
+  "featured": false,
+  "rating": "A (18+)",
+  "createdAt": "2026-02-15T09:49:32.102Z",
+  "youtubeId": "KPLWWIOCOOQ",
+  "overview": "Game of Thrones is an HBO fantasy series  known for its complex characters, political intrigue, and supernatural threats. The show revolves around noble families battling for control of the Iron Throne in the fictional continents of Westeros and Essos."
+}
