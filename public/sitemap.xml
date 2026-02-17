@@ -1,69 +1,153 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://mydonkey.in/</loc>
-    <lastmod>2026-02-14T14:33:51.556Z</lastmod>
-    <changefreq>weekly</changefreq>
+    <loc>https://www.mydonkey.in/</loc>
+    <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://mydonkey.in/about</loc>
-    <lastmod>2026-02-14T14:33:51.558Z</lastmod>
-    <changefreq>weekly</changefreq>
+    <loc>https://www.mydonkey.in/home</loc>
+    <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://mydonkey.in/features</loc>
-    <lastmod>2026-02-14T14:33:51.558Z</lastmod>
-    <changefreq>weekly</changefreq>
+    <loc>https://www.mydonkey.in/movies</loc>
+    <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://mydonkey.in/pricing</loc>
-    <lastmod>2026-02-14T14:33:51.558Z</lastmod>
-    <changefreq>weekly</changefreq>
+    <loc>https://www.mydonkey.in/tv</loc>
+    <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://mydonkey.in/contact</loc>
-    <lastmod>2026-02-14T14:33:51.558Z</lastmod>
-    <changefreq>weekly</changefreq>
+    <loc>https://www.mydonkey.in/login</loc>
+    <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://mydonkey.in/blog</loc>
-    <lastmod>2026-02-14T14:33:51.558Z</lastmod>
-    <changefreq>weekly</changefreq>
+    <loc>https://www.mydonkey.in/register</loc>
+    <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://mydonkey.in/how-it-works</loc>
-    <lastmod>2026-02-14T14:33:51.558Z</lastmod>
+    <loc>https://www.mydonkey.in/browse/11</loc>
+    <lastmod>2026-02-17T17:03:43.274Z</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://mydonkey.in/login</loc>
-    <lastmod>2026-02-14T14:33:51.558Z</lastmod>
+    <loc>https://www.mydonkey.in/browse/12</loc>
+    <lastmod>2026-02-17T17:03:43.276Z</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://mydonkey.in/blog/top-10-movies-2024</loc>
-    <lastmod>2026-02-14T14:33:51.558Z</lastmod>
+    <loc>https://www.mydonkey.in/browse/content_1770150350958</loc>
+    <lastmod>2026-02-17T17:03:43.276Z</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://mydonkey.in/blog/streaming-revolution</loc>
-    <lastmod>2026-02-14T14:33:51.558Z</lastmod>
+    <loc>https://www.mydonkey.in/browse/content_1770151835110</loc>
+    <lastmod>2026-02-17T17:03:43.276Z</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://mydonkey.in/blog/hidden-gems-sci-fi</loc>
-    <lastmod>2026-02-14T14:33:51.558Z</lastmod>
+    <loc>https://www.mydonkey.in/browse/content_1770219684201</loc>
+    <lastmod>2026-02-17T17:03:43.276Z</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/browse/content_1770389763167</loc>
+    <lastmod>2026-02-17T17:03:43.276Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/browse/content_1771144782861</loc>
+    <lastmod>2026-02-17T17:03:43.276Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/browse/content_1771150038540</loc>
+    <lastmod>2026-02-17T17:03:43.276Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/browse/content_1771155975870</loc>
+    <lastmod>2026-02-17T17:03:43.276Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/browse/content_1771156046019</loc>
+    <lastmod>2026-02-17T17:03:43.276Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/browse/content_1771156129085</loc>
+    <lastmod>2026-02-17T17:03:43.276Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/browse/content_1771160857004</loc>
+    <lastmod>2026-02-17T17:03:43.276Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/browse/content_1771161138785</loc>
+    <lastmod>2026-02-17T17:03:43.276Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/browse/content_1771162899302</loc>
+    <lastmod>2026-02-17T17:03:43.276Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/browse/mov_11</loc>
+    <lastmod>2026-02-17T17:03:43.276Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/browse/mov_14</loc>
+    <lastmod>2026-02-17T17:03:43.276Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/browse/mov_5</loc>
+    <lastmod>2026-02-17T17:03:43.276Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/browse/tv_10</loc>
+    <lastmod>2026-02-17T17:03:43.276Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/browse/tv_2</loc>
+    <lastmod>2026-02-17T17:03:43.276Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/browse/tv_3</loc>
+    <lastmod>2026-02-17T17:03:43.276Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
   </url>
 </urlset>
