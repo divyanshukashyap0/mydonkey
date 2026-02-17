@@ -602,26 +602,36 @@ const ContentManager = () => {
                                                             // Strategy: replace commas with newlines, then split by newline
                                                             const normalizedText = doc.value.replace(/,/g, '\n');
                                                             const rawLines = normalizedText.split(/\r?\n/);
-                                                            const lines = rawLines.map(l => l.trim()).filter(l => l.length > 0);
+                                                            const lines = rawLines.map(l => l.trim()).filter(l => l.length > 0).reverse();
                                                             console.log("Processing lines:", lines);
 
                                                             const defaultThumb = thumbDoc ? thumbDoc.value.trim() : '';
 
                                                             const newEpisodes: Episode[] = lines.map((line, idx) => {
                                                                 const url = line.trim();
+                                                                // Smart detection for S01E01, etc.
+                                                                const match = url.match(/[sS](\d+)\s*[eE](\d+)/);
                                                                 const isYt = extractYoutubeId(url).length === 11;
                                                                 const isDrive = extractDriveId(url).length > 20; // Basic check
 
+                                                                // Determine episode number logic:
+                                                                // 1. If match found -> use extracted number
+                                                                // 2. If not found -> use reversed index (assuming bottom-to-top paste)
+                                                                const episodeNumber = match ? parseInt(match[2]) : ((season.episodes.length || 0) + idx + 1);
+
                                                                 return {
                                                                     id: `ep_${Date.now()}_${idx}`,
-                                                                    episodeNumber: (season.episodes.length || 0) + idx + 1,
-                                                                    title: `Episode ${(season.episodes.length || 0) + idx + 1}`,
+                                                                    episodeNumber,
+                                                                    title: `Episode ${episodeNumber}`,
                                                                     driveId: isDrive ? extractDriveId(url) : '',
                                                                     youtubeId: isYt ? extractYoutubeId(url) : '',
                                                                     duration: '',
                                                                     stillUrl: defaultThumb
                                                                 };
                                                             });
+
+                                                            // Sort by episode number to ensure correct order
+                                                            newEpisodes.sort((a, b) => a.episodeNumber - b.episodeNumber);
 
                                                             updateSeason(season.id, { episodes: [...season.episodes, ...newEpisodes] });
                                                             doc.value = ''; // Clear input
