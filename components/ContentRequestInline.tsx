@@ -109,7 +109,7 @@ const ContentRequestInline: React.FC<ContentRequestInlineProps> = ({ className =
                             <CheckCircle size={12} /> Available in Library:
                         </p>
                         {matches.map(match => (
-                            <div key={match.id} className="flex items-center gap-3 bg-black/40 p-2 rounded-lg border border-green-500/30 hover:bg-black/60 transition cursor-pointer" onClick={() => navigate(`/watch/${match.id}`)}>
+                            <div key={match.id} className="flex items-center gap-3 bg-black/40 p-2 rounded-lg border border-green-500/30 hover:bg-black/60 transition cursor-pointer" onClick={() => navigate(`/browse/${match.id}`)}>
                                 <img src={match.poster_path} className="w-8 h-12 object-cover rounded bg-gray-800" alt={match.title} />
                                 <div className="flex-1 min-w-0">
                                     <h4 className="font-bold text-xs text-white line-clamp-1">{match.title}</h4>

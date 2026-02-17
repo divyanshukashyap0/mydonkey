@@ -51,11 +51,16 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
     };
 
     // Helper to determine if content is playable
-    const isMovie = content.type === 'movie';
-    const hasMovieSource = !!(content.movieDriveId || content.movieYoutubeId);
+    // Any type except 'tv' is considered a single video play mode (movie, sparks, sports, short)
+    const isSingleVideoType = content.type !== 'tv';
+
+    // Check for ANY valid video source
+    const hasVideoSource = !!(content.movieDriveId || content.movieYoutubeId || content.videoUrl || content.youtubeId);
+
     // Check if TV show has any seasons with episodes
     const hasEpisodes = content.type === 'tv' && !!content.seasons && content.seasons.length > 0 && content.seasons.some(s => s.episodes.length > 0);
-    const isPlayable = isMovie ? hasMovieSource : hasEpisodes;
+
+    const isPlayable = isSingleVideoType ? hasVideoSource : hasEpisodes;
 
     // Get current season object
     const currentSeason = content.seasons?.find(s => s.id === selectedSeasonId);
@@ -180,7 +185,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                         {/* Action Buttons Row */}
                         <div className="grid grid-cols-2 gap-3 mt-1">
                             {isPlayable ? (
-                                isMovie ? (
+                                isSingleVideoType ? (
                                     <button
                                         onClick={() => { onPlay(content, 'movie'); onClose(); }}
                                         className="bg-white text-black py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-gray-200 active:scale-95 transition"
@@ -222,7 +227,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                 <span className="text-[10px] text-gray-400">Rate</span>
                             </div>
                             <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-90 transition" onClick={async () => {
-                                const shareUrl = `${window.location.origin}/watch/${content.id}`;
+                                const shareUrl = `${window.location.origin}/browse/${content.id}`;
                                 const shareData = {
                                     title: content.title,
                                     text: `🎬 Watch "${content.title}" on My Donkey! ${content.overview?.slice(0, 100)}...`,
@@ -325,12 +330,12 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
 
                             <div className="flex flex-wrap items-center gap-4">
                                 {isPlayable ? (
-                                    isMovie ? (
+                                    isSingleVideoType ? (
                                         <button
                                             onClick={() => { onPlay(content, 'movie'); onClose(); }}
                                             className="bg-white text-black px-8 py-3 rounded font-bold text-lg flex items-center gap-2 hover:bg-gray-200 transition-transform active:scale-95"
                                         >
-                                            <Play size={24} fill="black" /> Play Movie
+                                            <Play size={24} fill="black" /> Play {content.type === 'movie' ? 'Movie' : 'Now'}
                                         </button>
                                     ) : (
                                         // TV Show - Show "Select Episode" to guide user
@@ -351,9 +356,9 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                 {content.youtubeId && (
                                     <button
                                         onClick={() => { onPlay(content, 'trailer'); onClose(); }}
-                                        className={`px-8 py-3 rounded font-bold text-lg flex items-center gap-2 transition-transform active:scale-95 ${!(isPlayable && isMovie) ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-600/60 hover:bg-gray-600 text-white'}`}
+                                        className={`px-8 py-3 rounded font-bold text-lg flex items-center gap-2 transition-transform active:scale-95 ${!(isPlayable && isSingleVideoType) ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-600/60 hover:bg-gray-600 text-white'}`}
                                     >
-                                        <Play size={24} fill={(isPlayable && isMovie) ? "white" : "black"} /> {(isPlayable && isMovie) ? 'Trailer' : 'Play Trailer'}
+                                        <Play size={24} fill={(isPlayable && isSingleVideoType) ? "white" : "black"} /> {(isPlayable && isSingleVideoType) ? 'Trailer' : 'Play Trailer'}
                                     </button>
                                 )}
 
@@ -373,7 +378,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                 </button>
                                 <button
                                     onClick={async () => {
-                                        const shareUrl = `${window.location.origin}/watch/${content.id}`;
+                                        const shareUrl = `${window.location.origin}/browse/${content.id}`;
                                         const shareData = {
                                             title: content.title,
                                             text: `🎬 Watch "${content.title}" on My Donkey! ${content.overview?.slice(0, 100)}...`,
