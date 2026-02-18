@@ -17,19 +17,43 @@ const AnalyticsManager = () => {
     useEffect(() => {
         setLoading(true);
 
-        // 1. Real-time Activity Logs (Optimized Limit to 20 for dashboard)
-        // Keep this as onSnapshot because it drives the "Live Feed" which is the coolest part.
-        const qActivity = query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(20));
+        // 1. Single Real-time Activity Stream (Optimized)
+        // We fetch the last 150 logs of ANY type. 
+        // - We use the first 20 for the "Recent Activity" feed.
+        // - We filter for 'video_play' within these 150 to calculate "Trending Now".
+        // This avoids needing a composite index on (action + timestamp) and uses the default timestamp index.
+        const qActivity = query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(150));
+
         const unsubActivity = onSnapshot(qActivity, (snap) => {
-            setRecentActivity(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-            setLoading(false); // Enable UI as soon as logs load
+            const allLogs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+            // 1A. Recent Activity Feed (Limit 20)
+            setRecentActivity(allLogs.slice(0, 20));
+
+            // 1B. Top Content (Derived from the same stream - Last 150 actions)
+            const popularity: Record<string, number> = {};
+            allLogs.forEach((log: any) => {
+                if (log.action === 'video_play' && log.details?.contentId) {
+                    popularity[log.details.contentId] = (popularity[log.details.contentId] || 0) + 1;
+                }
+            });
+
+            const sortedContent = Object.entries(popularity)
+                .sort(([, a], [, b]) => b - a)
+                .slice(0, 5)
+                .map(([id, count]) => {
+                    const c = content.find(x => x.id === id);
+                    return { title: c?.title || 'Unknown Content', count, poster: c?.poster_path };
+                });
+            setTopContentData(sortedContent);
+
+            setLoading(false);
         }, (error) => {
-            console.error("Activity Log Snapshot Error:", error);
-            // If index is missing, this will error. We handle it gracefully-ish.
+            console.error("Activity Stream Error:", error);
             setLoading(false);
         });
 
-        // 2. Optimized KPI Fetching (One-time fetch on mount to save reads)
+        // 2. Optimized KPI Fetching (One-time fetch on mount)
         const fetchStats = async () => {
             try {
                 // Active Users (Last 24h)
@@ -45,20 +69,6 @@ const AnalyticsManager = () => {
                 const qActive = query(collection(db, 'users'), where('lastActiveAt', '>', oneDayAgo));
                 const activeSnap = await getDocs(qActive); // Still reads docs but only active ones (e.g., 5-10 users)
                 setActiveUsersCount(activeSnap.size);
-
-                // Total Watch Time (Aggregation) 
-                // Note: sum() requires an index on 'totalWatchTimeSeconds' usually? 
-                // Actually, client-side aggregation on ALL users is what killed the quota. 
-                // We will NOT fetch all users. We will just fetch the top 100 active users and sum them for an "Approximation" 
-                // or use the server-side aggregation feature if available (Firebase v9.14+).
-                // Let's try server-side aggregation.
-
-                const coll = collection(db, 'users');
-                const snapshot = await getAggregateFromServer(coll, {
-                    totalWatchTime: sum('totalWatchTimeSeconds')
-                });
-
-                setCalculatedWatchTime(snapshot.data().totalWatchTime || 0);
 
                 // Global Watch History (From Active Users only)
                 // We reuse the 'activeSnap' from above to build the history list!
@@ -88,38 +98,29 @@ const AnalyticsManager = () => {
                 historyData.sort((a, b) => new Date(b.lastWatchedAt).getTime() - new Date(a.lastWatchedAt).getTime());
                 setGlobalHistory(historyData.slice(0, 20));
 
+                // Total Watch Time (Aggregation) 
+                // Note: sum() requires an index on 'totalWatchTimeSeconds' usually? 
+                // Actually, client-side aggregation on ALL users is what killed the quota. 
+                // We will NOT fetch all users. We will just fetch the top 100 active users and sum them for an "Approximation" 
+                // or use the server-side aggregation feature if available (Firebase v9.14+).
+                // Let's try server-side aggregation.
+
+                const coll = collection(db, 'users');
+                const snapshot = await getAggregateFromServer(coll, {
+                    totalWatchTime: sum('totalWatchTimeSeconds')
+                });
+
+                setCalculatedWatchTime(snapshot.data().totalWatchTime || 0);
+
             } catch (err) {
-                console.error("Stats Fetch Error:", err);
+                console.error("Stats Fetch Error (Likely Quota):", err);
             }
         };
 
         fetchStats();
 
-        // 3. Top Content (Separate, lighter snapshot)
-        // Only look at RECENT plays (last 100) to determine "Trending Now"
-        const playLogsQ = query(collection(db, 'activity_logs'), where('action', '==', 'video_play'), orderBy('timestamp', 'desc'), limit(100));
-        const unsubTop = onSnapshot(playLogsQ, (snap) => {
-            const popularity: Record<string, number> = {};
-            snap.forEach(doc => {
-                const data = doc.data();
-                if (data.details?.contentId) {
-                    popularity[data.details.contentId] = (popularity[data.details.contentId] || 0) + 1;
-                }
-            });
-
-            const sortedContent = Object.entries(popularity)
-                .sort(([, a], [, b]) => b - a)
-                .slice(0, 5)
-                .map(([id, count]) => {
-                    const c = content.find(x => x.id === id);
-                    return { title: c?.title || 'Unknown Content', count, poster: c?.poster_path };
-                });
-            setTopContentData(sortedContent);
-        });
-
         return () => {
             unsubActivity();
-            unsubTop();
         };
     }, [content]);
 

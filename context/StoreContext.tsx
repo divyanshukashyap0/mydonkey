@@ -126,10 +126,20 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const [isLoading, setIsLoading] = useState(true);
 
     const [content, setContent] = useState<Content[]>([]);
-    const [settings, setSettings] = useState<SiteSettings>(DEFAULT_SETTINGS);
+    // Load cached settings/plans if available
+    const [settings, setSettings] = useState<SiteSettings>(() => {
+        const cached = localStorage.getItem('globalSettings');
+        return cached ? JSON.parse(cached) : DEFAULT_SETTINGS;
+    });
+
     const [sections, setSections] = useState<Section[]>([]);
     const [users, setUsers] = useState<AppUser[]>([]);
-    const [plans, setPlans] = useState<Plan[]>([]);
+
+    // Load cached plans if available
+    const [plans, setPlans] = useState<Plan[]>(() => {
+        const cached = localStorage.getItem('cachedPlans');
+        return cached ? JSON.parse(cached) : [];
+    });
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
     const [isInstallable, setIsInstallable] = useState(false);
@@ -358,7 +368,11 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         });
 
         const unsubSettings = onSnapshot(doc(db, 'settings', 'global'), (doc) => {
-            if (doc.exists()) setSettings(doc.data() as SiteSettings);
+            if (doc.exists()) {
+                const data = doc.data() as SiteSettings;
+                setSettings(data);
+                localStorage.setItem('globalSettings', JSON.stringify(data));
+            }
         });
 
         const unsubSections = onSnapshot(query(collection(db, 'sections'), orderBy('order')), (snap) => {
@@ -366,7 +380,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         });
 
         const unsubPlans = onSnapshot(collection(db, 'plans'), (snap) => {
-            setPlans(snap.docs.map(d => ({ ...d.data(), id: d.id } as Plan)));
+            const data = snap.docs.map(d => ({ ...d.data(), id: d.id } as Plan));
+            setPlans(data);
+            localStorage.setItem('cachedPlans', JSON.stringify(data));
         });
 
         const unsubNotifs = onSnapshot(query(collection(db, 'notifications'), orderBy('createdAt', 'desc')), (snap) => {
@@ -439,10 +455,15 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             const lastUpdate = parseInt(localStorage.getItem('lastActivityUpdate') || '0');
             // Update only if more than 5 minutes have passed
             if (now - lastUpdate > 5 * 60 * 1000) {
-                await updateDoc(doc(db, 'users', fbUser.uid), {
-                    lastActiveAt: new Date().toISOString()
-                });
-                localStorage.setItem('lastActivityUpdate', now.toString());
+                try {
+                    await updateDoc(doc(db, 'users', fbUser.uid), {
+                        lastActiveAt: new Date().toISOString()
+                    });
+                    localStorage.setItem('lastActivityUpdate', now.toString());
+                } catch (error) {
+                    // Ignore quota errors or network issues for background updates
+                    console.warn("Failed to update activity status:", error);
+                }
             }
         };
 
