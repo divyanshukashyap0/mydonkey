@@ -139,6 +139,7 @@ export interface User {
   lastLogoutAt?: string;
   lastActiveAt?: string;
   totalWatchTime?: number;
+  totalWatchTimeSeconds?: number;
   continueWatching?: ContinueWatchingItem[];
   tokenVersion?: number;
   lowDataMode?: boolean;

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { BarChart3, Clock, Download, Play, TrendingUp } from 'lucide-react';
-import { collection, getDocs, limit, orderBy, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, limit, orderBy, query, where, onSnapshot, getAggregateFromServer, sum } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { User } from '../../../types';
 import { useStore } from '../../../context/StoreContext';
@@ -17,65 +17,87 @@ const AnalyticsManager = () => {
     useEffect(() => {
         setLoading(true);
 
-        // 1. Real-time Activity Logs
-        const qActivity = query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(50));
+        // 1. Real-time Activity Logs (Optimized Limit to 20 for dashboard)
+        // Keep this as onSnapshot because it drives the "Live Feed" which is the coolest part.
+        const qActivity = query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(20));
         const unsubActivity = onSnapshot(qActivity, (snap) => {
             setRecentActivity(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setLoading(false); // Enable UI as soon as logs load
+        }, (error) => {
+            console.error("Activity Log Snapshot Error:", error);
+            // If index is missing, this will error. We handle it gracefully-ish.
+            setLoading(false);
         });
 
-        // 2. Real-time Users (for Watch Time & Active Count)
-        const qUsers = query(collection(db, 'users'));
-        const unsubUsers = onSnapshot(qUsers, (snap) => {
-            const allUsers = snap.docs.map(d => d.data() as User);
+        // 2. Optimized KPI Fetching (One-time fetch on mount to save reads)
+        const fetchStats = async () => {
+            try {
+                // Active Users (Last 24h)
+                const now = new Date();
+                const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-            // Total Watch Time
-            // @ts-ignore
-            const totalSeconds = allUsers.reduce((acc, user) => acc + (user.totalWatchTimeSeconds || 0), 0);
-            setCalculatedWatchTime(totalSeconds);
+                // We use getCountFromServer for cheap counting if possible, but 
+                // standard 'where' queries still read index entries (cheaper than documents)
+                // However, without a composite index on 'lastActiveAt', this might fail or require an index.
+                // Fallback: Fetch metadata only if possible, but Firestore doesn't support "keys only" easily.
+                // Optimization: Index 'lastActiveAt'.
 
-            // Active Users (Last 24h)
-            const now = new Date();
-            const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-            // @ts-ignore
-            const activeCount = allUsers.filter(u => {
-                if (!u.lastActiveAt) return false;
-                // @ts-ignore
-                const date = u.lastActiveAt.toDate ? u.lastActiveAt.toDate() : new Date(u.lastActiveAt);
-                return date > oneDayAgo;
-            }).length;
-            setActiveUsersCount(activeCount);
+                const qActive = query(collection(db, 'users'), where('lastActiveAt', '>', oneDayAgo));
+                const activeSnap = await getDocs(qActive); // Still reads docs but only active ones (e.g., 5-10 users)
+                setActiveUsersCount(activeSnap.size);
 
-            // Global Watch History
-            const historyData: any[] = [];
-            allUsers.forEach(u => {
-                if (u.continueWatching && u.continueWatching.length > 0) {
-                    u.continueWatching.forEach(cw => {
-                        const c = content.find(x => x.id === cw.movieId);
-                        if (c) {
-                            historyData.push({
-                                userEmail: u.email,
-                                userId: u.uid,
-                                contentTitle: c.title,
-                                poster: c.backdrop_path || c.poster_path,
-                                progress: cw.progress,
-                                duration: cw.duration,
-                                lastWatchedAt: cw.lastWatchedAt,
-                                percent: Math.min(100, Math.round((cw.progress / cw.duration) * 100)) || 0
-                            });
-                        }
-                    });
-                }
-            });
-            historyData.sort((a, b) => new Date(b.lastWatchedAt).getTime() - new Date(a.lastWatchedAt).getTime());
-            setGlobalHistory(historyData.slice(0, 50));
-        });
+                // Total Watch Time (Aggregation) 
+                // Note: sum() requires an index on 'totalWatchTimeSeconds' usually? 
+                // Actually, client-side aggregation on ALL users is what killed the quota. 
+                // We will NOT fetch all users. We will just fetch the top 100 active users and sum them for an "Approximation" 
+                // or use the server-side aggregation feature if available (Firebase v9.14+).
+                // Let's try server-side aggregation.
 
+                const coll = collection(db, 'users');
+                const snapshot = await getAggregateFromServer(coll, {
+                    totalWatchTime: sum('totalWatchTimeSeconds')
+                });
 
-        // 3. Independent Top Content Query (Keep simpler/separate if needed, or put in useEffect)
-        // For 'Top Content', we need to aggregate logs. Since we don't want to download ALL logs ever in real-time,
-        // we might stick to a tailored query or just use the recent 500 logs we might fetch.
-        // Let's do a separate snapshot for wider stats but limited to recent 500 actions to keep it somewhat live but lighter.
-        const playLogsQ = query(collection(db, 'activity_logs'), where('action', '==', 'video_play'), orderBy('timestamp', 'desc'), limit(500));
+                setCalculatedWatchTime(snapshot.data().totalWatchTime || 0);
+
+                // Global Watch History (From Active Users only)
+                // We reuse the 'activeSnap' from above to build the history list!
+                const allActiveUsers = activeSnap.docs.map(d => d.data() as User);
+                const historyData: any[] = [];
+
+                allActiveUsers.forEach(u => {
+                    if (u.continueWatching && u.continueWatching.length > 0) {
+                        u.continueWatching.forEach(cw => {
+                            const c = content.find(x => x.id === cw.movieId);
+                            if (c) {
+                                historyData.push({
+                                    userEmail: u.email,
+                                    userId: u.uid,
+                                    contentTitle: c.title,
+                                    poster: c.backdrop_path || c.poster_path,
+                                    progress: cw.progress,
+                                    duration: cw.duration,
+                                    lastWatchedAt: cw.lastWatchedAt,
+                                    percent: Math.min(100, Math.round((cw.progress / cw.duration) * 100)) || 0
+                                });
+                            }
+                        });
+                    }
+                });
+                // Sort by last watched
+                historyData.sort((a, b) => new Date(b.lastWatchedAt).getTime() - new Date(a.lastWatchedAt).getTime());
+                setGlobalHistory(historyData.slice(0, 20));
+
+            } catch (err) {
+                console.error("Stats Fetch Error:", err);
+            }
+        };
+
+        fetchStats();
+
+        // 3. Top Content (Separate, lighter snapshot)
+        // Only look at RECENT plays (last 100) to determine "Trending Now"
+        const playLogsQ = query(collection(db, 'activity_logs'), where('action', '==', 'video_play'), orderBy('timestamp', 'desc'), limit(100));
         const unsubTop = onSnapshot(playLogsQ, (snap) => {
             const popularity: Record<string, number> = {};
             snap.forEach(doc => {
@@ -95,11 +117,8 @@ const AnalyticsManager = () => {
             setTopContentData(sortedContent);
         });
 
-        setLoading(false);
-
         return () => {
             unsubActivity();
-            unsubUsers();
             unsubTop();
         };
     }, [content]);
