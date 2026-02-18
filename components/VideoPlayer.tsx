@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, Volume2, VolumeX, Maximize, Settings, SkipForward, ArrowLeft, RotateCcw, RotateCw, Subtitles, Layers, BarChart2, Minimize, Headphones, Check, MessageSquare, Wifi, ExternalLink } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Settings, SkipForward, ArrowLeft, RotateCcw, RotateCw, Subtitles, Layers, BarChart2, Minimize, Headphones, Check, MessageSquare, Wifi, ExternalLink, Scan, Scaling } from 'lucide-react';
 import { Content } from '../types';
 import StatsPanel from './StatsPanel';
 import { useStore } from '../context/StoreContext';
@@ -131,6 +131,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const [initialLoad, setInitialLoad] = useState(true); // New state to track first play
     const [isBoosted, setIsBoosted] = useState(false);
     const [showDataWarning, setShowDataWarning] = useState(false);
+    const [isZoomed, setIsZoomed] = useState(false); // Zoom/Fill State
 
     // Data Usage Warning
     useEffect(() => {
@@ -657,53 +658,55 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             */}
 
             {/* Player Container */}
-            <div className="absolute inset-0 z-0 bg-black pointer-events-none overflow-hidden">
-                {directVideoUrl ? (
-                    <div className="w-full h-full relative pointer-events-auto">
-                        <iframe
-                            className="w-full h-full"
-                            src={directVideoUrl}
-                            allowFullScreen
-                            allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-                            sandbox="allow-forms allow-scripts allow-pointer-lock allow-same-origin allow-top-navigation allow-presentation"
-                            title={content.title}
-                        />
-                    </div>
-                ) : isDriveVideo ? (
-                    <div className="w-full h-full relative">
-                        {/* Mask the top bar (filename) of Google Drive Player */}
-                        {driveIdToUse && (
+            <div className="absolute inset-0 z-0 bg-black pointer-events-none overflow-hidden flex items-center justify-center">
+                <div className={`w-full h-full relative transition-transform duration-500 ease-in-out ${isZoomed ? 'scale-[1.35]' : 'scale-100'}`}>
+                    {directVideoUrl ? (
+                        <div className="w-full h-full relative pointer-events-auto">
                             <iframe
-                                className="absolute top-[-64px] left-0 w-full h-[calc(100%+64px)] pointer-events-auto"
-                                src={`https://drive.google.com/file/d/${driveIdToUse}/preview`}
+                                className="w-full h-full"
+                                src={directVideoUrl}
                                 allowFullScreen
                                 allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
                                 sandbox="allow-forms allow-scripts allow-pointer-lock allow-same-origin allow-top-navigation allow-presentation"
-                                loading="eager"
-                                title="Video Content"
-                            ></iframe>
-                        )}
-
-                        {/* Fallback Play Button for Large Files */}
-                        <div className={`absolute top-4 right-4 z-[60] pointer-events-auto transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
-                            <a
-                                href={`https://drive.google.com/file/d/${driveIdToUse}/view`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="bg-black/60 hover:bg-black/80 text-white/80 hover:text-white p-2 rounded-full backdrop-blur-md border border-white/10 flex items-center gap-2 text-xs font-bold transition-all group"
-                                title="Trouble playing? Open in Drive"
-                            >
-                                <ExternalLink size={14} />
-                                <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 whitespace-nowrap">Open External</span>
-                            </a>
+                                title={content.title}
+                            />
                         </div>
-                    </div>
-                ) : (
-                    <div className="w-full h-full relative overflow-hidden pointer-events-none">
-                        {/* Scale up YouTube to hide top title bar and bottom branding */}
-                        <div ref={playerContainerRef} id="youtube-player" className="w-full h-full origin-center pointer-events-none" />
-                    </div>
-                )}
+                    ) : isDriveVideo ? (
+                        <div className="w-full h-full relative">
+                            {/* Mask the top bar (filename) of Google Drive Player */}
+                            {driveIdToUse && (
+                                <iframe
+                                    className="absolute top-[-64px] left-0 w-full h-[calc(100%+64px)] pointer-events-auto"
+                                    src={`https://drive.google.com/file/d/${driveIdToUse}/preview`}
+                                    allowFullScreen
+                                    allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                                    sandbox="allow-forms allow-scripts allow-pointer-lock allow-same-origin allow-top-navigation allow-presentation"
+                                    loading="eager"
+                                    title="Video Content"
+                                ></iframe>
+                            )}
+
+                            {/* Fallback Play Button for Large Files */}
+                            <div className={`absolute top-4 right-4 z-[60] pointer-events-auto transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
+                                <a
+                                    href={`https://drive.google.com/file/d/${driveIdToUse}/view`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="bg-black/60 hover:bg-black/80 text-white/80 hover:text-white p-2 rounded-full backdrop-blur-md border border-white/10 flex items-center gap-2 text-xs font-bold transition-all group"
+                                    title="Trouble playing? Open in Drive"
+                                >
+                                    <ExternalLink size={14} />
+                                    <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 whitespace-nowrap">Open External</span>
+                                </a>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="w-full h-full relative overflow-hidden pointer-events-none">
+                            {/* Scale up YouTube to hide top title bar and bottom branding */}
+                            <div ref={playerContainerRef} id="youtube-player" className="w-full h-full origin-center pointer-events-none" />
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Loading Overlay */}
@@ -973,6 +976,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                         </div>
                                     )}
                                 </div>
+
+                                {/* Zoom / Fill Screen Toggle */}
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); }}
+                                    className={`hover:text-white transition-all p-2.5 rounded-xl hover:bg-white/5 ${isZoomed ? 'text-brand-red bg-white/5' : ''}`}
+                                    title={isZoomed ? "Reset Zoom" : "Fill Screen"}
+                                >
+                                    {isZoomed ? <Minimize size={22} /> : <Scan size={22} />}
+                                </button>
 
                                 {/* Fullscreen */}
                                 <button className="hover:text-white hover:bg-white/10 transition p-2.5 rounded-xl" onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}>
