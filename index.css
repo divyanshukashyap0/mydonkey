@@ -149,6 +149,82 @@ h6 {
   animation: slowZoom 20s linear infinite alternate;
 }
 
+
+/* Anime Intro Animations */
+@keyframes anime-slash {
+  0% {
+    transform: translateX(-100%) skewX(-20deg);
+    opacity: 0;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateX(100%) skewX(-20deg);
+    opacity: 0;
+  }
+}
+
+@keyframes anime-glitch {
+  0% {
+    transform: translate(0);
+  }
+
+  20% {
+    transform: translate(-2px, 2px);
+  }
+
+  40% {
+    transform: translate(-2px, -2px);
+  }
+
+  60% {
+    transform: translate(2px, 2px);
+  }
+
+  80% {
+    transform: translate(2px, -2px);
+  }
+
+  100% {
+    transform: translate(0);
+  }
+}
+
+@keyframes anime-fade-out {
+  0% {
+    opacity: 1;
+    filter: contrast(1);
+  }
+
+  50% {
+    filter: contrast(2) brightness(1.5);
+  }
+
+  100% {
+    opacity: 0;
+    filter: contrast(1);
+  }
+}
+
+.animate-anime-slash {
+  animation: anime-slash 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-anime-glitch {
+  animation: anime-glitch 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-anime-exit {
+  animation: anime-fade-out 0.5s ease-out forwards;
+}
+
+.animate-shimmer {
+  animation: shimmer 2s linear infinite;
+}
+
 /* --- Glassmorphism Utils --- */
 .glass-panel {
   background: rgba(20, 20, 20, 0.7);

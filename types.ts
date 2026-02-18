@@ -98,6 +98,7 @@ export interface SiteSettings {
   theme?: 'default' | 'luxury';
   websiteFont?: string;
   rankFont?: string;
+  heroFont?: string;
 }
 
 export interface Plan {

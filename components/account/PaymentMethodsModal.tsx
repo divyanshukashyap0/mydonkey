@@ -26,7 +26,7 @@ const PaymentMethodsModal: React.FC<PaymentMethodsModalProps> = ({ onClose }) =>
             setMethods(snap.docs.map(d => d.data() as PaymentMethod));
         });
         return () => unsubscribe();
-    }, [currentUser]);
+    }, [currentUser?.uid]);
 
     const handleAddCard = async (e: React.FormEvent) => {
         e.preventDefault();

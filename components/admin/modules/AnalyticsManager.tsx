@@ -14,6 +14,7 @@ const AnalyticsManager = () => {
     const [globalHistory, setGlobalHistory] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
+    // 1. Single Real-time Activity Stream (Optimized)
     useEffect(() => {
         setLoading(true);
 
@@ -53,7 +54,13 @@ const AnalyticsManager = () => {
             setLoading(false);
         });
 
-        // 2. Optimized KPI Fetching (One-time fetch on mount)
+        return () => {
+            unsubActivity();
+        };
+    }, [content]);
+
+    // 2. Optimized KPI Fetching (One-time fetch on mount)
+    useEffect(() => {
         const fetchStats = async () => {
             try {
                 // Active Users (Last 24h)
@@ -118,11 +125,7 @@ const AnalyticsManager = () => {
         };
 
         fetchStats();
-
-        return () => {
-            unsubActivity();
-        };
-    }, [content]);
+    }, []);
 
     if (loading) return <div className="p-10 text-center animate-pulse">Loading Analytics...</div>;
 

@@ -162,7 +162,10 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
                         </div>
                     )}
 
-                    <h1 className="text-3xl md:text-5xl lg:text-6xl font-black text-white leading-none drop-shadow-2xl animate-fade-up">
+                    <h1
+                        className="text-3xl md:text-5xl lg:text-6xl font-black text-white leading-none drop-shadow-2xl animate-fade-up"
+                        style={{ fontFamily: 'var(--font-hero)' }}
+                    >
                         {item.title}
                     </h1>
 

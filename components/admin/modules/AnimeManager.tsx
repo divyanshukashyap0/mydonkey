@@ -1,0 +1,914 @@
+import React, { useState, useMemo } from 'react';
+import { Plus, Edit, Trash2, Youtube, HardDrive, Star, Check, X, Bell, ChevronDown, ChevronRight, Play, Lock, Search, Filter, MoreVertical, Archive, LayoutTemplate } from 'lucide-react';
+import { useStore } from '../../../context/StoreContext';
+import { Content, Season, Episode } from '../../../types';
+import { doc, setDoc, deleteDoc, updateDoc, collection, addDoc, deleteField, writeBatch } from 'firebase/firestore';
+import { db } from '../../../firebase';
+
+const MOVIE_GENRES = ["Action", "Adventure", "Comedy", "Drama", "Horror", "Sci-Fi", "Thriller", "Romance", "Documentary", "Animation"];
+const TV_GENRES = ["Drama", "Comedy", "Reality", "Action", "Sci-Fi", "Documentary", "Kids", "Mystery"];
+
+const AnimeManager = () => {
+    const { content, settings, updateSettings } = useStore();
+    const [isEditing, setIsEditing] = useState(false);
+
+    // Filters & Search
+    const [filterType, setFilterType] = useState<'ALL' | 'movie' | 'tv'>('ALL');
+    const [filterStatus, setFilterStatus] = useState<'ALL' | 'published' | 'draft'>('ALL');
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Bulk Selection
+    const [selectedItems, setSelectedItems] = useState<string[]>([]);
+
+    const [formData, setFormData] = useState<Partial<Content>>({});
+
+    // Manage expanded season in UI
+    const [expandedSeasonId, setExpandedSeasonId] = useState<string | null>(null);
+    const [expandedEpisodeId, setExpandedEpisodeId] = useState<string | null>(null);
+
+    // Reset Form - Auto-add "Anime" genre
+    const resetForm = (type: 'movie' | 'tv' = 'movie') => {
+        setFormData({
+            type,
+            genres: ['Anime', 'Animation'], // Default to Anime
+            isPublished: false,
+            allowDownload: true,
+            allowPlayback: true,
+            comingSoon: false,
+            vote_average: 0,
+            duration: '',
+            rating: 'U/A 13+',
+            resolution: 'HD',
+            seasons: []
+        });
+        setIsEditing(true);
+        setExpandedSeasonId(null);
+        setExpandedEpisodeId(null);
+    };
+
+    // ID Extractors
+    const extractYoutubeId = (url: string) => {
+        if (!url) return '';
+        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+        const match = url.match(regExp);
+        return (match && match[2].length === 11) ? match[2] : url;
+    };
+
+    const extractDriveId = (url: string) => {
+        if (!url) return '';
+        const regExp = /[-\w]{25,}/;
+        const match = url.match(regExp);
+        return match ? match[0] : url;
+    };
+
+    // --- Season & Episode Handlers ---
+    const addSeason = () => {
+        const newSeason: Season = {
+            id: `season_${Date.now()}`,
+            seasonNumber: (formData.seasons?.length || 0) + 1,
+            title: `Season ${(formData.seasons?.length || 0) + 1}`,
+            episodes: []
+        };
+        setFormData(prev => ({ ...prev, seasons: [...(prev.seasons || []), newSeason] }));
+    };
+
+    const deleteSeason = (seasonId: string) => {
+        if (confirm("Delete this season?")) {
+            setFormData(prev => ({ ...prev, seasons: prev.seasons?.filter(s => s.id !== seasonId) }));
+        }
+    };
+
+    const updateSeason = (seasonId: string, updates: Partial<Season>) => {
+        setFormData(prev => ({
+            ...prev,
+            seasons: prev.seasons?.map(s => s.id === seasonId ? { ...s, ...updates } : s)
+        }));
+    };
+
+    const addEpisode = (seasonId: string) => {
+        const season = formData.seasons?.find(s => s.id === seasonId);
+        if (!season) return;
+
+        const newEpisode: Episode = {
+            id: `ep_${Date.now()}`,
+            episodeNumber: (season.episodes.length || 0) + 1,
+            title: `Episode ${(season.episodes.length || 0) + 1}`,
+            driveId: '',
+            duration: ''
+        };
+
+        const updatedSeason = { ...season, episodes: [...season.episodes, newEpisode] };
+        updateSeason(seasonId, { episodes: updatedSeason.episodes });
+    };
+
+    const updateEpisode = (seasonId: string, episodeId: string, updates: Partial<Episode>) => {
+        setFormData(prev => ({
+            ...prev,
+            seasons: prev.seasons?.map(s => {
+                if (s.id !== seasonId) return s;
+                return {
+                    ...s,
+                    episodes: s.episodes.map(e => e.id === episodeId ? { ...e, ...updates } : e)
+                };
+            })
+        }));
+    };
+
+    const deleteEpisode = (seasonId: string, episodeId: string) => {
+        setFormData(prev => ({
+            ...prev,
+            seasons: prev.seasons?.map(s => {
+                if (s.id !== seasonId) return s;
+                return { ...s, episodes: s.episodes.filter(e => e.id !== episodeId) };
+            })
+        }));
+    };
+
+
+    const handleSave = async () => {
+        if (!formData.title || !formData.poster_path) {
+            alert("Title and Poster are required");
+            return;
+        }
+
+        try {
+            const id = formData.id || `content_${Date.now()}`;
+            const now = new Date().toISOString();
+
+            // Ensure "Anime" tag is always present
+            const finalGenres = [...(formData.genres || [])];
+            if (!finalGenres.includes('Anime')) finalGenres.push('Anime');
+
+            // Clean Data
+            const finalData: Content = {
+                id,
+                title: formData.title,
+                overview: formData.overview || '',
+                poster_path: formData.poster_path,
+                poster_path_mobile: formData.poster_path_mobile || undefined,
+                backdrop_path: formData.backdrop_path || formData.poster_path,
+                backdrop_path_mobile: formData.backdrop_path_mobile || undefined,
+                youtubeId: extractYoutubeId(formData.youtubeId || ''),
+                movieDriveId: formData.type === 'movie' ? extractDriveId(formData.movieDriveId || '') : undefined,
+                movieYoutubeId: formData.type === 'movie' ? extractYoutubeId(formData.movieYoutubeId || '') : undefined,
+                type: formData.type || 'movie',
+                genres: finalGenres,
+                release_date: formData.release_date || now.split('T')[0],
+                vote_average: Number(formData.vote_average) || 0,
+                isPublished: formData.isPublished || false,
+                allowDownload: formData.allowDownload ?? true,
+                allowPlayback: formData.allowPlayback ?? true,
+                cast: typeof formData.cast === 'string' ? (formData.cast as string).split(',').map(s => s.trim()) : (formData.cast || []),
+                tags: typeof formData.tags === 'string' ? (formData.tags as string).split(',').map(s => s.trim()) : (formData.tags || []),
+                comingSoon: formData.comingSoon || false,
+                createdAt: formData.createdAt || now,
+                featured: formData.featured || false,
+
+                duration: formData.duration,
+                rating: formData.rating || 'U/A 13+',
+                resolution: formData.resolution || 'HD',
+                accessCode: formData.accessCode || undefined,
+                // Sanitize Seasons/Episodes
+                seasons: formData.type === 'tv' ? (formData.seasons || []).map(s => ({
+                    ...s,
+                    trailerYoutubeId: extractYoutubeId(s.trailerYoutubeId || ''),
+                    episodes: s.episodes.map(e => ({
+                        ...e,
+                        driveId: extractDriveId(e.driveId || '')
+                    }))
+                })) : []
+            };
+
+            // Sanitize data
+            const dataToSave = JSON.parse(JSON.stringify(finalData));
+            await setDoc(doc(db, 'content', id), dataToSave);
+
+            // Notification for new content
+            if (!formData.id && finalData.isPublished) {
+                await addDoc(collection(db, 'notifications'), {
+                    title: `New Arrival: ${finalData.title}`,
+                    message: `Watch ${finalData.title} now on My Donkey!`,
+                    image: finalData.poster_path,
+                    type: 'content',
+                    link: `/browse/${id}`,
+                    createdAt: now,
+                    read: false
+                });
+            }
+
+            alert("Anime content saved successfully!");
+            setIsEditing(false);
+            setFormData({});
+        } catch (e: any) {
+            console.error(e);
+            alert("Error saving content: " + e.message);
+        }
+    };
+
+    // --- Bulk Actions ---
+    const toggleSelection = (id: string) => {
+        setSelectedItems(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    };
+
+    const handleBulkDelete = async () => {
+        if (!confirm(`Delete ${selectedItems.length} items? This cannot be undone.`)) return;
+        const batch = writeBatch(db);
+        selectedItems.forEach(id => {
+            batch.delete(doc(db, 'content', id));
+        });
+        await batch.commit();
+        setSelectedItems([]);
+    };
+
+    const handleBulkPublish = async (status: boolean) => {
+        const batch = writeBatch(db);
+        selectedItems.forEach(id => {
+            batch.update(doc(db, 'content', id), { isPublished: status });
+        });
+        await batch.commit();
+        setSelectedItems([]);
+    };
+
+    // --- Filtering Logic (Anime Specific) ---
+    const filteredContent = useMemo(() => {
+        return content.filter(item => {
+            // Must be Anime
+            const isAnime = item.genres?.some(g => g.toLowerCase() === 'anime' || g.toLowerCase() === 'animation');
+            if (!isAnime) return false;
+
+            // Type Filter
+            if (filterType !== 'ALL' && item.type !== filterType) return false;
+
+            // Status Filter
+            if (filterStatus === 'published' && !item.isPublished) return false;
+            if (filterStatus === 'draft' && item.isPublished) return false;
+
+            // Search Filter
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                return item.title.toLowerCase().includes(q) ||
+                    item.genres.some(g => g.toLowerCase().includes(q)) ||
+                    item.tags?.some(t => t.toLowerCase().includes(q));
+            }
+            return true;
+        });
+    }, [content, filterType, filterStatus, searchQuery]);
+
+    if (isEditing) {
+        return (
+            <div className="bg-[#141414] p-6 rounded-xl border border-white/5 animate-in fade-in max-h-[90vh] overflow-y-auto">
+                {/* Form Header */}
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-2xl font-bold flex items-center gap-2 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">
+                        {formData.id ? 'Edit Anime' : 'Add New Anime'}
+                        <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded text-gray-400 font-mono text-white">v1.1</span>
+                    </h2>
+                    <button onClick={() => setIsEditing(false)} className="p-2 hover:bg-white/10 rounded"><X /></button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                        <div>
+                            <label className="text-xs text-gray-500 uppercase font-bold">Title</label>
+                            <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none focus:border-purple-600 transition"
+                                value={formData.title || ''} onChange={e => setFormData({ ...formData, title: e.target.value })} />
+                        </div>
+                        <div>
+                            <label className="text-xs text-gray-500 uppercase font-bold">Overview</label>
+                            <textarea className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none focus:border-purple-600 h-24 transition"
+                                value={formData.overview || ''} onChange={e => setFormData({ ...formData, overview: e.target.value })} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-xs text-gray-500 uppercase font-bold">Type</label>
+                                <select className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none"
+                                    value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value as 'movie' | 'tv' })}>
+                                    <option value="movie">Movie</option>
+                                    <option value="tv">TV Series</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-500 uppercase font-bold">Release Date</label>
+                                <input type="date" className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none"
+                                    value={formData.release_date || ''} onChange={e => setFormData({ ...formData, release_date: e.target.value })} />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            {formData.type?.toLowerCase() === 'movie' && (
+                                <div>
+                                    <label className="text-xs text-gray-500 uppercase font-bold flex justify-between">
+                                        Duration
+                                        <span className="text-[10px] text-blue-400 font-normal normal-case">Auto-calcs on play</span>
+                                    </label>
+                                    <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none font-mono placeholder:text-gray-700"
+                                        value={formData.duration || ''} onChange={e => setFormData({ ...formData, duration: e.target.value })}
+                                        placeholder="Auto (or type manually)" />
+                                </div>
+                            )}
+                            <div>
+                                <label className="text-xs text-gray-500 uppercase font-bold">Age Rating</label>
+                                <select className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none"
+                                    value={formData.rating || 'U/A 13+'} onChange={e => setFormData({ ...formData, rating: e.target.value })}>
+                                    <option value="U">U (Universal)</option>
+                                    <option value="U/A 7+">U/A 7+</option>
+                                    <option value="U/A 13+">U/A 13+</option>
+                                    <option value="U/A 16+">U/A 16+</option>
+                                    <option value="A (18+)">A (18+)</option>
+
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-xs text-gray-500 uppercase font-bold">Quality Label</label>
+                                <select className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none"
+                                    value={formData.resolution || 'HD'} onChange={e => setFormData({ ...formData, resolution: e.target.value as any })}>
+                                    <option value="4K">4K Ultra HD</option>
+                                    <option value="HD">HD (1080p)</option>
+                                    <option value="SD">SD (Standard)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-500 uppercase font-bold">Match Score (0-10)</label>
+                                <input type="number" min="0" max="10" step="0.1" className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none"
+                                    value={formData.vote_average || 0} onChange={e => setFormData({ ...formData, vote_average: Number(e.target.value) })} />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="text-xs text-gray-500 uppercase font-bold">Cast (comma separated)</label>
+                            <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none"
+                                value={Array.isArray(formData.cast) ? formData.cast.join(', ') : formData.cast || ''}
+                                onChange={e => setFormData({ ...formData, cast: e.target.value as any })} />
+                        </div>
+                        <div>
+                            <label className="text-xs text-gray-500 uppercase font-bold">Tags (comma separated)</label>
+                            <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none"
+                                value={Array.isArray(formData.tags) ? formData.tags.join(', ') : formData.tags || ''}
+                                onChange={e => setFormData({ ...formData, tags: e.target.value as any })} />
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        {/* Simplified Image Fields - One for PC, One for Mobile */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2">
+                                    🖥️ Image URL (Desktop/PC)
+                                </label>
+                                <input
+                                    className="w-full bg-black/50 border border-white/10 rounded p-2.5 outline-none focus:border-blue-500 transition"
+                                    placeholder="Paste image link for PC users"
+                                    value={formData.poster_path || ''}
+                                    onChange={e => setFormData({
+                                        ...formData,
+                                        poster_path: e.target.value,
+                                        backdrop_path: e.target.value // Same image for backdrop
+                                    })}
+                                />
+                                {formData.poster_path && (
+                                    <img src={formData.poster_path} className="w-full h-24 object-cover rounded border border-white/10" alt="Preview" />
+                                )}
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2">
+                                    📱 Image URL (Mobile) <span className="text-gray-600 font-normal normal-case">Optional</span>
+                                </label>
+                                <input
+                                    className="w-full bg-black/50 border border-white/10 rounded p-2.5 outline-none focus:border-blue-500 transition placeholder:text-gray-600"
+                                    placeholder="Leave empty to use PC image"
+                                    value={formData.poster_path_mobile || ''}
+                                    onChange={e => setFormData({
+                                        ...formData,
+                                        poster_path_mobile: e.target.value,
+                                        backdrop_path_mobile: e.target.value // Same image for backdrop
+                                    })}
+                                />
+                                {formData.poster_path_mobile && (
+                                    <img src={formData.poster_path_mobile} className="w-full h-24 object-cover rounded border border-white/10" alt="Mobile Preview" />
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Common Youtube (Trailer for Movie, Main Trailer for TV) */}
+                        <div>
+                            <label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2"><Youtube size={14} /> {formData.type === 'movie' ? 'Trailer YouTube ID' : 'Series Trailer ID'}</label>
+                            <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none"
+                                value={formData.youtubeId || ''} onChange={e => setFormData({ ...formData, youtubeId: e.target.value })}
+                                placeholder="Link or ID" />
+                        </div>
+
+                        {/* Movie Specific - Smart Source Input */}
+                        {formData.type === 'movie' && (
+                            <div>
+                                <label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2">Movie Source (Drive or YouTube)</label>
+                                <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none"
+                                    value={formData.movieDriveId || formData.movieYoutubeId || ''}
+                                    onChange={e => {
+                                        const val = e.target.value;
+                                        if (extractYoutubeId(val).length === 11) {
+                                            setFormData({ ...formData, movieYoutubeId: val, movieDriveId: '' });
+                                        } else {
+                                            setFormData({ ...formData, movieDriveId: val, movieYoutubeId: '' });
+                                        }
+                                    }}
+                                    placeholder="Paste Drive Link or YouTube Link" />
+
+                                <label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2 mt-4">Player Video URL (Optional)</label>
+                                <div className="text-[10px] text-gray-400 mb-1">Overrides the Movie Source for playback only. Useful if you want the download link to be different from the player.</div>
+                                <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none font-mono text-sm"
+                                    value={formData.videoUrl || ''}
+                                    onChange={e => setFormData({ ...formData, videoUrl: e.target.value })}
+                                    placeholder="https://example.com/video.mp4" />
+                            </div>
+                        )}
+
+                        {/* Video Preview */}
+                        {(extractYoutubeId(formData.youtubeId || '').length === 11 || (formData.movieYoutubeId && extractYoutubeId(formData.movieYoutubeId).length === 11) || (formData.movieDriveId && extractDriveId(formData.movieDriveId)) || formData.videoUrl) && (
+                            <div className="mt-4 bg-black/50 rounded-lg p-2 border border-white/10 h-40 overflow-hidden relative">
+                                <div className="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded text-xs text-white z-10">
+                                    {formData.videoUrl ? 'Direct Video URL' : formData.movieDriveId ? 'Drive Source' : formData.movieYoutubeId ? 'YouTube Movie' : 'Trailer'}
+                                </div>
+                                {formData.videoUrl ? (
+                                    <iframe className="w-full h-full rounded" src={formData.videoUrl} title="Preview" allowFullScreen />
+                                ) : formData.movieDriveId ? (
+                                    <iframe className="w-full h-full rounded" src={`https://drive.google.com/file/d/${extractDriveId(formData.movieDriveId)}/preview`} title="Preview" allowFullScreen />
+                                ) : (
+                                    <iframe className="w-full h-full rounded" src={`https://www.youtube.com/embed/${extractYoutubeId(formData.movieYoutubeId || formData.youtubeId || '')}`} title="Preview" allowFullScreen />
+                                )}
+                            </div>
+                        )}
+
+                        {/* Download Links Management (Movie) */}
+                        {formData.type === 'movie' && (
+                            <div className="mt-4 border-t border-white/10 pt-4">
+                                <label className="text-xs text-gray-500 uppercase font-bold mb-2 block">Download Links</label>
+                                <div className="space-y-2">
+                                    {formData.downloadLinks?.map((link, idx) => (
+                                        <div key={idx} className="flex gap-2">
+                                            <input
+                                                placeholder="Label (e.g. 1080p)"
+                                                className="w-1/3 bg-black/50 border border-white/10 rounded p-2 text-sm outline-none focus:border-blue-500"
+                                                value={link.label}
+                                                onChange={e => {
+                                                    const newLinks = [...(formData.downloadLinks || [])];
+                                                    newLinks[idx].label = e.target.value;
+                                                    setFormData({ ...formData, downloadLinks: newLinks });
+                                                }}
+                                            />
+                                            <input
+                                                placeholder="Download URL"
+                                                className="flex-1 bg-black/50 border border-white/10 rounded p-2 text-sm outline-none focus:border-blue-500"
+                                                value={link.url}
+                                                onChange={e => {
+                                                    const newLinks = [...(formData.downloadLinks || [])];
+                                                    newLinks[idx].url = e.target.value;
+                                                    setFormData({ ...formData, downloadLinks: newLinks });
+                                                }}
+                                            />
+                                            <button
+                                                onClick={() => {
+                                                    const newLinks = formData.downloadLinks?.filter((_, i) => i !== idx);
+                                                    setFormData({ ...formData, downloadLinks: newLinks });
+                                                }}
+                                                className="text-red-500 p-2 hover:bg-white/5 rounded"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <button
+                                        onClick={() => setFormData({ ...formData, downloadLinks: [...(formData.downloadLinks || []), { label: '', url: '' }] })}
+                                        className="text-xs flex items-center gap-1 bg-white/10 hover:bg-white/20 px-3 py-1 rounded transition"
+                                    >
+                                        <Plus size={14} /> Add Download Link
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        <div>
+                            <label className="text-xs text-gray-500 uppercase font-bold mb-2 block">Genres (Default: Anime + Others)</label>
+                            <div className="flex flex-wrap gap-2">
+                                {(formData.type === 'movie' ? MOVIE_GENRES : TV_GENRES).map(g => (
+                                    <button key={g}
+                                        onClick={() => {
+                                            const current = formData.genres || [];
+                                            const newGenres = current.includes(g) ? current.filter(x => x !== g) : [...current, g];
+                                            setFormData({ ...formData, genres: newGenres });
+                                        }}
+                                        className={`px-3 py-1 rounded-full text-xs font-bold border ${formData.genres?.includes(g) ? 'bg-purple-600 text-white border-purple-600' : 'border-gray-700 text-gray-400'}`}>
+                                        {g}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="mb-4">
+                            <label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2 mb-1">
+                                <Lock size={14} /> Restricted Access Code
+                            </label>
+                            <input
+                                className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none focus:border-red-600 placeholder:text-gray-700 font-mono"
+                                value={formData.accessCode || ''}
+                                onChange={e => setFormData({ ...formData, accessCode: e.target.value })}
+                                placeholder="Leave empty for public content"
+                            />
+                            <p className="text-[10px] text-gray-500 mt-1">If set, this content will be hidden until the code is entered.</p>
+                        </div>
+
+                        <div className="flex gap-4 pt-2">
+                            <button onClick={() => setFormData({ ...formData, isPublished: !formData.isPublished })}
+                                className={`flex-1 py-2 rounded font-bold border ${formData.isPublished ? 'bg-green-600/20 text-green-400 border-green-600' : 'bg-gray-800 text-gray-400 border-gray-600'}`}>
+                                {formData.isPublished ? 'Published' : 'Draft'}
+                            </button>
+                            <button onClick={() => setFormData({ ...formData, comingSoon: !formData.comingSoon })}
+                                className={`flex-1 py-2 rounded font-bold border ${formData.comingSoon ? 'bg-blue-600/20 text-blue-400 border-blue-600' : 'bg-gray-800 text-gray-400 border-gray-600'}`}>
+                                {formData.comingSoon ? 'Coming Soon' : 'Released'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Seasons & Episodes Manager */}
+                {
+                    formData.type === 'tv' && (
+                        <div className="mt-8 border-t border-white/10 pt-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-xl font-bold">Seasons & Episodes</h3>
+                                <button onClick={addSeason} className="text-xs flex items-center gap-1 bg-white/10 hover:bg-white/20 px-3 py-1 rounded">
+                                    <Plus size={14} /> Add Season
+                                </button>
+                            </div>
+
+                            <div className="space-y-4">
+                                {formData.seasons?.map((season, seasonIdx) => (
+                                    <div key={season.id} className="bg-black/40 border border-white/5 rounded-lg overflow-hidden">
+                                        <div
+                                            className="flex items-center justify-between p-4 bg-white/5 cursor-pointer hover:bg-white/10"
+                                            onClick={() => setExpandedSeasonId(expandedSeasonId === season.id ? null : season.id)}
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                {expandedSeasonId === season.id ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                                                <span className="font-bold">{season.title}</span>
+                                                <span className="text-xs text-gray-500">{season.episodes.length} Episodes</span>
+                                            </div>
+                                            <button onClick={(e) => { e.stopPropagation(); deleteSeason(season.id); }} className="text-red-500 hover:text-red-400 p-1">
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+
+                                        {expandedSeasonId === season.id && (
+                                            <div className="p-4 space-y-4 animate-in slide-in-from-top-2">
+                                                {/* Season Details */}
+                                                <div className="grid grid-cols-2 gap-4 mb-4">
+                                                    <input value={season.title} onChange={e => updateSeason(season.id, { title: e.target.value })}
+                                                        className="bg-black/50 border border-white/10 rounded p-2 text-sm" placeholder="Season Title" />
+                                                    <input value={season.trailerYoutubeId || ''} onChange={e => updateSeason(season.id, { trailerYoutubeId: e.target.value })}
+                                                        className="bg-black/50 border border-white/10 rounded p-2 text-sm" placeholder="Season Trailer (YouTube ID)" />
+                                                </div>
+
+                                                {/* Bulk Add Episodes */}
+                                                <div className="bg-white/5 p-4 rounded-lg mb-4 border border-white/10">
+                                                    <h4 className="text-sm font-bold mb-2 flex items-center gap-2">
+                                                        <Archive size={14} /> Bulk Add Episodes containing Links
+                                                    </h4>
+
+                                                    <input
+                                                        placeholder="Default Thumbnail URL (Optional) - Applied to all new episodes"
+                                                        className="w-full bg-black/50 border border-white/10 rounded p-2 text-xs mb-2 focus:border-blue-500 outline-none"
+                                                        id={`bulk-thumbnail-${season.id}`}
+                                                    />
+
+                                                    <textarea
+                                                        placeholder="Paste multiple YouTube or Drive links here (one per line). We'll auto-create episodes for them."
+                                                        className="w-full bg-black/50 border border-white/10 rounded p-2 text-xs font-mono h-24 mb-2 focus:border-blue-500 outline-none"
+                                                        id={`bulk-input-${season.id}`}
+                                                    />
+                                                    <button
+                                                        onClick={() => {
+                                                            const doc = document.getElementById(`bulk-input-${season.id}`) as HTMLTextAreaElement;
+                                                            const thumbDoc = document.getElementById(`bulk-thumbnail-${season.id}`) as HTMLInputElement;
+
+                                                            if (!doc || !doc.value.trim()) return;
+
+                                                            // Robust splitting for various delimiters (newline, comma, space if it looks like a separator)
+                                                            // Strategy: replace commas with newlines, then split by newline
+                                                            const normalizedText = doc.value.replace(/,/g, '\n');
+                                                            const rawLines = normalizedText.split(/\r?\n/);
+                                                            const lines = rawLines.map(l => l.trim()).filter(l => l.length > 0).reverse();
+                                                            console.log("Processing lines:", lines);
+
+                                                            const defaultThumb = thumbDoc ? thumbDoc.value.trim() : '';
+
+                                                            const newEpisodes: Episode[] = lines.map((line, idx) => {
+                                                                const url = line.trim();
+                                                                // Smart detection for S01E01, etc.
+                                                                const match = url.match(/[sS](\d+)\s*[eE](\d+)/);
+                                                                const isYt = extractYoutubeId(url).length === 11;
+                                                                const isDrive = extractDriveId(url).length > 20; // Basic check
+
+                                                                // Determine episode number logic:
+                                                                // 1. If match found -> use extracted number
+                                                                // 2. If not found -> use reversed index (assuming bottom-to-top paste)
+                                                                const episodeNumber = match ? parseInt(match[2]) : ((season.episodes.length || 0) + idx + 1);
+
+                                                                return {
+                                                                    id: `ep_${Date.now()}_${idx}`,
+                                                                    episodeNumber,
+                                                                    title: `Episode ${episodeNumber}`,
+                                                                    driveId: isDrive ? extractDriveId(url) : '',
+                                                                    youtubeId: isYt ? extractYoutubeId(url) : '',
+                                                                    duration: '',
+                                                                    stillUrl: defaultThumb
+                                                                };
+                                                            });
+
+                                                            // Sort by episode number to ensure correct order
+                                                            newEpisodes.sort((a, b) => a.episodeNumber - b.episodeNumber);
+
+                                                            updateSeason(season.id, { episodes: [...season.episodes, ...newEpisodes] });
+                                                            doc.value = ''; // Clear input
+                                                            if (thumbDoc) thumbDoc.value = '';
+                                                        }}
+                                                        className="text-xs bg-blue-600/20 text-blue-400 border border-blue-600 px-3 py-1.5 rounded hover:bg-blue-600 hover:text-white transition"
+                                                    >
+                                                        Process & Add Links
+                                                    </button>
+                                                </div>
+
+                                                {/* Episodes List */}
+                                                <div className="space-y-2 pl-4 border-l-2 border-white/10">
+                                                    {season.episodes.map((ep, epIdx) => (
+                                                        <div key={ep.id} className="bg-black/20 rounded mb-2 overflow-hidden">
+                                                            <div className="grid grid-cols-1 md:grid-cols-[auto_1.5fr_1.5fr_1.5fr_0.5fr_auto_auto] gap-2 items-center p-2">
+                                                                <span className="text-xs font-mono text-gray-500 px-2">{epIdx + 1}</span>
+                                                                <input value={ep.title} onChange={e => updateEpisode(season.id, ep.id, { title: e.target.value })}
+                                                                    className="bg-black/50 border border-white/10 rounded p-1.5 text-sm" placeholder="Ep Title" />
+
+                                                                <input value={ep.stillUrl || ''} onChange={e => updateEpisode(season.id, ep.id, { stillUrl: e.target.value })}
+                                                                    className="bg-black/50 border border-white/10 rounded p-1.5 text-sm" placeholder="Thumbnail URL" />
+
+                                                                {/* Smart Episode Source Input */}
+                                                                <div className="flex flex-col gap-1 w-full relative group">
+                                                                    <input
+                                                                        value={ep.driveId || ep.youtubeId || ''}
+                                                                        onChange={e => {
+                                                                            const val = e.target.value;
+                                                                            if (extractYoutubeId(val).length === 11) {
+                                                                                updateEpisode(season.id, ep.id, { youtubeId: val, driveId: '' });
+                                                                            } else {
+                                                                                updateEpisode(season.id, ep.id, { driveId: val, youtubeId: '' });
+                                                                            }
+                                                                        }}
+                                                                        className="bg-black/50 border border-white/10 rounded p-1.5 text-sm font-mono placeholder:text-gray-600 w-full"
+                                                                        placeholder="Source (Drive/YT)"
+                                                                    />
+                                                                    {/* Hidden input that appears on hover/focus for Player URL */}
+                                                                    <input
+                                                                        value={ep.videoUrl || ''}
+                                                                        onChange={e => updateEpisode(season.id, ep.id, { videoUrl: e.target.value })}
+                                                                        className="bg-black/50 border border-white/10 rounded p-1.5 text-[10px] font-mono placeholder:text-gray-600 w-full absolute top-full left-0 z-10 hidden group-hover:block focus:block focus:relative group-hover:relative"
+                                                                        placeholder="Player URL (Optional Override)"
+                                                                    />
+                                                                </div>
+
+                                                                <input value={ep.duration} onChange={e => updateEpisode(season.id, ep.id, { duration: e.target.value })}
+                                                                    className="bg-black/50 border border-white/10 rounded p-1.5 text-sm w-full text-center"
+                                                                    placeholder="Auto"
+                                                                    title="Auto-calcs on play"
+                                                                />
+
+                                                                <button
+                                                                    onClick={() => setExpandedEpisodeId(expandedEpisodeId === ep.id ? null : ep.id)}
+                                                                    className={`p-2 rounded hover:bg-white/5 transition ${expandedEpisodeId === ep.id ? 'text-blue-400 bg-white/5' : 'text-gray-400'}`}
+                                                                    title="Manage Downloads"
+                                                                >
+                                                                    <HardDrive size={16} />
+                                                                </button>
+
+                                                                <button onClick={() => deleteEpisode(season.id, ep.id)} className="text-red-500 p-2 hover:bg-white/5 rounded">
+                                                                    <Trash2 size={16} />
+                                                                </button>
+                                                            </div>
+
+                                                            {/* Expanded Episode Details (Downloads) */}
+                                                            {expandedEpisodeId === ep.id && (
+                                                                <div className="p-3 bg-black/40 border-t border-white/5 animate-in slide-in-from-top-1">
+                                                                    <label className="text-xs text-gray-500 uppercase font-bold mb-2 block flex items-center gap-2">
+                                                                        <Archive size={12} /> Download Links for {ep.title}
+                                                                    </label>
+                                                                    <div className="space-y-2">
+                                                                        {ep.downloadLinks?.map((link, linkIdx) => (
+                                                                            <div key={linkIdx} className="flex gap-2">
+                                                                                <input
+                                                                                    placeholder="Label (e.g. 1080p)"
+                                                                                    className="w-1/3 bg-black/50 border border-white/10 rounded p-1.5 text-xs outline-none focus:border-blue-500"
+                                                                                    value={link.label}
+                                                                                    onChange={e => {
+                                                                                        const currentLinks = [...(ep.downloadLinks || [])];
+                                                                                        currentLinks[linkIdx] = { ...currentLinks[linkIdx], label: e.target.value };
+                                                                                        updateEpisode(season.id, ep.id, { downloadLinks: currentLinks });
+                                                                                    }}
+                                                                                />
+                                                                                <input
+                                                                                    placeholder="Download URL"
+                                                                                    className="flex-1 bg-black/50 border border-white/10 rounded p-1.5 text-xs outline-none focus:border-blue-500"
+                                                                                    value={link.url}
+                                                                                    onChange={e => {
+                                                                                        const currentLinks = [...(ep.downloadLinks || [])];
+                                                                                        currentLinks[linkIdx] = { ...currentLinks[linkIdx], url: e.target.value };
+                                                                                        updateEpisode(season.id, ep.id, { downloadLinks: currentLinks });
+                                                                                    }}
+                                                                                />
+                                                                                <button
+                                                                                    onClick={() => {
+                                                                                        const currentLinks = ep.downloadLinks?.filter((_, i) => i !== linkIdx);
+                                                                                        updateEpisode(season.id, ep.id, { downloadLinks: currentLinks });
+                                                                                    }}
+                                                                                    className="text-red-500 p-1.5 hover:bg-white/5 rounded"
+                                                                                >
+                                                                                    <Trash2 size={14} />
+                                                                                </button>
+                                                                            </div>
+                                                                        ))}
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                const currentLinks = [...(ep.downloadLinks || [])];
+                                                                                currentLinks.push({ label: '', url: '' });
+                                                                                updateEpisode(season.id, ep.id, { downloadLinks: currentLinks });
+                                                                            }}
+                                                                            className="text-[10px] flex items-center gap-1 bg-white/5 hover:bg-white/10 px-2 py-1 rounded text-gray-400 hover:text-white transition"
+                                                                        >
+                                                                            <Plus size={12} /> Add Link
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                    <button onClick={() => addEpisode(season.id)} className="w-full py-2 border border-dashed border-white/20 text-gray-500 hover:text-white hover:border-white/40 rounded text-sm flex items-center justify-center gap-2">
+                                                        <Plus size={14} /> Add Episode
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )
+                }
+
+                <div className="flex justify-end gap-4 mt-8 border-t border-white/10 pt-4">
+                    <button onClick={() => setIsEditing(false)} className="px-6 py-2 rounded text-gray-400 font-bold hover:text-white">Cancel</button>
+                    <button onClick={handleSave} className="px-6 py-2 rounded bg-purple-600 text-white font-bold hover:bg-purple-700 shadow-lg shadow-purple-900/40">Save Anime</button>
+                </div>
+            </div >
+        );
+    }
+
+    return (
+        <div className="space-y-6 pb-20">
+            {/* Header & Controls */}
+            <div className="flex flex-col gap-6">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h2 className="text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">
+                            Anime Library
+                        </h2>
+                        <p className="text-gray-500 text-sm">{filteredContent.length} anime titles found</p>
+                    </div>
+                    <div className="flex gap-2">
+                        <button onClick={() => resetForm('movie')} className="bg-purple-600 px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-purple-700 transition shadow-lg shadow-purple-900/40">
+                            <Plus size={18} /> Add Anime Movie
+                        </button>
+                        <button onClick={() => resetForm('tv')} className="bg-pink-600 px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-pink-700 transition shadow-lg shadow-pink-900/40">
+                            <Plus size={18} /> Add Anime Series
+                        </button>
+                    </div>
+                </div>
+
+                {/* Filters Bar */}
+                <div className="flex flex-wrap items-center gap-3 bg-[#141414] p-3 rounded-xl border border-white/5">
+
+                    {/* Search */}
+                    <div className="relative flex-1 min-w-[200px]">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                        <input
+                            type="text"
+                            placeholder="Search anime..."
+                            className="w-full bg-black/50 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm focus:border-purple-500 outline-none transition"
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                        />
+                    </div>
+
+                    {/* Filters */}
+                    <select
+                        className="bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-purple-500"
+                        value={filterType}
+                        onChange={e => setFilterType(e.target.value as any)}
+                    >
+                        <option value="ALL">All Types</option>
+                        <option value="movie">Movies</option>
+                        <option value="tv">Series</option>
+                    </select>
+
+                    <select
+                        className="bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-purple-500"
+                        value={filterStatus}
+                        onChange={e => setFilterStatus(e.target.value as any)}
+                    >
+                        <option value="ALL">All Status</option>
+                        <option value="published">Published</option>
+                        <option value="draft">Drafts</option>
+                    </select>
+
+                    {selectedItems.length > 0 && (
+                        <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right">
+                            <div className="h-6 w-px bg-white/10 mx-2"></div>
+                            <span className="text-xs font-bold text-gray-400">{selectedItems.length} selected</span>
+                            <button onClick={() => handleBulkPublish(true)} className="p-2 hover:bg-white/10 rounded text-green-400" title="Publish Selected"><Check size={18} /></button>
+                            <button onClick={() => handleBulkPublish(false)} className="p-2 hover:bg-white/10 rounded text-gray-400" title="Unpublish Selected"><X size={18} /></button>
+                            <button onClick={handleBulkDelete} className="p-2 hover:bg-white/10 rounded text-red-500" title="Delete Selected"><Trash2 size={18} /></button>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Content Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {filteredContent.map(item => (
+                    <div key={item.id} className={`group relative bg-[#141414] rounded-xl overflow-hidden border transition-all hover:-translate-y-1 hover:shadow-2xl ${selectedItems.includes(item.id) ? 'border-purple-500 ring-1 ring-purple-500' : 'border-white/5 hover:border-white/20'}`}>
+                        {/* Status Badge */}
+                        <div className="absolute top-2 left-2 z-10 flex gap-2">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase backdrop-blur-md ${item.isPublished ? 'bg-green-500/80 text-white' : 'bg-gray-500/80 text-white'}`}>
+                                {item.isPublished ? 'Live' : 'Draft'}
+                            </span>
+                            {item.type === 'tv' && <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-500/80 text-white backdrop-blur-md">Series</span>}
+                        </div>
+
+                        {/* Selection Checkbox */}
+                        <div className="absolute top-2 right-2 z-10 transition-opacity opacity-0 group-hover:opacity-100">
+                            <input
+                                type="checkbox"
+                                checked={selectedItems.includes(item.id)}
+                                onChange={() => toggleSelection(item.id)}
+                                className="w-5 h-5 rounded border-gray-500 bg-black/50 checked:bg-purple-500 cursor-pointer"
+                            />
+                        </div>
+
+                        <div className="relative aspect-video">
+                            <img src={item.backdrop_path || item.poster_path} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-[#141414] to-transparent opacity-80" />
+                            <div className="absolute bottom-0 left-0 right-0 p-4">
+                                <h3 className="font-bold text-white truncate">{item.title}</h3>
+                                <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
+                                    <span>{new Date(item.release_date || '').getFullYear()}</span>
+                                    <span>•</span>
+                                    <span>{item.rating}</span>
+                                    <span>•</span>
+                                    <span className="truncate max-w-[100px]">{item.genres.slice(0, 2).join(', ')}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Actions Overlay */}
+                        <div className="p-3 flex justify-between items-center border-t border-white/5 bg-[#181818]">
+                            <div className="text-xs text-gray-500 font-mono truncate max-w-[100px]">{item.id}</div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => {
+                                        setFormData(JSON.parse(JSON.stringify(item)));
+                                        setIsEditing(true);
+                                    }}
+                                    className="p-1.5 hover:bg-white/10 rounded text-gray-300 hover:text-white"
+                                >
+                                    <Edit size={16} />
+                                </button>
+                                <button
+                                    onClick={() => deleteDoc(doc(db, 'content', item.id))}
+                                    className="p-1.5 hover:bg-white/10 rounded text-red-500 hover:text-red-400"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+
+                {/* Empty State */}
+                {filteredContent.length === 0 && (
+                    <div className="col-span-full py-20 text-center text-gray-500 border-2 border-dashed border-white/10 rounded-xl">
+                        <LayoutTemplate size={48} className="mx-auto mb-4 opacity-50" />
+                        <p className="text-lg font-medium">No anime found</p>
+                        <p className="text-sm">Try adjusting your filters or search query</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+export default AnimeManager;

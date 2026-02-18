@@ -38,7 +38,7 @@ const ProfileSelection = () => {
       setLoading(false);
     });
     return () => { unsub(); clearTimeout(safetyTimer); };
-  }, [currentUser]);
+  }, [currentUser?.uid]);
 
   const startAdd = () => {
     setMode('add');

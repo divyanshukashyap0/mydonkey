@@ -14,9 +14,10 @@ import ComingSoonManager from './modules/ComingSoonManager';
 import RequestsManager from './modules/RequestsManager';
 import PagesManager from './modules/PagesManager';
 import AppearanceManager from './modules/AppearanceManager';
+import AnimeManager from './modules/AnimeManager';
 
 // --- Types ---
-type ModuleType = 'dashboard' | 'content' | 'home' | 'coming_soon' | 'requests' | 'plans' | 'users' | 'settings' | 'pages' | 'appearance';
+type ModuleType = 'dashboard' | 'content' | 'anime' | 'home' | 'coming_soon' | 'requests' | 'plans' | 'users' | 'settings' | 'pages' | 'appearance';
 
 interface SidebarGroup {
   title: string;
@@ -35,6 +36,7 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
     title: 'Content Management',
     items: [
       { id: 'content', label: 'Content Library', icon: Film },
+      { id: 'anime', label: 'Anime Library', icon: Film },
       { id: 'home', label: 'Sections & Layout', icon: Home },
       { id: 'pages', label: 'Pages & Footer', icon: FileText },
       { id: 'coming_soon', label: 'Upcoming Releases', icon: Calendar },
@@ -174,6 +176,7 @@ export default function AdminLayout({ onExit }: { onExit: () => void }) {
           <div className="max-w-7xl mx-auto animate-in fade-in duration-300">
             {activeModule === 'dashboard' && <AnalyticsManager />}
             {activeModule === 'content' && <ContentManager />}
+            {activeModule === 'anime' && <AnimeManager />}
             {activeModule === 'home' && <SectionManager />}
             {activeModule === 'coming_soon' && <ComingSoonManager />}
             {activeModule === 'plans' && <PlanManager />}

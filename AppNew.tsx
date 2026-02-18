@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useStore } from './context/StoreContext';
 import { logUserActivity } from './utils/activityLogger';
 import TopNav from './components/TopNav';
+import AnimeIntro from './components/AnimeIntro';
 import HeroBanner from './components/HeroBanner';
 import HeroSkeleton from './components/HeroSkeleton';
 import ContentRail from './components/ContentRail';
@@ -40,6 +41,30 @@ const MainLayout = () => {
     const [viewingContent, setViewingContent] = useState<Content | null>(null);
     const [playingContent, setPlayingContent] = useState<Content | null>(null);
     const [showUnlockModal, setShowUnlockModal] = useState(false);
+
+    // --- Anime Intro State ---
+    const [showAnimeIntro, setShowAnimeIntro] = useState(false);
+    const [animeIntroMode, setAnimeIntroMode] = useState<'enter' | 'exit'>('enter');
+    const prevTabRef = useRef(activeTab);
+
+    useEffect(() => {
+        const prev = prevTabRef.current;
+
+        if (activeTab === 'anime') {
+            // Entering Anime
+            setAnimeIntroMode('enter');
+            setShowAnimeIntro(true);
+        } else if (prev === 'anime' && activeTab !== 'anime') {
+            // Exiting Anime
+            setAnimeIntroMode('exit');
+            setShowAnimeIntro(true);
+        } else {
+            setShowAnimeIntro(false);
+        }
+
+        prevTabRef.current = activeTab;
+    }, [activeTab]);
+    const [animeCategory, setAnimeCategory] = useState('All'); // State for Anime Filter
 
     useEffect(() => {
         if (currentUser) {
@@ -292,6 +317,66 @@ const MainLayout = () => {
             );
         }
 
+        if (activeTab === 'anime') {
+            // Filter Anime Content
+            const animeContent = content.filter(c =>
+                c.genres?.some(g => g.toLowerCase() === 'anime' || g.toLowerCase() === 'animation')
+            );
+
+            // Sub-Genre Filtering State (Local to this block if possible, but React needs it at top level or component)
+            // Since we are inside renderContent, we can't use useState hooks here directly if they weren't declared at top.
+            // WORKAROUND: We will declare the state at the top level of MainLayout.
+
+            // ... (See Top Level State Addition below) ...
+
+            // Derived filtered list
+            const filteredAnime = animeCategory === 'All'
+                ? animeContent
+                : animeContent.filter(c => c.genres?.includes(animeCategory));
+
+            const featuredAnime = animeContent.find(c => c.featured) || animeContent[0];
+
+            const categories = ['All', 'Action', 'Romance', 'Fantasy', 'Sci-Fi', 'Adventure', 'Drama'];
+
+            return (
+                <div className="min-h-screen pt-24 px-4 md:px-12 pb-12">
+                    <h1 className="text-3xl font-bold mb-8 flex items-center gap-3">
+                        <span className="bg-gradient-to-r from-brand-red to-purple-600 bg-clip-text text-transparent">Anime Library</span>
+                    </h1>
+
+                    {animeContent.length > 0 ? (
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                            {animeContent.map(item => (
+                                <div key={item.id} onClick={() => handleDetails(item)} className="group cursor-pointer relative aspect-[2/3] overflow-hidden rounded-xl border border-white/10 hover:border-brand-red/50 transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(229,9,20,0.4)]">
+                                    <img
+                                        src={item.poster_path_mobile || item.poster_path}
+                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                        loading="lazy"
+                                        alt={item.title}
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
+                                        <div>
+                                            <h3 className="font-bold text-white leading-tight mb-1">{item.title}</h3>
+                                            <div className="text-[10px] text-brand-red font-black uppercase">{item.genres?.[0]}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="h-64 flex flex-col items-center justify-center text-gray-500 border border-dashed border-white/10 rounded-xl">
+                            <p className="text-xl font-bold mb-2">No Anime Found</p>
+                            <p className="text-sm">Check back later for new additions!</p>
+                        </div>
+                    )}
+
+                    <div className="mt-16">
+                        <ContentRequestInline />
+                    </div>
+                </div>
+            );
+        }
+
         if (activeTab === 'my-list') {
             if (!isAuthenticated) return null;
 
@@ -365,6 +450,10 @@ const MainLayout = () => {
     return (
         <div className="bg-[#141414] min-h-screen text-white font-sans selection:bg-red-600 selection:text-white">
             <ScrollToTop />
+
+            {/* Anime Intro Overlay */}
+            {showAnimeIntro && <AnimeIntro mode={animeIntroMode} onComplete={() => setShowAnimeIntro(false)} />}
+
             <TopNav
                 activeTab={activeTab}
                 setTab={handleTabChange}

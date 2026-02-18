@@ -14,11 +14,13 @@ const AppearanceManager = () => {
     const { settings, updateSettings } = useStore();
     const [webFont, setWebFont] = useState(settings.websiteFont || 'Inter');
     const [rankFont, setRankFont] = useState(settings.rankFont || 'Anton');
+    const [heroFont, setHeroFont] = useState(settings.heroFont || settings.websiteFont || 'Inter');
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         setWebFont(settings.websiteFont || 'Inter');
         setRankFont(settings.rankFont || 'Anton');
+        setHeroFont(settings.heroFont || settings.websiteFont || 'Inter');
     }, [settings]);
 
     const handleSave = async () => {
@@ -26,7 +28,8 @@ const AppearanceManager = () => {
         try {
             await updateSettings({
                 websiteFont: webFont,
-                rankFont: rankFont
+                rankFont: rankFont,
+                heroFont: heroFont
             });
             alert('Appearance settings updated successfully!');
         } catch (error) {
@@ -136,6 +139,65 @@ const AppearanceManager = () => {
                         >
                             0
                         </span>
+                    </div>
+                </div>
+
+                {/* Hero Font Selection */}
+                <div className="bg-[#141414] p-6 rounded-xl border border-white/5 space-y-4 md:col-span-2">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="bg-red-500/20 p-2 rounded-lg text-red-400">
+                            <span className="text-xl font-black font-serif">H1</span>
+                        </div>
+                        <h3 className="text-xl font-bold text-white">Hero Section Font</h3>
+                    </div>
+                    <p className="text-sm text-gray-400">
+                        Select a powerful font for the main Hero Banner titles on the home page.
+                    </p>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-h-40 overflow-y-auto custom-scrollbar p-1">
+                        {GOOGLE_FONTS_RANK.map(font => (
+                            <button
+                                key={font}
+                                onClick={() => setHeroFont(font)}
+                                className={`px-3 py-2 rounded-lg text-left transition border ${heroFont === font
+                                    ? 'bg-red-600 border-red-500 text-white shadow-lg shadow-red-900/40'
+                                    : 'bg-black/40 border-white/10 text-gray-400 hover:border-white/30 hover:text-white'
+                                    }`}
+                            >
+                                <span className="text-base font-bold truncate block" style={{ fontFamily: font }}>{font}</span>
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Live Preview of Hero Banner */}
+                    <div className="mt-6 relative h-64 rounded-xl overflow-hidden group">
+                        <img
+                            src="https://image.tmdb.org/t/p/original/r2JignnASJrPoZg9MVh0tjiog72.jpg"
+                            className="absolute inset-0 w-full h-full object-cover opacity-60"
+                            alt="Preview"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#141414] via-black/40 to-transparent" />
+
+                        <div className="absolute bottom-0 left-0 p-6 md:p-10 w-full">
+                            <h1
+                                className="text-4xl md:text-5xl font-black text-white leading-none drop-shadow-2xl mb-4 transition-all duration-300"
+                                style={{ fontFamily: heroFont }}
+                            >
+                                AVATAR: THE WAY OF WATER
+                            </h1>
+                            <div className="flex gap-3">
+                                <button className="bg-white text-black px-6 py-2 rounded font-bold flex items-center gap-2">
+                                    Play
+                                </button>
+                                <button className="bg-gray-600/60 text-white px-6 py-2 rounded font-bold backdrop-blur-md">
+                                    More Info
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="absolute top-4 right-4 bg-black/60 backdrop-blur text-xs font-bold px-2 py-1 rounded border border-white/10 text-white">
+                            LIVE PREVIEW
+                        </div>
                     </div>
                 </div>
             </div>

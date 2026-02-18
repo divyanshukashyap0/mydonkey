@@ -57,7 +57,7 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
     const unreadNotifs = notifications.filter(n => !n.read).length;
 
     return (
-        <nav className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-700 ${isScrolled ? 'bg-black/60 backdrop-blur-xl border-b border-white/5 shadow-2xl py-2' : 'bg-gradient-to-b from-black/90 via-black/40 to-transparent py-4'}`}>
+        <nav className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-700 ${isScrolled ? 'bg-gradient-to-b from-black via-black/90 to-transparent py-4 shadow-none' : 'bg-gradient-to-b from-black/90 via-black/40 to-transparent py-4'}`}>
             <div className="max-w-[1920px] mx-auto px-4 md:px-12 h-16 md:h-20 flex items-center justify-between">
 
                 {/* Logo & Desktop Links */}
@@ -74,16 +74,24 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                             { id: 'home', label: 'Home' },
                             { id: 'tv', label: 'TV Shows' },
                             { id: 'movies', label: 'Movies' },
+                            { id: 'anime', label: 'Anime' },
                             { id: 'my-list', label: 'My List' },
                         ].map(item => (
                             <button
                                 key={item.id}
                                 onClick={() => handleNavClick(item.id)}
-                                className={`text-sm font-medium transition-all duration-300 hover:text-white relative px-1 py-1 ${activeTab === item.id ? 'text-white font-bold' : 'text-gray-300'}`}
+                                className={`text-sm font-bold transition-all duration-300 relative px-5 py-2 rounded-full overflow-hidden group
+                                    ${item.id === 'anime'
+                                        ? `bg-gradient-to-r from-violet-600 via-pink-500 to-violet-600 bg-[length:200%_auto] animate-shimmer text-white italic tracking-wide shadow-[0_0_20px_rgba(168,85,247,0.6)] hover:shadow-[0_0_30px_rgba(236,72,153,0.8)] hover:scale-110 border border-white/20`
+                                        : `${activeTab === item.id
+                                            ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.4)] scale-105 border-transparent'
+                                            : 'bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10 hover:border-white/30 hover:text-white hover:shadow-[0_0_15px_rgba(255,255,255,0.1)] hover:scale-105'}`
+                                    }
+                                `}
                             >
-                                {item.label}
-                                {activeTab === item.id && (
-                                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-red shadow-[0_0_8px_rgba(229,9,20,0.8)] animate-in fade-in zoom-in-50 duration-300" />
+                                <span className="relative z-10">{item.label}</span>
+                                {item.id === 'anime' && (
+                                    <div className="absolute inset-0 bg-white/20 group-hover:bg-white/30 transition-colors duration-300" />
                                 )}
                             </button>
                         ))}
@@ -216,65 +224,67 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
             </div>
 
             {/* Mobile Sidebar Navigation */}
-            {isMobileMenuOpen && (
-                <div className="fixed inset-0 z-[200] lg:hidden animate-in slide-in-from-right duration-300">
-                    <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
-                    <div className="absolute right-0 top-0 bottom-0 w-[85%] max-w-sm bg-black border-l border-white/10 p-6 flex flex-col shadow-2xl overflow-y-auto">
-                        <div className="flex justify-between items-center mb-10">
-                            <span className="font-black text-brand-red text-2xl tracking-tighter">MY DONKEY</span>
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setMobileMenuOpen(false);
-                                }}
-                                className="text-gray-400 hover:text-white p-2 -mr-2 transition-colors duration-200"
-                                aria-label="Close menu"
-                            >
-                                <X size={32} />
-                            </button>
-                        </div>
-
-                        <div className="flex-1 space-y-2">
-                            {[
-                                { id: 'home', label: 'Home' },
-                                { id: 'movies', label: 'Movies' },
-                                { id: 'tv', label: 'TV Shows' },
-                                { id: 'my-list', label: 'My List' }, // Note: My List will trigger login catch in AppNew
-                            ].map(item => (
+            {
+                isMobileMenuOpen && (
+                    <div className="fixed inset-0 z-[200] lg:hidden animate-in slide-in-from-right duration-300">
+                        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
+                        <div className="absolute right-0 top-0 bottom-0 w-[85%] max-w-sm bg-black border-l border-white/10 p-6 flex flex-col shadow-2xl overflow-y-auto">
+                            <div className="flex justify-between items-center mb-10">
+                                <span className="font-black text-brand-red text-2xl tracking-tighter">MY DONKEY</span>
                                 <button
-                                    key={item.id}
-                                    onClick={() => handleNavClick(item.id)}
-                                    className={`w-full text-left text-2xl font-bold py-3 px-4 rounded-xl transition ${activeTab === item.id ? 'bg-white/5 text-white border-l-4 border-brand-red' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setMobileMenuOpen(false);
+                                    }}
+                                    className="text-gray-400 hover:text-white p-2 -mr-2 transition-colors duration-200"
+                                    aria-label="Close menu"
                                 >
-                                    {item.label}
+                                    <X size={32} />
                                 </button>
-                            ))}
-                        </div>
+                            </div>
 
-                        <div className="space-y-4 pt-8 border-t border-white/10">
-                            {isInstallable && (
-                                <button onClick={() => { installPwa(); setMobileMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-brand-red/20 to-transparent border border-brand-red/30 rounded-xl">
-                                    <Smartphone size={20} className="text-brand-red" />
-                                    <div className="text-left">
-                                        <div className="text-white font-bold text-sm">Install App</div>
-                                        <div className="text-[10px] text-gray-400">Add to Home Screen</div>
-                                    </div>
-                                </button>
-                            )}
+                            <div className="flex-1 space-y-2">
+                                {[
+                                    { id: 'home', label: 'Home' },
+                                    { id: 'movies', label: 'Movies' },
+                                    { id: 'tv', label: 'TV Shows' },
+                                    { id: 'my-list', label: 'My List' }, // Note: My List will trigger login catch in AppNew
+                                ].map(item => (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => handleNavClick(item.id)}
+                                        className={`w-full text-left text-2xl font-bold py-3 px-4 rounded-xl transition ${activeTab === item.id ? 'bg-white/5 text-white border-l-4 border-brand-red' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                                    >
+                                        {item.label}
+                                    </button>
+                                ))}
+                            </div>
 
-                            {currentUser ? (
-                                <>
-                                    <button onClick={() => handleNavClick('account')} className="w-full text-left font-bold text-gray-400 hover:text-white px-4 py-2">Account Settings</button>
-                                    <button onClick={logout} className="w-full text-left font-bold text-brand-red px-4 py-2">Sign Out</button>
-                                </>
-                            ) : (
-                                <button onClick={onLoginClick} className="w-full text-left font-bold text-brand-red px-4 py-2">Sign In</button>
-                            )}
+                            <div className="space-y-4 pt-8 border-t border-white/10">
+                                {isInstallable && (
+                                    <button onClick={() => { installPwa(); setMobileMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-brand-red/20 to-transparent border border-brand-red/30 rounded-xl">
+                                        <Smartphone size={20} className="text-brand-red" />
+                                        <div className="text-left">
+                                            <div className="text-white font-bold text-sm">Install App</div>
+                                            <div className="text-[10px] text-gray-400">Add to Home Screen</div>
+                                        </div>
+                                    </button>
+                                )}
+
+                                {currentUser ? (
+                                    <>
+                                        <button onClick={() => handleNavClick('account')} className="w-full text-left font-bold text-gray-400 hover:text-white px-4 py-2">Account Settings</button>
+                                        <button onClick={logout} className="w-full text-left font-bold text-brand-red px-4 py-2">Sign Out</button>
+                                    </>
+                                ) : (
+                                    <button onClick={onLoginClick} className="w-full text-left font-bold text-brand-red px-4 py-2">Sign In</button>
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </nav>
+                )
+            }
+        </nav >
     );
 };
 

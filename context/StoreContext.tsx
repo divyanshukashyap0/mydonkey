@@ -112,7 +112,10 @@ const DEFAULT_SETTINGS: SiteSettings = {
     siteName: "MY DONKEY",
     heroVideoQuality: 'hd1080',
     maintenanceMode: false,
-    theme: 'default'
+    theme: 'default',
+    websiteFont: 'Inter',
+    rankFont: 'Anton',
+    heroFont: 'Inter'
 };
 
 export const PERMANENT_ADMINS = ['divyanshukashyap2430955@gmail.com', 'divyanshu00884466@gmail.com'];
@@ -769,7 +772,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         });
 
         return () => unsubscribe();
-    }, [currentUser]);
+    }, [currentUser?.role, currentUser?.uid]);
 
     const unlockContent = async (code: string): Promise<{ success: boolean; contentId?: string; message: string }> => {
         if (!fbUser || !currentProfile) return { success: false, message: 'Please sign in first.' };
