@@ -4,6 +4,7 @@ import { useStore } from '../context/StoreContext';
 import { Profile } from '../types';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
+import Loader from './Loader';
 
 const ProfileSelection = () => {
   const { currentUser, switchProfile, addProfile, deleteProfile, updateProfile } = useStore();
@@ -81,10 +82,18 @@ const ProfileSelection = () => {
     return 'Good Evening';
   };
 
-  if (loading) return (
-    <div className="min-h-screen bg-black flex items-center justify-center text-white flex-col gap-4">
-      <div className="w-12 h-12 border-4 border-brand-red border-t-white rounded-full animate-spin" />
-    </div>
+  const [videoDone, setVideoDone] = useState(false);
+
+  // Reset videoDone if loading starts again (though usually component unmounts/remounts or loading is strictly true/false)
+  useEffect(() => {
+    if (loading) setVideoDone(false);
+  }, [loading]);
+
+  if (loading || !videoDone) return (
+    <Loader
+      dataReady={!loading}
+      onComplete={() => setVideoDone(true)}
+    />
   );
 
   // Render Modal for Add/Edit

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from './context/StoreContext';
+import { logUserActivity } from './utils/activityLogger';
 import TopNav from './components/TopNav';
 import HeroBanner from './components/HeroBanner';
 import HeroSkeleton from './components/HeroSkeleton';
@@ -19,6 +20,7 @@ import SearchPage from './components/SearchPage';
 import ScrollToTop from './components/ScrollToTop';
 import ProfileSelection from './components/ProfileSelection';
 import FontLoader from './components/FontLoader';
+import Loader from './components/Loader';
 import { Content } from './types';
 import { StoreProvider } from './context/StoreContext';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
@@ -38,6 +40,12 @@ const MainLayout = () => {
     const [viewingContent, setViewingContent] = useState<Content | null>(null);
     const [playingContent, setPlayingContent] = useState<Content | null>(null);
     const [showUnlockModal, setShowUnlockModal] = useState(false);
+
+    useEffect(() => {
+        if (currentUser) {
+            logUserActivity(currentUser.uid, currentUser.email, 'page_view', { path: location.pathname }, currentUser.isGuest);
+        }
+    }, [location.pathname, currentUser]);
 
     // Deep Link Handler (e.g. /browse/content_123)
     useEffect(() => {
@@ -341,11 +349,7 @@ const MainLayout = () => {
     };
 
     if (isLoading) {
-        return (
-            <div className="min-h-screen bg-black flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600"></div>
-            </div>
-        );
+        return <Loader />;
     }
 
     // Force Profile Selection if logged in but no profile selected
@@ -410,9 +414,7 @@ const AppRoutes = () => {
                 path="/admin/*"
                 element={
                     isLoading ? (
-                        <div className="min-h-screen bg-black flex items-center justify-center">
-                            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600"></div>
-                        </div>
+                        <Loader />
                     ) : currentUser?.role === 'admin' ? (
                         <AdminLayout onExit={() => navigate('/')} />
                     ) : (

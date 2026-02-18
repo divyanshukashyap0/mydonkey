@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { BarChart3, Clock, Download, Play, TrendingUp } from 'lucide-react';
-import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
+import { collection, getDocs, limit, orderBy, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { User } from '../../../types';
 import { useStore } from '../../../context/StoreContext';
@@ -15,88 +15,93 @@ const AnalyticsManager = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                // Real: Fetch Activity Logs (Limit 100 for feed)
-                const qActivity = query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(50));
-                const snapActivity = await getDocs(qActivity);
-                setRecentActivity(snapActivity.docs.map(d => ({ id: d.id, ...d.data() })));
+        setLoading(true);
 
-                // Real: Fetch Users for calculating Total Platform Watch Time
-                const qUsers = query(collection(db, 'users'));
-                const snapUsers = await getDocs(qUsers);
-                const allUsers = snapUsers.docs.map(d => d.data() as User);
+        // 1. Real-time Activity Logs
+        const qActivity = query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(50));
+        const unsubActivity = onSnapshot(qActivity, (snap) => {
+            setRecentActivity(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
 
-                // Calculate Total Watch Time across ALL users
+        // 2. Real-time Users (for Watch Time & Active Count)
+        const qUsers = query(collection(db, 'users'));
+        const unsubUsers = onSnapshot(qUsers, (snap) => {
+            const allUsers = snap.docs.map(d => d.data() as User);
+
+            // Total Watch Time
+            // @ts-ignore
+            const totalSeconds = allUsers.reduce((acc, user) => acc + (user.totalWatchTimeSeconds || 0), 0);
+            setCalculatedWatchTime(totalSeconds);
+
+            // Active Users (Last 24h)
+            const now = new Date();
+            const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            // @ts-ignore
+            const activeCount = allUsers.filter(u => {
+                if (!u.lastActiveAt) return false;
                 // @ts-ignore
-                const totalSeconds = allUsers.reduce((acc, user) => acc + (user.totalWatchTimeSeconds || 0), 0);
-                setCalculatedWatchTime(totalSeconds);
+                const date = u.lastActiveAt.toDate ? u.lastActiveAt.toDate() : new Date(u.lastActiveAt);
+                return date > oneDayAgo;
+            }).length;
+            setActiveUsersCount(activeCount);
 
-                // Active Users (Active in last 24h)
-                const now = new Date();
-                const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-                // @ts-ignore
-                const activeCount = allUsers.filter(u => {
-                    if (!u.lastActiveAt) return false;
-                    // Handle Firestore Timestamp or String
-                    // @ts-ignore
-                    const date = u.lastActiveAt.toDate ? u.lastActiveAt.toDate() : new Date(u.lastActiveAt);
-                    return date > oneDayAgo;
-                }).length;
-                setActiveUsersCount(activeCount);
-
-                // Top Content (From logs)
-                // Filter 'video_play' actions
-                const playLogsQ = query(collection(db, 'activity_logs'), where('action', '==', 'video_play'), limit(500));
-                const playLogsSnap = await getDocs(playLogsQ);
-                const popularity: Record<string, number> = {};
-                playLogsSnap.forEach(doc => {
-                    const data = doc.data();
-                    if (data.details?.contentId) {
-                        popularity[data.details.contentId] = (popularity[data.details.contentId] || 0) + 1;
-                    }
-                });
-
-                const sortedContent = Object.entries(popularity)
-                    .sort(([, a], [, b]) => b - a)
-                    .slice(0, 5)
-                    .map(([id, count]) => {
-                        const c = content.find(x => x.id === id);
-                        return { title: c?.title || 'Unknown Content', count, poster: c?.poster_path };
+            // Global Watch History
+            const historyData: any[] = [];
+            allUsers.forEach(u => {
+                if (u.continueWatching && u.continueWatching.length > 0) {
+                    u.continueWatching.forEach(cw => {
+                        const c = content.find(x => x.id === cw.movieId);
+                        if (c) {
+                            historyData.push({
+                                userEmail: u.email,
+                                userId: u.uid,
+                                contentTitle: c.title,
+                                poster: c.backdrop_path || c.poster_path,
+                                progress: cw.progress,
+                                duration: cw.duration,
+                                lastWatchedAt: cw.lastWatchedAt,
+                                percent: Math.min(100, Math.round((cw.progress / cw.duration) * 100)) || 0
+                            });
+                        }
                     });
-                setTopContentData(sortedContent);
+                }
+            });
+            historyData.sort((a, b) => new Date(b.lastWatchedAt).getTime() - new Date(a.lastWatchedAt).getTime());
+            setGlobalHistory(historyData.slice(0, 50));
+        });
 
-                // Global Watch History from all users
-                const historyData: any[] = [];
-                allUsers.forEach(u => {
-                    if (u.continueWatching && u.continueWatching.length > 0) {
-                        u.continueWatching.forEach(cw => {
-                            const c = content.find(x => x.id === cw.movieId);
-                            if (c) {
-                                historyData.push({
-                                    userEmail: u.email,
-                                    userId: u.uid,
-                                    contentTitle: c.title,
-                                    poster: c.backdrop_path || c.poster_path, // Prefer backdrop for wide view
-                                    progress: cw.progress,
-                                    duration: cw.duration,
-                                    lastWatchedAt: cw.lastWatchedAt,
-                                    percent: Math.min(100, Math.round((cw.progress / cw.duration) * 100)) || 0
-                                });
-                            }
-                        });
-                    }
+
+        // 3. Independent Top Content Query (Keep simpler/separate if needed, or put in useEffect)
+        // For 'Top Content', we need to aggregate logs. Since we don't want to download ALL logs ever in real-time,
+        // we might stick to a tailored query or just use the recent 500 logs we might fetch.
+        // Let's do a separate snapshot for wider stats but limited to recent 500 actions to keep it somewhat live but lighter.
+        const playLogsQ = query(collection(db, 'activity_logs'), where('action', '==', 'video_play'), orderBy('timestamp', 'desc'), limit(500));
+        const unsubTop = onSnapshot(playLogsQ, (snap) => {
+            const popularity: Record<string, number> = {};
+            snap.forEach(doc => {
+                const data = doc.data();
+                if (data.details?.contentId) {
+                    popularity[data.details.contentId] = (popularity[data.details.contentId] || 0) + 1;
+                }
+            });
+
+            const sortedContent = Object.entries(popularity)
+                .sort(([, a], [, b]) => b - a)
+                .slice(0, 5)
+                .map(([id, count]) => {
+                    const c = content.find(x => x.id === id);
+                    return { title: c?.title || 'Unknown Content', count, poster: c?.poster_path };
                 });
-                // Sort by last watched desc
-                historyData.sort((a, b) => new Date(b.lastWatchedAt).getTime() - new Date(a.lastWatchedAt).getTime());
-                setGlobalHistory(historyData.slice(0, 50)); // Top 50 recent checks
+            setTopContentData(sortedContent);
+        });
 
-            } catch (e) {
-                console.error("Analytics error:", e);
-            }
-            setLoading(false);
+        setLoading(false);
+
+        return () => {
+            unsubActivity();
+            unsubUsers();
+            unsubTop();
         };
-        fetchStats();
     }, [content]);
 
     if (loading) return <div className="p-10 text-center animate-pulse">Loading Analytics...</div>;

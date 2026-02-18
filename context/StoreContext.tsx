@@ -12,8 +12,9 @@ import {
     Invoice,
     Device,
     ContentRequest,
-    Page
+    Page,
 } from '../types';
+import Loader from '../components/Loader';
 import { auth, db } from '../firebase';
 import { sendSubscriptionEmail } from '../utils/emailService';
 import {
@@ -900,13 +901,16 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         return () => clearTimeout(timer);
     }, [isLoading]);
 
+    // Minimum Loading Time Logic
+    const [minLoadFinished, setMinLoadFinished] = useState(false);
+
     return (
         <StoreContext.Provider value={contextValue}>
-            {isLoading ? (
-                <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white">
-                    <div className="w-12 h-12 border-4 border-brand-red/30 border-t-brand-red rounded-full animate-spin mb-4" />
-                    <p className="text-gray-400 text-sm animate-pulse">Initializing...</p>
-                </div>
+            {(!minLoadFinished) ? (
+                <Loader
+                    dataReady={!isLoading}
+                    onComplete={() => setMinLoadFinished(true)}
+                />
             ) : (
                 children
             )}

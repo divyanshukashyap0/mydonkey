@@ -264,18 +264,19 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                             <div id="episodes-mobile" className="mt-6 pb-20">
                                 {/* Season Selector */}
                                 {content.seasons.length > 1 && (
-                                    <div className="mb-4">
-                                        <select
-                                            value={selectedSeasonId}
-                                            onChange={(e) => setSelectedSeasonId(e.target.value)}
-                                            className="bg-white/10 border border-white/20 rounded px-4 py-2 text-sm font-bold text-white outline-none w-full appearance-none"
-                                        >
-                                            {content.seasons.map(season => (
-                                                <option key={season.id} value={season.id} className="bg-gray-900 text-white">
-                                                    {season.title}
-                                                </option>
-                                            ))}
-                                        </select>
+                                    <div className="mb-6 flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+                                        {content.seasons.map(season => (
+                                            <button
+                                                key={season.id}
+                                                onClick={() => setSelectedSeasonId(season.id)}
+                                                className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all border ${selectedSeasonId === season.id
+                                                        ? 'bg-white text-black border-white shadow-lg'
+                                                        : 'bg-white/10 text-white border-transparent hover:bg-white/20'
+                                                    }`}
+                                            >
+                                                {season.title}
+                                            </button>
+                                        ))}
                                     </div>
                                 )}
 
@@ -444,17 +445,20 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                         <div className="flex items-center justify-between mb-6">
                                             <h3 className="text-2xl font-bold text-white">Episodes</h3>
                                             {content.seasons.length > 1 && (
-                                                <select
-                                                    value={selectedSeasonId}
-                                                    onChange={(e) => setSelectedSeasonId(e.target.value)}
-                                                    className="bg-black/50 border border-white/20 rounded px-4 py-2 text-sm font-bold text-white outline-none cursor-pointer hover:bg-white/10"
-                                                >
+                                                <div className="flex gap-2">
                                                     {content.seasons.map(season => (
-                                                        <option key={season.id} value={season.id}>
+                                                        <button
+                                                            key={season.id}
+                                                            onClick={() => setSelectedSeasonId(season.id)}
+                                                            className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all border ${selectedSeasonId === season.id
+                                                                    ? 'bg-white text-black border-white shadow-md'
+                                                                    : 'bg-transparent text-gray-400 border-gray-600 hover:border-white hover:text-white'
+                                                                }`}
+                                                        >
                                                             {season.title}
-                                                        </option>
+                                                        </button>
                                                     ))}
-                                                </select>
+                                                </div>
                                             )}
                                         </div>
 
