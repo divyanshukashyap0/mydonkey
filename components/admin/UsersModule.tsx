@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Edit, Trash2, Check, X, CreditCard, Lock, Ban, Search, Filter, Eye, Clock, Calendar, Mail, User as UserIcon, Play } from 'lucide-react';
+import { Edit, Check, X, CreditCard, Lock, Ban, Search, Filter, User as UserIcon } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import { User, Invoice } from '../../types';
-import { doc, updateDoc, collection, getDocs, orderBy, query, where, limit } from 'firebase/firestore';
+import { doc, updateDoc, collection, getDocs, orderBy, query } from 'firebase/firestore';
 import { db, auth } from '../../firebase';
 import { sendPasswordResetEmail } from 'firebase/auth';
 
@@ -14,9 +14,9 @@ const UsersModule = () => {
     // Edit Mode State
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [userInvoices, setUserInvoices] = useState<Invoice[]>([]);
-    const [userActivity, setUserActivity] = useState<any[]>([]);
+    // userActivity state removed
     const [loadingInvoices, setLoadingInvoices] = useState(false);
-    const [activeTab, setActiveTab] = useState<'details' | 'activity' | 'history'>('details');
+    const [activeTab, setActiveTab] = useState<'details'>('details');
 
     // Filter Logic
     const filteredUsers = users.filter(user => {
@@ -43,15 +43,7 @@ const UsersModule = () => {
             setUserInvoices([]);
         }
 
-        // Fetch Activity Logs
-        try {
-            const qActivity = query(collection(db, 'activity_logs'), where('userId', '==', user.uid), orderBy('timestamp', 'desc'), limit(50));
-            const snapActivity = await getDocs(qActivity);
-            setUserActivity(snapActivity.docs.map(d => ({ id: d.id, ...d.data() })));
-        } catch (e) {
-            console.error("Failed to fetch activity", e);
-            setUserActivity([]);
-        }
+        // Activity Logs fetching removed
 
         setLoadingInvoices(false);
     };
@@ -211,190 +203,100 @@ const UsersModule = () => {
                             <button onClick={() => setEditingUser(null)} className="p-2 hover:bg-white/10 rounded-full transition text-gray-400 hover:text-white"><X size={20} /></button>
                         </div>
 
-                        {/* Tabs */}
+                        {/* Tabs - Simplified to single view */}
                         <div className="flex border-b border-white/10 bg-[#141414]">
-                            <button onClick={() => setActiveTab('details')} className={`flex-1 py-4 text-sm font-bold border-b-2 transition flex items-center justify-center gap-2 ${activeTab === 'details' ? 'border-blue-500 text-white bg-white/5' : 'border-transparent text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}>
+                            <div className="flex-1 py-4 text-sm font-bold border-b-2 border-blue-500 text-white bg-white/5 flex items-center justify-center gap-2">
                                 <UserIcon size={16} /> Account Details
-                            </button>
-                            <button onClick={() => setActiveTab('history')} className={`flex-1 py-4 text-sm font-bold border-b-2 transition flex items-center justify-center gap-2 ${activeTab === 'history' ? 'border-blue-500 text-white bg-white/5' : 'border-transparent text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}>
-                                <Eye size={16} /> Watch History
-                            </button>
-                            <button onClick={() => setActiveTab('activity')} className={`flex-1 py-4 text-sm font-bold border-b-2 transition flex items-center justify-center gap-2 ${activeTab === 'activity' ? 'border-blue-500 text-white bg-white/5' : 'border-transparent text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}>
-                                <Clock size={16} /> System Logs
-                            </button>
+                            </div>
                         </div>
 
                         {/* Modal Content */}
                         <div className="flex-1 overflow-y-auto p-8 bg-[#181818]">
-                            {activeTab === 'details' && (
-                                <div className="space-y-8 max-w-2xl mx-auto">
-                                    {/* Status Card */}
-                                    <div className="bg-[#111] p-6 rounded-xl border border-white/5 space-y-6">
-                                        <h3 className="font-bold text-gray-400 uppercase text-xs tracking-wider">Subscription & Access</h3>
+                            <div className="space-y-8 max-w-2xl mx-auto">
+                                {/* Status Card */}
+                                <div className="bg-[#111] p-6 rounded-xl border border-white/5 space-y-6">
+                                    <h3 className="font-bold text-gray-400 uppercase text-xs tracking-wider">Subscription & Access</h3>
 
-                                        <div className="grid grid-cols-2 gap-6">
-                                            <div>
-                                                <label className="block text-sm font-bold text-gray-400 mb-2">Current Plan</label>
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-400 mb-2">Current Plan</label>
+                                            <select
+                                                value={editingUser.plan}
+                                                onChange={(e) => handleUpdate({ plan: e.target.value })}
+                                                className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-blue-500 appearance-none font-medium"
+                                            >
+                                                {plans.map(p => <option key={p.id} value={p.name}>{p.name} - ₹{p.price}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-400 mb-2">User Role</label>
+                                            {/* @ts-ignore */}
+                                            {(['divyanshukashyap2430955@gmail.com', 'divyanshu00884466@gmail.com'].includes(editingUser.email || '')) ? (
+                                                <div className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-gray-500 font-medium flex items-center gap-2 cursor-not-allowed">
+                                                    <Lock size={14} /> Permanent Admin
+                                                </div>
+                                            ) : (
                                                 <select
-                                                    value={editingUser.plan}
-                                                    onChange={(e) => handleUpdate({ plan: e.target.value })}
+                                                    value={editingUser.role || 'user'}
+                                                    onChange={(e) => handleUpdate({ role: e.target.value as any })}
                                                     className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-blue-500 appearance-none font-medium"
                                                 >
-                                                    {plans.map(p => <option key={p.id} value={p.name}>{p.name} - ₹{p.price}</option>)}
+                                                    <option value="user">User</option>
+                                                    <option value="admin">Admin</option>
+                                                    <option value="guest">Guest</option>
                                                 </select>
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-bold text-gray-400 mb-2">User Role</label>
-                                                {/* @ts-ignore */}
-                                                {(['divyanshukashyap2430955@gmail.com', 'divyanshu00884466@gmail.com'].includes(editingUser.email || '')) ? (
-                                                    <div className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-gray-500 font-medium flex items-center gap-2 cursor-not-allowed">
-                                                        <Lock size={14} /> Permanent Admin
-                                                    </div>
-                                                ) : (
-                                                    <select
-                                                        value={editingUser.role || 'user'}
-                                                        onChange={(e) => handleUpdate({ role: e.target.value as any })}
-                                                        className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-blue-500 appearance-none font-medium"
-                                                    >
-                                                        <option value="user">User</option>
-                                                        <option value="admin">Admin</option>
-                                                        <option value="guest">Guest</option>
-                                                    </select>
-                                                )}
-                                            </div>
-                                            <div className="col-span-2">
-                                                <label className="block text-sm font-bold text-gray-400 mb-2">Account Status</label>
-                                                <button
-                                                    onClick={() => handleUpdate({ status: editingUser.status === 'active' ? 'blocked' : 'active' })}
-                                                    className={`w-full py-3 rounded-lg font-bold border flex items-center justify-center gap-2 transition ${editingUser.status === 'active' ? 'border-green-500/50 text-green-500 hover:bg-green-500/10' : 'border-red-500/50 text-red-500 hover:bg-red-500/10'}`}
-                                                >
-                                                    {editingUser.status === 'active' ? <Check size={16} /> : <Ban size={16} />}
-                                                    {editingUser.status === 'active' ? 'Active Account' : 'Account Blocked'}
-                                                </button>
-                                            </div>
+                                            )}
                                         </div>
-
-                                        <div className="pt-6 border-t border-white/5">
-                                            <h4 className="font-bold text-sm text-gray-400 mb-3">Security Actions</h4>
-                                            <button onClick={handleSendPasswordReset} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white/5 text-gray-300 border border-white/10 rounded-lg hover:bg-white/10 hover:text-white transition font-medium">
-                                                <Lock size={16} /> Send Password Reset Email
+                                        <div className="col-span-2">
+                                            <label className="block text-sm font-bold text-gray-400 mb-2">Account Status</label>
+                                            <button
+                                                onClick={() => handleUpdate({ status: editingUser.status === 'active' ? 'blocked' : 'active' })}
+                                                className={`w-full py-3 rounded-lg font-bold border flex items-center justify-center gap-2 transition ${editingUser.status === 'active' ? 'border-green-500/50 text-green-500 hover:bg-green-500/10' : 'border-red-500/50 text-red-500 hover:bg-red-500/10'}`}
+                                            >
+                                                {editingUser.status === 'active' ? <Check size={16} /> : <Ban size={16} />}
+                                                {editingUser.status === 'active' ? 'Active Account' : 'Account Blocked'}
                                             </button>
                                         </div>
                                     </div>
 
-                                    {/* Billing History */}
-                                    <div>
-                                        <h3 className="font-bold text-gray-400 uppercase text-xs tracking-wider mb-4">Billing History</h3>
-                                        {loadingInvoices ? (
-                                            <div className="flex justify-center p-8"><div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
-                                        ) : userInvoices.length === 0 ? (
-                                            <div className="text-gray-500 italic text-sm p-4 border border-dashed border-white/10 rounded-lg text-center">No invoices found.</div>
-                                        ) : (
-                                            <div className="space-y-2">
-                                                {userInvoices.map(inv => (
-                                                    <div key={inv.id} className="flex justify-between items-center bg-[#111] p-4 rounded-lg border border-white/5 hover:border-white/20 transition">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className={`p-2 rounded-full ${inv.status === 'paid' ? 'bg-green-500/10 text-green-500' : 'bg-yellow-500/10 text-yellow-500'}`}>
-                                                                <CreditCard size={16} />
-                                                            </div>
-                                                            <div className="flex flex-col">
-                                                                <span className="text-sm font-bold text-white">{inv.planName}</span>
-                                                                <span className="text-xs text-gray-500">{new Date(inv.date).toLocaleDateString()}</span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <div className="font-mono font-bold text-white">{inv.currency === 'INR' ? '₹' : '$'}{inv.amount}</div>
-                                                            <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${inv.status === 'paid' ? 'bg-green-500/10 text-green-500' : 'bg-yellow-500/10 text-yellow-500'}`}>{inv.status}</span>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
+                                    <div className="pt-6 border-t border-white/5">
+                                        <h4 className="font-bold text-sm text-gray-400 mb-3">Security Actions</h4>
+                                        <button onClick={handleSendPasswordReset} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white/5 text-gray-300 border border-white/10 rounded-lg hover:bg-white/10 hover:text-white transition font-medium">
+                                            <Lock size={16} /> Send Password Reset Email
+                                        </button>
                                     </div>
                                 </div>
-                            )}
 
-                            {activeTab === 'history' && (
-                                <div className="space-y-6 max-w-3xl mx-auto">
-                                    <div className="flex items-center gap-4 p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
-                                        <Eye className="text-blue-400" size={24} />
-                                        <div>
-                                            <div className="font-bold text-blue-400">Continue Watching</div>
-                                            <div className="text-xs text-blue-300/70">Content the user has started but not finished.</div>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 gap-3">
-                                        {editingUser.continueWatching && editingUser.continueWatching.length > 0 ? (
-                                            editingUser.continueWatching.map((item, index) => {
-                                                const movie = content.find(c => c.id === item.movieId);
-                                                if (!movie) return null;
-                                                const percent = Math.min(100, Math.round((item.progress / item.duration) * 100)) || 0;
-
-                                                return (
-                                                    <div key={index} className="bg-[#111] p-2 rounded-lg border border-white/5 flex gap-4 hover:border-white/20 transition group">
-                                                        <div className="w-32 h-20 bg-gray-800 rounded-md overflow-hidden flex-shrink-0 relative">
-                                                            <img
-                                                                src={movie.backdrop_path}
-                                                                alt={movie.title}
-                                                                className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition"
-                                                            />
-                                                            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-700">
-                                                                <div className="h-full bg-blue-500" style={{ width: `${percent}%` }} />
-                                                            </div>
-                                                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
-                                                                <div className="bg-black/50 p-1 rounded-full text-white"><Play size={16} fill="white" /></div>
-                                                            </div>
+                                {/* Billing History */}
+                                <div>
+                                    <h3 className="font-bold text-gray-400 uppercase text-xs tracking-wider mb-4">Billing History</h3>
+                                    {loadingInvoices ? (
+                                        <div className="flex justify-center p-8"><div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
+                                    ) : userInvoices.length === 0 ? (
+                                        <div className="text-gray-500 italic text-sm p-4 border border-dashed border-white/10 rounded-lg text-center">No invoices found.</div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {userInvoices.map(inv => (
+                                                <div key={inv.id} className="flex justify-between items-center bg-[#111] p-4 rounded-lg border border-white/5 hover:border-white/20 transition">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`p-2 rounded-full ${inv.status === 'paid' ? 'bg-green-500/10 text-green-500' : 'bg-yellow-500/10 text-yellow-500'}`}>
+                                                            <CreditCard size={16} />
                                                         </div>
-                                                        <div className="flex-1 flex flex-col justify-center py-2">
-                                                            <h4 className="font-bold text-base text-white">{movie.title}</h4>
-                                                            <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
-                                                                <span className="text-blue-400 font-bold">{percent}% Completed</span>
-                                                                <span>•</span>
-                                                                <span>Last watched: {new Date(item.lastWatchedAt).toLocaleDateString()}</span>
-                                                            </div>
+                                                        <div className="flex flex-col">
+                                                            <span className="text-sm font-bold text-white">{inv.planName}</span>
+                                                            <span className="text-xs text-gray-500">{new Date(inv.date).toLocaleDateString()}</span>
                                                         </div>
                                                     </div>
-                                                );
-                                            })
-                                        ) : (
-                                            <div className="bg-[#111] rounded-xl border border-dashed border-white/10 p-12 text-center text-gray-500">
-                                                No watch history available.
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            {activeTab === 'activity' && (
-                                <div className="space-y-6 max-w-3xl mx-auto">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h3 className="font-bold text-gray-400 uppercase text-xs tracking-wider">Recent System Logs</h3>
-                                    </div>
-                                    <div className="space-y-3 relative before:absolute before:left-4 before:top-0 before:bottom-0 before:w-px before:bg-white/10">
-                                        {userActivity.map((log, idx) => (
-                                            <div key={log.id} className="relative pl-10">
-                                                <div className={`absolute left-[13px] top-3 w-2 h-2 rounded-full border border-[#181818] ${log.action.includes('play') ? 'bg-green-500' : 'bg-gray-500'}`} />
-                                                <div className="bg-[#111] p-4 rounded-lg border border-white/5 hover:border-white/10 transition">
-                                                    <div className="flex justify-between items-start mb-1">
-                                                        <span className="font-bold text-sm text-white uppercase tracking-wider">{log.action.replace(/_/g, ' ')}</span>
-                                                        <span className="text-xs text-gray-500 font-mono flex items-center gap-1">
-                                                            <Clock size={10} />
-                                                            {log.timestamp?.toDate ? log.timestamp.toDate().toLocaleString() : 'Just now'}
-                                                        </span>
+                                                    <div className="text-right">
+                                                        <div className="font-mono font-bold text-white">{inv.currency === 'INR' ? '₹' : '$'}{inv.amount}</div>
+                                                        <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${inv.status === 'paid' ? 'bg-green-500/10 text-green-500' : 'bg-yellow-500/10 text-yellow-500'}`}>{inv.status}</span>
                                                     </div>
-                                                    {log.details && Object.keys(log.details).length > 0 && (
-                                                        <div className="mt-2 text-xs text-gray-400 bg-black/30 p-2 rounded font-mono border border-white/5 overflow-x-auto whitespace-pre-wrap">
-                                                            {JSON.stringify(log.details, null, 2)}
-                                                        </div>
-                                                    )}
                                                 </div>
-                                            </div>
-                                        ))}
-                                        {userActivity.length === 0 && <div className="text-gray-500 italic p-8 text-center bg-[#111] rounded-lg border border-dashed border-white/10">No recent activity recorded.</div>}
-                                    </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
-                            )}
+                            </div>
                         </div>
                     </div>
                 </div>

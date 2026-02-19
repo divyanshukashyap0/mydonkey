@@ -8,7 +8,7 @@ import UsersModule from './UsersModule';
 import ContentManager from './modules/ContentManager';
 import SectionManager from './modules/SectionManager';
 import SettingsManager from './modules/SettingsManager';
-import AnalyticsManager from './modules/AnalyticsManager';
+// AnalyticsManager removed
 import PlanManager from './modules/PlanManager';
 import ComingSoonManager from './modules/ComingSoonManager';
 import RequestsManager from './modules/RequestsManager';
@@ -18,7 +18,7 @@ import AnimeManager from './modules/AnimeManager';
 import ExportManager from './modules/ExportManager';
 
 // --- Types ---
-type ModuleType = 'dashboard' | 'content' | 'anime' | 'home' | 'coming_soon' | 'requests' | 'plans' | 'users' | 'settings' | 'pages' | 'appearance' | 'export';
+type ModuleType = 'content' | 'anime' | 'home' | 'coming_soon' | 'requests' | 'plans' | 'users' | 'settings' | 'pages' | 'appearance' | 'export';
 
 interface SidebarGroup {
   title: string;
@@ -27,12 +27,6 @@ interface SidebarGroup {
 
 // --- Configuration ---
 const SIDEBAR_GROUPS: SidebarGroup[] = [
-  {
-    title: 'Overview',
-    items: [
-      { id: 'dashboard', label: 'Analytics Dashboard', icon: LayoutDashboard },
-    ]
-  },
   {
     title: 'Content Management',
     items: [
@@ -62,9 +56,9 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
 ];
 
 export default function AdminLayout({ onExit }: { onExit: () => void }) {
-  const [activeModule, setActiveModule] = useState<ModuleType>('dashboard');
+  const [activeModule, setActiveModule] = useState<ModuleType>('content');
   const [isSidebarOpen, setSidebarOpen] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState<string[]>(['Overview', 'Content Management', 'Business', 'System']);
+  const [expandedGroups, setExpandedGroups] = useState<string[]>(['Content Management', 'Business', 'System']);
   const [showExitModal, setShowExitModal] = useState(false);
 
   const toggleGroup = (title: string) => {
@@ -176,7 +170,6 @@ export default function AdminLayout({ onExit }: { onExit: () => void }) {
         {/* Scrollable Module Viewer */}
         <main className="flex-1 overflow-y-auto p-4 md:p-8">
           <div className="max-w-7xl mx-auto animate-in fade-in duration-300">
-            {activeModule === 'dashboard' && <AnalyticsManager />}
             {activeModule === 'content' && <ContentManager />}
             {activeModule === 'anime' && <AnimeManager />}
             {activeModule === 'home' && <SectionManager />}

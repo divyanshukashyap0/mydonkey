@@ -36,7 +36,7 @@ const Loader: React.FC<LoaderProps> = ({ dataReady = true, onComplete }) => {
                 muted
                 playsInline
                 onEnded={handleVideoEnd}
-                className="w-24 h-24 object-cover rounded-full"
+                className="w-24 h-24 object-cover rounded-full pointer-events-none"
             />
         </div>
     );

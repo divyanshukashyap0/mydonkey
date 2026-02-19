@@ -34,7 +34,7 @@ const AnimeIntro: React.FC<AnimeIntroProps> = ({ onComplete, mode = 'enter' }) =
                     loop
                     muted
                     playsInline
-                    className="w-full h-full object-cover opacity-80"
+                    className="w-full h-full object-cover opacity-80 pointer-events-none"
                 />
                 <div className="absolute inset-0 bg-black/40" />
             </div>
