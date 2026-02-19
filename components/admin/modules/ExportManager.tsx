@@ -247,6 +247,13 @@ const ExportManager = () => {
                     }
                 }
 
+                // FORCE UPDATE VERSION
+                if (processed > 0) {
+                    await setDoc(doc(db, 'settings', 'global'), {
+                        contentVersion: (settings?.contentVersion || 0) + 1
+                    }, { merge: true });
+                }
+
                 setImportStats({ total, success: processed, skipped, errors: 0 });
                 alert(`Import Complete!\nAdded: ${processed}\nSkipped (Duplicates): ${skipped}`);
 

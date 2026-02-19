@@ -183,6 +183,11 @@ const AnimeManager = () => {
             const dataToSave = JSON.parse(JSON.stringify(finalData));
             await setDoc(doc(db, 'content', id), dataToSave);
 
+            // Increment DB Version to trigger client reuse/fetch
+            await setDoc(doc(db, 'settings', 'global'), {
+                contentVersion: (settings.contentVersion || 0) + 1
+            }, { merge: true });
+
             // Notification for new content
             if (!formData.id && finalData.isPublished) {
                 await addDoc(collection(db, 'notifications'), {
@@ -214,18 +219,22 @@ const AnimeManager = () => {
         if (!confirm(`Delete ${selectedItems.length} items? This cannot be undone.`)) return;
         const batch = writeBatch(db);
         selectedItems.forEach(id => {
-            batch.delete(doc(db, 'content', id));
         });
         await batch.commit();
+        await setDoc(doc(db, 'settings', 'global'), {
+            contentVersion: (settings.contentVersion || 0) + 1
+        }, { merge: true });
         setSelectedItems([]);
     };
 
     const handleBulkPublish = async (status: boolean) => {
         const batch = writeBatch(db);
         selectedItems.forEach(id => {
-            batch.update(doc(db, 'content', id), { isPublished: status });
         });
         await batch.commit();
+        await setDoc(doc(db, 'settings', 'global'), {
+            contentVersion: (settings.contentVersion || 0) + 1
+        }, { merge: true });
         setSelectedItems([]);
     };
 

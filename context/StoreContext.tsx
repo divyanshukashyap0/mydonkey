@@ -373,46 +373,70 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             if (docSnap.exists()) {
                 const serverSettings = docSnap.data() as SiteSettings;
                 setSettings(serverSettings);
-                localStorage.setItem('globalSettings', JSON.stringify(serverSettings));
+                try {
+                    localStorage.setItem('globalSettings', JSON.stringify(serverSettings));
+                } catch (e) { console.warn("LS Full (Settings)", e); }
 
                 // B. Content Sync Logic
                 const localContentVersion = parseInt(localStorage.getItem('contentVersion') || '0');
-                const serverContentVersion = serverSettings.contentVersion || 0;
+                const serverContentVersion = Number(serverSettings.contentVersion || 0);
 
                 // Check if we have cached content
                 const cachedContentStr = localStorage.getItem('cachedContent');
 
-                if (serverContentVersion > localContentVersion || !cachedContentStr) {
-                    console.log(`[Cache] Updating Content (Server: ${serverContentVersion} > Local: ${localContentVersion})`);
+                if (serverContentVersion !== localContentVersion || !cachedContentStr) {
+                    console.log(`[Cache] Updating Content (Server: ${serverContentVersion} vs Local: ${localContentVersion}). Reason: ${!cachedContentStr ? 'No Cache' : 'Version Mismatch'}`);
                     // Fetch fresh data
                     const contentSnap = await getDocs(collection(db, 'content'));
                     const freshContent = contentSnap.docs.map(d => ({ ...d.data(), id: d.id } as Content));
 
                     // Update Cache & State
                     setContent(freshContent);
-                    localStorage.setItem('cachedContent', JSON.stringify(freshContent));
-                    localStorage.setItem('contentVersion', serverContentVersion.toString());
+                    try {
+                        localStorage.setItem('cachedContent', JSON.stringify(freshContent));
+                        localStorage.setItem('contentVersion', serverContentVersion.toString());
+                    } catch (e) {
+                        console.error("LocalStorage Limit Exceeded during Content Save:", e);
+                        // If we can't save to cache, we might want to clear old cache or just rely on memory
+                    }
                 } else {
                     console.log(`[Cache] Content up to date (v${localContentVersion}). Loading from Cache.`);
                     // Load from Cache
                     if (cachedContentStr) {
-                        setContent(JSON.parse(cachedContentStr));
+                        try {
+                            const parsedContent = JSON.parse(cachedContentStr);
+                            if (parsedContent.length === 0 && localContentVersion > 0) {
+                                console.warn("[Cache] Cached content is empty but version > 0. Forcing refresh.");
+                                const contentSnap = await getDocs(collection(db, 'content'));
+                                const freshContent = contentSnap.docs.map(d => ({ ...d.data(), id: d.id } as Content));
+                                setContent(freshContent);
+                                try {
+                                    localStorage.setItem('cachedContent', JSON.stringify(freshContent));
+                                } catch (e) { console.warn("LS Full", e); }
+                            } else {
+                                setContent(parsedContent);
+                            }
+                        } catch (e) {
+                            console.error("Error parsing cached content:", e);
+                        }
                     }
                 }
 
                 // C. Sections Sync Logic
                 const localSectionsVersion = parseInt(localStorage.getItem('sectionsVersion') || '0');
-                const serverSectionsVersion = serverSettings.sectionsVersion || 0;
+                const serverSectionsVersion = Number(serverSettings.sectionsVersion || 0);
                 const cachedSectionsStr = localStorage.getItem('cachedSections');
 
-                if (serverSectionsVersion > localSectionsVersion || !cachedSectionsStr) {
-                    console.log(`[Cache] Updating Sections (Server: ${serverSectionsVersion} > Local: ${localSectionsVersion})`);
+                if (serverSectionsVersion !== localSectionsVersion || !cachedSectionsStr) {
+                    console.log(`[Cache] Updating Sections (Server: ${serverSectionsVersion} vs Local: ${localSectionsVersion})`);
                     const sectionsSnap = await getDocs(query(collection(db, 'sections'), orderBy('order')));
                     const freshSections = sectionsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Section));
 
                     setSections(freshSections);
-                    localStorage.setItem('cachedSections', JSON.stringify(freshSections));
-                    localStorage.setItem('sectionsVersion', serverSectionsVersion.toString());
+                    try {
+                        localStorage.setItem('cachedSections', JSON.stringify(freshSections));
+                        localStorage.setItem('sectionsVersion', serverSectionsVersion.toString());
+                    } catch (e) { console.warn("LS Full (Sections)", e); }
                 } else {
                     console.log(`[Cache] Sections up to date (v${localSectionsVersion}). Loading from Cache.`);
                     if (cachedSectionsStr) {
@@ -426,7 +450,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         const unsubPlans = onSnapshot(collection(db, 'plans'), (snap) => {
             const data = snap.docs.map(d => ({ ...d.data(), id: d.id } as Plan));
             setPlans(data);
-            localStorage.setItem('cachedPlans', JSON.stringify(data));
+            try {
+                localStorage.setItem('cachedPlans', JSON.stringify(data));
+            } catch (e) { }
         });
 
         const unsubNotifs = onSnapshot(query(collection(db, 'notifications'), orderBy('createdAt', 'desc')), (snap) => {
@@ -470,15 +496,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             if (currentProfile) {
                 const updated = profiles.find(p => p.id === currentProfile.id);
                 if (updated) setCurrentProfile(updated);
-            } else {
-                // Auto-select from localStorage if available
-                // Auto-select from localStorage if available
-                // REMOVED for "Select Profile on Refresh" feature
-                // const savedProfileId = localStorage.getItem('selectedProfileId');
-                // if (savedProfileId) {
-                //     const saved = profiles.find(p => p.id === savedProfileId);
-                //     if (saved) setCurrentProfile(saved);
-                // }
             }
         });
 
@@ -489,19 +506,30 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }, [fbUser, currentProfile?.id]);
 
     // 4. Activity Tracker (Throttled)
+    // Use a ref for in-memory throttling fallback if LocalStorage fails
+    const lastActivityRef = React.useRef<number>(0);
+
     useEffect(() => {
         if (!fbUser) return;
 
         const updateActivity = async () => {
             const now = Date.now();
-            const lastUpdate = parseInt(localStorage.getItem('lastActivityUpdate') || '0');
+            const localLastUpdate = parseInt(localStorage.getItem('lastActivityUpdate') || '0');
+            // Use the greater of local storage or memory ref (handling LS failure)
+            const lastUpdate = Math.max(localLastUpdate, lastActivityRef.current);
+
             // Update only if more than 5 minutes have passed
             if (now - lastUpdate > 5 * 60 * 1000) {
                 try {
                     await updateDoc(doc(db, 'users', fbUser.uid), {
                         lastActiveAt: new Date().toISOString()
                     });
-                    localStorage.setItem('lastActivityUpdate', now.toString());
+                    lastActivityRef.current = now; // Update memory ref
+                    try {
+                        localStorage.setItem('lastActivityUpdate', now.toString());
+                    } catch (e) {
+                        console.warn("Failed to save activity timestamp to LS (likely full). Using memory throttle.", e);
+                    }
                 } catch (error) {
                     // Ignore quota errors or network issues for background updates
                     console.warn("Failed to update activity status:", error);
