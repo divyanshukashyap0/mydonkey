@@ -2,12 +2,13 @@ import React from 'react';
 import { Download, FileSpreadsheet, Users, Film, MessageSquare, Database, Upload, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useStore } from '../../../context/StoreContext';
 import * as XLSX from 'xlsx';
-import { collection, writeBatch, doc } from 'firebase/firestore';
+import { collection, writeBatch, doc, setDoc, getDocsFromCache } from 'firebase/firestore';
 import { db } from '../../../firebase';
 
 const ExportManager = () => {
-    const { content, users, contentRequests } = useStore();
+    const { settings } = useStore();
     const [importing, setImporting] = React.useState(false);
+    const [exporting, setExporting] = React.useState(false);
     const [importStats, setImportStats] = React.useState<{ total: number; success: number; skipped: number; errors: number } | null>(null);
 
     const exportToExcel = (data: any[], fileName: string, sheetName: string) => {
@@ -17,51 +18,87 @@ const ExportManager = () => {
         XLSX.writeFile(wb, `${fileName}_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
-    const handleExportContent = () => {
-        const data = content.map(c => ({
-            ID: c.id,
-            Title: c.title,
-            Type: c.type,
-            Genres: c.genres?.join(', '),
-            ReleaseDate: c.release_date,
-            Rating: c.vote_average,
-            Featured: c.featured ? 'Yes' : 'No',
-            Original: c.isOriginal ? 'Yes' : 'No',
-            TrailerLink: c.youtubeId ? `https://www.youtube.com/watch?v=${c.youtubeId}` : 'N/A',
-            PosterURL: c.poster_path,
-            BackdropURL: c.backdrop_path,
-            VideoURL: c.videoUrl || 'N/A',
-            MovieDriveID: c.movieDriveId || 'N/A',
-            MovieYoutubeID: c.movieYoutubeId || 'N/A',
-            CreatedAt: c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'
-        }));
-        exportToExcel(data, 'MyDonkey_Content', 'Content Library');
+    const handleExportContent = async () => {
+        setExporting(true);
+        try {
+            const snapshot = await getDocsFromCache(collection(db, 'content'));
+            const data = snapshot.docs.map(doc => {
+                const c = doc.data();
+                return {
+                    ID: c.id,
+                    Title: c.title,
+                    Type: c.type,
+                    Genres: c.genres?.join(', '),
+                    ReleaseDate: c.release_date,
+                    Rating: c.vote_average,
+                    Featured: c.featured ? 'Yes' : 'No',
+                    Original: c.isOriginal ? 'Yes' : 'No',
+                    TrailerLink: c.youtubeId ? `https://www.youtube.com/watch?v=${c.youtubeId}` : 'N/A',
+                    PosterURL: c.poster_path,
+                    BackdropURL: c.backdrop_path,
+                    VideoURL: c.videoUrl || 'N/A',
+                    MovieDriveID: c.movieDriveId || 'N/A',
+                    MovieYoutubeID: c.movieYoutubeId || 'N/A',
+                    CreatedAt: c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'
+                };
+            });
+            exportToExcel(data, 'MyDonkey_Content', 'Content Library');
+        } catch (error) {
+            console.error("Export Error:", error);
+            alert("Failed to export content. Please try again.");
+        } finally {
+            setExporting(false);
+        }
     };
 
-    const handleExportUsers = () => {
-        const data = users.map(u => ({
-            UID: u.uid,
-            Email: u.email,
-            Role: u.role,
-            Plan: u.plan,
-            Status: u.status,
-            Joined: u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'N/A',
-            LastActive: u.lastActiveAt ? new Date(u.lastActiveAt).toLocaleString() : 'N/A'
-        }));
-        exportToExcel(data, 'MyDonkey_Users', 'User Base');
+    const handleExportUsers = async () => {
+        setExporting(true);
+        try {
+            const snapshot = await getDocsFromCache(collection(db, 'users'));
+            const data = snapshot.docs.map(doc => {
+                const u = doc.data();
+                return {
+                    UID: u.uid,
+                    Email: u.email,
+                    Role: u.role,
+                    Plan: u.plan,
+                    Status: u.status,
+                    Joined: u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'N/A',
+                    LastActive: u.lastActiveAt ? new Date(u.lastActiveAt).toLocaleString() : 'N/A'
+                };
+            });
+            exportToExcel(data, 'MyDonkey_Users', 'User Base');
+        } catch (error) {
+            console.error("Export Error:", error);
+            alert("Failed to export users.");
+        } finally {
+            setExporting(false);
+        }
     };
 
 
-    const handleExportRequests = () => {
-        const data = contentRequests.map(r => ({
-            ID: r.id,
-            Title: r.contentTitle,
-            UserEmail: r.userEmail,
-            UserName: r.userName,
-            Status: r.status,
-            RequestedAt: r.createdAt ? new Date(r.createdAt).toLocaleString() : 'N/A'
-        }));
-        exportToExcel(data, 'MyDonkey_Requests', 'Content Requests');
+    const handleExportRequests = async () => {
+        setExporting(true);
+        try {
+            const snapshot = await getDocsFromCache(collection(db, 'content_requests'));
+            const data = snapshot.docs.map(doc => {
+                const r = doc.data();
+                return {
+                    ID: r.id,
+                    Title: r.contentTitle,
+                    UserEmail: r.userEmail,
+                    UserName: r.userName,
+                    Status: r.status,
+                    RequestedAt: r.createdAt ? new Date(r.createdAt).toLocaleString() : 'N/A'
+                };
+            });
+            exportToExcel(data, 'MyDonkey_Requests', 'Content Requests');
+        } catch (error) {
+            console.error("Export Error:", error);
+            alert("Failed to export requests.");
+        } finally {
+            setExporting(false);
+        }
     };
 
     const getEpisodesData = () => {
@@ -89,58 +126,109 @@ const ExportManager = () => {
         return episodesData;
     };
 
-    const handleExportAll = () => {
-        const wb = XLSX.utils.book_new();
+    const handleExportAll = async () => {
+        setExporting(true);
+        try {
+            const wb = XLSX.utils.book_new();
 
-        // Content Sheet
-        const contentData = content.map(c => ({
-            ID: c.id,
-            Title: c.title,
-            Type: c.type,
-            Genres: c.genres?.join(', '),
-            ReleaseDate: c.release_date,
-            Rating: c.vote_average,
-            Featured: c.featured ? 'Yes' : 'No',
-            TrailerLink: c.youtubeId ? `https://www.youtube.com/watch?v=${c.youtubeId}` : 'N/A',
-            PosterURL: c.poster_path,
-            BackdropURL: c.backdrop_path,
-            VideoURL: c.videoUrl || 'N/A',
-            CreatedAt: c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'
-        }));
-        const wsContent = XLSX.utils.json_to_sheet(contentData);
-        XLSX.utils.book_append_sheet(wb, wsContent, 'Content');
+            // Fetch all necessary collections from CACHE (Quota Bypass)
+            console.log("Starting full DB export from Device Cache...");
+            const [contentSnap, usersSnap, requestsSnap] = await Promise.all([
+                getDocsFromCache(collection(db, 'content')),
+                getDocsFromCache(collection(db, 'users')),
+                getDocsFromCache(collection(db, 'content_requests'))
+            ]);
+            console.log(`Fetched (Cache): ${contentSnap.size} content, ${usersSnap.size} users, ${requestsSnap.size} requests`);
 
-        // Users Sheet
-        const userData = users.map(u => ({
-            UID: u.uid,
-            Email: u.email,
-            Role: u.role,
-            Plan: u.plan,
-            Status: u.status,
-            Joined: u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'N/A',
-            LastActive: u.lastActiveAt ? new Date(u.lastActiveAt).toLocaleString() : 'N/A'
-        }));
-        const wsUsers = XLSX.utils.json_to_sheet(userData);
-        XLSX.utils.book_append_sheet(wb, wsUsers, 'Users');
+            // 1. Content Sheet
+            const contentData = contentSnap.docs.map(doc => {
+                const c = doc.data();
+                return {
+                    ID: c.id,
+                    Title: c.title,
+                    Type: c.type,
+                    Genres: c.genres?.join(', '),
+                    ReleaseDate: c.release_date,
+                    Rating: c.vote_average,
+                    Featured: c.featured ? 'Yes' : 'No',
+                    Original: c.isOriginal ? 'Yes' : 'No',
+                    TrailerLink: c.youtubeId ? `https://www.youtube.com/watch?v=${c.youtubeId}` : 'N/A',
+                    PosterURL: c.poster_path,
+                    BackdropURL: c.backdrop_path,
+                    VideoURL: (c.videoUrl && c.videoUrl !== 'N/A') ? c.videoUrl : '',
+                    MovieDriveID: (c.movieDriveId && c.movieDriveId !== 'N/A') ? c.movieDriveId : '',
+                    MovieYoutubeID: (c.movieYoutubeId && c.movieYoutubeId !== 'N/A') ? c.movieYoutubeId : '',
+                    CreatedAt: c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'
+                };
+            });
+            const wsContent = XLSX.utils.json_to_sheet(contentData);
+            XLSX.utils.book_append_sheet(wb, wsContent, 'Content');
 
-        // Requests Sheet
-        const requestData = contentRequests.map(r => ({
-            ID: r.id,
-            Title: r.contentTitle,
-            UserEmail: r.userEmail,
-            UserName: r.userName,
-            Status: r.status,
-            RequestedAt: r.createdAt ? new Date(r.createdAt).toLocaleString() : 'N/A'
-        }));
-        const wsRequests = XLSX.utils.json_to_sheet(requestData);
-        XLSX.utils.book_append_sheet(wb, wsRequests, 'Requests');
+            // 2. Users Sheet
+            const userData = usersSnap.docs.map(doc => {
+                const u = doc.data();
+                return {
+                    UID: u.uid,
+                    Email: u.email,
+                    Role: u.role,
+                    Plan: u.plan,
+                    Status: u.status,
+                    Joined: u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'N/A',
+                    LastActive: u.lastActiveAt ? new Date(u.lastActiveAt).toLocaleString() : 'N/A'
+                };
+            });
+            const wsUsers = XLSX.utils.json_to_sheet(userData);
+            XLSX.utils.book_append_sheet(wb, wsUsers, 'Users');
 
-        // Episodes Sheet
-        const episodesData = getEpisodesData();
-        const wsEpisodes = XLSX.utils.json_to_sheet(episodesData);
-        XLSX.utils.book_append_sheet(wb, wsEpisodes, 'Episodes');
+            // 3. Requests Sheet
+            const requestData = requestsSnap.docs.map(doc => {
+                const r = doc.data();
+                return {
+                    ID: r.id,
+                    Title: r.contentTitle,
+                    UserEmail: r.userEmail,
+                    UserName: r.userName,
+                    Status: r.status,
+                    RequestedAt: r.createdAt ? new Date(r.createdAt).toLocaleString() : 'N/A'
+                };
+            });
+            const wsRequests = XLSX.utils.json_to_sheet(requestData);
+            XLSX.utils.book_append_sheet(wb, wsRequests, 'Requests');
 
-        XLSX.writeFile(wb, `MyDonkey_Full_Backup_${new Date().toISOString().split('T')[0]}.xlsx`);
+            // 4. Episodes Sheet
+            const episodesData: any[] = [];
+            contentSnap.docs.forEach(doc => {
+                const c = doc.data();
+                if (c.type === 'tv' && c.seasons) {
+                    c.seasons.forEach((s: any) => {
+                        s.episodes.forEach((e: any) => {
+                            episodesData.push({
+                                SeriesID: c.id,
+                                SeriesTitle: c.title,
+                                Season: s.seasonNumber,
+                                EpisodeNumber: e.episodeNumber,
+                                EpisodeTitle: e.title,
+                                VideoURL: (e.videoUrl && e.videoUrl !== 'N/A') ? e.videoUrl : '',
+                                DriveID: (e.driveId && e.driveId !== 'N/A') ? e.driveId : '',
+                                YoutubeID: (e.youtubeId && e.youtubeId !== 'N/A') ? e.youtubeId : '',
+                                Duration: (e.duration && e.duration !== 'N/A') ? e.duration : '',
+                                Description: (e.overview && e.overview !== 'N/A') ? e.overview : ''
+                            });
+                        });
+                    });
+                }
+            });
+            const wsEpisodes = XLSX.utils.json_to_sheet(episodesData);
+            XLSX.utils.book_append_sheet(wb, wsEpisodes, 'Episodes');
+
+            XLSX.writeFile(wb, `MyDonkey_Full_Backup_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+        } catch (error) {
+            console.error("Export Error:", error);
+            alert("Failed to export full backup.");
+        } finally {
+            setExporting(false);
+        }
     };
 
     const handleDownloadTemplate = () => {
@@ -245,9 +333,9 @@ const ExportManager = () => {
                     youtubeId: row.TrailerLink ? (row.TrailerLink.includes('v=') ? row.TrailerLink.split('v=')[1] : row.TrailerLink) : (row.YoutubeID || ''),
                     poster_path: row.PosterURL || '',
                     backdrop_path: row.BackdropURL || row.PosterURL || '',
-                    videoUrl: row.VideoURL !== 'N/A' ? row.VideoURL : '',
-                    movieDriveId: row.MovieDriveID !== 'N/A' ? row.MovieDriveID : '',
-                    movieYoutubeId: row.MovieYoutubeID !== 'N/A' ? row.MovieYoutubeID : '',
+                    videoUrl: (row.VideoURL && row.VideoURL !== 'N/A') ? row.VideoURL : '',
+                    movieDriveId: (row.MovieDriveID && row.MovieDriveID !== 'N/A') ? row.MovieDriveID : '',
+                    movieYoutubeId: (row.MovieYoutubeID && row.MovieYoutubeID !== 'N/A') ? row.MovieYoutubeID : '',
                     featured: (row.Featured || 'No').toLowerCase() === 'yes',
                     isOriginal: (row.Original || 'No').toLowerCase() === 'yes',
                     duration: row.Duration || '',
@@ -308,12 +396,12 @@ const ExportManager = () => {
                 const userRef = doc(db, 'users', u.UID);
                 batch.set(userRef, {
                     uid: u.UID,
-                    email: u.Email,
-                    role: u.Role,
-                    plan: u.Plan,
-                    status: u.Status,
-                    createdAt: u.Joined !== 'N/A' ? new Date(u.Joined).toISOString() : new Date().toISOString(),
-                    lastActiveAt: u.LastActive !== 'N/A' ? new Date(u.LastActive).toISOString() : undefined
+                    email: u.Email || '',
+                    role: u.Role || 'user',
+                    plan: u.Plan || 'free',
+                    status: u.Status || 'active',
+                    createdAt: (u.Joined && u.Joined !== 'N/A') ? new Date(u.Joined).toISOString() : new Date().toISOString(),
+                    lastActiveAt: (u.LastActive && u.LastActive !== 'N/A') ? new Date(u.LastActive).toISOString() : null
                 }, { merge: true });
                 count++;
             });
@@ -329,10 +417,10 @@ const ExportManager = () => {
                 const ref = doc(db, 'content_requests', r.ID);
                 batch.set(ref, {
                     id: r.ID,
-                    contentTitle: r.Title,
-                    userEmail: r.UserEmail,
-                    userName: r.UserName,
-                    status: r.Status,
+                    contentTitle: r.Title || 'Unknown Content',
+                    userEmail: r.UserEmail || '',
+                    userName: r.UserName || 'Anonymous',
+                    status: r.Status || 'pending',
                     createdAt: r.RequestedAt !== 'N/A' ? new Date(r.RequestedAt).toISOString() : new Date().toISOString()
                 }, { merge: true });
             });
@@ -373,12 +461,12 @@ const ExportManager = () => {
                     const eps = seasonMap[sNum].map((e: any) => ({
                         id: `ep_${Date.now()}_${e.EpisodeNumber}`, // Generate new ID or add ID to export
                         episodeNumber: e.EpisodeNumber,
-                        title: e.EpisodeTitle,
-                        overview: e.Description !== 'N/A' ? e.Description : '',
-                        videoUrl: e.VideoURL !== 'N/A' ? e.VideoURL : '',
-                        driveId: e.DriveID !== 'N/A' ? e.DriveID : '',
-                        youtubeId: e.YoutubeID !== 'N/A' ? e.YoutubeID : '',
-                        duration: e.Duration !== 'N/A' ? e.Duration : '',
+                        title: e.EpisodeTitle || `Episode ${e.EpisodeNumber}`,
+                        overview: (e.Description && e.Description !== 'N/A') ? e.Description : '',
+                        videoUrl: (e.VideoURL && e.VideoURL !== 'N/A') ? e.VideoURL : '',
+                        driveId: (e.DriveID && e.DriveID !== 'N/A') ? e.DriveID : '',
+                        youtubeId: (e.YoutubeID && e.YoutubeID !== 'N/A') ? e.YoutubeID : '',
+                        duration: (e.Duration && e.Duration !== 'N/A') ? e.Duration : '',
                         stillUrl: '' // Wasn't in export
                     })).sort((a, b) => a.episodeNumber - b.episodeNumber);
 
@@ -484,7 +572,7 @@ const ExportManager = () => {
                         onClick={handleExportAll}
                         className="px-6 py-3 bg-brand-red hover:bg-red-700 text-white font-bold rounded-lg flex items-center gap-2 transition hover:scale-105 shadow-lg whitespace-nowrap"
                     >
-                        <Download size={20} /> Export Everything
+                        <Download size={20} /> {exporting ? 'Exporting...' : 'Export Everything'}
                     </button>
                 </div>
 
