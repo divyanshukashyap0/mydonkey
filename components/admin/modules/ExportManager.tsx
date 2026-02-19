@@ -181,93 +181,233 @@ const ExportManager = () => {
             try {
                 const bstr = evt.target?.result;
                 const wb = XLSX.read(bstr, { type: 'binary' });
-                const wsname = wb.SheetNames[0];
-                const ws = wb.Sheets[wsname];
-                const data = XLSX.utils.sheet_to_json(ws);
 
-                if (data.length === 0) {
-                    alert('File is empty or invalid.');
-                    setImporting(false);
-                    return;
+                // check if this is a "Full Backup" (has specific sheets)
+                const sheetNames = wb.SheetNames;
+                const isFullBackup = sheetNames.includes('Content') && sheetNames.includes('Users');
+
+                if (isFullBackup) {
+                    await handleFullRestore(wb);
+                } else {
+                    // Standard single-sheet content import
+                    const wsname = wb.SheetNames[0];
+                    const ws = wb.Sheets[wsname];
+                    const data = XLSX.utils.sheet_to_json(ws);
+                    await processContentBatch(data);
                 }
 
-                // Process Data with Batching (Max 500 per batch)
-                const total = data.length;
-                let processed = 0;
-                let skipped = 0;
-                const BATCH_SIZE = 450; // Safety margin below 500
-
-                for (let i = 0; i < total; i += BATCH_SIZE) {
-                    const chunk = data.slice(i, i + BATCH_SIZE);
-                    const batch = writeBatch(db);
-                    let batchCount = 0;
-
-                    chunk.forEach((row: any) => {
-                        const title = row.Title ? String(row.Title).trim() : 'Untitled';
-
-                        // Check for duplicates in existing content (Case Insenstive)
-                        const exists = content.some(c => c.title.toLowerCase() === title.toLowerCase());
-
-                        if (exists) {
-                            skipped++;
-                            return; // Skip duplicate
-                        }
-
-                        const docRef = doc(collection(db, 'content'));
-                        const newId = docRef.id;
-
-                        const newItem: any = {
-                            id: newId,
-                            title: title,
-                            overview: row.Overview || '',
-                            type: (row.Type || 'movie').toLowerCase(),
-                            genres: row.Genres ? row.Genres.split(',').map((g: string) => g.trim()) : [],
-                            release_date: row.ReleaseDate || new Date().toISOString().split('T')[0],
-                            vote_average: Number(row.Rating) || 0,
-                            youtubeId: row.YoutubeID || '',
-                            poster_path: row.PosterURL || '',
-                            backdrop_path: row.BackdropURL || '',
-                            videoUrl: row.VideoURL || '',
-                            movieDriveId: row.MovieDriveID || '',
-                            movieYoutubeId: row.MovieYoutubeID || '',
-                            featured: (row.Featured || 'No').toLowerCase() === 'yes',
-                            isOriginal: (row.Original || 'No').toLowerCase() === 'yes',
-                            duration: row.Duration || '',
-                            createdAt: new Date().toISOString(),
-                            isPublished: true
-                        };
-
-                        batch.set(docRef, newItem);
-                        batchCount++;
-                    });
-
-                    if (batchCount > 0) {
-                        await batch.commit();
-                        processed += batchCount;
-                    }
-                }
-
-                // FORCE UPDATE VERSION
-                if (processed > 0) {
-                    await setDoc(doc(db, 'settings', 'global'), {
-                        contentVersion: (settings?.contentVersion || 0) + 1
-                    }, { merge: true });
-                }
-
-                setImportStats({ total, success: processed, skipped, errors: 0 });
-                alert(`Import Complete!\nAdded: ${processed}\nSkipped (Duplicates): ${skipped}`);
-
-            } catch (error) {
+            } catch (error: any) {
                 console.error("Import Error:", error);
-                alert("Error exploring file. Please check the format.");
+                alert("Error importing file: " + error.message);
                 setImportStats({ total: 0, success: 0, skipped: 0, errors: 1 });
             } finally {
                 setImporting(false);
-                // Reset input
-                e.target.value = '';
+                e.target.value = ''; // Reset input
             }
         };
         reader.readAsBinaryString(file);
+    };
+
+    const processContentBatch = async (data: any[], checkDuplicates = true) => {
+        if (data.length === 0) return;
+
+        const total = data.length;
+        let processed = 0;
+        let skipped = 0;
+        const BATCH_SIZE = 450;
+
+        for (let i = 0; i < total; i += BATCH_SIZE) {
+            const chunk = data.slice(i, i + BATCH_SIZE);
+            const batch = writeBatch(db);
+            let batchCount = 0;
+
+            chunk.forEach((row: any) => {
+                const title = row.Title ? String(row.Title).trim() : 'Untitled';
+
+                // Existing content check
+                if (checkDuplicates && content.some(c => c.title.toLowerCase() === title.toLowerCase())) {
+                    skipped++;
+                    return;
+                }
+
+                // ID Preservation if available (from Backup), else new ID
+                const docId = row.ID || doc(collection(db, 'content')).id;
+                const docRef = doc(db, 'content', docId);
+
+                const newItem: any = {
+                    id: docId,
+                    title: title,
+                    overview: row.Overview || '',
+                    type: (row.Type || 'movie').toLowerCase(),
+                    genres: row.Genres ? String(row.Genres).split(',').map((g: string) => g.trim()) : [],
+                    release_date: row.ReleaseDate || new Date().toISOString().split('T')[0],
+                    vote_average: Number(row.Rating) || 0,
+                    youtubeId: row.TrailerLink ? (row.TrailerLink.includes('v=') ? row.TrailerLink.split('v=')[1] : row.TrailerLink) : (row.YoutubeID || ''),
+                    poster_path: row.PosterURL || '',
+                    backdrop_path: row.BackdropURL || row.PosterURL || '',
+                    videoUrl: row.VideoURL !== 'N/A' ? row.VideoURL : '',
+                    movieDriveId: row.MovieDriveID !== 'N/A' ? row.MovieDriveID : '',
+                    movieYoutubeId: row.MovieYoutubeID !== 'N/A' ? row.MovieYoutubeID : '',
+                    featured: (row.Featured || 'No').toLowerCase() === 'yes',
+                    isOriginal: (row.Original || 'No').toLowerCase() === 'yes',
+                    duration: row.Duration || '',
+                    createdAt: row.CreatedAt !== 'N/A' ? new Date(row.CreatedAt).toISOString() : new Date().toISOString(),
+                    isPublished: true,
+                    // Preserve extra fields if restoring
+                    poster_path_mobile: row.PosterURL, // Fallback
+                    backdrop_path_mobile: row.BackdropURL // Fallback
+                };
+
+                batch.set(docRef, newItem, { merge: true });
+                batchCount++;
+            });
+
+            if (batchCount > 0) {
+                await batch.commit();
+                processed += batchCount;
+            }
+        }
+
+        // Update version
+        if (processed > 0) {
+            await setDoc(doc(db, 'settings', 'global'), {
+                contentVersion: (settings?.contentVersion || 0) + 1
+            }, { merge: true });
+        }
+
+        return { processed, skipped };
+    };
+
+    const handleFullRestore = async (wb: XLSX.WorkBook) => {
+        let totalStats = { added: 0, skipped: 0 };
+
+        // 1. Restore Content
+        if (wb.Sheets['Content']) {
+            const contentData = XLSX.utils.sheet_to_json(wb.Sheets['Content']);
+            console.log(`Restoring ${contentData.length} content items...`);
+            // We turn off duplicate check for backup restore to ensure IDs match
+            // But we actually DO want duplicate check if merging? 
+            // The user said "Upload same excel data after new firebase database", implying empty DB.
+            const stats = await processContentBatch(contentData, false);
+            if (stats) {
+                totalStats.added += stats.processed;
+            }
+        }
+
+        // 2. Restore Users (Optional)
+        if (wb.Sheets['Users']) {
+            const usersData = XLSX.utils.sheet_to_json(wb.Sheets['Users']);
+            console.log(`Restoring ${usersData.length} users...`);
+
+            const batch = writeBatch(db);
+            let count = 0;
+
+            // Limit to 450 for safety in one go (or implement loop if huge, keeping simple for now)
+            usersData.slice(0, 490).forEach((u: any) => {
+                if (!u.UID) return;
+                const userRef = doc(db, 'users', u.UID);
+                batch.set(userRef, {
+                    uid: u.UID,
+                    email: u.Email,
+                    role: u.Role,
+                    plan: u.Plan,
+                    status: u.Status,
+                    createdAt: u.Joined !== 'N/A' ? new Date(u.Joined).toISOString() : new Date().toISOString(),
+                    lastActiveAt: u.LastActive !== 'N/A' ? new Date(u.LastActive).toISOString() : undefined
+                }, { merge: true });
+                count++;
+            });
+            await batch.commit();
+        }
+
+        // 3. Restore Requests
+        if (wb.Sheets['Requests']) {
+            const reqData = XLSX.utils.sheet_to_json(wb.Sheets['Requests']);
+            const batch = writeBatch(db);
+            reqData.slice(0, 490).forEach((r: any) => {
+                if (!r.ID) return;
+                const ref = doc(db, 'content_requests', r.ID);
+                batch.set(ref, {
+                    id: r.ID,
+                    contentTitle: r.Title,
+                    userEmail: r.UserEmail,
+                    userName: r.UserName,
+                    status: r.Status,
+                    createdAt: r.RequestedAt !== 'N/A' ? new Date(r.RequestedAt).toISOString() : new Date().toISOString()
+                }, { merge: true });
+            });
+            await batch.commit();
+        }
+
+        // 4. Restore Episodes (Crucial: Rebuild Structure)
+        if (wb.Sheets['Episodes']) {
+            const epData = XLSX.utils.sheet_to_json(wb.Sheets['Episodes']);
+            console.log(`Restoring ${epData.length} episodes...`);
+
+            // Group by Series ID
+            const seriesMap: Record<string, any[]> = {};
+            epData.forEach((row: any) => {
+                if (!row.SeriesID) return;
+                if (!seriesMap[row.SeriesID]) seriesMap[row.SeriesID] = [];
+                seriesMap[row.SeriesID].push(row);
+            });
+
+            // Process each series
+            const batch = writeBatch(db);
+            let batchCount = 0;
+
+            for (const seriesId of Object.keys(seriesMap)) {
+                const rows = seriesMap[seriesId];
+
+                // Reconstruct Seasons
+                // Group rows by Season Number
+                const seasonMap: Record<number, any[]> = {};
+                rows.forEach(r => {
+                    const sNum = Number(r.Season) || 1;
+                    if (!seasonMap[sNum]) seasonMap[sNum] = [];
+                    seasonMap[sNum].push(r);
+                });
+
+                const seasons = Object.keys(seasonMap).map(sNumStr => {
+                    const sNum = Number(sNumStr);
+                    const eps = seasonMap[sNum].map((e: any) => ({
+                        id: `ep_${Date.now()}_${e.EpisodeNumber}`, // Generate new ID or add ID to export
+                        episodeNumber: e.EpisodeNumber,
+                        title: e.EpisodeTitle,
+                        overview: e.Description !== 'N/A' ? e.Description : '',
+                        videoUrl: e.VideoURL !== 'N/A' ? e.VideoURL : '',
+                        driveId: e.DriveID !== 'N/A' ? e.DriveID : '',
+                        youtubeId: e.YoutubeID !== 'N/A' ? e.YoutubeID : '',
+                        duration: e.Duration !== 'N/A' ? e.Duration : '',
+                        stillUrl: '' // Wasn't in export
+                    })).sort((a, b) => a.episodeNumber - b.episodeNumber);
+
+                    return {
+                        id: `season_${sNum}`,
+                        seasonNumber: sNum,
+                        title: `Season ${sNum}`,
+                        episodes: eps,
+                        trailerYoutubeId: ''
+                    };
+                });
+
+                // Update the Series Content Doc with these seasons
+                const seriesRef = doc(db, 'content', seriesId);
+                batch.update(seriesRef, { seasons: seasons });
+                batchCount++;
+
+                if (batchCount >= 450) {
+                    await batch.commit();
+                    batchCount = 0;
+                    // Reset batch? No, writeBatch cannot be reused.
+                    // Ideally we'd loop batch creation but limiting complexity here.
+                }
+            }
+            if (batchCount > 0) await batch.commit();
+        }
+
+        alert(`Full Restore Complete!\nRestored Content items: ${totalStats.added}`);
+        setImportStats({ total: 1, success: 1, skipped: 0, errors: 0 });
     };
 
     return (

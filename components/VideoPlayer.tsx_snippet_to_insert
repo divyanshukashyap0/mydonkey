@@ -1,0 +1,28 @@
+    // Check for duration update (Auto-calculate) - Run once per session
+    const hasUpdatedDuration = React.useRef(false);
+
+    useEffect(() => {
+        if (!content || !playerRef.current || !currentUser || currentUser.role !== 'admin') return;
+        if (hasUpdatedDuration.current) return;
+
+        // Check once after 5 seconds of playback
+        const checkTimer = setTimeout(() => {
+            if (playerRef.current && playerRef.current.getDuration) {
+                const duration = playerRef.current.getDuration();
+                if (duration > 0) {
+                    const mins = Math.floor(duration / 60);
+                    const durationStr = `${mins}m`;
+
+                    // Only update if missing or different (and valid)
+                    if (mins > 0 && content.duration !== durationStr) {
+                        console.log(`[AutoFix] Updating duration to ${durationStr}`);
+                        updateContentDuration(content.id, durationStr) // This is async
+                            .catch(e => console.error("Duration update failed", e));
+                        hasUpdatedDuration.current = true; // Block future updates
+                    }
+                }
+            }
+        }, 5000);
+
+        return () => clearTimeout(checkTimer);
+    }, [content.id, currentUser, updateContentDuration, playing]);

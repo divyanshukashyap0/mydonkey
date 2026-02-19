@@ -150,6 +150,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const [contentRequests, setContentRequests] = useState<ContentRequest[]>([]);
     const [pages, setPages] = useState<Page[]>([]);
 
+    // Track versions in memory to prevent infinite loops if LocalStorage fails
+    const localContentVersionRef = React.useRef(parseInt(localStorage.getItem('contentVersion') || '0'));
+    const localSectionsVersionRef = React.useRef(parseInt(localStorage.getItem('sectionsVersion') || '0'));
+
     // --- Theme Application ---
     useEffect(() => {
         if (settings.theme === 'luxury') {
@@ -378,38 +382,47 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 } catch (e) { console.warn("LS Full (Settings)", e); }
 
                 // B. Content Sync Logic
-                const localContentVersion = parseInt(localStorage.getItem('contentVersion') || '0');
+                // Use Memory Ref as the source of truth for "current local version"
+                const currentLocalContentVersion = localContentVersionRef.current;
                 const serverContentVersion = Number(serverSettings.contentVersion || 0);
 
-                // Check if we have cached content
                 const cachedContentStr = localStorage.getItem('cachedContent');
 
-                if (serverContentVersion !== localContentVersion || !cachedContentStr) {
-                    console.log(`[Cache] Updating Content (Server: ${serverContentVersion} vs Local: ${localContentVersion}). Reason: ${!cachedContentStr ? 'No Cache' : 'Version Mismatch'}`);
+                if (serverContentVersion !== currentLocalContentVersion || !cachedContentStr) {
+                    console.log(`[Cache] Updating Content (Server: ${serverContentVersion} vs Local: ${currentLocalContentVersion}). Reason: ${!cachedContentStr ? 'No Cache' : 'Version Mismatch'}`);
+
                     // Fetch fresh data
                     const contentSnap = await getDocs(collection(db, 'content'));
                     const freshContent = contentSnap.docs.map(d => ({ ...d.data(), id: d.id } as Content));
 
                     // Update Cache & State
                     setContent(freshContent);
+
+                    // Update Memory Ref IMMEDIATELY to stop re-fetches
+                    localContentVersionRef.current = serverContentVersion;
+
                     try {
                         localStorage.setItem('cachedContent', JSON.stringify(freshContent));
                         localStorage.setItem('contentVersion', serverContentVersion.toString());
                     } catch (e) {
-                        console.error("LocalStorage Limit Exceeded during Content Save:", e);
-                        // If we can't save to cache, we might want to clear old cache or just rely on memory
+                        console.error("LocalStorage Write Failed (Quota Exceeded). Content updated in memory only.", e);
                     }
                 } else {
-                    console.log(`[Cache] Content up to date (v${localContentVersion}). Loading from Cache.`);
+                    console.log(`[Cache] Content up to date (v${currentLocalContentVersion}). Loading from Cache.`);
                     // Load from Cache
                     if (cachedContentStr) {
                         try {
                             const parsedContent = JSON.parse(cachedContentStr);
-                            if (parsedContent.length === 0 && localContentVersion > 0) {
+                            // Deep check for empty array if version > 0
+                            if (parsedContent.length === 0 && currentLocalContentVersion > 0) {
                                 console.warn("[Cache] Cached content is empty but version > 0. Forcing refresh.");
                                 const contentSnap = await getDocs(collection(db, 'content'));
                                 const freshContent = contentSnap.docs.map(d => ({ ...d.data(), id: d.id } as Content));
+
                                 setContent(freshContent);
+                                // Update Ref
+                                localContentVersionRef.current = serverContentVersion;
+
                                 try {
                                     localStorage.setItem('cachedContent', JSON.stringify(freshContent));
                                 } catch (e) { console.warn("LS Full", e); }
@@ -423,22 +436,26 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 }
 
                 // C. Sections Sync Logic
-                const localSectionsVersion = parseInt(localStorage.getItem('sectionsVersion') || '0');
+                const currentLocalSectionsVersion = localSectionsVersionRef.current;
                 const serverSectionsVersion = Number(serverSettings.sectionsVersion || 0);
                 const cachedSectionsStr = localStorage.getItem('cachedSections');
 
-                if (serverSectionsVersion !== localSectionsVersion || !cachedSectionsStr) {
-                    console.log(`[Cache] Updating Sections (Server: ${serverSectionsVersion} vs Local: ${localSectionsVersion})`);
+                if (serverSectionsVersion !== currentLocalSectionsVersion || !cachedSectionsStr) {
+                    console.log(`[Cache] Updating Sections (Server: ${serverSectionsVersion} vs Local: ${currentLocalSectionsVersion})`);
                     const sectionsSnap = await getDocs(query(collection(db, 'sections'), orderBy('order')));
                     const freshSections = sectionsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Section));
 
                     setSections(freshSections);
+
+                    // Update Memory Ref IMMEDIATELY
+                    localSectionsVersionRef.current = serverSectionsVersion;
+
                     try {
                         localStorage.setItem('cachedSections', JSON.stringify(freshSections));
                         localStorage.setItem('sectionsVersion', serverSectionsVersion.toString());
                     } catch (e) { console.warn("LS Full (Sections)", e); }
                 } else {
-                    console.log(`[Cache] Sections up to date (v${localSectionsVersion}). Loading from Cache.`);
+                    console.log(`[Cache] Sections up to date (v${currentLocalSectionsVersion}). Loading from Cache.`);
                     if (cachedSectionsStr) {
                         setSections(JSON.parse(cachedSectionsStr));
                     }

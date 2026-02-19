@@ -347,22 +347,39 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 setProgress(prog);
                 progressRef.current = prog;
                 setShowSkipIntro(curr > 30 && curr < 120 && content.type === 'tv');
-
-                // Auto-Duration Update (Admin Only Check)
-                if (currentUser?.role === 'admin' && (!content.duration || content.duration === '0m')) {
-                    const mins = Math.floor(dur / 60);
-                    const durationStr = `${mins}m`;
-                    // Simple check to avoid repeated calls
-                    if (mins > 0 && content.duration !== durationStr) {
-                        updateContentDuration(content.id, durationStr)
-                            .then(() => { })
-                            .catch(e => console.error('[AutoDuration] Update failed', e));
-                    }
-                }
             }
         }, 500);
         return () => clearInterval(interval);
     }, [playing, isDriveVideo, currentUser?.role, content.duration]);
+
+    // Check for duration update (Auto-calculate) - Run once per session
+    const hasUpdatedDuration = useRef(false);
+
+    useEffect(() => {
+        if (!content || !playerRef.current || !currentUser || currentUser.role !== 'admin') return;
+        if (hasUpdatedDuration.current) return;
+
+        // Check once after 5 seconds of playback
+        const checkTimer = setTimeout(() => {
+            if (playerRef.current && playerRef.current.getDuration) {
+                const duration = playerRef.current.getDuration();
+                if (duration > 0) {
+                    const mins = Math.floor(duration / 60);
+                    const durationStr = `${mins}m`;
+
+                    // Only update if missing or different (and valid)
+                    if (mins > 0 && content.duration !== durationStr) {
+                        console.log(`[AutoFix] Updating duration to ${durationStr}`);
+                        updateContentDuration(content.id, durationStr)
+                            .catch(e => console.error("Duration update failed", e));
+                        hasUpdatedDuration.current = true; // Block future updates
+                    }
+                }
+            }
+        }, 5000);
+
+        return () => clearTimeout(checkTimer);
+    }, [content.id, currentUser?.role, playing]);
 
     // Save Progress Store
     useEffect(() => {
