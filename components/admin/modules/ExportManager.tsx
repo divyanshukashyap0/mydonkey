@@ -6,7 +6,7 @@ import { collection, writeBatch, doc, setDoc, getDocsFromCache } from 'firebase/
 import { db } from '../../../firebase';
 
 const ExportManager = () => {
-    const { settings } = useStore();
+    const { content, users, contentRequests, settings } = useStore();
     const [importing, setImporting] = React.useState(false);
     const [exporting, setExporting] = React.useState(false);
     const [importStats, setImportStats] = React.useState<{ total: number; success: number; skipped: number; errors: number } | null>(null);
