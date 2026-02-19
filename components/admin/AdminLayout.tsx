@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   LayoutDashboard, Film, Users, Settings, Home, LogOut,
-  Tags, CreditCard, Calendar, MessageSquare, ChevronDown, ChevronRight, Menu, X, FileText
+  Tags, CreditCard, Calendar, MessageSquare, ChevronDown, ChevronRight, Menu, X, FileText, Database
 } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import UsersModule from './UsersModule';
@@ -15,9 +15,10 @@ import RequestsManager from './modules/RequestsManager';
 import PagesManager from './modules/PagesManager';
 import AppearanceManager from './modules/AppearanceManager';
 import AnimeManager from './modules/AnimeManager';
+import ExportManager from './modules/ExportManager';
 
 // --- Types ---
-type ModuleType = 'dashboard' | 'content' | 'anime' | 'home' | 'coming_soon' | 'requests' | 'plans' | 'users' | 'settings' | 'pages' | 'appearance';
+type ModuleType = 'dashboard' | 'content' | 'anime' | 'home' | 'coming_soon' | 'requests' | 'plans' | 'users' | 'settings' | 'pages' | 'appearance' | 'export';
 
 interface SidebarGroup {
   title: string;
@@ -55,6 +56,7 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
     items: [
       { id: 'appearance', label: 'Appearance & Theme', icon: Tags },
       { id: 'settings', label: 'Settings', icon: Settings },
+      { id: 'export', label: 'Import / Export', icon: Database },
     ]
   }
 ];
@@ -183,8 +185,10 @@ export default function AdminLayout({ onExit }: { onExit: () => void }) {
             {activeModule === 'users' && <UsersModule />}
             {activeModule === 'settings' && <SettingsManager />}
             {activeModule === 'requests' && <RequestsManager />}
+
             {activeModule === 'pages' && <PagesManager />}
             {activeModule === 'appearance' && <AppearanceManager />}
+            {activeModule === 'export' && <ExportManager />}
           </div>
         </main>
       </div>

@@ -197,6 +197,18 @@ const MainLayout = () => {
         handleTabChange(page.toLowerCase());
     };
 
+    // Pagination State
+    const [visibleCount, setVisibleCount] = useState(24);
+
+    useEffect(() => {
+        setVisibleCount(24); // Reset on tab change
+        window.scrollTo(0, 0);
+    }, [activeTab, animeCategory]);
+
+    const handleLoadMore = () => {
+        setVisibleCount(prev => prev + 24);
+    };
+
     // Render Content based on Tab
     const renderContent = () => {
         // Info Pages - Dynamic
@@ -276,11 +288,12 @@ const MainLayout = () => {
         }
 
         if (activeTab === 'movies') {
+            const visibleMovies = movies.slice(0, visibleCount);
             return (
                 <div className="pt-24 px-4 md:px-12 pb-12 min-h-screen">
                     <h1 className="text-3xl font-bold mb-8">Movies</h1>
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-12">
-                        {movies.map(item => (
+                        {visibleMovies.map(item => (
                             <div key={item.id} onClick={() => handleDetails(item)} className="cursor-pointer transition-transform hover:scale-105 relative aspect-[2/3]">
                                 <img
                                     src={item.poster_path_mobile || item.poster_path}
@@ -291,17 +304,25 @@ const MainLayout = () => {
                             </div>
                         ))}
                     </div>
+                    {movies.length > visibleCount && (
+                        <div className="flex justify-center mb-12">
+                            <button onClick={handleLoadMore} className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-full font-bold transition">
+                                Load More
+                            </button>
+                        </div>
+                    )}
                     <ContentRequestInline />
                 </div>
             );
         }
 
         if (activeTab === 'tv') {
+            const visibleTV = tvShows.slice(0, visibleCount);
             return (
                 <div className="pt-24 px-4 md:px-12 pb-12 min-h-screen">
                     <h1 className="text-3xl font-bold mb-8">TV Shows</h1>
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-12">
-                        {tvShows.map(item => (
+                        {visibleTV.map(item => (
                             <div key={item.id} onClick={() => handleDetails(item)} className="cursor-pointer transition-transform hover:scale-105 relative aspect-[2/3]">
                                 <img
                                     src={item.poster_path_mobile || item.poster_path}
@@ -312,6 +333,13 @@ const MainLayout = () => {
                             </div>
                         ))}
                     </div>
+                    {tvShows.length > visibleCount && (
+                        <div className="flex justify-center mb-12">
+                            <button onClick={handleLoadMore} className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-full font-bold transition">
+                                Load More
+                            </button>
+                        </div>
+                    )}
                     <ContentRequestInline />
                 </div>
             );
@@ -323,20 +351,12 @@ const MainLayout = () => {
                 c.genres?.some(g => g.toLowerCase() === 'anime' || g.toLowerCase() === 'animation')
             );
 
-            // Sub-Genre Filtering State (Local to this block if possible, but React needs it at top level or component)
-            // Since we are inside renderContent, we can't use useState hooks here directly if they weren't declared at top.
-            // WORKAROUND: We will declare the state at the top level of MainLayout.
-
-            // ... (See Top Level State Addition below) ...
-
             // Derived filtered list
             const filteredAnime = animeCategory === 'All'
                 ? animeContent
                 : animeContent.filter(c => c.genres?.includes(animeCategory));
 
-            const featuredAnime = animeContent.find(c => c.featured) || animeContent[0];
-
-            const categories = ['All', 'Action', 'Romance', 'Fantasy', 'Sci-Fi', 'Adventure', 'Drama'];
+            const visibleAnime = filteredAnime.slice(0, visibleCount);
 
             return (
                 <div className="min-h-screen pt-24 px-4 md:px-12 pb-12">
@@ -344,25 +364,34 @@ const MainLayout = () => {
                         <span className="bg-gradient-to-r from-brand-red to-purple-600 bg-clip-text text-transparent">Anime Library</span>
                     </h1>
 
-                    {animeContent.length > 0 ? (
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
-                            {animeContent.map(item => (
-                                <div key={item.id} onClick={() => handleDetails(item)} className="group cursor-pointer relative aspect-[2/3] overflow-hidden rounded-xl border border-white/10 hover:border-brand-red/50 transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(229,9,20,0.4)]">
-                                    <img
-                                        src={item.poster_path_mobile || item.poster_path}
-                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                        loading="lazy"
-                                        alt={item.title}
-                                    />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
-                                        <div>
-                                            <h3 className="font-bold text-white leading-tight mb-1">{item.title}</h3>
-                                            <div className="text-[10px] text-brand-red font-black uppercase">{item.genres?.[0]}</div>
+                    {filteredAnime.length > 0 ? (
+                        <>
+                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                                {visibleAnime.map(item => (
+                                    <div key={item.id} onClick={() => handleDetails(item)} className="group cursor-pointer relative aspect-[2/3] overflow-hidden rounded-xl border border-white/10 hover:border-brand-red/50 transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(229,9,20,0.4)]">
+                                        <img
+                                            src={item.poster_path_mobile || item.poster_path}
+                                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                            loading="lazy"
+                                            alt={item.title}
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
+                                            <div>
+                                                <h3 className="font-bold text-white leading-tight mb-1">{item.title}</h3>
+                                                <div className="text-[10px] text-brand-red font-black uppercase">{item.genres?.[0]}</div>
+                                            </div>
                                         </div>
                                     </div>
+                                ))}
+                            </div>
+                            {filteredAnime.length > visibleCount && (
+                                <div className="flex justify-center mt-12">
+                                    <button onClick={handleLoadMore} className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-full font-bold transition">
+                                        Load More Anime
+                                    </button>
                                 </div>
-                            ))}
-                        </div>
+                            )}
+                        </>
                     ) : (
                         <div className="h-64 flex flex-col items-center justify-center text-gray-500 border border-dashed border-white/10 rounded-xl">
                             <p className="text-xl font-bold mb-2">No Anime Found</p>

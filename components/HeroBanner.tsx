@@ -80,12 +80,10 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
                     },
                     events: {
                         onReady: (event: any) => {
-                            console.log('Hero Player Ready - Attempting to play');
                             event.target.mute(); // Ensure mute first
                             event.target.playVideo();
                         },
                         onStateChange: (event: any) => {
-                            console.log('Hero Player State Change:', event.data);
                             // YT.PlayerState.PLAYING = 1
                             if (event.data === 1) {
                                 setVideoPlaying(true);

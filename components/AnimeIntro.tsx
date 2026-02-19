@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 
 interface AnimeIntroProps {
     onComplete: () => void;
+    mode?: 'enter' | 'exit';
 }
 
-const AnimeIntro: React.FC<AnimeIntroProps> = ({ onComplete }) => {
+const AnimeIntro: React.FC<AnimeIntroProps> = ({ onComplete, mode = 'enter' }) => {
     const [phase, setPhase] = useState<'start' | 'slash' | 'text' | 'exit'>('start');
 
     useEffect(() => {
@@ -42,7 +43,7 @@ const AnimeIntro: React.FC<AnimeIntroProps> = ({ onComplete }) => {
                         アニメ
                     </div>
                     <div className="absolute -top-4 -left-4 text-brand-red font-black text-xl tracking-[1em] animate-pulse">
-                        WAKE UP
+                        {mode === 'exit' ? 'REALITY' : 'WAKE UP'}
                     </div>
                 </div>
             )}

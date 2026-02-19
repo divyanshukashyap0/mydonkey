@@ -99,6 +99,8 @@ export interface SiteSettings {
   websiteFont?: string;
   rankFont?: string;
   heroFont?: string;
+  contentVersion?: number;
+  sectionsVersion?: number;
 }
 
 export interface Plan {

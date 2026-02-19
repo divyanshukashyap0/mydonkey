@@ -365,23 +365,64 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }, []);
 
     // 2. Data Sync Listeners
+    // 2. Data Sync Listeners - Optimized with Cache-First Strategy
     useEffect(() => {
-        const unsubContent = onSnapshot(collection(db, 'content'), (snap) => {
-            setContent(snap.docs.map(d => ({ ...d.data(), id: d.id } as Content)));
-        });
+        // A. Settings Listener (Single Doc Read - Cheap)
+        // This acts as the "Signal" for other data updates
+        const unsubSettings = onSnapshot(doc(db, 'settings', 'global'), async (docSnap) => {
+            if (docSnap.exists()) {
+                const serverSettings = docSnap.data() as SiteSettings;
+                setSettings(serverSettings);
+                localStorage.setItem('globalSettings', JSON.stringify(serverSettings));
 
-        const unsubSettings = onSnapshot(doc(db, 'settings', 'global'), (doc) => {
-            if (doc.exists()) {
-                const data = doc.data() as SiteSettings;
-                setSettings(data);
-                localStorage.setItem('globalSettings', JSON.stringify(data));
+                // B. Content Sync Logic
+                const localContentVersion = parseInt(localStorage.getItem('contentVersion') || '0');
+                const serverContentVersion = serverSettings.contentVersion || 0;
+
+                // Check if we have cached content
+                const cachedContentStr = localStorage.getItem('cachedContent');
+
+                if (serverContentVersion > localContentVersion || !cachedContentStr) {
+                    console.log(`[Cache] Updating Content (Server: ${serverContentVersion} > Local: ${localContentVersion})`);
+                    // Fetch fresh data
+                    const contentSnap = await getDocs(collection(db, 'content'));
+                    const freshContent = contentSnap.docs.map(d => ({ ...d.data(), id: d.id } as Content));
+
+                    // Update Cache & State
+                    setContent(freshContent);
+                    localStorage.setItem('cachedContent', JSON.stringify(freshContent));
+                    localStorage.setItem('contentVersion', serverContentVersion.toString());
+                } else {
+                    console.log(`[Cache] Content up to date (v${localContentVersion}). Loading from Cache.`);
+                    // Load from Cache
+                    if (cachedContentStr) {
+                        setContent(JSON.parse(cachedContentStr));
+                    }
+                }
+
+                // C. Sections Sync Logic
+                const localSectionsVersion = parseInt(localStorage.getItem('sectionsVersion') || '0');
+                const serverSectionsVersion = serverSettings.sectionsVersion || 0;
+                const cachedSectionsStr = localStorage.getItem('cachedSections');
+
+                if (serverSectionsVersion > localSectionsVersion || !cachedSectionsStr) {
+                    console.log(`[Cache] Updating Sections (Server: ${serverSectionsVersion} > Local: ${localSectionsVersion})`);
+                    const sectionsSnap = await getDocs(query(collection(db, 'sections'), orderBy('order')));
+                    const freshSections = sectionsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Section));
+
+                    setSections(freshSections);
+                    localStorage.setItem('cachedSections', JSON.stringify(freshSections));
+                    localStorage.setItem('sectionsVersion', serverSectionsVersion.toString());
+                } else {
+                    console.log(`[Cache] Sections up to date (v${localSectionsVersion}). Loading from Cache.`);
+                    if (cachedSectionsStr) {
+                        setSections(JSON.parse(cachedSectionsStr));
+                    }
+                }
             }
         });
 
-        const unsubSections = onSnapshot(query(collection(db, 'sections'), orderBy('order')), (snap) => {
-            setSections(snap.docs.map(d => ({ ...d.data(), id: d.id } as Section)));
-        });
-
+        // Keep Plans & Notifications as real-time for now (low frequency updates, critical for billing)
         const unsubPlans = onSnapshot(collection(db, 'plans'), (snap) => {
             const data = snap.docs.map(d => ({ ...d.data(), id: d.id } as Plan));
             setPlans(data);
@@ -406,9 +447,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
 
         return () => {
-            unsubContent();
             unsubSettings();
-            unsubSections();
             unsubPlans();
             unsubNotifs();
             unsubPages();

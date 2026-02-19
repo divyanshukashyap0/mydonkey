@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BarChart3, Clock, Download, Play, TrendingUp } from 'lucide-react';
+import { BarChart3, Clock, Download, Play, TrendingUp, AlertTriangle, Database } from 'lucide-react';
 import { collection, getDocs, limit, orderBy, query, where, onSnapshot, getAggregateFromServer, sum } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { User } from '../../../types';
@@ -151,6 +151,33 @@ const AnalyticsManager = () => {
                     <div className="relative z-10">
                         <p className="text-gray-400 text-sm font-bold uppercase flex items-center gap-2"><TrendingUp size={16} /> Active Users (24h)</p>
                         <p className="text-4xl font-black mt-2 text-white">{activeUsersCount}</p>
+                    </div>
+                </div>
+
+                {/* Database Usage Estimation Card */}
+                <div className="bg-[#141414] p-6 rounded-xl border border-white/5 relative overflow-hidden md:col-span-3 lg:col-span-1">
+                    <div className="relative z-10">
+                        <p className="text-gray-400 text-sm font-bold uppercase flex items-center gap-2">
+                            <Database size={16} /> Est. Database Reads
+                        </p>
+                        <div className="mt-2 flex items-baseline gap-2">
+                            <p className="text-4xl font-black text-white">
+                                {((content.length * (activeUsersCount || 1)) + 500).toLocaleString()}
+                            </p>
+                            <span className="text-xs text-gray-500 font-bold uppercase">Reads/Day (Est.)</span>
+                        </div>
+
+                        <div className={`mt-3 flex items-start gap-2 text-xs p-2 rounded border ${((content.length * (activeUsersCount || 1)) > 45000)
+                                ? 'bg-red-500/10 text-red-500 border-red-500/20'
+                                : 'bg-green-500/10 text-green-500 border-green-500/20'
+                            }`}>
+                            <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                            <span>
+                                {((content.length * (activeUsersCount || 1)) > 45000)
+                                    ? "Warning: Approaching Spark Plan limit (50k/day). Consider enabling maintenance mode or upgrading."
+                                    : "Usage is within safe limits for Spark Plan (50k/day). Processed safely via Cache."}
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>

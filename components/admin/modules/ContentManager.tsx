@@ -179,6 +179,11 @@ const ContentManager = () => {
             const dataToSave = JSON.parse(JSON.stringify(finalData));
             await setDoc(doc(db, 'content', id), dataToSave);
 
+            // Increment DB Version to trigger client reuse/fetch
+            await setDoc(doc(db, 'settings', 'global'), {
+                contentVersion: (settings.contentVersion || 0) + 1
+            }, { merge: true });
+
             // Notification for new content
             if (!formData.id && finalData.isPublished) {
                 await addDoc(collection(db, 'notifications'), {
@@ -204,6 +209,9 @@ const ContentManager = () => {
     const handleDelete = async (id: string) => {
         if (confirm("Are you sure you want to delete this content?")) {
             await deleteDoc(doc(db, 'content', id));
+            await setDoc(doc(db, 'settings', 'global'), {
+                contentVersion: (settings.contentVersion || 0) + 1
+            }, { merge: true });
         }
     };
 
@@ -227,6 +235,9 @@ const ContentManager = () => {
             batch.delete(doc(db, 'content', id));
         });
         await batch.commit();
+        await setDoc(doc(db, 'settings', 'global'), {
+            contentVersion: (settings.contentVersion || 0) + 1
+        }, { merge: true });
         setSelectedItems([]);
     };
 
@@ -603,7 +614,6 @@ const ContentManager = () => {
                                                             const normalizedText = doc.value.replace(/,/g, '\n');
                                                             const rawLines = normalizedText.split(/\r?\n/);
                                                             const lines = rawLines.map(l => l.trim()).filter(l => l.length > 0).reverse();
-                                                            console.log("Processing lines:", lines);
 
                                                             const defaultThumb = thumbDoc ? thumbDoc.value.trim() : '';
 

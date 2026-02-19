@@ -164,7 +164,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     ];
 
     const onPlayerReady = (event: any) => {
-        console.log('Player Ready');
         setIsPlayerReady(true);
         setIsBuffering(false);
         const playerDuration = event.target.getDuration();
@@ -220,7 +219,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const handleQualityChange = (quality: string) => {
         if (!playerRef.current) return;
 
-        console.log('VideoPlayer: Forcing quality to', quality);
         const currentTime = playerRef.current.getCurrentTime();
 
         // Use loadVideoById to force a reload stream with new quality (most reliable method)
@@ -264,8 +262,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     // Initialize YouTube Player
     useEffect(() => {
         if (!isApiReady || isDriveVideo || playerRef.current || !youtubeVideoId) return;
-
-        console.log('Initializing YouTube Player for:', youtubeVideoId);
 
         playerRef.current = new window.YT.Player('youtube-player', {
             videoId: youtubeVideoId,
@@ -358,9 +354,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     const durationStr = `${mins}m`;
                     // Simple check to avoid repeated calls
                     if (mins > 0 && content.duration !== durationStr) {
-                        console.log(`[AutoDuration] Updating ${content.title} (${content.id}) to ${durationStr}`);
                         updateContentDuration(content.id, durationStr)
-                            .then(() => console.log('[AutoDuration] Update success'))
+                            .then(() => { })
                             .catch(e => console.error('[AutoDuration] Update failed', e));
                     }
                 }

@@ -18,20 +18,24 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
         if (input) input.focus();
     }, []);
 
-    // Filter content based on query
+    // Debounce Query
     useEffect(() => {
-        if (!query.trim()) {
-            setResults([]);
-            return;
-        }
+        const timer = setTimeout(() => {
+            if (!query.trim()) {
+                setResults([]);
+                return;
+            }
 
-        const lowerQuery = query.toLowerCase();
-        const filtered = content.filter(item =>
-            item.title.toLowerCase().includes(lowerQuery) ||
-            item.overview?.toLowerCase().includes(lowerQuery) ||
-            item.genres?.some(g => g.toLowerCase().includes(lowerQuery))
-        );
-        setResults(filtered);
+            const lowerQuery = query.toLowerCase();
+            const filtered = content.filter(item =>
+                item.title.toLowerCase().includes(lowerQuery) ||
+                item.overview?.toLowerCase().includes(lowerQuery) ||
+                item.genres?.some(g => g.toLowerCase().includes(lowerQuery))
+            );
+            setResults(filtered);
+        }, 300); // 300ms delay
+
+        return () => clearTimeout(timer);
     }, [query, content]);
 
     return (
