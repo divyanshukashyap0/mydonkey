@@ -132,9 +132,22 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
         <div className="relative w-full overflow-hidden group bg-cinema-black h-[70vh] lg:h-[85vh]">
 
             {/* Background Layer: Image (Always visible initially, fades out when video playing) */}
+            {/* Background Layer: Image (Always visible initially, fades out when video playing) */}
             <div className={`absolute inset-0 transition-opacity duration-1000 z-10 ${videoPlaying ? 'opacity-0' : 'opacity-100'}`}>
-                <img src={item.backdrop_path} className="w-full h-full object-cover" alt="Hero Backdrop" />
-                <div className="absolute inset-0 bg-gradient-to-r from-black via-black/40 to-transparent" />
+                {/* Mobile: Poster (Smartphone Image) */}
+                <img
+                    src={item.poster_path_mobile || item.poster_path}
+                    className="w-full h-full object-cover md:hidden"
+                    alt="Hero Poster"
+                />
+
+                {/* Desktop: Backdrop (Desktop Image) - Full Screen */}
+                <img
+                    src={item.backdrop_path}
+                    className="w-full h-full object-cover hidden md:block"
+                    alt="Hero Backdrop"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-cinema-black via-cinema-black/20 to-transparent md:bg-gradient-to-r md:from-black md:via-black/40 md:to-transparent" />
             </div>
 
             {/* Background Layer: Video (Oversized for cinematic fill) */}
@@ -151,49 +164,54 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
             <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-cinema-black to-transparent z-20" />
 
             {/* Content Layer - Positioned at BOTTOM to not cover video */}
-            <div className="absolute bottom-0 left-0 right-0 z-40 px-6 md:px-12 lg:px-16 pb-6 md:pb-12">
-                <div className="max-w-2xl space-y-4">
-                    {isOriginal && (
-                        <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left duration-700">
-                            <img src="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png" className="h-5 w-auto object-contain" alt="Logo" />
-                            <div className="text-gray-300 text-[10px] font-bold tracking-widest">ORIGINAL</div>
-                        </div>
-                    )}
-
-                    <h1
-                        className="text-3xl md:text-5xl lg:text-6xl font-black text-white leading-none drop-shadow-2xl animate-fade-up"
-                        style={{ fontFamily: 'var(--font-hero)' }}
-                    >
-                        {item.title}
-                    </h1>
-
-                    <div className="flex flex-wrap items-center gap-2 md:gap-4 text-white font-medium text-sm md:text-base animate-fade-up delay-100 opacity-0">
-                        {ratingScore && (
-                            <span className="text-green-400 font-bold">{ratingScore}/10 Rating</span>
+            <div className="absolute bottom-0 left-0 right-0 z-40 px-6 md:px-12 lg:px-16 pb-6 md:pb-12 pointer-events-none">
+                <div className="max-w-4xl flex items-end justify-between">
+                    <div className="max-w-2xl space-y-4 pointer-events-auto">
+                        {isOriginal && (
+                            <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left duration-700">
+                                <img src="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png" className="h-5 w-auto object-contain" alt="Logo" />
+                                <div className="text-gray-300 text-[10px] font-bold tracking-widest">ORIGINAL</div>
+                            </div>
                         )}
-                        <span>{item.release_date ? item.release_date.split('-')[0] : ''}</span>
-                        <span className="bg-gray-800 px-2 py-0.5 rounded border border-gray-600 text-xs">{item.rating || 'U/A 13+'}</span>
-                        <span className="bg-brand-red/20 text-brand-red border border-brand-red px-2 py-0.5 rounded text-xs">{item.resolution || '4K'}</span>
-                    </div>
 
-                    {/* Overview - Hidden on mobile, only visible on desktop */}
-                    <p className="hidden md:block text-gray-200 text-base line-clamp-3 drop-shadow-md leading-relaxed animate-fade-up delay-200 opacity-0">
-                        {item.overview}
-                    </p>
+                        <h1
+                            className="text-3xl md:text-5xl lg:text-7xl font-black text-white leading-none drop-shadow-2xl animate-fade-up"
+                            style={{ fontFamily: 'var(--font-hero)' }}
+                        >
+                            {item.title}
+                        </h1>
 
-                    <div className="flex gap-3 pt-2 animate-fade-up delay-300 opacity-0">
-                        <button
-                            onClick={() => onPlay({ ...item, playMode: 'movie' })}
-                            className="bg-white text-black px-5 md:px-8 py-2.5 md:py-3 rounded font-bold text-base md:text-lg flex items-center gap-2 hover:bg-gray-200 transition-transform hover:scale-105 active:scale-95"
-                        >
-                            <PlayCircle size={22} fill="black" /> Play
-                        </button>
-                        <button
-                            onClick={() => onDetails(item)}
-                            className="bg-gray-600/40 backdrop-blur-md text-white px-5 md:px-8 py-2.5 md:py-3 rounded font-bold text-base md:text-lg flex items-center gap-2 hover:bg-gray-600/60 transition-transform hover:scale-105 active:scale-95"
-                        >
-                            <Info size={22} /> More Info
-                        </button>
+                        <div className="flex flex-wrap items-center gap-2 md:gap-4 text-white font-medium text-sm md:text-base animate-fade-up delay-100 opacity-0">
+                            {ratingScore && (
+                                <span className="text-green-400 font-bold">{ratingScore}/10 Rating</span>
+                            )}
+                            <span>{item.release_date ? item.release_date.split('-')[0] : ''}</span>
+                            <span className="bg-gray-800 px-2 py-0.5 rounded border border-gray-600 text-xs">{item.rating || 'U/A 13+'}</span>
+                            <span className="bg-brand-red/20 text-brand-red border border-brand-red px-2 py-0.5 rounded text-xs">{item.resolution || '4K'}</span>
+                            {(item.genres || []).slice(0, 3).map(g => (
+                                <span key={g} className="text-gray-400 text-sm hidden md:inline">• {g}</span>
+                            ))}
+                        </div>
+
+                        {/* Overview - Hidden on mobile, only visible on desktop */}
+                        <p className="hidden md:block text-gray-200 text-base line-clamp-3 drop-shadow-md leading-relaxed animate-fade-up delay-200 opacity-0 max-w-xl">
+                            {item.overview}
+                        </p>
+
+                        <div className="flex gap-3 pt-2 animate-fade-up delay-300 opacity-0">
+                            <button
+                                onClick={() => onPlay({ ...item, playMode: 'movie' })}
+                                className="bg-white text-black px-5 md:px-8 py-2.5 md:py-3 rounded-full font-bold text-base md:text-lg flex items-center gap-2 hover:bg-gray-200 transition-transform hover:scale-105 active:scale-95"
+                            >
+                                <PlayCircle size={22} fill="black" /> Play
+                            </button>
+                            <button
+                                onClick={() => onDetails(item)}
+                                className="bg-gray-600/40 backdrop-blur-md text-white px-5 md:px-8 py-2.5 md:py-3 rounded-full font-bold text-base md:text-lg flex items-center gap-2 hover:bg-gray-600/60 transition-transform hover:scale-105 active:scale-95"
+                            >
+                                <Info size={22} /> More Info
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -202,7 +220,7 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
             {videoPlaying && (
                 <button
                     onClick={handleMuteToggle}
-                    className="absolute bottom-24 right-6 md:bottom-32 md:right-12 z-40 bg-black/40 border border-white/20 p-2.5 md:p-3 rounded-full text-white hover:bg-white/10 transition animate-in fade-in"
+                    className="absolute bottom-24 right-6 md:bottom-12 md:right-12 z-40 bg-black/40 border border-white/20 p-2.5 md:p-3 rounded-full text-white hover:bg-white/10 transition animate-in fade-in"
                 >
                     {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
                 </button>

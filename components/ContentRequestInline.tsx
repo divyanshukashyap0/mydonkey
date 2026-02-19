@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Send, CheckCircle, Play } from 'lucide-react';
+import { Send, CheckCircle, Play, X } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { Content } from '../types';
 
@@ -54,10 +54,23 @@ const ContentRequestInline: React.FC<ContentRequestInlineProps> = ({ className =
         }
     };
 
+    const [isVisible, setIsVisible] = useState(true);
+
+    if (!isVisible) return null;
+
     return (
-        <div className={`rounded-xl overflow-hidden border border-white/10 shadow-2xl relative ${className}`}>
+        <div className={`rounded-xl overflow-hidden border border-white/10 shadow-2xl relative ${className} animate-in fade-in slide-in-from-bottom-4`}>
             {/* Background Gradient */}
             <div className="absolute inset-0 bg-gradient-to-br from-[#1a1a2e] to-[#16213e] z-0" />
+
+            {/* Close Button */}
+            <button
+                onClick={() => setIsVisible(false)}
+                className="absolute top-2 right-2 p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition z-20"
+                aria-label="BSDismiss"
+            >
+                <X size={20} />
+            </button>
 
             {/* Content */}
             <div className="relative z-10 p-5 md:p-6">

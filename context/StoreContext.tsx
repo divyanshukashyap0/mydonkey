@@ -48,7 +48,8 @@ import {
     query,
     orderBy,
     where,
-    serverTimestamp
+    serverTimestamp,
+    getDocsFromCache
 } from 'firebase/firestore';
 
 interface StoreContextType {
@@ -391,9 +392,22 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 if (serverContentVersion !== currentLocalContentVersion || !cachedContentStr) {
                     console.log(`[Cache] Updating Content (Server: ${serverContentVersion} vs Local: ${currentLocalContentVersion}). Reason: ${!cachedContentStr ? 'No Cache' : 'Version Mismatch'}`);
 
-                    // Fetch fresh data
-                    const contentSnap = await getDocs(collection(db, 'content'));
-                    const freshContent = contentSnap.docs.map(d => ({ ...d.data(), id: d.id } as Content));
+                    // Fetch fresh data with Cache Fallback (for Quota Exceeded)
+                    let freshContent: Content[] = [];
+                    try {
+                        const contentSnap = await getDocs(collection(db, 'content'));
+                        freshContent = contentSnap.docs.map(d => ({ ...d.data(), id: d.id } as Content));
+                    } catch (err) {
+                        console.warn("Network fetch failed (Quota/Offline). Trying Cache...", err);
+                        try {
+                            const contentSnap = await getDocsFromCache(collection(db, 'content'));
+                            freshContent = contentSnap.docs.map(d => ({ ...d.data(), id: d.id } as Content));
+                            console.log(`[Cache] Recovered ${freshContent.length} items from offline cache.`);
+                        } catch (cacheErr) {
+                            console.error("Cache recovery failed:", cacheErr);
+                            // Last resort: Keep existing state or empty
+                        }
+                    }
 
                     // Update Cache & State
                     setContent(freshContent);
@@ -413,22 +427,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     if (cachedContentStr) {
                         try {
                             const parsedContent = JSON.parse(cachedContentStr);
-                            // Deep check for empty array if version > 0
-                            if (parsedContent.length === 0 && currentLocalContentVersion > 0) {
-                                console.warn("[Cache] Cached content is empty but version > 0. Forcing refresh.");
-                                const contentSnap = await getDocs(collection(db, 'content'));
-                                const freshContent = contentSnap.docs.map(d => ({ ...d.data(), id: d.id } as Content));
-
-                                setContent(freshContent);
-                                // Update Ref
-                                localContentVersionRef.current = serverContentVersion;
-
-                                try {
-                                    localStorage.setItem('cachedContent', JSON.stringify(freshContent));
-                                } catch (e) { console.warn("LS Full", e); }
-                            } else {
-                                setContent(parsedContent);
-                            }
+                            setContent(parsedContent);
                         } catch (e) {
                             console.error("Error parsing cached content:", e);
                         }
@@ -440,10 +439,26 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 const serverSectionsVersion = Number(serverSettings.sectionsVersion || 0);
                 const cachedSectionsStr = localStorage.getItem('cachedSections');
 
-                if (serverSectionsVersion !== currentLocalSectionsVersion || !cachedSectionsStr) {
-                    console.log(`[Cache] Updating Sections (Server: ${serverSectionsVersion} vs Local: ${currentLocalSectionsVersion})`);
-                    const sectionsSnap = await getDocs(query(collection(db, 'sections'), orderBy('order')));
-                    const freshSections = sectionsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Section));
+                // FORCE UPDATE logic: If (Version Mismatch) OR (No Cache) OR (Sections Length is 0 in state/cache [we check string length for speed])
+                // This ensures that if the user has no sections, we always try to fetch at least once.
+                const shouldFetchSections =
+                    serverSectionsVersion !== currentLocalSectionsVersion ||
+                    !cachedSectionsStr ||
+                    cachedSectionsStr.length < 5; // Empty array "[]" is length 2
+
+                if (shouldFetchSections) {
+                    console.log(`[Cache] Updating Sections. Reason: ${serverSectionsVersion !== currentLocalSectionsVersion ? 'Version Mismatch' : 'Missing/Empty Cache'}`);
+                    let freshSections: Section[] = [];
+                    try {
+                        const sectionsSnap = await getDocs(query(collection(db, 'sections'), orderBy('order')));
+                        freshSections = sectionsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Section));
+                    } catch (err) {
+                        console.warn("Sections fetch failed. Trying Cache...", err);
+                        try {
+                            const sectionsSnap = await getDocsFromCache(query(collection(db, 'sections'), orderBy('order')));
+                            freshSections = sectionsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Section));
+                        } catch (cacheErr) { console.error(cacheErr); }
+                    }
 
                     setSections(freshSections);
 
@@ -461,6 +476,39 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     }
                 }
             }
+        }, (error) => {
+            console.error("Settings Listener Failed (Quota/Offline). Initiating Safe Mode Load.", error);
+            // FAILSAFE: Try to load from LocalStorage / Cache anyway
+            const cachedContentStr = localStorage.getItem('cachedContent');
+            if (cachedContentStr) {
+                try {
+                    setContent(JSON.parse(cachedContentStr));
+                    console.log("Safe Mode: Loaded Content from LocalStorage.");
+                } catch (e) { console.error("Safe Mode Content Parse Failed", e); }
+            } else {
+                // Try Firestore Cache if LS is empty
+                getDocsFromCache(collection(db, 'content')).then(snap => {
+                    if (!snap.empty) {
+                        setContent(snap.docs.map(d => ({ ...d.data(), id: d.id } as Content)));
+                        console.log("Safe Mode: Loaded Content from Firestore Cache.");
+                    }
+                }).catch(e => console.error("Safe Mode Firestore Cache Failed", e));
+            }
+
+            const cachedSectionsStr = localStorage.getItem('cachedSections');
+            if (cachedSectionsStr) {
+                try {
+                    setSections(JSON.parse(cachedSectionsStr));
+                    console.log("Safe Mode: Loaded Sections from LocalStorage.");
+                } catch (e) { console.error("Safe Mode Sections Parse Failed", e); }
+            } else {
+                getDocsFromCache(query(collection(db, 'sections'), orderBy('order'))).then(snap => {
+                    if (!snap.empty) {
+                        setSections(snap.docs.map(d => ({ ...d.data(), id: d.id } as Section)));
+                        console.log("Safe Mode: Loaded Sections from Firestore Cache.");
+                    }
+                }).catch(e => console.error("Safe Mode Sections Cache Failed", e));
+            }
         });
 
         // Keep Plans & Notifications as real-time for now (low frequency updates, critical for billing)
@@ -470,14 +518,20 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             try {
                 localStorage.setItem('cachedPlans', JSON.stringify(data));
             } catch (e) { }
+        }, (error) => {
+            console.error("Plans Sync Error (Quota/Offline):", error);
         });
 
         const unsubNotifs = onSnapshot(query(collection(db, 'notifications'), orderBy('createdAt', 'desc')), (snap) => {
             setNotifications(snap.docs.map(d => ({ ...d.data(), id: d.id } as Notification)));
+        }, (error) => {
+            console.error("Notifications Sync Error:", error);
         });
 
         const unsubPages = onSnapshot(collection(db, 'pages'), (snap) => {
             setPages(snap.docs.map(d => ({ ...d.data(), id: d.id } as Page)));
+        }, (error) => {
+            console.error("Pages Sync Error:", error);
         });
 
         let unsubUsers = () => { };

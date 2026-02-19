@@ -21,10 +21,10 @@ const LiveSportsRail: React.FC<LiveSportsRailProps> = ({ items, onPlay }) => {
                     <div
                         key={item.id}
                         onClick={() => onPlay(item)}
-                        className="flex-none w-[280px] md:w-[350px] group cursor-pointer relative"
+                        className="flex-none w-[160px] md:w-[200px] group cursor-pointer relative"
                     >
-                        <div className="aspect-video rounded-lg overflow-hidden border border-white/10 group-hover:border-white/40 transition-all relative">
-                            <img src={item.backdrop_path} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={item.title} />
+                        <div className="aspect-[2/3] rounded-lg overflow-hidden border border-white/10 group-hover:border-white/40 transition-all relative">
+                            <img src={item.poster_path_mobile || item.poster_path} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={item.title} />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 group-hover:opacity-90 transition-opacity" />
 
                             {/* Live/Coming Soon Badge */}
@@ -34,7 +34,7 @@ const LiveSportsRail: React.FC<LiveSportsRailProps> = ({ items, onPlay }) => {
 
                             <div className="absolute bottom-3 left-3 right-3 flex justify-between items-end">
                                 <div className="flex-1">
-                                    <h3 className="text-sm font-bold text-white line-clamp-1">{item.title}</h3>
+                                    <h3 className="text-sm font-bold text-white line-clamp-2">{item.title}</h3>
                                     <p className="text-[10px] text-gray-300 font-medium">{(item.genres || []).join(' • ')}</p>
                                 </div>
                                 <PlayCircle size={32} className="text-white opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0 duration-300" />

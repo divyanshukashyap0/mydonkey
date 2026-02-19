@@ -21,14 +21,27 @@ const AnimeIntro: React.FC<AnimeIntroProps> = ({ onComplete, mode = 'enter' }) =
             clearTimeout(t3);
             clearTimeout(t4);
         };
-    }, [onComplete]);
+    }, []);
 
     return (
         <div className={`fixed inset-0 z-[100] bg-black flex items-center justify-center overflow-hidden ${phase === 'exit' ? 'animate-anime-exit' : ''}`}>
 
+            {/* Background Video */}
+            <div className="absolute inset-0 z-0">
+                <video
+                    src="/Anime.mp4"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover opacity-80"
+                />
+                <div className="absolute inset-0 bg-black/40" />
+            </div>
+
             {/* Phase 1: The Slash */}
             {phase === 'slash' && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
                     <div className="w-[150%] h-2 bg-white shadow-[0_0_50px_rgba(255,255,255,0.8)] animate-anime-slash" />
                 </div>
             )}
@@ -47,9 +60,6 @@ const AnimeIntro: React.FC<AnimeIntroProps> = ({ onComplete, mode = 'enter' }) =
                     </div>
                 </div>
             )}
-
-            {/* Background Particles/Noise could go here */}
-            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none mix-blend-overlay"></div>
         </div>
     );
 };

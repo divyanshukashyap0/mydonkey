@@ -318,8 +318,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         if (!playing || !currentUser?.uid || currentUser?.isGuest) return;
 
         const heartbeat = setInterval(() => {
-            incrementWatchTime(currentUser.uid, 10);
-        }, 10000);
+            incrementWatchTime(currentUser.uid, 60);
+        }, 60000);
 
         return () => clearInterval(heartbeat);
     }, [playing, currentUser?.uid, currentUser?.isGuest]);
@@ -386,7 +386,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         if (isDriveVideo || isTrailer) return;
         const saveInterval = setInterval(() => {
             if (duration > 0) updatePlaybackProgress(content.id, progressRef.current, currentTime, duration);
-        }, 5000);
+        }, 30000);
         return () => {
             clearInterval(saveInterval);
             if (duration > 0) updatePlaybackProgress(content.id, progressRef.current, currentTime, duration);
@@ -548,46 +548,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     }, []);
 
     // Gesture State
-    const [brightness, setBrightness] = useState(100);
-    const touchStartRef = useRef<{ x: number, y: number, time: number } | null>(null);
     const lastTapRef = useRef<{ time: number, x: number } | null>(null);
     const [rippleSides, setRippleSides] = useState<('left' | 'right')[]>([]);
-
-    const handleTouchStart = (e: React.TouchEvent) => {
-        touchStartRef.current = {
-            x: e.touches[0].clientX,
-            y: e.touches[0].clientY,
-            time: Date.now()
-        };
-    };
-
-    const handleTouchMove = (e: React.TouchEvent) => {
-        if (!touchStartRef.current) return;
-
-        const deltaY = touchStartRef.current.y - e.touches[0].clientY;
-        const deltaX = e.touches[0].clientX - touchStartRef.current.x;
-        const isLeft = touchStartRef.current.x < window.innerWidth / 2;
-
-        // Vertical Swipe (Volume/Brightness) - Threshold 10px
-        if (Math.abs(deltaY) > 10 && Math.abs(deltaY) > Math.abs(deltaX)) {
-            const sensitivity = 0.5;
-            if (isLeft) {
-                // Brightness
-                setBrightness(prev => Math.min(100, Math.max(10, prev + (deltaY * sensitivity))));
-            } else {
-                // Volume
-                const newVol = Math.min(100, Math.max(0, volume + (deltaY * sensitivity)));
-                setVolume(newVol);
-                if (playerRef.current) playerRef.current.setVolume(newVol);
-            }
-            // Reset reference to avoid jumpiness, but keep "continuous" feel
-            touchStartRef.current.y = e.touches[0].clientY;
-        }
-    };
-
-    const handleTouchEnd = () => {
-        touchStartRef.current = null;
-    };
 
     const handleTap = (e: React.MouseEvent) => {
         const now = Date.now();
@@ -779,9 +741,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             {!isDriveVideo && (
                 <div
                     className="absolute inset-0 z-[115]"
-                    onTouchStart={handleTouchStart}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={handleTouchEnd}
                     onClick={handleTap}
                 >
                     {/* Visual Feedback for Double Tap */}
@@ -792,9 +751,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                             </div>
                         </div>
                     ))}
-
-                    {/* Brightness Overlay (Simulated) */}
-                    <div className="absolute inset-0 bg-black pointer-events-none transition-opacity duration-100" style={{ opacity: 1 - (brightness / 100) }} />
                 </div>
             )}
 
@@ -854,16 +810,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                     </button>
                                 </div>
 
-                                {/* Volume Slider */}
-                                <div className="hidden md:flex items-center gap-2 group/vol cursor-pointer pl-4 border-l border-white/10 ml-2">
+                                {/* Volume Toggle Only (Slider Removed) */}
+                                <div className="hidden md:flex items-center gap-2 pl-4 border-l border-white/10 ml-2">
                                     <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} className="text-gray-300 hover:text-white p-2 rounded-full hover:bg-white/10 transition">
                                         {isMuted ? <VolumeX size={22} /> : <Volume2 size={22} />}
                                     </button>
-                                    <div className="w-0 overflow-hidden group-hover/vol:w-24 transition-all duration-300 ease-out">
-                                        <input type="range" min="0" max="100" value={isMuted ? 0 : volume}
-                                            onChange={(e) => setVolume(Number(e.target.value))}
-                                            className="h-1 bg-white/20 rounded-full w-20 appearance-none outline-none accent-brand-red cursor-pointer hover:bg-white/30" />
-                                    </div>
                                 </div>
                             </div>
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useStore } from './context/StoreContext';
 import { logUserActivity } from './utils/activityLogger';
 import TopNav from './components/TopNav';
@@ -209,6 +209,10 @@ const MainLayout = () => {
         setVisibleCount(prev => prev + 24);
     };
 
+    const handleIntroComplete = useCallback(() => {
+        setShowAnimeIntro(false);
+    }, []);
+
     // Render Content based on Tab
     const renderContent = () => {
         // Info Pages - Dynamic
@@ -256,6 +260,12 @@ const MainLayout = () => {
                                     autoItems = content.filter(c => c.type === 'movie').slice(0, 10);
                                 } else if (section.type === 'new_tv') {
                                     autoItems = content.filter(c => c.type === 'tv').slice(0, 10);
+                                } else if (section.type === 'tag' && section.tagFilter) {
+                                    autoItems = content.filter(c => c.tags?.includes(section.tagFilter!) || c.genres?.includes(section.tagFilter!)).slice(0, 10);
+                                } else if (section.type === 'my_list') {
+                                    if (currentProfile?.myList) {
+                                        autoItems = content.filter(c => currentProfile.myList.includes(c.id));
+                                    }
                                 }
 
                                 // Manual items
@@ -297,7 +307,7 @@ const MainLayout = () => {
                             <div key={item.id} onClick={() => handleDetails(item)} className="cursor-pointer transition-transform hover:scale-105 relative aspect-[2/3]">
                                 <img
                                     src={item.poster_path_mobile || item.poster_path}
-                                    className="rounded-lg shadow-lg w-full aspect-[2/3] object-cover"
+                                    className="rounded-lg w-full h-full object-cover shadow-lg"
                                     loading="lazy"
                                     alt={item.title}
                                 />
@@ -326,7 +336,7 @@ const MainLayout = () => {
                             <div key={item.id} onClick={() => handleDetails(item)} className="cursor-pointer transition-transform hover:scale-105 relative aspect-[2/3]">
                                 <img
                                     src={item.poster_path_mobile || item.poster_path}
-                                    className="rounded-lg shadow-lg w-full aspect-[2/3] object-cover"
+                                    className="rounded-lg w-full h-full object-cover shadow-lg"
                                     loading="lazy"
                                     alt={item.title}
                                 />
@@ -359,48 +369,63 @@ const MainLayout = () => {
             const visibleAnime = filteredAnime.slice(0, visibleCount);
 
             return (
-                <div className="min-h-screen pt-24 px-4 md:px-12 pb-12">
-                    <h1 className="text-3xl font-bold mb-8 flex items-center gap-3">
-                        <span className="bg-gradient-to-r from-brand-red to-purple-600 bg-clip-text text-transparent">Anime Library</span>
-                    </h1>
+                <div className="min-h-screen pt-24 px-4 md:px-12 pb-12 relative overflow-hidden">
+                    {/* Background Video */}
+                    <div className="absolute inset-0 z-0">
+                        <video
+                            src="/Anime.mp4"
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/60" />
+                    </div>
 
-                    {filteredAnime.length > 0 ? (
-                        <>
-                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
-                                {visibleAnime.map(item => (
-                                    <div key={item.id} onClick={() => handleDetails(item)} className="group cursor-pointer relative aspect-[2/3] overflow-hidden rounded-xl border border-white/10 hover:border-brand-red/50 transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(229,9,20,0.4)]">
-                                        <img
-                                            src={item.poster_path_mobile || item.poster_path}
-                                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                            loading="lazy"
-                                            alt={item.title}
-                                        />
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
-                                            <div>
-                                                <h3 className="font-bold text-white leading-tight mb-1">{item.title}</h3>
-                                                <div className="text-[10px] text-brand-red font-black uppercase">{item.genres?.[0]}</div>
+                    <div className="relative z-10">
+                        <h1 className="text-3xl font-bold mb-8 flex items-center gap-3">
+                            <span className="bg-gradient-to-r from-brand-red to-purple-600 bg-clip-text text-transparent">Anime Library</span>
+                        </h1>
+
+                        {filteredAnime.length > 0 ? (
+                            <>
+                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                                    {visibleAnime.map(item => (
+                                        <div key={item.id} onClick={() => handleDetails(item)} className="group cursor-pointer relative aspect-[2/3] overflow-hidden rounded-xl border border-white/10 hover:border-brand-red/50 transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(229,9,20,0.4)]">
+                                            <img
+                                                src={item.poster_path_mobile || item.poster_path}
+                                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                                loading="lazy"
+                                                alt={item.title}
+                                            />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
+                                                <div>
+                                                    <h3 className="font-bold text-white leading-tight mb-1">{item.title}</h3>
+                                                    <div className="text-[10px] text-brand-red font-black uppercase">{item.genres?.[0]}</div>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
-                            {filteredAnime.length > visibleCount && (
-                                <div className="flex justify-center mt-12">
-                                    <button onClick={handleLoadMore} className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-full font-bold transition">
-                                        Load More Anime
-                                    </button>
+                                    ))}
                                 </div>
-                            )}
-                        </>
-                    ) : (
-                        <div className="h-64 flex flex-col items-center justify-center text-gray-500 border border-dashed border-white/10 rounded-xl">
-                            <p className="text-xl font-bold mb-2">No Anime Found</p>
-                            <p className="text-sm">Check back later for new additions!</p>
-                        </div>
-                    )}
+                                {filteredAnime.length > visibleCount && (
+                                    <div className="flex justify-center mt-12">
+                                        <button onClick={handleLoadMore} className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-full font-bold transition">
+                                            Load More Anime
+                                        </button>
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <div className="h-64 flex flex-col items-center justify-center text-gray-500 border border-dashed border-white/10 rounded-xl">
+                                <p className="text-xl font-bold mb-2">No Anime Found</p>
+                                <p className="text-sm">Check back later for new additions!</p>
+                            </div>
+                        )}
 
-                    <div className="mt-16">
-                        <ContentRequestInline />
+                        <div className="mt-16">
+                            <ContentRequestInline />
+                        </div>
                     </div>
                 </div>
             );
@@ -481,7 +506,7 @@ const MainLayout = () => {
             <ScrollToTop />
 
             {/* Anime Intro Overlay */}
-            {showAnimeIntro && <AnimeIntro mode={animeIntroMode} onComplete={() => setShowAnimeIntro(false)} />}
+            {showAnimeIntro && <AnimeIntro mode={animeIntroMode} onComplete={handleIntroComplete} />}
 
             <TopNav
                 activeTab={activeTab}

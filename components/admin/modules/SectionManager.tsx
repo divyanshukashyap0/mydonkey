@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Plus, Edit, Trash2, Eye, EyeOff, MoveUp, MoveDown, Check, X, Search, GripVertical, AlertCircle } from 'lucide-react';
 import { useStore } from '../../../context/StoreContext';
 import { Section, Content } from '../../../types';
-import { doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../../../firebase';
 
 const SCOPES = [
@@ -18,7 +18,9 @@ const TYPES = [
     { id: 'curated', label: 'Curated Collection', desc: 'Manually select specific titles' },
     { id: 'originals', label: 'Originals', desc: 'Shows content marked as Original' },
     { id: 'new_movies', label: 'New Movies', desc: 'Recently added movies' },
-    { id: 'new_tv', label: 'New TV Shows', desc: 'Recently added TV shows' }
+    { id: 'new_tv', label: 'New TV Shows', desc: 'Recently added TV shows' },
+    { id: 'my_list', label: 'My List / Favourites', desc: 'User specific watchlist' },
+    { id: 'tag', label: 'Tag Based', desc: 'Content with specific tag (e.g. Marvel)' }
 ];
 
 const MOVIE_GENRES = ["Action", "Adventure", "Comedy", "Drama", "Horror", "Sci-Fi", "Thriller", "Romance", "Documentary", "Animation"];
@@ -69,6 +71,9 @@ const SectionManager = () => {
 
         try {
             await setDoc(doc(db, 'sections', id), finalData);
+            // Force Cache Update
+            await setDoc(doc(db, 'settings', 'global'), { sectionsVersion: Date.now() }, { merge: true });
+
             alert("Section saved successfully!");
             resetForm();
         } catch (e: any) {
@@ -77,37 +82,64 @@ const SectionManager = () => {
     };
 
     const handleDelete = async (id: string) => {
-        if (confirm("Delete section?")) await deleteDoc(doc(db, 'sections', id));
+        if (confirm("Delete section?")) {
+            await deleteDoc(doc(db, 'sections', id));
+            // Force Cache Update
+            await setDoc(doc(db, 'settings', 'global'), { sectionsVersion: Date.now() }, { merge: true });
+        }
     };
 
     const handleGenerateDefaults = async () => {
-        if (!confirm("This will generate default sections (Trending, Originals, Movies, TV). Continue?")) return;
+        if (!confirm("This will generate default sections (Trending, New, Marvel, Favourites, Requests). Continue?")) return;
 
         const defaults = [
             { title: "Trending Now", type: 'trending', order: 0, enabled: true, scopes: ['home'] },
-            { title: "My Donkey Originals", type: 'originals', order: 1, enabled: true, scopes: ['home'] },
-            { title: "New Releases", type: 'new_movies', order: 2, enabled: true, scopes: ['home'] },
-            { title: "TV Shows", type: 'new_tv', order: 3, enabled: true, scopes: ['home'] }
+            { title: "New Cinema", type: 'new_movies', order: 1, enabled: true, scopes: ['home'] },
+            { title: "Marvel Universe", type: 'tag', tagFilter: 'Marvel', order: 2, enabled: true, scopes: ['home'] },
+            { title: "Your Favourites", type: 'my_list', order: 3, enabled: true, scopes: ['home'] },
+            { title: "Popular Requests", type: 'curated', order: 4, enabled: true, scopes: ['home'], contentIds: [] },
+            { title: "TV Shows", type: 'new_tv', order: 5, enabled: true, scopes: ['home'] }
         ];
 
         try {
-            for (const d of defaults) {
-                const id = `section_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-                await setDoc(doc(db, 'sections', id), { ...d, id, contentIds: [], genreFilter: null });
-            }
-            alert("Default sections generated!");
+            const batch = writeBatch(db);
+
+            defaults.forEach((d, index) => {
+                // Ensure unique IDs even if loop is fast
+                const id = `section_default_${index}_${Date.now()}`;
+                const ref = doc(db, 'sections', id);
+                batch.set(ref, {
+                    ...d,
+                    id,
+                    contentIds: [],
+                    genreFilter: null
+                });
+            });
+
+            // IMPORTANT: Increment version to force cache refresh
+            const settingsRef = doc(db, 'settings', 'global');
+            batch.set(settingsRef, { sectionsVersion: Date.now() }, { merge: true });
+
+            await batch.commit();
+            alert("Default sections generated! Refreshing...");
+            // Clear local cache to be safe
+            localStorage.removeItem('cachedSections');
+            window.location.reload();
         } catch (e: any) {
+            console.error(e);
             alert("Error generating defaults: " + e.message);
         }
     };
 
-    const moveSection = (index: number, direction: 'up' | 'down') => {
+    const moveSection = async (index: number, direction: 'up' | 'down') => {
         const sorted = [...sections].sort((a, b) => a.order - b.order);
         const targetIndex = direction === 'up' ? index - 1 : index + 1;
         if (targetIndex >= 0 && targetIndex < sorted.length) {
             [sorted[index], sorted[targetIndex]] = [sorted[targetIndex], sorted[index]];
             sorted.forEach((s, idx) => s.order = idx);
-            updateSections(sorted);
+            await updateSections(sorted);
+            // Force Cache Update
+            await setDoc(doc(db, 'settings', 'global'), { sectionsVersion: Date.now() }, { merge: true });
         }
     };
 
@@ -148,6 +180,14 @@ const SectionManager = () => {
                 break;
             case 'new_tv':
                 autoItems = content.filter(c => c.type === 'tv').slice(0, 10);
+                break;
+            case 'my_list':
+                // For preview, we can't really show "My List" since it's user specific.
+                // Maybe show a placeholder or random items?
+                autoItems = content.slice(0, 5);
+                break;
+            case 'tag':
+                autoItems = content.filter(c => c.tags?.includes(formData.tagFilter || '')).slice(0, 10);
                 break;
         }
 
@@ -211,6 +251,18 @@ const SectionManager = () => {
                                             </button>
                                         ))}
                                     </div>
+                                </div>
+                            )}
+
+                            {formData.type === 'tag' && (
+                                <div>
+                                    <label className="text-xs text-gray-500 uppercase font-bold mb-1 block">Tag Filter</label>
+                                    <input className="w-full bg-black/50 border border-white/10 rounded p-3 outline-none focus:border-red-600 font-bold"
+                                        value={formData.tagFilter || ''}
+                                        onChange={e => setFormData({ ...formData, tagFilter: e.target.value })}
+                                        placeholder="e.g. Marvel, DC, Anime"
+                                    />
+                                    <p className="text-[10px] text-gray-500 mt-1">Must match tag in content exactly (case-sensitive)</p>
                                 </div>
                             )}
 
@@ -407,6 +459,7 @@ const SectionManager = () => {
                             <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
                                 <span className="capitalize bg-white/5 px-2 py-0.5 rounded border border-white/5">{TYPES.find(t => t.id === section.type)?.label || section.type}</span>
                                 {section.type === 'genre' && <span className="bg-white/5 px-2 py-0.5 rounded border border-white/5">{section.genreFilter}</span>}
+                                {section.type === 'tag' && <span className="bg-white/5 px-2 py-0.5 rounded border border-white/5">#{section.tagFilter}</span>}
                                 {section.type === 'curated' && <span className="bg-white/5 px-2 py-0.5 rounded border border-white/5">{section.contentIds?.length || 0} items</span>}
                                 {section.showRanking && <span className="bg-white/5 px-2 py-0.5 rounded border border-white/5 text-brand-red">Ranked</span>}
                             </div>

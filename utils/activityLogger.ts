@@ -12,6 +12,9 @@ export type ActivityType =
     | 'plan_purchase'
     | 'profile_update';
 
+// In-memory throttle map to prevent spamming user updates
+const lastUserUpdateMap: Record<string, number> = {};
+
 /**
  * Logs a user action to the 'activity_logs' collection.
  */
@@ -22,9 +25,14 @@ export const logUserActivity = async (
     details: any = {},
     isGuest: boolean = false
 ) => {
+    // COMPLETELY DISABLED PER USER REQUEST TO REDUCE WRITES
+    return;
     if (!userId) return;
 
     try {
+        // DISABLING ACTIVITY LOGS TO SAVE WRITES
+        // The user requested to "close" activity logs.
+        /*
         await addDoc(collection(db, 'activity_logs'), {
             userId,
             email: email || 'unknown',
@@ -36,13 +44,20 @@ export const logUserActivity = async (
             userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
             platform: typeof navigator !== 'undefined' ? navigator.platform : 'unknown'
         });
+        */
 
-        // Update 'lastActiveAt' on user profile for quick Online/Offline status
-        // Now that guests are persisted, we can update them too!
-        const userRef = doc(db, 'users', userId);
-        updateDoc(userRef, {
-            lastActiveAt: serverTimestamp()
-        }).catch(err => console.error("Failed to update lastActiveAt", err));
+        // Update 'lastActiveAt' on user profile (Throttled to once per 5 mins)
+        // This drastically reduces Writes
+        const lastUpdate = lastUserUpdateMap[userId] || 0;
+        const now = Date.now();
+        if (now - lastUpdate > 5 * 60 * 1000) {
+            const userRef = doc(db, 'users', userId);
+            updateDoc(userRef, {
+                lastActiveAt: serverTimestamp()
+            }).catch(err => console.error("Failed to update lastActiveAt", err));
+
+            lastUserUpdateMap[userId] = now;
+        }
 
     } catch (error) {
         console.error("Error logging activity:", error);
@@ -54,6 +69,8 @@ export const logUserActivity = async (
  * Call this periodically during playback.
  */
 export const incrementWatchTime = async (userId: string, seconds: number) => {
+    // COMPLETELY DISABLED PER USER REQUEST TO REDUCE WRITES
+    return;
     if (!userId || seconds <= 0) return;
     try {
         const userRef = doc(db, 'users', userId);

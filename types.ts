@@ -81,8 +81,9 @@ export interface Section {
   id: string;
   title: string;
   order: number;
-  type: 'trending' | 'genre' | 'curated' | 'originals' | 'new_movies' | 'new_tv';
+  type: 'trending' | 'genre' | 'curated' | 'originals' | 'new_movies' | 'new_tv' | 'my_list' | 'tag';
   genreFilter?: string;
+  tagFilter?: string;
   contentIds?: string[];
   enabled: boolean;
   scopes: ('home' | 'tv' | 'movie' | 'new')[];

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BarChart3, Clock, Download, Play, TrendingUp, AlertTriangle, Database } from 'lucide-react';
+import { BarChart3, Clock, Download, Play, TrendingUp, AlertTriangle, Database, RefreshCcw } from 'lucide-react';
 import { collection, getDocs, limit, orderBy, query, where, onSnapshot, getAggregateFromServer, sum } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { User } from '../../../types';
@@ -14,24 +14,19 @@ const AnalyticsManager = () => {
     const [globalHistory, setGlobalHistory] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // 1. Single Real-time Activity Stream (Optimized)
-    useEffect(() => {
+    const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+
+    const fetchData = async () => {
         setLoading(true);
+        try {
+            // 1. Activity Logs (Manual Fetch)
+            const qActivity = query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(50)); // Reduced limit
+            const activitySnap = await getDocs(qActivity);
+            const allLogs = activitySnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-        // 1. Single Real-time Activity Stream (Optimized)
-        // We fetch the last 150 logs of ANY type. 
-        // - We use the first 20 for the "Recent Activity" feed.
-        // - We filter for 'video_play' within these 150 to calculate "Trending Now".
-        // This avoids needing a composite index on (action + timestamp) and uses the default timestamp index.
-        const qActivity = query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(150));
-
-        const unsubActivity = onSnapshot(qActivity, (snap) => {
-            const allLogs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-            // 1A. Recent Activity Feed (Limit 20)
             setRecentActivity(allLogs.slice(0, 20));
 
-            // 1B. Top Content (Derived from the same stream - Last 150 actions)
+            // Top Content Calculation
             const popularity: Record<string, number> = {};
             allLogs.forEach((log: any) => {
                 if (log.action === 'video_play' && log.details?.contentId) {
@@ -48,40 +43,38 @@ const AnalyticsManager = () => {
                 });
             setTopContentData(sortedContent);
 
-            setLoading(false);
-        }, (error) => {
-            console.error("Activity Stream Error:", error);
-            setLoading(false);
-        });
+            // 2. Stats
+            await fetchStats();
 
-        return () => {
-            unsubActivity();
-        };
+            setLastUpdated(new Date());
+        } catch (error) {
+            console.error("Analytics Fetch Error:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Initial Load
+    useEffect(() => {
+        fetchData();
     }, [content]);
 
-    // 2. Optimized KPI Fetching (One-time fetch on mount)
-    useEffect(() => {
-        const fetchStats = async () => {
+    const fetchStats = async () => {
+        try {
+            // Active Users (Last 24h)
+            const now = new Date();
+            const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+            // Active Users (With Quota Safety)
             try {
-                // Active Users (Last 24h)
-                const now = new Date();
-                const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-
-                // We use getCountFromServer for cheap counting if possible, but 
-                // standard 'where' queries still read index entries (cheaper than documents)
-                // However, without a composite index on 'lastActiveAt', this might fail or require an index.
-                // Fallback: Fetch metadata only if possible, but Firestore doesn't support "keys only" easily.
-                // Optimization: Index 'lastActiveAt'.
-
                 const qActive = query(collection(db, 'users'), where('lastActiveAt', '>', oneDayAgo));
-                const activeSnap = await getDocs(qActive); // Still reads docs but only active ones (e.g., 5-10 users)
+                const activeSnap = await getDocs(qActive);
                 setActiveUsersCount(activeSnap.size);
 
-                // Global Watch History (From Active Users only)
-                // We reuse the 'activeSnap' from above to build the history list!
+                // Global Watch History
                 const allActiveUsers = activeSnap.docs.map(d => d.data() as User);
+                // ... (History logic moved inside active user success block)
                 const historyData: any[] = [];
-
                 allActiveUsers.forEach(u => {
                     if (u.continueWatching && u.continueWatching.length > 0) {
                         u.continueWatching.forEach(cw => {
@@ -101,37 +94,49 @@ const AnalyticsManager = () => {
                         });
                     }
                 });
-                // Sort by last watched
                 historyData.sort((a, b) => new Date(b.lastWatchedAt).getTime() - new Date(a.lastWatchedAt).getTime());
                 setGlobalHistory(historyData.slice(0, 20));
 
-                // Total Watch Time (Aggregation) 
-                // Note: sum() requires an index on 'totalWatchTimeSeconds' usually? 
-                // Actually, client-side aggregation on ALL users is what killed the quota. 
-                // We will NOT fetch all users. We will just fetch the top 100 active users and sum them for an "Approximation" 
-                // or use the server-side aggregation feature if available (Firebase v9.14+).
-                // Let's try server-side aggregation.
+            } catch (e) {
+                console.warn("Active Users Fetch Failed (Quota):", e);
+                setActiveUsersCount(0); // Fallback
+            }
 
+            // Total Watch Time (With Quota Safety)
+            try {
                 const coll = collection(db, 'users');
                 const snapshot = await getAggregateFromServer(coll, {
                     totalWatchTime: sum('totalWatchTimeSeconds')
                 });
-
                 setCalculatedWatchTime(snapshot.data().totalWatchTime || 0);
-
-            } catch (err) {
-                console.error("Stats Fetch Error (Likely Quota):", err);
+            } catch (e) {
+                console.warn("Aggregation Failed (Quota):", e);
+                setCalculatedWatchTime(0);
             }
-        };
 
-        fetchStats();
-    }, []);
+        } catch (err) {
+            console.error("Stats Fetch Error (Likely Quota):", err);
+        }
+    };
 
     if (loading) return <div className="p-10 text-center animate-pulse">Loading Analytics...</div>;
 
     return (
         <div className="space-y-8 animate-in fade-in">
-            <h2 className="text-3xl font-bold">Platform Analytics</h2>
+            <div className="flex items-center justify-between">
+                <h2 className="text-3xl font-bold">Platform Analytics</h2>
+                <button
+                    onClick={fetchData}
+                    disabled={loading}
+                    className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition disabled:opacity-50"
+                >
+                    <RefreshCcw size={16} className={loading ? "animate-spin" : ""} />
+                    {loading ? "Refreshing..." : "Refresh Stats"}
+                </button>
+            </div>
+            <div className="text-xs text-gray-500 -mt-6">
+                Last updated: {lastUpdated.toLocaleTimeString()}
+            </div>
 
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -168,8 +173,8 @@ const AnalyticsManager = () => {
                         </div>
 
                         <div className={`mt-3 flex items-start gap-2 text-xs p-2 rounded border ${((content.length * (activeUsersCount || 1)) > 45000)
-                                ? 'bg-red-500/10 text-red-500 border-red-500/20'
-                                : 'bg-green-500/10 text-green-500 border-green-500/20'
+                            ? 'bg-red-500/10 text-red-500 border-red-500/20'
+                            : 'bg-green-500/10 text-green-500 border-green-500/20'
                             }`}>
                             <AlertTriangle size={14} className="shrink-0 mt-0.5" />
                             <span>

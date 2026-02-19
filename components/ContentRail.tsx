@@ -101,7 +101,7 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                         </div>
                                     )}
 
-                                    <div className={`relative flex-1 ${layout === 'landscape' ? 'aspect-video' : 'aspect-[2/3]'} group/card rounded-md overflow-hidden bg-gray-900 shadow-xl border border-white/5 hover:scale-110 transition-transform duration-300 z-20`}>
+                                    <div className={`relative flex-1 ${layout === 'landscape' ? 'aspect-video' : 'aspect-[2/3]'} group/card rounded-lg overflow-hidden shadow-xl hover:scale-110 transition-transform duration-300 z-20`}>
                                         {layout === 'landscape' ? (
                                             <picture>
                                                 {item.backdrop_path_mobile && <source media="(max-width: 767px)" srcSet={item.backdrop_path_mobile} />}

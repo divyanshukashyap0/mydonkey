@@ -51,7 +51,13 @@ const FontLoader: React.FC = () => {
                 link.rel = 'stylesheet';
                 document.head.appendChild(link);
             }
-            link.href = `https://fonts.googleapis.com/css2?family=${heroFont.replace(/\s+/g, '+')}:wght@700;900&display=swap`;
+
+            // Handle single-weight display fonts
+            const singleWeightFonts = ['Alfa Slab One', 'Anton', 'Bebas Neue', 'Abril Fatface', 'Righteous'];
+            const isSingleWeight = singleWeightFonts.includes(heroFont);
+            const weights = isSingleWeight ? 'wght@400' : 'wght@700;900';
+
+            link.href = `https://fonts.googleapis.com/css2?family=${heroFont.replace(/\s+/g, '+')}:${weights}&display=swap`;
         }
         document.documentElement.style.setProperty('--font-hero', `"${heroFont}", sans-serif`);
 
