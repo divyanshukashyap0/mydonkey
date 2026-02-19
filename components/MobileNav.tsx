@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Search, Download, PlayCircle } from 'lucide-react';
+import { Home, Search, Download, PlayCircle, Sparkles } from 'lucide-react';
 
 interface MobileNavProps {
     activeTab: string;
@@ -14,6 +14,11 @@ const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setTab, currentProfile
                 <button onClick={() => setTab('home')} className={`flex flex-col items-center gap-1 transition-colors min-w-[3.5rem] ${activeTab === 'home' ? 'text-white' : 'text-gray-400 hover:text-gray-200'}`}>
                     <Home size={20} strokeWidth={activeTab === 'home' ? 3 : 2} />
                     <span className="text-[10px] font-medium">Home</span>
+                </button>
+
+                <button onClick={() => setTab('anime')} className={`flex flex-col items-center gap-1 transition-colors min-w-[3.5rem] ${activeTab === 'anime' ? 'text-white' : 'text-gray-400 hover:text-gray-200'}`}>
+                    <Sparkles size={20} strokeWidth={activeTab === 'anime' ? 3 : 2} className={activeTab === 'anime' ? 'text-brand-red animate-pulse' : ''} />
+                    <span className="text-[10px] font-medium">Anime</span>
                 </button>
 
                 <button onClick={() => setTab('search')} className={`flex flex-col items-center gap-1 transition-colors min-w-[3.5rem] ${activeTab === 'search' ? 'text-white' : 'text-gray-400 hover:text-gray-200'}`}>
