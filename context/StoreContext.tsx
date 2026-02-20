@@ -78,8 +78,8 @@ interface StoreContextType {
     toggleSectionVisibility: (id: string) => Promise<void>;
     updateUser: (updates: Partial<AppUser>) => Promise<void>;
     toggleWatchlist: (contentId: string) => Promise<void>;
-    switchProfile: (profileId: string | null) => void;
-    addProfile: (name: string, isKids: boolean, avatarUrl: string) => Promise<void>;
+    switchProfile: (profileId: string | null | Profile) => void;
+    addProfile: (name: string, isKids: boolean, avatarUrl: string) => Promise<Profile | void>;
     updateProfile: (profileId: string, updates: Partial<Profile>) => Promise<void>;
     deleteProfile: (profileId: string) => Promise<void>;
     updatePlaybackProgress: (movieId: string, progress: number, stoppedAt: number, duration: number) => Promise<void>;
@@ -724,12 +724,20 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
     };
 
-    const switchProfile = (profileId: string | null) => {
-        if (!profileId) {
+    const switchProfile = (profileOrId: string | null | Profile) => {
+        if (!profileOrId) {
             setCurrentProfile(null);
             localStorage.removeItem('selectedProfileId');
             return;
         }
+
+        if (typeof profileOrId === 'object') {
+            setCurrentProfile(profileOrId);
+            localStorage.setItem('selectedProfileId', profileOrId.id);
+            return;
+        }
+
+        const profileId = profileOrId;
         const profile = userProfiles.find(p => p.id === profileId);
         if (profile) {
             setCurrentProfile(profile);
@@ -742,6 +750,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         const id = `profile_${Date.now()}`;
         const newProfile: Profile = { id, name, isKids, avatarUrl, myList: [] };
         await setDoc(doc(db, 'users', fbUser.uid, 'profiles', id), newProfile);
+        return newProfile;
     };
 
     const updateProfile = async (profileId: string, updates: Partial<Profile>) => {

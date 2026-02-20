@@ -59,7 +59,11 @@ const ProfileSelection = () => {
     if (!name.trim()) return;
 
     if (mode === 'add') {
-      await addProfile(name, isKids, selectedAvatar);
+      const newProfile = await addProfile(name, isKids, selectedAvatar);
+      if (newProfile) {
+        switchProfile(newProfile);
+        return; // Exit to trigger re-render / nav
+      }
     } else if (mode === 'edit' && editingProfileId) {
       await updateProfile(editingProfileId, { name, isKids, avatarUrl: selectedAvatar });
     }
