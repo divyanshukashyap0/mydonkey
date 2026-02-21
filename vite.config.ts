@@ -16,6 +16,9 @@ export default defineConfig(({ mode }) => {
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+        workbox: {
+          maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MiB
+        },
         manifest: {
           name: 'My Donkey OTT',
           short_name: 'MyDonkey',
@@ -44,6 +47,18 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@': path.resolve(__dirname, '.'),
       }
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+            'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage'],
+            'vendor-motion': ['framer-motion'],
+          }
+        }
+      },
+      chunkSizeWarningLimit: 1000,
     },
     esbuild: {
       drop: ['console', 'debugger'],
