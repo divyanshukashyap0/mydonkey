@@ -1,9 +1,14 @@
-import React, { useState, useMemo } from 'react';
-import { Plus, Edit, Trash2, Youtube, HardDrive, Star, Check, X, Bell, ChevronDown, ChevronRight, Play, Lock, Search, Filter, MoreVertical, Archive } from 'lucide-react';
+import React, { useState, useMemo, useRef } from 'react';
+import { Plus, Edit, Trash2, Youtube, HardDrive, Star, Check, X, Bell, ChevronDown, ChevronRight, Play, Lock, Search, Filter, MoreVertical, Archive, Sparkles, Loader2 } from 'lucide-react';
 import { useStore } from '../../../context/StoreContext';
 import { Content, Season, Episode } from '../../../types';
 import { doc, setDoc, deleteDoc, updateDoc, collection, addDoc, deleteField, writeBatch } from 'firebase/firestore';
 import { db } from '../../../firebase';
+import {
+    searchTMDB, fetchTMDBDetails, tmdbPosterUrl, tmdbBackdropUrl,
+    mapTMDBGenres, mapTMDBRating, formatRuntime,
+    TMDBSearchResult
+} from '../../../services/tmdbService';
 
 const MOVIE_GENRES = ["Action", "Adventure", "Comedy", "Drama", "Horror", "Sci-Fi", "Thriller", "Romance", "Documentary", "Animation"];
 const TV_GENRES = ["Drama", "Comedy", "Reality", "Action", "Sci-Fi", "Documentary", "Kids", "Mystery"];
@@ -16,6 +21,14 @@ const ContentManager = () => {
     const [filterType, setFilterType] = useState<'ALL' | 'movie' | 'tv'>('ALL');
     const [filterStatus, setFilterStatus] = useState<'ALL' | 'published' | 'draft'>('ALL');
     const [searchQuery, setSearchQuery] = useState('');
+
+    // TMDB Auto-Fetch State
+    const [tmdbQuery, setTmdbQuery] = useState('');
+    const [tmdbResults, setTmdbResults] = useState<TMDBSearchResult[]>([]);
+    const [tmdbLoading, setTmdbLoading] = useState(false);
+    const [tmdbFilled, setTmdbFilled] = useState(false);
+    const [tmdbError, setTmdbError] = useState('');
+    const tmdbSearchRef = useRef<HTMLDivElement>(null);
 
     // Bulk Selection
     const [selectedItems, setSelectedItems] = useState<string[]>([]);
@@ -44,6 +57,73 @@ const ContentManager = () => {
         setIsEditing(true);
         setExpandedSeasonId(null);
         setExpandedEpisodeId(null);
+        setTmdbQuery('');
+        setTmdbResults([]);
+        setTmdbFilled(false);
+        setTmdbError('');
+    };
+
+    // TMDB Search Handler
+    const handleTMDBSearch = async () => {
+        if (!tmdbQuery.trim()) return;
+        setTmdbLoading(true);
+        setTmdbError('');
+        setTmdbResults([]);
+        try {
+            const results = await searchTMDB(tmdbQuery, formData.type === 'tv' ? 'tv' : 'movie');
+            setTmdbResults(results);
+            if (results.length === 0) setTmdbError('No results found. Try a different title.');
+        } catch (e: any) {
+            setTmdbError(e.message || 'TMDB search failed');
+        } finally {
+            setTmdbLoading(false);
+        }
+    };
+
+    // TMDB Auto-Fill Handler
+    const handleTMDBAutofill = async (result: TMDBSearchResult) => {
+        setTmdbLoading(true);
+        setTmdbResults([]);
+        try {
+            const type = formData.type === 'tv' ? 'tv' : 'movie';
+            const detail = await fetchTMDBDetails(result.id, type);
+
+            const title = detail.title || detail.name || '';
+            const releaseDate = detail.release_date || detail.first_air_date || '';
+            const genres = mapTMDBGenres([], detail.genres);
+            const cast = detail.credits?.cast
+                .sort((a, b) => a.order - b.order)
+                .slice(0, 6)
+                .map(a => a.name) || [];
+            const runtime = type === 'movie'
+                ? formatRuntime(detail.runtime)
+                : detail.episode_run_time?.[0] ? `${detail.episode_run_time[0]}m` : '';
+            const rating = mapTMDBRating(detail, type);
+            const poster = tmdbPosterUrl(detail.poster_path, 'w500');
+            const backdrop = tmdbBackdropUrl(detail.backdrop_path, 'w1280');
+
+            setFormData(prev => ({
+                ...prev,
+                // Only fill fields that are currently empty — never overwrite existing data
+                title: prev.title || title,
+                overview: prev.overview || detail.overview || '',
+                poster_path: prev.poster_path || poster,
+                backdrop_path: prev.backdrop_path || backdrop,
+                release_date: prev.release_date || releaseDate.split('T')[0],
+                vote_average: prev.vote_average || Math.round(detail.vote_average * 10) / 10,
+                genres: (prev.genres && prev.genres.length > 0) ? prev.genres : genres,
+                cast: (prev.cast && (prev.cast as string[]).length > 0) ? prev.cast : cast,
+                duration: prev.duration || runtime,
+                rating: prev.rating || rating,
+            }));
+
+            setTmdbFilled(true);
+            setTmdbQuery(title);
+        } catch (e: any) {
+            setTmdbError(e.message || 'Failed to fetch details');
+        } finally {
+            setTmdbLoading(false);
+        }
     };
 
     // ID Extractors
@@ -278,9 +358,92 @@ const ContentManager = () => {
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-2xl font-bold flex items-center gap-2">
                         {formData.id ? 'Edit Content' : 'Add New Content'}
-                        <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded text-gray-500 font-mono">v1.1</span>
+                        <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded text-gray-500 font-mono">v1.2</span>
+                        {tmdbFilled && (
+                            <span className="text-[10px] bg-blue-500/20 border border-blue-500/40 text-blue-400 px-2 py-0.5 rounded flex items-center gap-1">
+                                <Sparkles size={10} /> TMDB Auto-filled
+                            </span>
+                        )}
                     </h2>
                     <button onClick={() => setIsEditing(false)} className="p-2 hover:bg-white/10 rounded"><X /></button>
+                </div>
+
+                {/* TMDB Auto-Fetch Panel */}
+                <div className="mb-6 bg-gradient-to-r from-blue-950/40 to-purple-950/30 border border-blue-500/20 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Sparkles size={16} className="text-blue-400" />
+                        <span className="text-sm font-bold text-blue-300">Auto-fill from TMDB</span>
+                        <span className="text-[10px] text-gray-500">
+                            {import.meta.env.VITE_TMDB_API_KEY ? '' : '⚠ Add VITE_TMDB_API_KEY to .env'}
+                        </span>
+                    </div>
+                    <div className="flex gap-2" ref={tmdbSearchRef}>
+                        <input
+                            className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 placeholder:text-gray-600 transition"
+                            placeholder={`Search ${formData.type === 'tv' ? 'TV show' : 'movie'} title on TMDB...`}
+                            value={tmdbQuery}
+                            onChange={e => { setTmdbQuery(e.target.value); setTmdbFilled(false); }}
+                            onKeyDown={e => e.key === 'Enter' && handleTMDBSearch()}
+                        />
+                        <button
+                            onClick={handleTMDBSearch}
+                            disabled={tmdbLoading || !tmdbQuery.trim()}
+                            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-bold transition shadow-lg shadow-blue-900/30"
+                        >
+                            {tmdbLoading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
+                            {tmdbLoading ? 'Searching…' : 'Search'}
+                        </button>
+                    </div>
+
+                    {/* Error */}
+                    {tmdbError && (
+                        <p className="text-xs text-red-400 mt-2 flex items-center gap-1"><X size={12} />{tmdbError}</p>
+                    )}
+
+                    {/* Results Dropdown */}
+                    {tmdbResults.length > 0 && (
+                        <div className="mt-3 space-y-2 max-h-72 overflow-y-auto pr-1">
+                            {tmdbResults.map(result => (
+                                <div
+                                    key={result.id}
+                                    className="flex items-center gap-3 bg-black/40 hover:bg-white/5 border border-white/5 hover:border-blue-500/30 rounded-lg p-2.5 transition group cursor-pointer"
+                                >
+                                    {/* Poster thumbnail */}
+                                    <div className="w-10 h-14 rounded overflow-hidden flex-shrink-0 bg-white/10">
+                                        {(result.poster_path) ? (
+                                            <img
+                                                src={`https://image.tmdb.org/t/p/w92${result.poster_path}`}
+                                                alt={result.title || result.name}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-gray-600 text-[10px]">N/A</div>
+                                        )}
+                                    </div>
+
+                                    {/* Info */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="font-bold text-sm text-white truncate">{result.title || result.name}</div>
+                                        <div className="text-[11px] text-gray-400">
+                                            {(result.release_date || result.first_air_date || '').slice(0, 4)}
+                                            {result.vote_average > 0 && (
+                                                <span className="ml-2 text-yellow-400">★ {result.vote_average.toFixed(1)}</span>
+                                            )}
+                                        </div>
+                                        <div className="text-[11px] text-gray-600 line-clamp-1">{result.overview}</div>
+                                    </div>
+
+                                    {/* Use This Button */}
+                                    <button
+                                        onClick={() => handleTMDBAutofill(result)}
+                                        className="flex-shrink-0 text-xs font-bold bg-blue-600/80 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg transition opacity-80 group-hover:opacity-100"
+                                    >
+                                        Use This
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -288,7 +451,11 @@ const ContentManager = () => {
                         <div>
                             <label className="text-xs text-gray-500 uppercase font-bold">Title</label>
                             <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none focus:border-red-600"
-                                value={formData.title || ''} onChange={e => setFormData({ ...formData, title: e.target.value })} />
+                                value={formData.title || ''}
+                                onChange={e => {
+                                    setFormData({ ...formData, title: e.target.value });
+                                    setTmdbQuery(e.target.value); // Keep TMDB search in sync
+                                }} />
                         </div>
                         <div>
                             <label className="text-xs text-gray-500 uppercase font-bold">Overview</label>
@@ -857,6 +1024,9 @@ const ContentManager = () => {
                                 toggleSelection(item.id);
                             } else {
                                 setFormData(item);
+                                setTmdbQuery(item.title || '');
+                                setTmdbFilled(false);
+                                setTmdbResults([]);
                                 setIsEditing(true);
                             }
                         }}
@@ -901,7 +1071,7 @@ const ContentManager = () => {
                             {/* Hover Actions */}
                             <div className="absolute inset-x-0 bottom-0 p-3 translate-y-full group-hover:translate-y-0 transition-transform duration-300 flex justify-center gap-3 pb-8">
                                 <button
-                                    onClick={(e) => { e.stopPropagation(); setFormData(item); setIsEditing(true); }}
+                                    onClick={(e) => { e.stopPropagation(); setFormData(item); setTmdbQuery(item.title || ''); setTmdbFilled(false); setTmdbResults([]); setIsEditing(true); }}
                                     className="p-2 rounded-full bg-white text-black hover:scale-110 transition shadow-lg"
                                     title="Edit"
                                 >

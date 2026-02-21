@@ -1,0 +1,8 @@
+﻿components/admin/modules/ComingSoonManager.tsx(26,38): error TS2304: Cannot find name 'resetForm'.
+components/admin/modules/ComingSoonManager.tsx(76,22): error TS2304: Cannot find name 'extractYoutubeId'.
+components/admin/modules/ComingSoonManager.tsx(78,101): error TS2304: Cannot find name 'extractYoutubeId'.
+components/admin/modules/ComingSoonManager.tsx(104,46): error TS2304: Cannot find name 'resetForm'.
+components/admin/modules/ComingSoonManager.tsx(105,46): error TS2304: Cannot find name 'handleSave'.
+components/admin/modules/ComingSoonManager.tsx(120,42): error TS2304: Cannot find name 'resetForm'.
+components/admin/modules/ComingSoonManager.tsx(174,56): error TS2304: Cannot find name 'sendNotificationNow'.
+components/admin/modules/ComingSoonManager.tsx(184,64): error TS2304: Cannot find name 'handleDelete'.

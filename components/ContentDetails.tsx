@@ -270,8 +270,8 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                                 key={season.id}
                                                 onClick={() => setSelectedSeasonId(season.id)}
                                                 className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all border ${selectedSeasonId === season.id
-                                                        ? 'bg-white text-black border-white shadow-lg'
-                                                        : 'bg-white/10 text-white border-transparent hover:bg-white/20'
+                                                    ? 'bg-white text-black border-white shadow-lg'
+                                                    : 'bg-white/10 text-white border-transparent hover:bg-white/20'
                                                     }`}
                                             >
                                                 {season.title}
@@ -451,8 +451,8 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                                             key={season.id}
                                                             onClick={() => setSelectedSeasonId(season.id)}
                                                             className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all border ${selectedSeasonId === season.id
-                                                                    ? 'bg-white text-black border-white shadow-md'
-                                                                    : 'bg-transparent text-gray-400 border-gray-600 hover:border-white hover:text-white'
+                                                                ? 'bg-white text-black border-white shadow-md'
+                                                                : 'bg-transparent text-gray-400 border-gray-600 hover:border-white hover:text-white'
                                                                 }`}
                                                         >
                                                             {season.title}

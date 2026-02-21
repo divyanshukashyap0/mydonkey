@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import Hls from 'hls.js';
 import { Play, Pause, Volume2, VolumeX, Maximize, Settings, SkipForward, ArrowLeft, RotateCcw, RotateCw, Subtitles, Layers, BarChart2, Minimize, Headphones, Check, MessageSquare, Wifi, ExternalLink, Scan, Scaling } from 'lucide-react';
 import { Content } from '../types';
 import StatsPanel from './StatsPanel';
@@ -73,6 +74,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     // Direct Video URL Calculation
     // Only used if Override exists AND it's not YT AND it's not Drive
     const directVideoUrl = (overrideUrl && !overrideYoutubeId && !overrideDriveId) ? overrideUrl : null;
+    const isHls = directVideoUrl?.toLowerCase().includes('.m3u8');
 
     // 3. Final Player Mode Determination
     const useDirect = !!directVideoUrl;
@@ -259,9 +261,100 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         }
     };
 
+    // Initialize HLS Player
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const hlsRef = useRef<Hls | null>(null);
+
+    useEffect(() => {
+        if (!isHls || !directVideoUrl || !videoRef.current) return;
+
+        if (Hls.isSupported()) {
+            const hls = new Hls({
+                enableWorker: true,
+                lowLatencyMode: true,
+                backBufferLength: 60
+            });
+            hlsRef.current = hls;
+            hls.loadSource(directVideoUrl);
+            hls.attachMedia(videoRef.current);
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                setIsPlayerReady(true);
+                if (playing) videoRef.current?.play();
+            });
+            hls.on(Hls.Events.LEVEL_LOADED, (event, data) => {
+                setDuration(data.details.totalduration);
+            });
+            hls.on(Hls.Events.ERROR, (event, data) => {
+                if (data.fatal) {
+                    switch (data.type) {
+                        case Hls.ErrorTypes.NETWORK_ERROR:
+                            console.error("HLS Network Error", data);
+                            hls.startLoad();
+                            break;
+                        case Hls.ErrorTypes.MEDIA_ERROR:
+                            console.error("HLS Media Error", data);
+                            hls.recoverMediaError();
+                            break;
+                        default:
+                            hls.destroy();
+                            break;
+                    }
+                }
+            });
+        } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
+            // Native HLS support (Safari)
+            videoRef.current.src = directVideoUrl;
+            videoRef.current.addEventListener('loadedmetadata', () => {
+                setIsPlayerReady(true);
+                setDuration(videoRef.current?.duration || 0);
+                if (playing) videoRef.current?.play();
+            });
+        }
+
+        return () => {
+            if (hlsRef.current) {
+                hlsRef.current.destroy();
+                hlsRef.current = null;
+            }
+        };
+    }, [isHls, directVideoUrl]);
+
+    // Sync HLS Playback state
+    useEffect(() => {
+        if (!isHls || !videoRef.current) return;
+        if (playing) videoRef.current.play().catch(() => { });
+        else videoRef.current.pause();
+    }, [playing, isHls]);
+
+    // HLS Progress Tracking
+    useEffect(() => {
+        if (!isHls || !videoRef.current) return;
+        const interval = setInterval(() => {
+            if (videoRef.current && playing) {
+                const curr = videoRef.current.currentTime;
+                const dur = videoRef.current.duration;
+                setCurrentTime(curr);
+                if (dur > 0) {
+                    setDuration(dur);
+                    const prog = (curr / dur) * 100;
+                    setProgress(prog);
+                    progressRef.current = prog;
+                }
+            }
+        }, 500);
+        return () => clearInterval(interval);
+    }, [playing, isHls]);
+
+    // Sync Vol/Mute for HLS
+    useEffect(() => {
+        if (!isHls || !videoRef.current) return;
+        videoRef.current.volume = isMuted ? 0 : volume / 100;
+        videoRef.current.muted = isMuted;
+    }, [volume, isMuted, isHls]);
+
     // Initialize YouTube Player
     useEffect(() => {
-        if (!isApiReady || isDriveVideo || playerRef.current || !youtubeVideoId) return;
+        if (!isApiReady || isDriveVideo || isHls || playerRef.current || !youtubeVideoId) return;
 
         playerRef.current = new window.YT.Player('youtube-player', {
             videoId: youtubeVideoId,
@@ -301,7 +394,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     // React -> Player Sync & Logging
     useEffect(() => {
-        if (isDriveVideo) return;
+        if (isDriveVideo || isHls) return;
         if (!playerRef.current?.playVideo) return;
 
         if (playing) {
@@ -325,7 +418,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     }, [playing, currentUser?.uid, currentUser?.isGuest]);
 
     useEffect(() => {
-        if (isDriveVideo) return;
+        if (isDriveVideo || isHls) return;
         if (!playerRef.current?.setVolume) return;
         if (isMuted) playerRef.current.mute();
         else {
@@ -336,7 +429,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     // Progress Loop
     useEffect(() => {
-        if (isDriveVideo) return;
+        if (isDriveVideo || isHls) return;
         const interval = setInterval(() => {
             if (playerRef.current && playing && playerRef.current.getCurrentTime) {
                 const curr = playerRef.current.getCurrentTime();
@@ -356,7 +449,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const hasUpdatedDuration = useRef(false);
 
     useEffect(() => {
-        if (!content || !playerRef.current || !currentUser || currentUser.role !== 'admin') return;
+        if (!content || !playerRef.current || isHls || !currentUser || currentUser.role !== 'admin') return;
         if (hasUpdatedDuration.current) return;
 
         // Check once after 5 seconds of playback
@@ -383,7 +476,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     // Save Progress Store
     useEffect(() => {
-        if (isDriveVideo || isTrailer) return;
+        if (isDriveVideo || isHls || isTrailer) return;
         const saveInterval = setInterval(() => {
             if (duration > 0) updatePlaybackProgress(content.id, progressRef.current, currentTime, duration);
         }, 30000);
@@ -464,7 +557,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [playing, isFullscreen, isDriveVideo]);
+    }, [playing, isFullscreen, isDriveVideo, isHls]);
 
 
     // Resume Logic: Watch for currentUser to populate if it wasn't ready initially
@@ -579,7 +672,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         const pos = (e.clientX - rect.left) / rect.width;
         const newTime = pos * duration;
         setProgress(pos * 100);
-        if (playerRef.current) playerRef.current.seekTo(newTime, true);
+
+        if (isHls && videoRef.current) {
+            videoRef.current.currentTime = newTime;
+        } else if (playerRef.current) {
+            playerRef.current.seekTo(newTime, true);
+        }
     };
 
     const handleSubtitleChange = (track: any) => {
@@ -636,14 +734,23 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 <div className={`w-full h-full relative transition-transform duration-500 ease-in-out ${isZoomed ? 'scale-[1.35]' : 'scale-100'}`}>
                     {directVideoUrl ? (
                         <div className="w-full h-full relative pointer-events-auto">
-                            <iframe
-                                className="w-full h-full"
-                                src={directVideoUrl}
-                                allowFullScreen
-                                allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-                                sandbox="allow-forms allow-scripts allow-pointer-lock allow-same-origin allow-top-navigation allow-presentation"
-                                title={content.title}
-                            />
+                            {isHls ? (
+                                <video
+                                    ref={videoRef}
+                                    className="w-full h-full object-contain"
+                                    playsInline
+                                    onClick={() => setPlaying(!playing)}
+                                />
+                            ) : (
+                                <iframe
+                                    className="w-full h-full"
+                                    src={directVideoUrl}
+                                    allowFullScreen
+                                    allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                                    sandbox="allow-forms allow-scripts allow-pointer-lock allow-same-origin allow-top-navigation allow-presentation"
+                                    title={content.title}
+                                />
+                            )}
                         </div>
                     ) : isDriveVideo ? (
                         <div className="w-full h-full relative">
