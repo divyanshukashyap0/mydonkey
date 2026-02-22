@@ -47,7 +47,6 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
             duration: episode.duration
         };
         onPlay(episodeContent, 'movie');
-        onClose();
     };
 
     // Helper to determine if content is playable
@@ -187,7 +186,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                             {isPlayable ? (
                                 isSingleVideoType ? (
                                     <button
-                                        onClick={() => { onPlay(content, 'movie'); onClose(); }}
+                                        onClick={() => { onPlay(content, 'movie'); }}
                                         className="bg-white text-black py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-gray-200 active:scale-95 transition"
                                     >
                                         <Play size={18} fill="black" /> Play
@@ -212,7 +211,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
 
                             {content.youtubeId && (
                                 <button
-                                    onClick={() => { onPlay(content, 'trailer'); onClose(); }}
+                                    onClick={() => { onPlay(content, 'trailer'); }}
                                     className="bg-white/10 backdrop-blur-md text-white border border-white/20 py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition"
                                 >
                                     <Play size={18} /> Trailer
@@ -339,7 +338,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                 {isPlayable ? (
                                     isSingleVideoType ? (
                                         <button
-                                            onClick={() => { onPlay(content, 'movie'); onClose(); }}
+                                            onClick={() => { onPlay(content, 'movie'); }}
                                             className="bg-white text-black px-8 py-3 rounded font-bold text-lg flex items-center gap-2 hover:bg-gray-200 transition-transform active:scale-95"
                                         >
                                             <Play size={24} fill="black" /> Play {content.type === 'movie' ? 'Movie' : 'Now'}
@@ -367,7 +366,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
 
                                 {content.youtubeId && (
                                     <button
-                                        onClick={() => { onPlay(content, 'trailer'); onClose(); }}
+                                        onClick={() => { onPlay(content, 'trailer'); }}
                                         className={`px-8 py-3 rounded font-bold text-lg flex items-center gap-2 transition-transform active:scale-95 ${!(isPlayable && isSingleVideoType) ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-600/60 hover:bg-gray-600 text-white'}`}
                                     >
                                         <Play size={24} fill={(isPlayable && isSingleVideoType) ? "white" : "black"} /> {(isPlayable && isSingleVideoType) ? 'Trailer' : 'Play Trailer'}

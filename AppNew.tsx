@@ -72,7 +72,7 @@ const MainLayout = () => {
         }
     }, [location.pathname, currentUser]);
 
-    // Deep Link Handler (e.g. /browse/content_123)
+    // Deep Link Handler (e.g. /browse/content_123 or /watch/content_123)
     useEffect(() => {
         if (location.pathname.startsWith('/browse/')) {
             const contentId = location.pathname.split('/')[2];
@@ -84,16 +84,87 @@ const MainLayout = () => {
                     } else {
                         // Content loaded but ID not found
                         console.warn(`Deep link content not found: ${contentId}`);
-                        // Optional: Use a toast here if available in future
-                        // alert("Content not found"); // Removed to be less intrusive, just redirect
                         navigate('/home', { replace: true });
                     }
                 } else {
                     navigate('/home', { replace: true });
                 }
             }
+        } else {
+            // URL cleared, ensure modal closes
+            if (viewingContent) {
+                setViewingContent(null);
+            }
         }
-    }, [location.pathname, content, navigate]);
+
+        if (location.pathname.startsWith('/watch/')) {
+            const contentId = location.pathname.split('/')[2];
+            const searchParams = new URLSearchParams(location.search);
+            const mode = searchParams.get('mode') as 'trailer' | 'movie' || 'movie';
+            const stateItem = (location.state as any)?.item;
+
+            // Wait for authentication and content to load
+            if (!isLoading && content.length > 0) {
+                if (contentId) {
+                    let item = stateItem || content.find(c => c.id === contentId);
+
+                    if (!item) {
+                        for (const show of content) {
+                            if (show.type === 'tv' && show.seasons) {
+                                for (const season of show.seasons) {
+                                    const episode = season.episodes.find(e => e.id === contentId);
+                                    if (episode) {
+                                        item = {
+                                            ...show,
+                                            id: episode.id,
+                                            title: `${show.title} - ${season.title} | ${episode.title}`,
+                                            movieDriveId: episode.driveId,
+                                            movieYoutubeId: episode.youtubeId,
+                                            videoUrl: episode.videoUrl,
+                                            duration: episode.duration
+                                        };
+                                        break;
+                                    }
+                                }
+                            }
+                            if (item) break;
+                        }
+                    }
+
+                    if (item) {
+                        // Authenticate if required (trailers don't need auth, movies do)
+                        if (mode === 'movie' && !isAuthenticated) {
+                            navigate('/login');
+                            return;
+                        }
+
+                        // Check for Exclusive Content
+                        if (mode === 'movie' && item.accessCode && !currentProfile?.unlockedContent?.includes(item.id)) {
+                            setShowUnlockModal(true);
+                            navigate(-1); // Go back from /watch if locked
+                            return;
+                        }
+
+                        if (!playingContent || playingContent.id !== item.id || playingContent.playMode !== mode) {
+                            setPlayingContent({ ...item, playMode: mode });
+                        }
+                    } else {
+                        // Optional: Handle episodes correctly if deep linking directly to episode ID
+                        // For now, if ID not in main content list, redirect
+                        console.warn(`Watch deep link content not found: ${contentId}`);
+                        navigate('/home', { replace: true });
+                    }
+                } else {
+                    navigate('/home', { replace: true });
+                }
+            }
+        } else {
+            if (playingContent) {
+                setPlayingContent(null);
+            }
+        }
+
+    }, [location.pathname, location.search, content, navigate, viewingContent, playingContent, isLoading, isAuthenticated, currentProfile]);
 
     // Redirect root and /features to /home
     useEffect(() => {
@@ -131,7 +202,7 @@ const MainLayout = () => {
     // Handlers
     const handlePlay = (item: Content, mode: 'movie' | 'trailer' = 'movie') => {
         if (mode === 'trailer') {
-            setPlayingContent({ ...item, playMode: 'trailer' });
+            navigate(`/watch/${item.id}?mode=trailer`, { state: { item } });
         } else {
             if (isAuthenticated && currentUser) {
                 // Check for Exclusive Content
@@ -139,7 +210,7 @@ const MainLayout = () => {
                     setShowUnlockModal(true);
                     return;
                 }
-                setPlayingContent({ ...item, playMode: 'movie' });
+                navigate(`/watch/${item.id}?mode=movie`, { state: { item } });
             } else {
                 navigate('/login');
             }
@@ -147,7 +218,7 @@ const MainLayout = () => {
     };
 
     const handleDetails = (item: Content) => {
-        setViewingContent(item);
+        navigate(`/browse/${item.id}`);
     };
 
     const handleTabChange = (tabId: string) => {
@@ -526,7 +597,14 @@ const MainLayout = () => {
             {viewingContent && (
                 <ContentDetails
                     content={viewingContent}
-                    onClose={() => setViewingContent(null)}
+                    onClose={() => {
+                        // If coming from another page, go back. If opened directly, go home.
+                        if (window.history.length > 2) {
+                            navigate(-1);
+                        } else {
+                            navigate('/home');
+                        }
+                    }}
                     onPlay={handlePlay}
                     onDetails={handleDetails}
                 />
@@ -535,7 +613,13 @@ const MainLayout = () => {
             {playingContent && (
                 <VideoPlayer
                     content={playingContent}
-                    onClose={() => setPlayingContent(null)}
+                    onClose={() => {
+                        if (window.history.length > 2) {
+                            navigate(-1);
+                        } else {
+                            navigate('/home');
+                        }
+                    }}
                 />
             )}
             <UnlockContentModal
