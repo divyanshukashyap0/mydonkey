@@ -53,7 +53,6 @@ const PlayPasswordModal: React.FC<PlayPasswordModalProps> = ({ contentTitle, onC
                     <p className="text-gray-400 text-sm mt-2 line-clamp-1">
                         <span className="text-white font-semibold">{contentTitle}</span>
                     </p>
-                    <p className="text-gray-500 text-xs mt-1">Your password is your profile name</p>
                 </div>
 
                 {/* Form */}
