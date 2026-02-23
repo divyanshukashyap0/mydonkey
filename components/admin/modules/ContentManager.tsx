@@ -7,7 +7,7 @@ import { db } from '../../../firebase';
 import {
     searchTMDB, fetchTMDBDetails, tmdbPosterUrl, tmdbBackdropUrl,
     mapTMDBGenres, mapTMDBRating, formatRuntime,
-    TMDBSearchResult
+    TMDBSearchResult, fetchTMDBSeason, tmdbStillUrl
 } from '../../../services/tmdbService';
 
 const MOVIE_GENRES = ["Action", "Adventure", "Comedy", "Drama", "Horror", "Sci-Fi", "Thriller", "Romance", "Documentary", "Animation"];
@@ -101,6 +101,35 @@ const ContentManager = () => {
             const rating = mapTMDBRating(detail, type);
             const poster = tmdbPosterUrl(detail.poster_path, 'w500');
             const backdrop = tmdbBackdropUrl(detail.backdrop_path, 'w1280');
+            const posterMobile = tmdbPosterUrl(detail.poster_path, 'w342');
+            const backdropMobile = tmdbBackdropUrl(detail.backdrop_path, 'w780');
+
+            let newSeasons = formData.seasons || [];
+
+            // If TV, check for seasons and episodes
+            if (type === 'tv' && detail.seasons && newSeasons.length === 0) {
+                // Fetch each valid season details (skip specials)
+                const validSeasons = detail.seasons.filter(s => s.season_number > 0);
+
+                const seasonPromises = validSeasons.map(vs => fetchTMDBSeason(detail.id, vs.season_number).catch(() => null));
+                const resolvedSeasons = await Promise.all(seasonPromises);
+
+                newSeasons = resolvedSeasons.filter(Boolean).map((seasonData, index) => {
+                    return {
+                        id: `season_${Date.now()}_${index}`,
+                        seasonNumber: seasonData!.season_number,
+                        title: seasonData!.name || `Season ${seasonData!.season_number}`,
+                        episodes: (seasonData!.episodes || []).map((ep, epIndex) => ({
+                            id: `ep_${Date.now()}_${index}_${epIndex}`,
+                            episodeNumber: ep.episode_number,
+                            title: ep.name || `Episode ${ep.episode_number}`,
+                            overview: ep.overview,
+                            stillUrl: tmdbStillUrl(ep.still_path, 'w300'),
+                            duration: ep.runtime ? `${ep.runtime}m` : runtime,
+                        }))
+                    };
+                });
+            }
 
             setFormData(prev => ({
                 ...prev,
@@ -109,12 +138,15 @@ const ContentManager = () => {
                 overview: prev.overview || detail.overview || '',
                 poster_path: prev.poster_path || poster,
                 backdrop_path: prev.backdrop_path || backdrop,
+                poster_path_mobile: prev.poster_path_mobile || posterMobile,
+                backdrop_path_mobile: prev.backdrop_path_mobile || backdropMobile,
                 release_date: prev.release_date || releaseDate.split('T')[0],
                 vote_average: prev.vote_average || Math.round(detail.vote_average * 10) / 10,
                 genres: (prev.genres && prev.genres.length > 0) ? prev.genres : genres,
                 cast: (prev.cast && (prev.cast as string[]).length > 0) ? prev.cast : cast,
                 duration: prev.duration || runtime,
                 rating: prev.rating || rating,
+                seasons: type === 'tv' && (!prev.seasons || prev.seasons.length === 0) ? newSeasons : prev.seasons,
             }));
 
             setTmdbFilled(true);

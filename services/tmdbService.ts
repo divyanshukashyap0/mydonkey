@@ -6,10 +6,13 @@ const TMDB_BASE = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
 const API_KEY = import.meta.env.VITE_TMDB_API_KEY;
 
-export const tmdbPosterUrl = (path: string | null, size: 'w500' | 'w780' | 'original' = 'w500') =>
+export const tmdbPosterUrl = (path: string | null, size: 'w342' | 'w500' | 'w780' | 'original' = 'w500') =>
     path ? `${TMDB_IMAGE_BASE}/${size}${path}` : '';
 
-export const tmdbBackdropUrl = (path: string | null, size: 'w1280' | 'original' = 'w1280') =>
+export const tmdbBackdropUrl = (path: string | null, size: 'w780' | 'w1280' | 'original' = 'w1280') =>
+    path ? `${TMDB_IMAGE_BASE}/${size}${path}` : '';
+
+export const tmdbStillUrl = (path: string | null, size: 'w300' | 'original' = 'w300') =>
     path ? `${TMDB_IMAGE_BASE}/${size}${path}` : '';
 
 export interface TMDBSearchResult {
@@ -38,6 +41,17 @@ export interface TMDBDetail {
     vote_average: number;
     runtime?: number;         // movie (minutes)
     episode_run_time?: number[]; // tv
+    number_of_seasons?: number;
+    seasons?: {
+        air_date: string;
+        episode_count: number;
+        id: number;
+        name: string;
+        overview: string;
+        poster_path: string;
+        season_number: number;
+        vote_average: number;
+    }[];
     genres: { id: number; name: string }[];
     credits?: {
         cast: { name: string; order: number }[];
@@ -50,6 +64,27 @@ export interface TMDBDetail {
     release_dates?: {
         results: { iso_3166_1: string; release_dates: { certification: string }[] }[];
     };
+}
+
+export interface TMDBEpisodeDetail {
+    id: number;
+    episode_number: number;
+    name: string;
+    overview: string;
+    still_path: string | null;
+    air_date: string;
+    runtime: number; // minutes
+}
+
+export interface TMDBSeasonDetail {
+    _id: string;
+    id: number;
+    air_date: string;
+    name: string;
+    overview: string;
+    poster_path: string | null;
+    season_number: number;
+    episodes: TMDBEpisodeDetail[];
 }
 
 /** Search for movies or TV shows on TMDB */
@@ -83,6 +118,18 @@ export async function fetchTMDBDetails(
     const res = await fetch(url);
     if (!res.ok) throw new Error(`TMDB fetch failed: ${res.statusText}`);
     return res.json() as Promise<TMDBDetail>;
+}
+
+/** Fetch full details for a TV season, which includes its episodes */
+export async function fetchTMDBSeason(
+    tmdbId: number,
+    seasonNumber: number
+): Promise<TMDBSeasonDetail> {
+    if (!API_KEY) throw new Error('VITE_TMDB_API_KEY is not set in .env');
+    const url = `${TMDB_BASE}/tv/${tmdbId}/season/${seasonNumber}?api_key=${API_KEY}&language=en-US`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`TMDB season fetch failed: ${res.statusText}`);
+    return res.json() as Promise<TMDBSeasonDetail>;
 }
 
 // TMDB genre IDs → app genre names (shared subset)
