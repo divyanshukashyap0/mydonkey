@@ -973,6 +973,16 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }));
     }, [notifications, currentUser?.readNotifications]);
 
+    // Filter out exclusive content globally
+    const processedContent = useMemo(() => {
+        return content.filter(item => {
+            if (!item.accessCode) return true; // Standard content is always visible
+            if (currentUser?.role === 'admin') return true; // Admins see everything
+            if (currentProfile?.unlockedContent?.includes(item.id)) return true; // Unlocked by profile
+            return false; // Hide completely
+        });
+    }, [content, currentProfile?.unlockedContent, currentUser?.role]);
+
     const contextValue = useMemo(() => ({
         isAuthenticated,
         isLoading,
@@ -982,7 +992,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         loginWithApple,
         loginAsGuest,
         logout,
-        content,
+        content: processedContent,
         users,
         currentUser,
         currentProfile,
@@ -1043,7 +1053,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }), [
         isAuthenticated,
         isLoading,
-        content,
+        processedContent,
         pages,
         users,
         currentUser,
