@@ -63,16 +63,17 @@ const PlayPasswordModal: React.FC<PlayPasswordModalProps> = ({ contentTitle, onC
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="w-full space-y-4">
+                <form onSubmit={handleSubmit} className="w-full space-y-4" autoComplete="off">
                     <div className="relative">
                         <input
                             ref={inputRef}
                             type={showPassword ? 'text' : 'password'}
                             value={input}
                             onChange={(e) => { setInput(e.target.value); setError(''); }}
-                            placeholder="Enter profile name..."
+                            placeholder="Enter password..."
                             className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 outline-none focus:border-brand-red/50 transition pr-12 text-center text-lg tracking-widest"
-                            autoComplete="off"
+                            autoComplete="new-password"
+                            name="watch-password"
                         />
                         <button
                             type="button"
