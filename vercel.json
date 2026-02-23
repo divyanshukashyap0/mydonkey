@@ -1,18 +1,5 @@
 {
-    "functions": {
-        "api/content-seo.js": {
-            "runtime": "nodejs18.x"
-        }
-    },
     "rewrites": [
-        {
-            "source": "/browse/:id",
-            "destination": "/api/content-seo"
-        },
-        {
-            "source": "/watch/:id",
-            "destination": "/api/content-seo"
-        },
         {
             "source": "/(.*)",
             "destination": "/index.html"
