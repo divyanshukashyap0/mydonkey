@@ -101,8 +101,15 @@ const ContentManager = () => {
             const rating = mapTMDBRating(detail, type);
             const poster = tmdbPosterUrl(detail.poster_path, 'w500');
             const backdrop = tmdbBackdropUrl(detail.backdrop_path, 'w1280');
-            const posterMobile = tmdbPosterUrl(detail.poster_path, 'w342');
-            const backdropMobile = tmdbBackdropUrl(detail.backdrop_path, 'w780');
+
+            // Find visually distinct mobile poster (different file_path than primary)
+            const altPosterPath = detail.images?.posters?.find(p => p.file_path !== detail.poster_path)?.file_path;
+            const posterMobile = tmdbPosterUrl(altPosterPath || detail.poster_path, 'w342');
+
+            // Find visually distinct mobile backdrop (different file_path than primary)
+            const altBackdropPath = detail.images?.backdrops?.find(b => b.file_path !== detail.backdrop_path)?.file_path;
+            const backdropMobile = tmdbBackdropUrl(altBackdropPath || detail.backdrop_path, 'w780');
+
             const trailerId = extractTMDBTrailer(detail);
 
             let newSeasons = formData.seasons || [];

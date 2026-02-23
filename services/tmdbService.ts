@@ -64,6 +64,10 @@ export interface TMDBDetail {
             type: string;
         }[];
     };
+    images?: {
+        backdrops: { file_path: string }[];
+        posters: { file_path: string }[];
+    };
     genres: { id: number; name: string }[];
     credits?: {
         cast: { name: string; order: number }[];
@@ -123,8 +127,8 @@ export async function fetchTMDBDetails(
 
     const appendExtra =
         type === 'movie'
-            ? 'credits,release_dates,videos'
-            : 'credits,content_ratings,videos';
+            ? 'credits,release_dates,videos,images&include_image_language=en,null'
+            : 'credits,content_ratings,videos,images&include_image_language=en,null';
 
     const url = `${TMDB_BASE}/${type}/${tmdbId}?api_key=${API_KEY}&language=en-US&append_to_response=${appendExtra}`;
     const res = await fetch(url);
