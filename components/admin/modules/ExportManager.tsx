@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, FileSpreadsheet, Users, Film, MessageSquare, Database, Upload, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Download, FileSpreadsheet, Users, Film, MessageSquare, Database, Upload, AlertTriangle, CheckCircle, FolderSync } from 'lucide-react';
 import { useStore } from '../../../context/StoreContext';
 import * as XLSX from 'xlsx';
 import { collection, writeBatch, doc, setDoc, getDocsFromCache } from 'firebase/firestore';
@@ -11,7 +11,73 @@ const ExportManager = () => {
     const [exporting, setExporting] = React.useState(false);
     const [importStats, setImportStats] = React.useState<{ total: number; success: number; skipped: number; errors: number } | null>(null);
 
+    const [driveFolderId, setDriveFolderId] = React.useState('');
+    const [driveApiKey, setDriveApiKey] = React.useState('');
+    const [driveImporting, setDriveImporting] = React.useState(false);
+
+    const handleDriveImport = async () => {
+        if (!driveFolderId || !driveApiKey) return alert("Please enter both Folder ID and API Key");
+        setDriveImporting(true);
+        setImportStats(null);
+        try {
+            const folderId = driveFolderId.trim();
+            const apiKey = driveApiKey.trim();
+            const url = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents&fields=files(id,name,mimeType,thumbnailLink)&key=${apiKey}&pageSize=1000`;
+            const res = await fetch(url);
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`Drive API Error ${res.status}: ${errText}`);
+            }
+            const data = await res.json();
+
+            if (data.error) throw new Error(`Google API Error: ${data.error.message}\n\nCheck: API key has Drive API enabled, folder is shared publicly.`);
+
+            const files = data.files || [];
+            if (files.length === 0) throw new Error("No files found. Ensure:\n1) Folder ID is correct\n2) Folder is shared publicly (Anyone with the link)\n3) API Key has Google Drive API enabled");
+
+            // Accept video files by mimeType or common extension
+            const videos = files.filter((f: any) =>
+                f.mimeType.startsWith('video/') ||
+                f.mimeType === 'application/octet-stream' ||
+                /\.(mp4|mkv|avi|mov|webm|m4v)$/i.test(f.name)
+            );
+
+            if (videos.length === 0) {
+                const types = [...new Set(files.map((f: any) => f.mimeType))].join(', ');
+                throw new Error(`Found ${files.length} files but none detected as videos.\nFile types found: ${types}\n\nEnsure the folder contains video files (.mp4, .mkv, etc).`);
+            }
+
+            // Format exactly like Excel imports
+            const contentData = videos.map((file: any) => {
+                const title = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
+                return {
+                    Title: title,
+                    Overview: `Imported from Google Drive.`,
+                    Type: 'movie',
+                    MovieDriveID: file.id,
+                    PosterURL: file.thumbnailLink ? file.thumbnailLink.replace('=s220', '=s1000') : '',
+                    BackdropURL: file.thumbnailLink ? file.thumbnailLink.replace('=s220', '=s1000') : '',
+                    Featured: 'No',
+                    Original: 'No',
+                    ReleaseDate: new Date().toISOString().split('T')[0],
+                    Rating: 0
+                };
+            });
+
+            const stats = await processContentBatch(contentData, true);
+            alert(`Drive import complete!\n✅ ${stats?.processed || 0} added\n⏭️ ${stats?.skipped || 0} skipped (duplicates)`);
+            setImportStats({ total: videos.length, success: stats?.processed || 0, skipped: stats?.skipped || 0, errors: 0 });
+        } catch (error: any) {
+            console.error("Drive Import Error:", error);
+            alert("Drive Import Failed:\n" + error.message);
+            setImportStats({ total: 0, success: 0, skipped: 0, errors: 1 });
+        } finally {
+            setDriveImporting(false);
+        }
+    };
+
     const exportToExcel = (data: any[], fileName: string, sheetName: string) => {
+
         const ws = XLSX.utils.json_to_sheet(data);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, sheetName);
@@ -553,6 +619,46 @@ const ExportManager = () => {
                         </span>
                     </div>
                 )}
+            </div>
+
+            {/* Drive Import Section */}
+            <div className="bg-[#141414] border border-blue-500/20 rounded-xl p-6 relative overflow-hidden">
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
+                    <div className="flex-1">
+                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                            <FolderSync size={20} className="text-blue-500" /> Google Drive Import
+                        </h3>
+                        <p className="text-gray-400 text-sm mt-1">Automatically import videos directly from a public Google Drive Folder.</p>
+                    </div>
+
+                    <div className="flex flex-col md:flex-row items-center gap-4 w-full lg:w-auto">
+                        <input
+                            type="text"
+                            placeholder="Drive Folder ID"
+                            value={driveFolderId}
+                            onChange={(e) => setDriveFolderId(e.target.value)}
+                            className="bg-black border border-white/10 rounded-lg p-3 text-sm flex-1 lg:w-48 outline-none focus:border-blue-500"
+                        />
+                        <input
+                            type="password"
+                            placeholder="Google API Key"
+                            value={driveApiKey}
+                            onChange={(e) => setDriveApiKey(e.target.value)}
+                            className="bg-black border border-white/10 rounded-lg p-3 text-sm flex-1 lg:w-48 outline-none focus:border-blue-500"
+                        />
+                        <button
+                            onClick={handleDriveImport}
+                            disabled={driveImporting}
+                            className={`px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-lg flex items-center gap-2 transition whitespace-nowrap`}
+                        >
+                            {driveImporting ? (
+                                <><FolderSync size={18} className="animate-spin" /> Importing...</>
+                            ) : (
+                                <><FolderSync size={18} /> Import Folder</>
+                            )}
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

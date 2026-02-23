@@ -1,6 +1,14 @@
 {
     "rewrites": [
         {
+            "source": "/browse/:id",
+            "destination": "/api/content-seo"
+        },
+        {
+            "source": "/watch/:id",
+            "destination": "/api/content-seo"
+        },
+        {
             "source": "/(.*)",
             "destination": "/index.html"
         }
