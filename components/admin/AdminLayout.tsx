@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   LayoutDashboard, Film, Users, Settings, Home, LogOut,
-  Tags, CreditCard, Calendar, MessageSquare, ChevronDown, ChevronRight, Menu, X, FileText, Database
+  Tags, CreditCard, Calendar, MessageSquare, ChevronDown, ChevronRight, Menu, X, FileText, Database, Lock
 } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import UsersModule from './UsersModule';
@@ -16,9 +16,10 @@ import PagesManager from './modules/PagesManager';
 import AppearanceManager from './modules/AppearanceManager';
 import AnimeManager from './modules/AnimeManager';
 import ExportManager from './modules/ExportManager';
+import ExclusiveContentManager from './modules/ExclusiveContentManager';
 
 // --- Types ---
-type ModuleType = 'content' | 'anime' | 'home' | 'coming_soon' | 'requests' | 'plans' | 'users' | 'settings' | 'pages' | 'appearance' | 'export';
+type ModuleType = 'content' | 'anime' | 'home' | 'coming_soon' | 'requests' | 'plans' | 'users' | 'settings' | 'pages' | 'appearance' | 'export' | 'exclusive';
 
 interface SidebarGroup {
   title: string;
@@ -32,6 +33,7 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
     items: [
       { id: 'content', label: 'Content Library', icon: Film },
       { id: 'anime', label: 'Anime Library', icon: Film },
+      { id: 'exclusive', label: 'Exclusive Content', icon: Lock },
       { id: 'home', label: 'Sections & Layout', icon: Home },
       { id: 'pages', label: 'Pages & Footer', icon: FileText },
       { id: 'coming_soon', label: 'Upcoming Releases', icon: Calendar },
@@ -182,6 +184,7 @@ export default function AdminLayout({ onExit }: { onExit: () => void }) {
             {activeModule === 'pages' && <PagesManager />}
             {activeModule === 'appearance' && <AppearanceManager />}
             {activeModule === 'export' && <ExportManager />}
+            {activeModule === 'exclusive' && <ExclusiveContentManager />}
           </div>
         </main>
       </div>

@@ -207,18 +207,28 @@ const MainLayout = () => {
             navigate(`/watch/${item.id}?mode=trailer`, { state: { item } });
         } else {
             if (isAuthenticated && currentUser) {
-                // Check for Exclusive Content
+                // Check for old accessCode exclusive system
                 if (item.accessCode && !currentProfile?.unlockedContent?.includes(item.id)) {
                     setShowUnlockModal(true);
                     return;
                 }
-                // Password gate: store pending play and show modal
-                setPendingPlay({ item, mode });
+
+                // YouTube-only content → no password gate
+                const isYouTubeOnly = !item.movieDriveId && !item.videoUrl;
+
+                // Only show password gate for Drive/direct content marked isExclusive
+                if (!isYouTubeOnly && item.isExclusive) {
+                    setPendingPlay({ item, mode });
+                    return;
+                }
+
+                navigate(`/watch/${item.id}?mode=movie`, { state: { item } });
             } else {
                 navigate('/login');
             }
         }
     };
+
 
     // Called after password modal confirmed
     const handlePlayConfirmed = () => {
