@@ -9,17 +9,11 @@ const ExclusiveContentManager = () => {
     const [filterType, setFilterType] = useState<'all' | 'exclusive' | 'free'>('all');
     const [saving, setSaving] = useState<string | null>(null);
 
-    // Filter only Drive/Direct content (not YouTube-only — those skip password)
-    const nonYoutubeContent = useMemo(() =>
-        content.filter(c =>
-            c.movieDriveId || c.videoUrl ||
-            (c.type === 'tv' && c.seasons?.some(s => s.episodes.some(e => e.driveId || e.videoUrl)))
-        ),
-        [content]
-    );
+    // All content — admin can make any item exclusive (even YouTube)
+    const allContent = content;
 
     const filtered = useMemo(() => {
-        let list = nonYoutubeContent;
+        let list = allContent;
         if (filterType === 'exclusive') list = list.filter(c => c.isExclusive);
         if (filterType === 'free') list = list.filter(c => !c.isExclusive);
         if (search.trim()) {
@@ -27,7 +21,7 @@ const ExclusiveContentManager = () => {
             list = list.filter(c => c.title.toLowerCase().includes(q));
         }
         return list;
-    }, [nonYoutubeContent, search, filterType]);
+    }, [allContent, search, filterType]);
 
     const toggleExclusive = async (item: Content) => {
         setSaving(item.id);
@@ -41,9 +35,9 @@ const ExclusiveContentManager = () => {
     };
 
     const stats = {
-        total: nonYoutubeContent.length,
-        exclusive: nonYoutubeContent.filter(c => (c as any).isExclusive).length,
-        free: nonYoutubeContent.filter(c => !(c as any).isExclusive).length,
+        total: allContent.length,
+        exclusive: allContent.filter(c => c.isExclusive).length,
+        free: allContent.filter(c => !c.isExclusive).length,
     };
 
     return (
@@ -54,8 +48,7 @@ const ExclusiveContentManager = () => {
                     <Lock className="text-brand-red" /> Exclusive Content
                 </h2>
                 <p className="text-gray-400 mt-2">
-                    Content marked as <span className="text-brand-red font-bold">Exclusive</span> requires a password before playing.
-                    YouTube-only content is always free to watch.
+                    Content marked as <span className="text-brand-red font-bold">Exclusive</span> requires a password before playing — for any content type including YouTube.
                 </p>
             </div>
 

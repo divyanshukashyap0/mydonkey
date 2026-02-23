@@ -219,11 +219,11 @@ const MainLayout = () => {
                     return;
                 }
 
-                // YouTube-only content → no password gate
+                // YouTube-only content → no password by default
                 const isYouTubeOnly = !item.movieDriveId && !item.videoUrl;
 
-                // All Drive/direct content requires password
-                if (!isYouTubeOnly) {
+                // Gate: all Drive/direct content, OR any content explicitly marked exclusive
+                if (!isYouTubeOnly || item.isExclusive) {
                     setPendingPlay({ item, mode });
                     return;
                 }
