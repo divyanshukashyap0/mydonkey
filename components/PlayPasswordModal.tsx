@@ -23,12 +23,10 @@ const PlayPasswordModal: React.FC<PlayPasswordModalProps> = ({ contentTitle, onC
         e.preventDefault();
         const entered = input.trim().toLowerCase();
         const required = correctPassword.trim().toLowerCase();
+        const firstName = required.split(' ')[0];
 
-        // Explicitly block first-name-only entries if name has multiple words
-        const firstWordOnly = required.split(' ')[0];
-        const isFirstNameOnly = required.includes(' ') && entered === firstWordOnly;
-
-        if (!isFirstNameOnly && entered === required) {
+        // Accept either first name only OR the full name
+        if (entered === required || entered === firstName) {
             onConfirm();
         } else {
             setError('Incorrect password.');
@@ -37,6 +35,7 @@ const PlayPasswordModal: React.FC<PlayPasswordModalProps> = ({ contentTitle, onC
             setTimeout(() => setShake(false), 600);
         }
     };
+
 
     return (
         <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
