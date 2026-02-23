@@ -222,8 +222,8 @@ const MainLayout = () => {
                 // YouTube-only content → no password gate
                 const isYouTubeOnly = !item.movieDriveId && !item.videoUrl;
 
-                // Only show password gate for Drive/direct content marked isExclusive
-                if (!isYouTubeOnly && item.isExclusive) {
+                // All Drive/direct content requires password
+                if (!isYouTubeOnly) {
                     setPendingPlay({ item, mode });
                     return;
                 }
