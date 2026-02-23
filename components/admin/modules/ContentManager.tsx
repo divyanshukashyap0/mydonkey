@@ -7,7 +7,7 @@ import { db } from '../../../firebase';
 import {
     searchTMDB, fetchTMDBDetails, tmdbPosterUrl, tmdbBackdropUrl,
     mapTMDBGenres, mapTMDBRating, formatRuntime,
-    TMDBSearchResult, fetchTMDBSeason, tmdbStillUrl
+    TMDBSearchResult, fetchTMDBSeason, tmdbStillUrl, extractTMDBTrailer
 } from '../../../services/tmdbService';
 
 const MOVIE_GENRES = ["Action", "Adventure", "Comedy", "Drama", "Horror", "Sci-Fi", "Thriller", "Romance", "Documentary", "Animation"];
@@ -103,6 +103,7 @@ const ContentManager = () => {
             const backdrop = tmdbBackdropUrl(detail.backdrop_path, 'w1280');
             const posterMobile = tmdbPosterUrl(detail.poster_path, 'w342');
             const backdropMobile = tmdbBackdropUrl(detail.backdrop_path, 'w780');
+            const trailerId = extractTMDBTrailer(detail);
 
             let newSeasons = formData.seasons || [];
 
@@ -140,13 +141,14 @@ const ContentManager = () => {
                 backdrop_path: prev.backdrop_path || backdrop,
                 poster_path_mobile: prev.poster_path_mobile || posterMobile,
                 backdrop_path_mobile: prev.backdrop_path_mobile || backdropMobile,
+                youtubeId: prev.youtubeId || trailerId || '',
                 release_date: prev.release_date || releaseDate.split('T')[0],
                 vote_average: prev.vote_average || Math.round(detail.vote_average * 10) / 10,
                 genres: (prev.genres && prev.genres.length > 0) ? prev.genres : genres,
                 cast: (prev.cast && (prev.cast as string[]).length > 0) ? prev.cast : cast,
                 duration: prev.duration || runtime,
                 rating: prev.rating || rating,
-                seasons: type === 'tv' && (!prev.seasons || prev.seasons.length === 0) ? newSeasons : prev.seasons,
+                seasons: type === 'tv' ? newSeasons : prev.seasons,
             }));
 
             setTmdbFilled(true);

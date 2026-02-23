@@ -52,6 +52,18 @@ export interface TMDBDetail {
         season_number: number;
         vote_average: number;
     }[];
+    videos?: {
+        results: {
+            id: string;
+            iso_639_1: string;
+            iso_3166_1: string;
+            key: string;
+            name: string;
+            site: string;
+            size: number;
+            type: string;
+        }[];
+    };
     genres: { id: number; name: string }[];
     credits?: {
         cast: { name: string; order: number }[];
@@ -111,8 +123,8 @@ export async function fetchTMDBDetails(
 
     const appendExtra =
         type === 'movie'
-            ? 'credits,release_dates'
-            : 'credits,content_ratings';
+            ? 'credits,release_dates,videos'
+            : 'credits,content_ratings,videos';
 
     const url = `${TMDB_BASE}/${type}/${tmdbId}?api_key=${API_KEY}&language=en-US&append_to_response=${appendExtra}`;
     const res = await fetch(url);
@@ -130,6 +142,13 @@ export async function fetchTMDBSeason(
     const res = await fetch(url);
     if (!res.ok) throw new Error(`TMDB season fetch failed: ${res.statusText}`);
     return res.json() as Promise<TMDBSeasonDetail>;
+}
+
+/** Extract the first official YouTube trailer from TMDB detail */
+export function extractTMDBTrailer(detail: TMDBDetail): string | undefined {
+    if (!detail.videos || !detail.videos.results) return undefined;
+    const trailer = detail.videos.results.find(v => v.type === 'Trailer' && v.site === 'YouTube');
+    return trailer?.key;
 }
 
 // TMDB genre IDs → app genre names (shared subset)
