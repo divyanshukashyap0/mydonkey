@@ -17,6 +17,7 @@ import RequestContent from './components/RequestContent';
 import AdminLayout from './components/admin/AdminLayout';
 import ContentRequestInline from './components/ContentRequestInline';
 import UnlockContentModal from './components/UnlockContentModal';
+import PlayPasswordModal from './components/PlayPasswordModal';
 import SearchPage from './components/SearchPage';
 import ScrollToTop from './components/ScrollToTop';
 import ProfileSelection from './components/ProfileSelection';
@@ -41,6 +42,7 @@ const MainLayout = () => {
     const [viewingContent, setViewingContent] = useState<Content | null>(null);
     const [playingContent, setPlayingContent] = useState<Content | null>(null);
     const [showUnlockModal, setShowUnlockModal] = useState(false);
+    const [pendingPlay, setPendingPlay] = useState<{ item: Content; mode: 'movie' | 'trailer' } | null>(null);
 
     // --- Anime Intro State ---
     const [showAnimeIntro, setShowAnimeIntro] = useState(false);
@@ -210,11 +212,20 @@ const MainLayout = () => {
                     setShowUnlockModal(true);
                     return;
                 }
-                navigate(`/watch/${item.id}?mode=movie`, { state: { item } });
+                // Password gate: store pending play and show modal
+                setPendingPlay({ item, mode });
             } else {
                 navigate('/login');
             }
         }
+    };
+
+    // Called after password modal confirmed
+    const handlePlayConfirmed = () => {
+        if (!pendingPlay) return;
+        const { item, mode } = pendingPlay;
+        setPendingPlay(null);
+        navigate(`/watch/${item.id}?mode=movie`, { state: { item } });
     };
 
     const handleDetails = (item: Content) => {
@@ -626,6 +637,17 @@ const MainLayout = () => {
                 isOpen={showUnlockModal}
                 onClose={() => setShowUnlockModal(false)}
             />
+
+            {/* Play Password Gate */}
+            {pendingPlay && currentProfile && (
+                <PlayPasswordModal
+                    contentTitle={pendingPlay.item.title}
+                    correctPassword={currentProfile.name}
+                    onConfirm={handlePlayConfirmed}
+                    onCancel={() => setPendingPlay(null)}
+                />
+            )}
+
         </div>
     );
 };
