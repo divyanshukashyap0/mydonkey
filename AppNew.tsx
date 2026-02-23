@@ -207,6 +207,12 @@ const MainLayout = () => {
             navigate(`/watch/${item.id}?mode=trailer`, { state: { item } });
         } else {
             if (isAuthenticated && currentUser) {
+                // Whitelisted users skip ALL gates (password + access code)
+                if (currentUser.bypassPassword) {
+                    navigate(`/watch/${item.id}?mode=movie`, { state: { item } });
+                    return;
+                }
+
                 // Check for old accessCode exclusive system
                 if (item.accessCode && !currentProfile?.unlockedContent?.includes(item.id)) {
                     setShowUnlockModal(true);
@@ -228,6 +234,7 @@ const MainLayout = () => {
             }
         }
     };
+
 
 
     // Called after password modal confirmed

@@ -257,6 +257,26 @@ const UsersModule = () => {
                                                 {editingUser.status === 'active' ? 'Active Account' : 'Account Blocked'}
                                             </button>
                                         </div>
+
+                                        {/* Password Bypass Toggle */}
+                                        <div className="col-span-2">
+                                            <label className="block text-sm font-bold text-gray-400 mb-2">
+                                                Content Access
+                                            </label>
+                                            <button
+                                                onClick={() => handleUpdate({ bypassPassword: !editingUser.bypassPassword })}
+                                                className={`w-full py-3 rounded-lg font-bold border flex items-center justify-center gap-2 transition ${editingUser.bypassPassword ? 'border-yellow-500/50 text-yellow-400 bg-yellow-500/5 hover:bg-yellow-500/10' : 'border-white/10 text-gray-400 hover:bg-white/5'}`}
+                                            >
+                                                <Lock size={16} />
+                                                {editingUser.bypassPassword
+                                                    ? '✅ Password Free Access (No password required for this user)'
+                                                    : '🔒 Standard Access (Password required for exclusive content)'}
+                                            </button>
+                                            <p className="text-[11px] text-gray-600 mt-1.5 text-center">
+                                                When enabled, this user skips the password gate and access codes on all content.
+                                            </p>
+                                        </div>
+
                                     </div>
 
                                     <div className="pt-6 border-t border-white/5">

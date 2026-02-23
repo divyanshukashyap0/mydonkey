@@ -153,6 +153,7 @@ export interface User {
   autoFullscreen?: boolean; // User preference for auto-fullscreen
   isGuest?: boolean;
   createdAt?: string;
+  bypassPassword?: boolean; // If true, user skips password gate and access codes
 }
 
 export interface ContinueWatchingItem {
