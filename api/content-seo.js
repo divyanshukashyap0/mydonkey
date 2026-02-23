@@ -1,6 +1,5 @@
-// Vercel Serverless Function - CommonJS format required
-const fs = require('fs');
-const path = require('path');
+// Vercel Serverless Function - CommonJS
+// Generates OG meta tags directly - no filesystem access required
 
 module.exports = async function handler(req, res) {
     const urlPath = req.url || '';
@@ -12,67 +11,75 @@ module.exports = async function handler(req, res) {
         contentId = decodeURIComponent(match[2]);
     }
 
-    // Read index.html from the built dist folder
-    const indexPath = path.join(process.cwd(), 'dist', 'index.html');
-    let html = '';
-    try {
-        html = fs.readFileSync(indexPath, 'utf8');
-    } catch (err) {
-        console.error('Failed to read dist/index.html:', err.message);
-        res.setHeader('Content-Type', 'text/html');
-        res.status(200).send('<!DOCTYPE html><html lang="en"><head><title>My Donkey</title></head><body><div id="root"></div></body></html>');
-        return;
-    }
+    // Default meta values
+    let title = 'My Donkey | Premium Streaming';
+    let description = 'Stream the latest movies, web series, and anime in HD on My Donkey.';
+    let image = 'https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png';
+    const siteUrl = `https://${req.headers.host || 'mydonkey.in'}${urlPath}`;
+    const redirectUrl = urlPath; // The SPA will handle this via client-side routing
 
     if (contentId) {
         try {
             const projectId = 'my-donkey-ott';
             const firebaseUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/content/${contentId}`;
-
             const fbRes = await fetch(firebaseUrl);
-            const fbData = await fbRes.json();
 
-            if (fbData && fbData.fields) {
-                const title = fbData.fields.title?.stringValue || 'My Donkey';
-                const rawDesc = fbData.fields.overview?.stringValue || 'Stream the latest movies and shows on My Donkey.';
-                const description = rawDesc.substring(0, 200);
-                const image =
-                    fbData.fields.backdrop_path?.stringValue ||
-                    fbData.fields.poster_path?.stringValue ||
-                    'https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png';
-
-                const siteUrl = `https://${req.headers.host || 'mydonkey.in'}${urlPath}`;
-
-                const ogTags = `
-  <meta property="og:site_name" content="My Donkey" />
-  <meta property="og:title" content="${title} | My Donkey" />
-  <meta property="og:description" content="${description}" />
-  <meta property="og:image" content="${image}" />
-  <meta property="og:image:width" content="1280" />
-  <meta property="og:image:height" content="720" />
-  <meta property="og:url" content="${siteUrl}" />
-  <meta property="og:type" content="video.movie" />
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="${title} | My Donkey" />
-  <meta name="twitter:description" content="${description}" />
-  <meta name="twitter:image" content="${image}" />`;
-
-                // Replace <title>
-                html = html.replace(/<title>.*?<\/title>/, `<title>${title} | My Donkey</title>`);
-
-                // Replace the OG tag block between markers
-                if (html.includes('<!-- OG_TAGS_START -->') && html.includes('<!-- OG_TAGS_END -->')) {
-                    html = html.replace(/<!-- OG_TAGS_START -->[\s\S]*?<!-- OG_TAGS_END -->/, `<!-- OG_TAGS_START -->${ogTags}\n  <!-- OG_TAGS_END -->`);
-                } else {
-                    // Fallback: inject before </head>
-                    html = html.replace('</head>', `${ogTags}\n</head>`);
+            if (fbRes.ok) {
+                const fbData = await fbRes.json();
+                if (fbData && fbData.fields) {
+                    title = (fbData.fields.title?.stringValue || 'My Donkey') + ' | My Donkey';
+                    const raw = fbData.fields.overview?.stringValue || '';
+                    description = raw.length > 200 ? raw.substring(0, 200) + '...' : raw || description;
+                    image =
+                        fbData.fields.backdrop_path?.stringValue ||
+                        fbData.fields.poster_path?.stringValue ||
+                        image;
                 }
             }
         } catch (e) {
-            console.error('SEO Firebase fetch error:', e.message);
-            // Silently fall through — still serve the HTML without dynamic tags
+            console.error('Firebase fetch error:', e.message);
         }
     }
+
+    // Escape values to prevent XSS in attributes
+    const safe = (s) => String(s).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    // Return a lightweight HTML shell with OG tags + client-side redirect to SPA
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${safe(title)}</title>
+
+  <!-- Open Graph -->
+  <meta property="og:site_name" content="My Donkey" />
+  <meta property="og:title" content="${safe(title)}" />
+  <meta property="og:description" content="${safe(description)}" />
+  <meta property="og:image" content="${safe(image)}" />
+  <meta property="og:image:width" content="1280" />
+  <meta property="og:image:height" content="720" />
+  <meta property="og:url" content="${safe(siteUrl)}" />
+  <meta property="og:type" content="video.movie" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${safe(title)}" />
+  <meta name="twitter:description" content="${safe(description)}" />
+  <meta name="twitter:image" content="${safe(image)}" />
+
+  <!-- Redirect real users to the SPA -->
+  <script>
+    window.location.replace("${safe(redirectUrl)}");
+  </script>
+  <noscript>
+    <meta http-equiv="refresh" content="0; url=${safe(redirectUrl)}" />
+  </noscript>
+</head>
+<body style="background:#141414;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+  <p>Redirecting to My Donkey...</p>
+</body>
+</html>`;
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
