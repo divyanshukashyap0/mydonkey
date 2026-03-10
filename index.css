@@ -284,3 +284,19 @@ h6 {
 .animate-shake {
   animation: shake 0.6s cubic-bezier(0.36, 0.07, 0.19, 0.97);
 }
+
+/* --- Video Player: Landscape Mobile Overrides --- */
+/* On phones in landscape (height is tiny), make the player chrome minimal */
+@media (orientation: landscape) and (max-height: 500px) {
+
+  /* Tighten the bottom controls bar */
+  .vp-controls-bar {
+    padding: 4px 6px !important;
+    gap: 4px !important;
+  }
+
+  /* Hide the center playback controls overlay – user taps the bottom bar */
+  .vp-center-controls {
+    display: none !important;
+  }
+}

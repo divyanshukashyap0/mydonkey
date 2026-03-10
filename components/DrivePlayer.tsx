@@ -24,7 +24,7 @@ const DrivePlayer: React.FC<DrivePlayerProps> = ({ driveId, title = 'Video Conte
         setShowWarning(false);
     }, [driveId]);
 
-    // Show warning if it has been "loaded" for 10 seconds (could be stuck on Drive's internal spinner)
+    // Show warning if it has been loaded for 10 seconds (could be stuck on Drive's internal spinner)
     useEffect(() => {
         let timer: ReturnType<typeof setTimeout>;
         if (!loading && !error) {
@@ -37,21 +37,28 @@ const DrivePlayer: React.FC<DrivePlayerProps> = ({ driveId, title = 'Video Conte
         };
     }, [loading, error]);
 
-    // Handle iframe load event
+    // Handle iframe load event — delay reveal so Drive's disclaimer screen is hidden behind our overlay
     const handleLoad = () => {
-        setLoading(false);
+        setTimeout(() => setLoading(false), 2500);
     };
 
     return (
         <div className="relative w-full h-full bg-black flex items-center justify-center overflow-hidden">
             {/* 16:9 Responsive Wrapper Case (If parent isn't fixed size, it maintains ratio) */}
-            <div className="relative w-full h-full overflow-hidden">
+            <div className="relative w-full h-full overflow-hidden" style={{ clipPath: 'inset(0px 0px 0px 0px)' }}>
 
                 {/* The Frame: Google Drive Native Player */}
                 <iframe
-                    key={driveId} // Force remount on ID change for stability
-                    className={`absolute inset-0 w-full h-full border-0 transition-opacity duration-700 ${loading ? 'opacity-0' : 'opacity-100'}`}
-                    src={`https://drive.google.com/file/d/${driveId}/preview${autoplay ? '?autoplay=1' : ''}`}
+                    key={driveId}
+                    className={`border-0 transition-opacity duration-700 ${loading ? 'opacity-0' : 'opacity-100'}`}
+                    style={{
+                        position: 'absolute',
+                        top: '-40px',
+                        left: '-2px',
+                        width: 'calc(100% + 4px)',
+                        height: 'calc(100% + 100px)',
+                    }}
+                    src={`https://drive.google.com/file/d/${driveId}/preview?rm=minimal${autoplay ? '&autoplay=1' : ''}`}
                     allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
                     referrerPolicy="no-referrer"
                     loading="eager"
@@ -95,35 +102,35 @@ const DrivePlayer: React.FC<DrivePlayerProps> = ({ driveId, title = 'Video Conte
                     </div>
                 )}
 
-                {/* Quick Actions (Floating) */}
+                {/* Watch Externally — always a compact icon-circle at top-right, never expands on mobile */}
                 {!loading && (
-                    <div className="absolute top-4 right-4 z-40 flex flex-col items-end gap-3">
-                        {showWarning && (
-                            <div className="bg-[#E50914]/90 text-white px-4 py-3 rounded-xl text-sm font-medium shadow-2xl backdrop-blur-md animate-in slide-in-from-right-4 fade-in max-w-xs text-right ring-1 ring-white/20 relative pr-10">
-                                <button
-                                    onClick={() => setShowWarning(false)}
-                                    className="absolute top-2 right-2 p-1 bg-black/20 hover:bg-black/40 rounded-full text-white/80 hover:text-white transition-colors"
-                                >
-                                    <X size={14} />
-                                </button>
-                                <p className="font-bold text-base mb-1">Video stuck loading?</p>
-                                <p className="text-white/90 text-xs leading-relaxed">
-                                    Your browser's <strong className="text-white">Tracking Prevention</strong> (or Adblocker) might be blocking the player.
-                                </p>
-                            </div>
-                        )}
-                        <a
-                            href={`https://drive.google.com/file/d/${driveId}/view`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className={`bg-black/60 hover:bg-black/90 text-white/80 hover:text-white p-3 rounded-full backdrop-blur-md border border-white/20 flex items-center gap-2 text-sm font-bold transition-all group shadow-xl ${showWarning ? 'ring-2 ring-[#E50914] text-white animate-pulse' : ''}`}
-                            title="External Player"
+                    <a
+                        href={`https://drive.google.com/file/d/${driveId}/view`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="absolute top-3 right-3 z-40 bg-black/50 hover:bg-black/80 text-white/70 hover:text-white p-2.5 rounded-full backdrop-blur-md border border-white/15 flex items-center gap-2 text-xs font-bold transition-all group shadow-xl"
+                        title="Watch Externally"
+                    >
+                        <ExternalLink size={16} />
+                        <span className="overflow-hidden max-w-0 group-hover:max-w-[120px] group-hover:pr-1 transition-all duration-300 whitespace-nowrap hidden md:block">
+                            Watch Externally
+                        </span>
+                    </a>
+                )}
+
+                {/* Stuck-loading warning — bottom-left toast, never covers the video on mobile */}
+                {showWarning && (
+                    <div className="absolute bottom-4 left-3 right-3 md:left-4 md:right-auto md:max-w-xs z-40 bg-[#E50914]/90 text-white px-4 py-3 rounded-xl text-sm font-medium shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom-4 fade-in ring-1 ring-white/20 relative pr-10">
+                        <button
+                            onClick={() => setShowWarning(false)}
+                            className="absolute top-2 right-2 p-1 bg-black/20 hover:bg-black/40 rounded-full text-white/80 hover:text-white transition-colors"
                         >
-                            <ExternalLink size={18} />
-                            <span className={`overflow-hidden transition-all duration-300 whitespace-nowrap ${showWarning ? 'max-w-xs px-1' : 'max-w-0 group-hover:max-w-xs group-hover:px-1'}`}>
-                                Watch Externally
-                            </span>
-                        </a>
+                            <X size={14} />
+                        </button>
+                        <p className="font-bold text-sm mb-0.5">Video stuck loading?</p>
+                        <p className="text-white/90 text-xs leading-relaxed">
+                            Your browser's <strong className="text-white">Tracking Prevention</strong> (or Adblocker) might be blocking the player.
+                        </p>
                     </div>
                 )}
             </div>

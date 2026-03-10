@@ -142,6 +142,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         return (window.innerWidth <= 768 || window.innerHeight <= 768) && /Mobile|Android|iPhone|iPad/i.test(navigator.userAgent);
     }, []);
     const [showEmbedOverlay, setShowEmbedOverlay] = useState(isDirectIframeEmbed && isMobile);
+    const [showDriveOverlay, setShowDriveOverlay] = useState(isDriveVideo && isMobile);
 
     // Data Usage Warning
     useEffect(() => {
@@ -552,8 +553,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
 
     // Controls Visibility Timer
+    // Only mouse-move resets the timer (desktop). Taps are handled by handleTap below.
     useEffect(() => {
-        const resetTimer = () => {
+        const onMouseMove = () => {
             setShowControls(true);
             if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
             controlsTimeoutRef.current = setTimeout(() => {
@@ -561,13 +563,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             }, 3000);
         };
 
-        window.addEventListener('mousemove', resetTimer);
-        window.addEventListener('click', resetTimer);
-        resetTimer();
+        window.addEventListener('mousemove', onMouseMove);
+
+        // Start an initial 4-second timer: controls are visible on mount then auto-hide
+        if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+        controlsTimeoutRef.current = setTimeout(() => {
+            if (!showStats && !showAudioSubMenu && !showQualityMenu && playing) setShowControls(false);
+        }, 4000);
 
         return () => {
-            window.removeEventListener('mousemove', resetTimer);
-            window.removeEventListener('click', resetTimer);
+            window.removeEventListener('mousemove', onMouseMove);
             if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
         };
     }, [showStats, showAudioSubMenu, showQualityMenu, playing]);
@@ -681,6 +686,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const lastTapRef = useRef<{ time: number, x: number } | null>(null);
     const [rippleSides, setRippleSides] = useState<('left' | 'right')[]>([]);
 
+    const startHideTimer = React.useCallback(() => {
+        if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+        controlsTimeoutRef.current = setTimeout(() => {
+            setShowControls(false);
+        }, 3000);
+    }, []);
+
     const handleTap = (e: React.MouseEvent) => {
         const now = Date.now();
         const x = e.clientX;
@@ -702,8 +714,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             }
             lastTapRef.current = null; // Reset
         } else {
-            // Single Tap - Toggle Controls
-            setShowControls(!showControls);
+            // Single Tap: if controls visible → hide immediately; if hidden → show + start 3s timer
+            if (showControls) {
+                if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+                setShowControls(false);
+            } else {
+                setShowControls(true);
+                startHideTimer();
+            }
             lastTapRef.current = { time: now, x };
         }
     };
@@ -856,6 +874,28 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 )
             }
 
+            {/* Drive Video Tap-to-Fullscreen Overlay for Mobile */}
+            {
+                showDriveOverlay && isDriveVideo && (
+                    <div
+                        className="absolute inset-0 z-[200] bg-black/85 backdrop-blur-sm flex flex-col items-center justify-center cursor-pointer"
+                        onClick={async (e) => {
+                            e.stopPropagation();
+                            await toggleFullscreen();
+                            setShowDriveOverlay(false);
+                        }}
+                    >
+                        <div className="bg-brand-red text-white p-5 rounded-full mb-4 shadow-[0_0_30px_rgba(229,9,20,0.6)] animate-pulse">
+                            <Play size={48} className="translate-x-1" />
+                        </div>
+                        <h2 className="text-white font-bold text-xl mb-2 text-center">{content.title}</h2>
+                        <p className="text-gray-300 text-sm text-center max-w-xs px-4">
+                            Tap to watch in fullscreen
+                        </p>
+                    </div>
+                )
+            }
+
             {/* Skip Intro */}
             {
                 !isDriveVideo && showSkipIntro && (
@@ -878,14 +918,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             }
 
             {/* Header - Transparent Floating Pill Style */}
-            <div className={`absolute top-0 left-0 w-full p-6 transition-opacity duration-300 pointer-events-none z-[120] ${showControls ? 'opacity-100' : 'opacity-0'}`}>
-                <div className="bg-black/40 backdrop-blur-md border border-white/5 inline-flex items-center gap-4 px-6 py-3 rounded-full pointer-events-auto hover:bg-black/60 transition-colors">
+            <div className={`absolute top-0 left-0 w-full p-3 md:p-6 transition-opacity duration-300 pointer-events-none z-[120] ${showControls ? 'opacity-100' : 'opacity-0'}`}>
+                <div className="bg-black/40 backdrop-blur-md border border-white/5 inline-flex items-center gap-2 md:gap-4 px-3 py-2 md:px-6 md:py-3 rounded-full pointer-events-auto hover:bg-black/60 transition-colors">
                     <button onClick={onClose} className="text-white hover:text-brand-red transition-colors group">
-                        <ArrowLeft size={24} className="group-hover:-translate-x-1 transition-transform" />
+                        <ArrowLeft size={20} className="md:w-6 md:h-6 group-hover:-translate-x-1 transition-transform" />
                     </button>
-                    <div className="h-6 w-px bg-white/10 mx-1"></div>
+                    <div className="h-5 w-px bg-white/10 mx-0.5"></div>
                     <div className="text-left">
-                        <div className="text-white font-bold text-sm md:text-base leading-tight tracking-wide line-clamp-1 max-w-[200px] md:max-w-md">{content.title}</div>
+                        <div className="text-white font-bold text-xs md:text-base leading-tight tracking-wide line-clamp-1 max-w-[160px] md:max-w-md">{content.title}</div>
                     </div>
                 </div>
             </div>
@@ -912,19 +952,19 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
             {/* Centered Playback Controls */}
             {!isDriveVideo && !isDirectIframeEmbed && (
-                <div className={`absolute inset-0 z-[116] pointer-events-none flex flex-row items-center justify-center gap-8 md:gap-16 transition-all duration-300 ${showControls ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
-                    <button className="text-white/80 hover:text-white bg-black/20 hover:bg-black/40 backdrop-blur-sm transition-all p-4 md:p-5 rounded-full pointer-events-auto active:scale-95" onClick={(e) => { e.stopPropagation(); handleSkip(-10); }} title="-10s">
-                        <RotateCcw size={32} className="md:w-10 md:h-10" />
+                <div className={`vp-center-controls absolute inset-0 z-[116] pointer-events-none flex flex-row items-center justify-center gap-4 md:gap-16 transition-all duration-300 ${showControls ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+                    <button className="text-white/80 hover:text-white bg-black/20 hover:bg-black/40 backdrop-blur-sm transition-all p-3 md:p-5 rounded-full pointer-events-auto active:scale-95" onClick={(e) => { e.stopPropagation(); handleSkip(-10); }} title="-10s">
+                        <RotateCcw size={24} className="md:w-10 md:h-10" />
                     </button>
                     <button onClick={(e) => { e.stopPropagation(); setPlaying(!playing); }}
-                        className="text-white hover:text-brand-red bg-black/40 backdrop-blur-md hover:bg-black/60 transition-all p-5 md:p-7 rounded-full active:scale-95 pointer-events-auto border border-white/10 shadow-2xl">
+                        className="text-white hover:text-brand-red bg-black/40 backdrop-blur-md hover:bg-black/60 transition-all p-4 md:p-7 rounded-full active:scale-95 pointer-events-auto border border-white/10 shadow-2xl">
                         {playing ?
-                            <Pause size={44} className="fill-current md:w-16 md:h-16" /> :
-                            <Play size={44} className="fill-current ml-2 md:w-16 md:h-16" />
+                            <Pause size={34} className="fill-current md:w-16 md:h-16" /> :
+                            <Play size={34} className="fill-current ml-1 md:ml-2 md:w-16 md:h-16" />
                         }
                     </button>
-                    <button className="text-white/80 hover:text-white bg-black/20 hover:bg-black/40 backdrop-blur-sm transition-all p-4 md:p-5 rounded-full pointer-events-auto active:scale-95" onClick={(e) => { e.stopPropagation(); handleSkip(10); }} title="+10s">
-                        <RotateCw size={32} className="md:w-10 md:h-10" />
+                    <button className="text-white/80 hover:text-white bg-black/20 hover:bg-black/40 backdrop-blur-sm transition-all p-3 md:p-5 rounded-full pointer-events-auto active:scale-95" onClick={(e) => { e.stopPropagation(); handleSkip(10); }} title="+10s">
+                        <RotateCw size={24} className="md:w-10 md:h-10" />
                     </button>
                 </div>
             )}
@@ -932,54 +972,63 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             {/* Controls - Floating Glass Bar (Hide for Drive Video and Direct Video) */}
             {
                 !isDriveVideo && !isDirectIframeEmbed && (
-                    <div className={`absolute bottom-0 left-0 right-0 p-4 md:p-8 transition-all duration-500 pointer-events-none z-[120] ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+                    <div className={`absolute bottom-0 left-0 right-0 px-2 py-2 md:p-8 transition-all duration-500 pointer-events-none z-[120] ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+                        style={{ paddingBottom: `calc(0.5rem + env(safe-area-inset-bottom, 0px))` }}>
 
                         {/* Main Control Bar */}
-                        <div className="bg-[#0f0f0f]/90 backdrop-blur-2xl border border-white/10 rounded-2xl md:rounded-3xl p-4 md:px-6 md:py-5 shadow-2xl pointer-events-auto flex flex-col gap-3 w-full max-w-5xl mx-auto ring-1 ring-white/5">
+                        <div className="vp-controls-bar bg-[#0f0f0f]/90 backdrop-blur-2xl border border-white/10 rounded-xl md:rounded-3xl p-2.5 md:px-6 md:py-5 shadow-2xl pointer-events-auto flex flex-col gap-2 md:gap-3 w-full max-w-5xl mx-auto ring-1 ring-white/5">
 
                             {/* Slider / Timeline */}
-                            <div className="w-full flex items-center gap-4 group/timeline">
+                            <div className="w-full flex items-center gap-2 md:gap-4 group/timeline">
                                 {/* Current Time */}
-                                <div className="text-xs font-bold text-gray-400 font-mono w-12 text-right tracking-wider">
+                                <div className="text-[10px] md:text-xs font-bold text-gray-400 font-mono w-9 md:w-12 text-right tracking-wider">
                                     {formatTime(currentTime)}
                                 </div>
 
-                                {/* Progress Bar */}
-                                <div className="flex-1 h-1.5 bg-white/10 rounded-full relative cursor-pointer group-hover/timeline:h-2.5 transition-all duration-300 overflow-visible"
-                                    onClick={handleSeek}>
-                                    {/* Buffered/Background */}
-                                    <div className="absolute inset-0 rounded-full overflow-hidden">
-                                        <div className="h-full bg-white/5 w-full"></div>
+                                {/* Progress Bar — tall touch target on mobile */}
+                                <div
+                                    className="flex-1 relative cursor-pointer flex items-center"
+                                    style={{ height: '44px' }}
+                                    onClick={handleSeek}
+                                >
+                                    {/* Track */}
+                                    <div className="absolute left-0 right-0 h-3 md:h-1.5 bg-white/15 rounded-full overflow-hidden" style={{ top: '50%', transform: 'translateY(-50%)' }}>
+                                        <div className="h-full bg-white/5 w-full" />
+                                        {/* Filled */}
+                                        <div
+                                            className="absolute inset-y-0 left-0 bg-gradient-to-r from-brand-red to-red-600 rounded-full shadow-[0_0_10px_rgba(229,9,20,0.5)]"
+                                            style={{ width: `${progress}%` }}
+                                        />
                                     </div>
-                                    {/* Filled Progress */}
-                                    <div className="h-full bg-gradient-to-r from-brand-red to-red-600 rounded-full relative shadow-[0_0_15px_rgba(229,9,20,0.6)]" style={{ width: `${progress}%` }}>
-                                        {/* Handle */}
-                                        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-md scale-0 group-hover/timeline:scale-125 transition-transform duration-200"></div>
-                                    </div>
+                                    {/* Thumb dot — always visible on mobile, hover on desktop */}
+                                    <div
+                                        className="absolute w-4 h-4 bg-white rounded-full shadow-lg z-10 -translate-y-1/2 top-1/2 md:scale-0 md:group-hover/timeline:scale-100 transition-transform duration-200"
+                                        style={{ left: `calc(${progress}% - 8px)` }}
+                                    />
                                 </div>
 
                                 {/* Duration */}
-                                <div className="text-xs font-bold text-gray-400 font-mono w-12 text-left tracking-wider">
+                                <div className="text-[10px] md:text-xs font-bold text-gray-400 font-mono w-9 md:w-12 text-left tracking-wider">
                                     {formatTime(duration)}
                                 </div>
                             </div>
 
                             {/* Lower Controls Row */}
-                            <div className="flex justify-between items-center mt-1">
+                            <div className="flex justify-between items-center">
 
                                 {/* LEFT: Volume Controls */}
-                                <div className="flex flex-1 items-center gap-2">
-                                    <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} className="text-gray-300 hover:text-white p-2 rounded-full hover:bg-white/10 transition hidden md:block">
-                                        {isMuted ? <VolumeX size={22} /> : <Volume2 size={22} />}
+                                <div className="flex flex-1 items-center gap-1 md:gap-2">
+                                    <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} className="text-gray-300 hover:text-white p-1.5 md:p-2 rounded-full hover:bg-white/10 transition">
+                                        {isMuted ? <VolumeX size={18} className="md:w-[22px] md:h-[22px]" /> : <Volume2 size={18} className="md:w-[22px] md:h-[22px]" />}
                                     </button>
                                 </div>
 
                                 {/* RIGHT: Features */}
-                                <div className="flex items-center gap-2 md:gap-3 text-gray-400">
+                                <div className="flex items-center gap-0.5 md:gap-3 text-gray-400">
                                     {isSports && (
                                         <button onClick={(e) => { e.stopPropagation(); setShowStats(!showStats); }}
-                                            className={`hover:text-brand-red transition-all p-2.5 rounded-xl hover:bg-white/5 ${showStats ? 'bg-brand-red/10 text-brand-red md:ring-1 md:ring-brand-red/50' : ''}`} title="Match Stats">
-                                            <BarChart2 size={22} />
+                                            className={`hover:text-brand-red transition-all p-1.5 md:p-2.5 rounded-xl hover:bg-white/5 ${showStats ? 'bg-brand-red/10 text-brand-red md:ring-1 md:ring-brand-red/50' : ''}`} title="Match Stats">
+                                            <BarChart2 size={18} className="md:w-[22px] md:h-[22px]" />
                                         </button>
                                     )}
 
@@ -987,10 +1036,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                     <div className="relative">
                                         <button
                                             onClick={(e) => { e.stopPropagation(); setShowAudioSubMenu(!showAudioSubMenu); setShowQualityMenu(false); }}
-                                            className={`hover:text-white transition-all p-2.5 rounded-xl hover:bg-white/5 ${showAudioSubMenu ? 'bg-white/10 text-white' : ''}`}
+                                            className={`hover:text-white transition-all p-1.5 md:p-2.5 rounded-xl hover:bg-white/5 ${showAudioSubMenu ? 'bg-white/10 text-white' : ''}`}
                                             title="Audio & Subtitles"
                                         >
-                                            <MessageSquare size={22} />
+                                            <MessageSquare size={18} className="md:w-[22px] md:h-[22px]" />
                                         </button>
 
                                         {/* Audio/Sub Menu Popup */}
@@ -1075,9 +1124,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                     {/* Quality Settings */}
                                     <div className="relative">
                                         <button onClick={(e) => { e.stopPropagation(); setShowQualityMenu(!showQualityMenu); setShowAudioSubMenu(false); }}
-                                            className={`hover:text-white transition-all p-2.5 rounded-xl hover:bg-white/5 ${showQualityMenu ? 'bg-white/10 text-white' : ''}`}
+                                            className={`hover:text-white transition-all p-1.5 md:p-2.5 rounded-xl hover:bg-white/5 ${showQualityMenu ? 'bg-white/10 text-white' : ''}`}
                                             title="Quality & Speed">
-                                            <Settings size={22} />
+                                            <Settings size={18} className="md:w-[22px] md:h-[22px]" />
                                         </button>
 
                                         {showQualityMenu && (
@@ -1117,15 +1166,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                     {/* Zoom / Fill Screen Toggle */}
                                     <button
                                         onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); }}
-                                        className={`hover:text-white transition-all p-2.5 rounded-xl hover:bg-white/5 ${isZoomed ? 'text-brand-red bg-white/5' : ''}`}
+                                        className={`hover:text-white transition-all p-1.5 md:p-2.5 rounded-xl hover:bg-white/5 ${isZoomed ? 'text-brand-red bg-white/5' : ''}`}
                                         title={isZoomed ? "Reset Zoom" : "Fill Screen"}
                                     >
-                                        {isZoomed ? <Minimize size={22} /> : <Scan size={22} />}
+                                        {isZoomed ? <Minimize size={18} className="md:w-[22px] md:h-[22px]" /> : <Scan size={18} className="md:w-[22px] md:h-[22px]" />}
                                     </button>
 
                                     {/* Fullscreen */}
-                                    <button className="hover:text-white hover:bg-white/10 transition p-2.5 rounded-xl" onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}>
-                                        {isFullscreen ? <Minimize size={22} /> : <Maximize size={22} />}
+                                    <button className="hover:text-white hover:bg-white/10 transition p-1.5 md:p-2.5 rounded-xl" onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}>
+                                        {isFullscreen ? <Minimize size={18} className="md:w-[22px] md:h-[22px]" /> : <Maximize size={18} className="md:w-[22px] md:h-[22px]" />}
                                     </button>
                                 </div>
                             </div>
