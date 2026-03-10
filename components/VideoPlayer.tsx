@@ -144,6 +144,28 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const [showEmbedOverlay, setShowEmbedOverlay] = useState(isDirectIframeEmbed && isMobile);
     const [showDriveOverlay, setShowDriveOverlay] = useState(isDriveVideo && isMobile);
 
+    // Portrait/Landscape detection for mobile embedded-player layout
+    const [isPortrait, setIsPortrait] = useState(() =>
+        isMobile ? window.matchMedia('(orientation: portrait)').matches : false
+    );
+
+    useEffect(() => {
+        if (!isMobile) return;
+        const mq = window.matchMedia('(orientation: portrait)');
+        const handler = (e: MediaQueryListEvent) => setIsPortrait(e.matches);
+        mq.addEventListener('change', handler);
+        return () => mq.removeEventListener('change', handler);
+    }, [isMobile]);
+
+    // Unlock orientation on unmount (no forced lock — portrait is valid)
+    useEffect(() => {
+        return () => {
+            if (isMobile && screen.orientation && (screen.orientation as any).unlock) {
+                try { (screen.orientation as any).unlock(); } catch (_) { }
+            }
+        };
+    }, [isMobile]);
+
     // Data Usage Warning
     useEffect(() => {
         if (!currentUser?.lowDataMode && !isDriveVideo) {
@@ -152,29 +174,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             return () => clearTimeout(timer);
         }
     }, [currentUser?.lowDataMode, isDriveVideo]);
-
-    // Mobile Auto-Rotation
-    useEffect(() => {
-        if (isMobile && screen.orientation && (screen.orientation as any).lock) {
-            try {
-                (screen.orientation as any).lock('landscape').catch((err: any) => {
-                    console.log('Screen orientation lock failed or not supported:', err);
-                });
-            } catch (err) {
-                console.log('Screen orientation API error:', err);
-            }
-        }
-
-        return () => {
-            if (isMobile && screen.orientation && (screen.orientation as any).unlock) {
-                try {
-                    (screen.orientation as any).unlock();
-                } catch (err) {
-                    // Ignore unlock errors
-                }
-            }
-        };
-    }, [isMobile]);
 
     // Player Options
     const [qualities, setQualities] = useState<string[]>([]);
@@ -767,11 +766,195 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     const isSports = content.genres?.includes('Sports') || content.tags?.includes('Sports');
 
+    // ── Mobile Portrait: YouTube-style partial layout ──────────────────────
+    if (isMobile && isPortrait) {
+        const renderVideoCore = () => (
+            <div className="relative w-full" style={{ aspectRatio: '16/9', background: '#000' }}>
+                {/* Actual player(s) */}
+                {directVideoUrl ? (
+                    (isHls || isNativeVideo) ? (
+                        <video
+                            ref={videoRef}
+                            className="w-full h-full object-contain"
+                            playsInline
+                            onClick={() => setPlaying(!playing)}
+                            src={isNativeVideo ? directVideoUrl : undefined}
+                            onLoadedMetadata={(e) => {
+                                if (isNativeVideo) {
+                                    setIsPlayerReady(true);
+                                    setDuration(e.currentTarget.duration);
+                                    if (playing) e.currentTarget.play().catch(console.error);
+                                }
+                            }}
+                        />
+                    ) : (
+                        <iframe
+                            className="w-full h-full"
+                            src={directVideoUrl}
+                            allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                            title={content.title}
+                        />
+                    )
+                ) : isDriveVideo ? (
+                    <div className="w-full h-full pointer-events-auto">
+                        {driveIdToUse && (
+                            <DrivePlayer driveId={driveIdToUse} title={content.title} autoplay={playing} />
+                        )}
+                    </div>
+                ) : (
+                    <div className="w-full h-full overflow-hidden pointer-events-none">
+                        <div ref={playerContainerRef} id="youtube-player" className="w-full h-full origin-center pointer-events-none" />
+                    </div>
+                )}
+
+                {/* Loading Spinner */}
+                {(initialLoad || isBuffering) && !isDriveVideo && !isDirectIframeEmbed && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80">
+                        <div className="animate-spin rounded-full h-8 w-8 border-4 border-[#E50914] border-t-transparent mb-3" />
+                        <div className="text-white text-sm font-bold animate-pulse">Loading…</div>
+                    </div>
+                )}
+
+                {/* Drive overlay (tap to fullscreen) */}
+                {showDriveOverlay && isDriveVideo && (
+                    <div
+                        className="absolute inset-0 z-20 bg-black/85 flex flex-col items-center justify-center cursor-pointer"
+                        onClick={async (e) => { e.stopPropagation(); await toggleFullscreen(); setShowDriveOverlay(false); }}
+                    >
+                        <div className="bg-[#E50914] text-white p-4 rounded-full mb-3 shadow-[0_0_24px_rgba(229,9,20,0.6)] animate-pulse">
+                            <Play size={36} className="translate-x-0.5" />
+                        </div>
+                        <p className="text-white font-bold text-base">{content.title}</p>
+                        <p className="text-gray-300 text-xs mt-1">Tap to watch fullscreen</p>
+                    </div>
+                )}
+
+                {/* Embed overlay (tap to fullscreen) */}
+                {showEmbedOverlay && isDirectIframeEmbed && (
+                    <div
+                        className="absolute inset-0 z-20 bg-black/85 flex flex-col items-center justify-center cursor-pointer"
+                        onClick={async (e) => { e.stopPropagation(); await toggleFullscreen(); setShowEmbedOverlay(false); }}
+                    >
+                        <div className="bg-[#E50914] text-white p-4 rounded-full mb-3 animate-pulse">
+                            <Play size={36} className="translate-x-0.5" />
+                        </div>
+                        <p className="text-white font-bold text-base">Tap to Start Fullscreen</p>
+                    </div>
+                )}
+
+                {/* Center play/pause controls */}
+                {!isDriveVideo && !isDirectIframeEmbed && (
+                    <div
+                        className={`absolute inset-0 z-10 flex items-center justify-center gap-8 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                        onClick={handleTap}
+                        style={{ WebkitTapHighlightColor: 'rgba(0,0,0,0)' }}
+                    >
+                        <button className="text-white/80 bg-black/30 backdrop-blur-sm p-3 rounded-full active:scale-90 transition pointer-events-auto" onClick={(e) => { e.stopPropagation(); handleSkip(-10); }}>
+                            <RotateCcw size={22} />
+                        </button>
+                        <button className="text-white bg-black/50 backdrop-blur-md p-4 rounded-full border border-white/10 active:scale-90 transition pointer-events-auto" onClick={(e) => { e.stopPropagation(); setPlaying(!playing); }}>
+                            {playing ? <Pause size={28} className="fill-current" /> : <Play size={28} className="fill-current ml-0.5" />}
+                        </button>
+                        <button className="text-white/80 bg-black/30 backdrop-blur-sm p-3 rounded-full active:scale-90 transition pointer-events-auto" onClick={(e) => { e.stopPropagation(); handleSkip(10); }}>
+                            <RotateCw size={22} />
+                        </button>
+                    </div>
+                )}
+
+                {/* Seek bar */}
+                {!isDriveVideo && !isDirectIframeEmbed && (
+                    <div className={`absolute bottom-0 left-0 right-0 px-3 pb-2 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-gray-400 font-mono">{formatTime(currentTime)}</span>
+                            <div className="flex-1 relative h-8 flex items-center" onClick={handleSeek}>
+                                <div className="absolute left-0 right-0 h-1 bg-white/20 rounded-full overflow-hidden">
+                                    <div className="h-full bg-[#E50914] rounded-full" style={{ width: `${progress}%` }} />
+                                </div>
+                                <div className="absolute w-3 h-3 bg-white rounded-full -translate-x-1/2 shadow" style={{ left: `${progress}%` }} />
+                            </div>
+                            <span className="text-[10px] text-gray-400 font-mono">{formatTime(duration)}</span>
+                            <button className="text-gray-300 ml-1" onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}>
+                                <Maximize size={16} />
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+
+        return (
+            <div className="fixed inset-0 z-[100] bg-[#0f0f0f] flex flex-col overflow-y-auto font-sans select-none">
+                {/* Top bar: back + title */}
+                <div className="flex items-center gap-3 px-3 py-3 flex-shrink-0">
+                    <button onClick={onClose} className="text-white p-1.5 rounded-full hover:bg-white/10 transition active:scale-90">
+                        <ArrowLeft size={22} />
+                    </button>
+                    <span className="text-white font-bold text-sm flex-1 truncate">{content.title}</span>
+                    <button onClick={() => toggleFullscreen()} className="text-gray-400 p-1.5 rounded-full hover:bg-white/10 transition">
+                        <Maximize size={18} />
+                    </button>
+                </div>
+
+                {/* 16:9 Video area */}
+                <div className="w-full flex-shrink-0 bg-black">
+                    {renderVideoCore()}
+                </div>
+
+                {/* Content info below the player */}
+                <div className="flex-1 px-4 pt-4 pb-8 space-y-3">
+                    <h2 className="text-white font-black text-xl leading-tight">{content.title}</h2>
+
+                    {/* Metadata badges */}
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400">
+                        {content.release_date && <span>{content.release_date.split('-')[0]}</span>}
+                        {content.rating && <span className="border border-white/30 px-1.5 py-0.5 rounded text-[10px]">{content.rating}</span>}
+                        {content.resolution && <span className="border border-white/30 px-1.5 py-0.5 rounded text-[10px] font-black">{content.resolution}</span>}
+                        {content.genres?.slice(0, 2).map(g => (
+                            <span key={g} className="bg-white/10 px-2 py-0.5 rounded-full text-[10px]">{g}</span>
+                        ))}
+                    </div>
+
+                    {/* Overview */}
+                    {content.overview && (
+                        <p className="text-gray-300 text-sm leading-relaxed line-clamp-4">{content.overview}</p>
+                    )}
+
+                    {/* Volume mute toggle */}
+                    {!isDriveVideo && !isDirectIframeEmbed && (
+                        <div className="flex items-center gap-4 pt-1">
+                            <button
+                                onClick={() => setIsMuted(!isMuted)}
+                                className="flex items-center gap-2 text-gray-300 text-xs bg-white/10 px-3 py-2 rounded-full"
+                            >
+                                {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                                {isMuted ? 'Unmute' : 'Muted off'}
+                            </button>
+                            <button
+                                onClick={() => toggleFullscreen()}
+                                className="flex items-center gap-2 text-gray-300 text-xs bg-white/10 px-3 py-2 rounded-full"
+                            >
+                                <Maximize size={14} />
+                                Fullscreen
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Rotate hint */}
+                    <div className="flex items-center gap-2 text-gray-500 text-[11px] pt-1">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z" /><path d="m9 12 2 2 4-4" /></svg>
+                        Rotate phone to landscape for fullscreen
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // ── Fullscreen layout (desktop + mobile landscape) ─────────────────────
     return (
         <div
             className={`fixed inset-0 z-[100] bg-black flex flex-col justify-center items-center overflow-hidden font-sans select-none ${!showControls ? 'cursor-none' : ''}`}
         >
-            {/* Strict Right-Click Block Overlay 
+            {/* Strict Right-Click Block Overlay
                 - For YouTube: pointer-events 'auto' when controls hidden (blocks all clicks to iframe).
                 - For Drive: MUST be 'none' always, otherwise user can't click internal iframe buttons.
             */}
