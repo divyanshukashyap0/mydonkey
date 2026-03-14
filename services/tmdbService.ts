@@ -101,6 +101,25 @@ export interface TMDBSeasonDetail {
     poster_path: string | null;
     season_number: number;
     episodes: TMDBEpisodeDetail[];
+    videos?: {
+        results: {
+            key: string;
+            site: string;
+            type: string;
+        }[];
+    };
+}
+
+export async function fetchTMDBEpisode(
+    tmdbId: number,
+    seasonNumber: number,
+    episodeNumber: number
+): Promise<TMDBEpisodeDetail & { videos?: { results: any[] } }> {
+    if (!API_KEY) throw new Error('VITE_TMDB_API_KEY is not set in .env');
+    const url = `${TMDB_BASE}/tv/${tmdbId}/season/${seasonNumber}/episode/${episodeNumber}?api_key=${API_KEY}&language=en-US&append_to_response=videos`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`TMDB episode fetch failed: ${res.statusText}`);
+    return res.json();
 }
 
 /** Search for movies or TV shows on TMDB */
@@ -127,8 +146,8 @@ export async function fetchTMDBDetails(
 
     const appendExtra =
         type === 'movie'
-            ? 'credits,release_dates,videos,images&include_image_language=en,null'
-            : 'credits,content_ratings,videos,images&include_image_language=en,null';
+            ? 'credits,release_dates,videos,images&include_image_language=en,null&include_video_language=en,null'
+            : 'credits,content_ratings,videos,images&include_image_language=en,null&include_video_language=en,null';
 
     const url = `${TMDB_BASE}/${type}/${tmdbId}?api_key=${API_KEY}&language=en-US&append_to_response=${appendExtra}`;
     const res = await fetch(url);
@@ -142,17 +161,41 @@ export async function fetchTMDBSeason(
     seasonNumber: number
 ): Promise<TMDBSeasonDetail> {
     if (!API_KEY) throw new Error('VITE_TMDB_API_KEY is not set in .env');
-    const url = `${TMDB_BASE}/tv/${tmdbId}/season/${seasonNumber}?api_key=${API_KEY}&language=en-US`;
+    const url = `${TMDB_BASE}/tv/${tmdbId}/season/${seasonNumber}?api_key=${API_KEY}&language=en-US&append_to_response=videos`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`TMDB season fetch failed: ${res.statusText}`);
     return res.json() as Promise<TMDBSeasonDetail>;
 }
 
 /** Extract the first official YouTube trailer from TMDB detail */
-export function extractTMDBTrailer(detail: TMDBDetail): string | undefined {
+export function extractTMDBTrailer(detail: TMDBDetail | TMDBSeasonDetail): string | undefined {
     if (!detail.videos || !detail.videos.results) return undefined;
-    const trailer = detail.videos.results.find(v => v.type === 'Trailer' && v.site === 'YouTube');
-    return trailer?.key;
+    const items = detail.videos.results;
+    
+    // Priority: Trailer -> Teaser -> Clip -> Opening -> Any YouTube
+    const trailer = items.find(v => v.type === 'Trailer' && v.site === 'YouTube');
+    if (trailer) return trailer.key;
+    
+    const teaser = items.find(v => v.type === 'Teaser' && v.site === 'YouTube');
+    if (teaser) return teaser.key;
+    
+    const clip = items.find(v => (v.type === 'Clip' || v.type === 'Featurette') && v.site === 'YouTube');
+    if (clip) return clip.key;
+
+    const opening = items.find(v => v.type === 'Opening Credits' && v.site === 'YouTube');
+    if (opening) return opening.key;
+
+    return items.find(v => v.site === 'YouTube')?.key;
+}
+
+/** Extract the best available video for an episode */
+export function extractTMDBEpisodeVideo(detail: { videos?: { results: any[] } }): string | undefined {
+    if (!detail.videos || !detail.videos.results) return undefined;
+    const items = detail.videos.results;
+    
+    // For episodes, Clips are most common
+    const clip = items.find(v => (v.type === 'Clip' || v.type === 'Teaser' || v.type === 'Trailer' || v.type === 'Opening Credits' || v.type === 'Featurette') && v.site === 'YouTube');
+    return clip?.key || items.find(v => v.site === 'YouTube')?.key;
 }
 
 // TMDB genre IDs → app genre names (shared subset)

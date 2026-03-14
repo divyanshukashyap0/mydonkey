@@ -31,7 +31,7 @@ const UnlockContentModal: React.FC<UnlockContentModalProps> = ({ isOpen, onClose
                 setTimeout(() => {
                     onClose();
                     // Content is globally unlocked in context; UI will auto-refresh
-                    window.location.reload(); // Optional: force refresh to ensure images load
+                    navigate('/exclusive');
                 }, 1500);
             } else {
                 setError(result.message);

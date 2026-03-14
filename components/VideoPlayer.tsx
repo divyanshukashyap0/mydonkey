@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Hls from 'hls.js';
-import { Play, Pause, Volume2, VolumeX, Maximize, Settings, SkipForward, ArrowLeft, RotateCcw, RotateCw, Subtitles, Layers, BarChart2, Minimize, Headphones, Check, MessageSquare, Wifi, ExternalLink, Scan, Scaling } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Settings, SkipForward, ArrowLeft, RotateCcw, RotateCw, Subtitles, Layers, BarChart2, Minimize, Headphones, Check, MessageSquare, Wifi, ExternalLink, Scan, Scaling, AlertCircle, RefreshCw } from 'lucide-react';
 import { Content } from '../types';
 import StatsPanel from './StatsPanel';
 import DrivePlayer from './DrivePlayer';
@@ -26,15 +26,31 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     // Extract IDs locally for safety
     const getDriveId = (url: string) => {
         if (!url) return '';
+        // Look for typical Google Drive ID patterns
+        // 1. Full URL with /d/ID/ (most reliable)
+        const driveUrlMatch = url.match(/\/file\/d\/([-\w]{25,})/);
+        if (driveUrlMatch) return driveUrlMatch[1];
+        
+        // 2. Raw ID (25+ chars, typically includes hyphens and underscores)
+        const rawIdMatch = url.match(/^[-\w]{25,}$/);
+        if (rawIdMatch) return url;
+
+        // 3. Fallback: Any 25+ char alphanumeric segment that doesn't look like a whole different URL
+        if (url.includes('youtube.com') || url.includes('youtu.be')) return '';
         const match = url.match(/[-\w]{25,}/);
-        return match ? match[0] : url;
+        return match ? match[0] : '';
     };
 
     const getYoutubeId = (url: string) => {
         if (!url) return '';
         const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
         const match = url.match(regExp);
-        return (match && match[2].length === 11) ? match[2] : url;
+        if (match && match[2].length === 11) return match[2];
+        
+        // Handle raw 11-char ID
+        if (/^[a-zA-Z0-9_-]{11}$/.test(url)) return url;
+        
+        return '';
     };
 
     // Determine play mode
@@ -51,14 +67,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     // YouTube ID Calculation
     // Priority: Override YT ID > Legacy Movie YT ID > Legacy Standard YT ID
     let finalYoutubeId = '';
-    if (overrideYoutubeId && overrideYoutubeId.length === 11) {
+    if (overrideYoutubeId) {
         finalYoutubeId = overrideYoutubeId;
     } else if (isMovieMode) {
         finalYoutubeId = getYoutubeId(content.movieYoutubeId || '');
     } else {
         // Legacy content.youtubeId could be Drive or YT
-        const rawId = content.youtubeId || '';
-        if (rawId.length <= 20) finalYoutubeId = getYoutubeId(rawId);
+        // Priority to YT detection if it matches an 11-char pattern
+        finalYoutubeId = getYoutubeId(content.youtubeId || '');
     }
 
     // Drive ID Calculation
@@ -69,8 +85,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     } else if (isMovieMode) {
         finalDriveId = getDriveId(content.movieDriveId || '');
     } else {
-        const rawId = content.youtubeId || '';
-        if (rawId.length > 20) finalDriveId = getDriveId(rawId);
+        // If it's not a YT ID, check if it's a Drive ID
+        if (!finalYoutubeId) {
+            finalDriveId = getDriveId(content.youtubeId || '');
+        }
     }
 
     // Direct Video URL Calculation
@@ -96,8 +114,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     // Original logic: `isDriveVideo = (isMovieMode && !!content.movieDriveId) || ...`
     // So for Movies, checks Drive first.
 
-    const isLegacyMovieDriveScale = isMovieMode && !overrideUrl && !!content.movieDriveId;
-    const isLegacyStandardDrive = !isMovieMode && !overrideUrl && (content.youtubeId || '').length > 20;
+    const isLegacyMovieDriveScale = isMovieMode && !overrideUrl && !!finalDriveId && !finalYoutubeId;
+    const isLegacyStandardDrive = !isMovieMode && !overrideUrl && !!finalDriveId && !finalYoutubeId;
 
     // We use Drive Player if:
     // A. We have an explicit Drive Override
@@ -139,6 +157,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const [isBoosted, setIsBoosted] = useState(false);
     const [showDataWarning, setShowDataWarning] = useState(false);
     const [isZoomed, setIsZoomed] = useState(false); // Zoom/Fill State
+    const [playbackError, setPlaybackError] = useState<string | null>(null);
 
     const isMobile = useMemo(() => {
         return (window.innerWidth <= 768 || window.innerHeight <= 768) && /Mobile|Android|iPhone|iPad/i.test(navigator.userAgent);
@@ -373,6 +392,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                             hls.recoverMediaError();
                             break;
                         default:
+                            console.error("HLS Fatal Error", data);
+                            setPlaybackError("Failed to load video stream");
                             hls.destroy();
                             break;
                     }
@@ -452,6 +473,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 onError: (e: any) => {
                     console.error('YouTube Player Error:', e.data);
                     setIsBuffering(false);
+                    let msg = 'Playback error occurred';
+                    if (e.data === 2) msg = 'Invalid video ID';
+                    if (e.data === 5) msg = 'Embedded player error';
+                    if (e.data === 100) msg = 'Video not found or removed';
+                    if (e.data === 101 || e.data === 150) msg = 'Playback restricted by owner';
+                    setPlaybackError(msg);
                 }
             }
         });
@@ -1123,6 +1150,31 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     </div>
                 )
             }
+
+            {/* Error Overlay */}
+            {playbackError && (
+                <div className="absolute inset-0 z-[250] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in fade-in">
+                    <div className="bg-brand-red/10 p-6 rounded-full mb-6 border border-brand-red/20 shadow-[0_0_50px_rgba(229,9,20,0.2)]">
+                        <AlertCircle size={64} className="text-brand-red" />
+                    </div>
+                    <h2 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">Playback Error</h2>
+                    <p className="text-gray-400 mb-8 max-w-sm leading-relaxed">{playbackError}</p>
+                    <div className="flex gap-4">
+                        <button 
+                            onClick={() => window.location.reload()}
+                            className="bg-white text-black px-8 py-3 rounded-xl font-black hover:bg-gray-200 transition-all active:scale-95 flex items-center gap-2"
+                        >
+                            <RefreshCw size={18} /> RETRY
+                        </button>
+                        <button 
+                            onClick={onClose}
+                            className="bg-white/5 border border-white/10 text-white px-8 py-3 rounded-xl font-bold hover:bg-white/10 transition-all"
+                        >
+                            GO BACK
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Skip Intro */}
             {

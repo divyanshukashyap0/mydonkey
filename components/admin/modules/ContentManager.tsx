@@ -7,14 +7,15 @@ import { db } from '../../../firebase';
 import {
     searchTMDB, fetchTMDBDetails, tmdbPosterUrl, tmdbBackdropUrl,
     mapTMDBGenres, mapTMDBRating, formatRuntime,
-    TMDBSearchResult, fetchTMDBSeason, tmdbStillUrl, extractTMDBTrailer
+    TMDBSearchResult, fetchTMDBSeason, tmdbStillUrl, extractTMDBTrailer,
+    fetchTMDBEpisode, extractTMDBEpisodeVideo
 } from '../../../services/tmdbService';
 
 const MOVIE_GENRES = ["Action", "Adventure", "Comedy", "Drama", "Horror", "Sci-Fi", "Thriller", "Romance", "Documentary", "Animation"];
 const TV_GENRES = ["Drama", "Comedy", "Reality", "Action", "Sci-Fi", "Documentary", "Kids", "Mystery"];
 
 const ContentManager = () => {
-    const { content, settings, updateSettings } = useStore();
+    const { content, rawContent, settings, updateSettings } = useStore();
     const [isEditing, setIsEditing] = useState(false);
 
     // Filters & Search
@@ -32,6 +33,8 @@ const ContentManager = () => {
 
     // Bulk Selection
     const [selectedItems, setSelectedItems] = useState<string[]>([]);
+    const [bulkFastMode, setBulkFastMode] = useState(false);
+    const [skipEpisodeVideos, setSkipEpisodeVideos] = useState(false);
 
     const [formData, setFormData] = useState<Partial<Content>>({});
 
@@ -122,27 +125,65 @@ const ContentManager = () => {
                 const seasonPromises = validSeasons.map(vs => fetchTMDBSeason(detail.id, vs.season_number).catch(() => null));
                 const resolvedSeasons = await Promise.all(seasonPromises);
 
-                newSeasons = resolvedSeasons.filter(Boolean).map((seasonData, index) => {
+                newSeasons = await Promise.all(resolvedSeasons.filter(Boolean).map(async (seasonData, index) => {
+                    const seasonTrailerId = extractTMDBTrailer(seasonData!);
+                    
+                    const seasonTMDBId = seasonData!.id;
+
+                    const totalEpisodes = (seasonData!.episodes || []).length;
+                    const episodesToFetch = (seasonData!.episodes || []).slice(0, 5000);
+                    const episodeDetails: any[] = [];
+                    
+                    // Thinning Strategy: To avoid Firestore 1MB limit for massive shows (4000+ episodes)
+                    // We omit episode-level overviews if total episodes > 500
+                    const shouldThinData = totalEpisodes > 500;
+
+                    // Only fetch episode details if not skipping videos
+                    if (!skipEpisodeVideos) {
+                        // Batch fetching (15 at a time) to avoid TMDB rate limits while being faster
+                        for (let i = 0; i < episodesToFetch.length; i += 15) {
+                            const batch = episodesToFetch.slice(i, i + 15);
+                            const results = await Promise.all(
+                                batch.map(ep => fetchTMDBEpisode(detail.id, seasonData!.season_number, ep.episode_number).catch(() => null))
+                            );
+                            episodeDetails.push(...results);
+                            // Smaller delay for faster processing, but still safe against TMDB 40 req/10s
+                            if (i + 15 < episodesToFetch.length) await new Promise(r => setTimeout(r, 150));
+                        }
+                    } else {
+                        // Just use basic data from season fetch
+                        episodeDetails.push(...episodesToFetch);
+                    }
+
                     return {
                         id: `season_${Date.now()}_${index}`,
+                        tmdbId: seasonTMDBId,
                         seasonNumber: seasonData!.season_number,
                         title: seasonData!.name || `Season ${seasonData!.season_number}`,
-                        episodes: (seasonData!.episodes || []).map((ep, epIndex) => ({
-                            id: `ep_${Date.now()}_${index}_${epIndex}`,
-                            episodeNumber: ep.episode_number,
-                            title: ep.name || `Episode ${ep.episode_number}`,
-                            overview: ep.overview,
-                            stillUrl: tmdbStillUrl(ep.still_path, 'w300'),
-                            duration: ep.runtime ? `${ep.runtime}m` : runtime,
-                        }))
+                        trailerYoutubeId: seasonTrailerId || '',
+                        episodes: (seasonData!.episodes || []).map((ep, epIndex) => {
+                            const epDetail = episodeDetails.find(d => d && d.episode_number === ep.episode_number);
+                            const epYoutubeId = epDetail ? extractTMDBEpisodeVideo(epDetail) : '';
+
+                            return {
+                                id: `ep_${Date.now()}_${index}_${epIndex}`,
+                                episodeNumber: ep.episode_number,
+                                title: ep.name || `Episode ${ep.episode_number}`,
+                                overview: shouldThinData ? undefined : ep.overview, // Data Thinning
+                                stillUrl: tmdbStillUrl(ep.still_path, 'w300'),
+                                duration: ep.runtime ? `${ep.runtime}m` : runtime,
+                                youtubeId: epYoutubeId || '',
+                            };
+                        })
                     };
-                });
+                }));
             }
 
             setFormData(prev => ({
                 ...prev,
                 // Only fill fields that are currently empty — never overwrite existing data
                 title: prev.title || title,
+                tmdbId: result.id,
                 overview: prev.overview || detail.overview || '',
                 poster_path: prev.poster_path || poster,
                 backdrop_path: prev.backdrop_path || backdrop,
@@ -373,7 +414,7 @@ const ContentManager = () => {
 
     // --- Filtering Logic ---
     const filteredContent = useMemo(() => {
-        return content.filter(item => {
+        return rawContent.filter(item => {
             // Type Filter
             if (filterType !== 'ALL' && item.type !== filterType) return false;
 
@@ -423,6 +464,9 @@ const ContentManager = () => {
                             className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 placeholder:text-gray-600 transition"
                             placeholder={`Search ${formData.type === 'tv' ? 'TV show' : 'movie'} title on TMDB...`}
                             value={tmdbQuery}
+                            autoComplete="off"
+                            autoCorrect="off"
+                            spellCheck="false"
                             onChange={e => { setTmdbQuery(e.target.value); setTmdbFilled(false); }}
                             onKeyDown={e => e.key === 'Enter' && handleTMDBSearch()}
                         />
@@ -435,7 +479,17 @@ const ContentManager = () => {
                             {tmdbLoading ? 'Searching…' : 'Search'}
                         </button>
                     </div>
-
+                    <div className="flex items-center gap-4 mt-2 mb-3">
+                        <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer hover:text-white transition group">
+                            <input
+                                type="checkbox"
+                                checked={skipEpisodeVideos}
+                                onChange={(e) => setSkipEpisodeVideos(e.target.checked)}
+                                className="rounded border-white/10 bg-black text-blue-600 focus:ring-blue-500"
+                            />
+                            Skip Episode Videos (Faster Autofill)
+                        </label>
+                    </div>
                     {/* Error */}
                     {tmdbError && (
                         <p className="text-xs text-red-400 mt-2 flex items-center gap-1"><X size={12} />{tmdbError}</p>
@@ -788,11 +842,22 @@ const ContentManager = () => {
                                                         <Archive size={14} /> Bulk Add Episodes containing Links
                                                     </h4>
 
-                                                    <input
-                                                        placeholder="Default Thumbnail URL (Optional) - Applied to all new episodes"
-                                                        className="w-full bg-black/50 border border-white/10 rounded p-2 text-xs mb-2 focus:border-blue-500 outline-none"
-                                                        id={`bulk-thumbnail-${season.id}`}
-                                                    />
+                                                    <div className="flex flex-col md:flex-row gap-4 mb-2">
+                                                        <input
+                                                            placeholder="Default Thumbnail URL (Optional)"
+                                                            className="flex-1 bg-black/50 border border-white/10 rounded p-2 text-xs focus:border-blue-500 outline-none"
+                                                            id={`bulk-thumbnail-${season.id}`}
+                                                        />
+                                                        <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer hover:text-white transition whitespace-nowrap">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={bulkFastMode}
+                                                                onChange={(e) => setBulkFastMode(e.target.checked)}
+                                                                className="rounded border-white/10 bg-black"
+                                                            />
+                                                            Fast Mode (Skip TMDB Metadata)
+                                                        </label>
+                                                    </div>
 
                                                     <textarea
                                                         placeholder="Paste multiple YouTube or Drive links here (one per line). We'll auto-create episodes for them."
@@ -800,50 +865,80 @@ const ContentManager = () => {
                                                         id={`bulk-input-${season.id}`}
                                                     />
                                                     <button
-                                                        onClick={() => {
+                                                        onClick={async () => {
                                                             const doc = document.getElementById(`bulk-input-${season.id}`) as HTMLTextAreaElement;
                                                             const thumbDoc = document.getElementById(`bulk-thumbnail-${season.id}`) as HTMLInputElement;
-
                                                             if (!doc || !doc.value.trim()) return;
 
-                                                            // Robust splitting for various delimiters (newline, comma, space if it looks like a separator)
-                                                            // Strategy: replace commas with newlines, then split by newline
-                                                            const normalizedText = doc.value.replace(/,/g, '\n');
-                                                            const rawLines = normalizedText.split(/\r?\n/);
-                                                            const lines = rawLines.map(l => l.trim()).filter(l => l.length > 0).reverse();
+                                                            // Start loading
+                                                            setTmdbLoading(true);
 
-                                                            const defaultThumb = thumbDoc ? thumbDoc.value.trim() : '';
+                                                            try {
+                                                                const normalizedText = doc.value.replace(/,/g, '\n');
+                                                                const rawLines = normalizedText.split(/\r?\n/);
+                                                                const lines = rawLines.map(l => l.trim()).filter(l => l.length > 0).reverse();
 
-                                                            const newEpisodes: Episode[] = lines.map((line, idx) => {
-                                                                const url = line.trim();
-                                                                // Smart detection for S01E01, etc.
-                                                                const match = url.match(/[sS](\d+)\s*[eE](\d+)/);
-                                                                const isYt = extractYoutubeId(url).length === 11;
-                                                                const isDrive = extractDriveId(url).length > 20; // Basic check
+                                                                const defaultThumb = thumbDoc ? thumbDoc.value.trim() : '';
 
-                                                                // Determine episode number logic:
-                                                                // 1. If match found -> use extracted number
-                                                                // 2. If not found -> use reversed index (assuming bottom-to-top paste)
-                                                                const episodeNumber = match ? parseInt(match[2]) : ((season.episodes.length || 0) + idx + 1);
+                                                                const processedEpisodes: Episode[] = [];
+                                                                
+                                                                // Batch processing (10 at a time) to avoid TMDB rate limits
+                                                                for (let i = 0; i < lines.length; i += 10) {
+                                                                    const batchLines = lines.slice(i, i + 10);
+                                                                    const batchResults = await Promise.all(batchLines.map(async (line, idx) => {
+                                                                        const globalIdx = i + idx;
+                                                                        const url = line.trim();
+                                                                        const match = url.match(/[sS](\d+)\s*[eE](\d+)/);
+                                                                        const isYt = extractYoutubeId(url).length === 11;
+                                                                        const isDrive = extractDriveId(url).length > 20;
 
-                                                                return {
-                                                                    id: `ep_${Date.now()}_${idx}`,
-                                                                    episodeNumber,
-                                                                    title: `Episode ${episodeNumber}`,
-                                                                    driveId: isDrive ? extractDriveId(url) : '',
-                                                                    youtubeId: isYt ? extractYoutubeId(url) : '',
-                                                                    duration: '',
-                                                                    stillUrl: defaultThumb
-                                                                };
-                                                            });
+                                                                        const episodeNumber = match ? parseInt(match[2]) : ((season.episodes.length || 0) + globalIdx + 1);
 
-                                                            // Sort by episode number to ensure correct order
-                                                            newEpisodes.sort((a, b) => a.episodeNumber - b.episodeNumber);
+                                                                        let epTitle = `Episode ${episodeNumber}`;
+                                                                        let epStill = defaultThumb;
 
-                                                            updateSeason(season.id, { episodes: [...season.episodes, ...newEpisodes] });
-                                                            doc.value = ''; // Clear input
-                                                            if (thumbDoc) thumbDoc.value = '';
+                                                                        // Fetch TMDB Metadata if possible and NOT in Fast Mode
+                                                                        if (!bulkFastMode && formData.tmdbId && formData.type === 'tv') {
+                                                                            try {
+                                                                                const tmdbEp = await fetchTMDBEpisode(formData.tmdbId, season.seasonNumber, episodeNumber);
+                                                                                if (tmdbEp) {
+                                                                                    epTitle = tmdbEp.name || epTitle;
+                                                                                    epStill = tmdbStillUrl(tmdbEp.still_path, 'w300') || epStill;
+                                                                                }
+                                                                            } catch (e) {
+                                                                                console.warn(`Failed to fetch TMDB metadata for Ep ${episodeNumber}`, e);
+                                                                            }
+                                                                        }
+
+                                                                        return {
+                                                                            id: `ep_${Date.now()}_${globalIdx}`,
+                                                                            episodeNumber,
+                                                                            title: epTitle,
+                                                                            driveId: isDrive ? extractDriveId(url) : '',
+                                                                            youtubeId: isYt ? extractYoutubeId(url) : '',
+                                                                            duration: '',
+                                                                            stillUrl: epStill
+                                                                        };
+                                                                    }));
+                                                                    processedEpisodes.push(...batchResults);
+                                                                    
+                                                                    // Small delay between batches if more are coming
+                                                                    if (i + 10 < lines.length) {
+                                                                        await new Promise(r => setTimeout(r, 200));
+                                                                    }
+                                                                }
+
+                                                                // Sort by episode number to ensure correct order
+                                                                processedEpisodes.sort((a, b) => a.episodeNumber - b.episodeNumber);
+
+                                                                updateSeason(season.id, { episodes: [...season.episodes, ...processedEpisodes] });
+                                                                doc.value = ''; // Clear input
+                                                                if (thumbDoc) thumbDoc.value = '';
+                                                            } finally {
+                                                                setTmdbLoading(false);
+                                                            }
                                                         }}
+                                                        disabled={tmdbLoading}
                                                         className="text-xs bg-blue-600/20 text-blue-400 border border-blue-600 px-3 py-1.5 rounded hover:bg-blue-600 hover:text-white transition"
                                                     >
                                                         Process & Add Links
@@ -1008,6 +1103,9 @@ const ContentManager = () => {
                         <Search className="absolute left-3 top-2.5 text-gray-500" size={18} />
                         <input
                             value={searchQuery}
+                            autoComplete="off"
+                            autoCorrect="off"
+                            spellCheck="false"
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Search by title, genre, tag..."
                             className="w-full bg-black/50 border border-white/10 rounded pl-10 pr-4 py-2 outline-none focus:border-white/30 text-sm"

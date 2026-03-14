@@ -14,6 +14,7 @@ import Footer from './components/Footer';
 import InfoPage from './components/InfoPage';
 import AccountSettings from './components/AccountSettings';
 import RequestContent from './components/RequestContent';
+import ExclusiveContentPage from './components/ExclusiveContentPage';
 import AdminLayout from './components/admin/AdminLayout';
 import ContentRequestInline from './components/ContentRequestInline';
 import UnlockContentModal from './components/UnlockContentModal';
@@ -24,12 +25,13 @@ import FontLoader from './components/FontLoader';
 import Loader from './components/Loader';
 import ContentPopup from './components/ContentPopup';
 import Pagination from './components/Pagination';
+import NotFound from './components/NotFound';
 import { Content } from './types';
 import { StoreProvider } from './context/StoreContext';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 
 const MainLayout = () => {
-    const { content, currentUser, currentProfile, isLoading, isAuthenticated, sections, pages, settings, incrementViews } = useStore();
+    const { content, rawContent, currentUser, currentProfile, isLoading, isAuthenticated, sections, pages, settings, incrementViews } = useStore();
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -78,15 +80,20 @@ const MainLayout = () => {
     useEffect(() => {
         if (location.pathname.startsWith('/browse/')) {
             const contentId = location.pathname.split('/')[2];
-            if (content.length > 0) {
+            if (rawContent.length > 0) {
                 if (contentId) {
-                    const item = content.find(c => c.id === contentId);
+                    const item = rawContent.find(c => c.id === contentId);
                     if (item) {
+                        // Check for Exclusive access via URL
+                        if (item.isExclusive && !currentProfile?.unlockedContent?.includes('global_unlock')) {
+                            navigate('/exclusive', { replace: true });
+                            return;
+                        }
                         setViewingContent(item);
                     } else {
                         // Content loaded but ID not found
                         console.warn(`Deep link content not found: ${contentId}`);
-                        navigate('/home', { replace: true });
+                        navigate('/404', { replace: true });
                     }
                 } else {
                     navigate('/home', { replace: true });
@@ -106,12 +113,12 @@ const MainLayout = () => {
             const stateItem = (location.state as any)?.item;
 
             // Wait for authentication and content to load
-            if (!isLoading && content.length > 0) {
+            if (!isLoading && rawContent.length > 0) {
                 if (contentId) {
-                    let item = stateItem || content.find(c => c.id === contentId);
+                    let item = stateItem || rawContent.find(c => c.id === contentId);
 
                     if (!item) {
-                        for (const show of content) {
+                        for (const show of rawContent) {
                             if (show.type === 'tv' && show.seasons) {
                                 for (const season of show.seasons) {
                                     const episode = season.episodes.find(e => e.id === contentId);
@@ -142,10 +149,10 @@ const MainLayout = () => {
 
                         // Check for Exclusive Content
                         if (mode === 'movie' && item.isExclusive && !currentProfile?.unlockedContent?.includes('global_unlock')) {
-                            setShowUnlockModal(true);
-                            navigate(-1); // Go back from /watch if locked
+                            navigate('/exclusive', { replace: true });
                             return;
                         }
+                        setPlayingContent(item);
 
                         if (!playingContent || playingContent.id !== item.id || playingContent.playMode !== mode) {
                             setPlayingContent({ ...item, playMode: mode });
@@ -158,7 +165,7 @@ const MainLayout = () => {
                         // Optional: Handle episodes correctly if deep linking directly to episode ID
                         // For now, if ID not in main content list, redirect
                         console.warn(`Watch deep link content not found: ${contentId}`);
-                        navigate('/home', { replace: true });
+                        navigate('/404', { replace: true });
                     }
                 } else {
                     navigate('/home', { replace: true });
@@ -554,6 +561,10 @@ const MainLayout = () => {
             return <SearchPage onDetails={handleDetails} />;
         }
 
+        if (activeTab === 'exclusive') {
+            return <ExclusiveContentPage onDetails={handleDetails} />;
+        }
+
         if (activeTab === 'account') {
             if (!isAuthenticated) return <Navigate to="/home" />;
             return <AccountSettings setActiveTab={handleTabChange} />;
@@ -564,16 +575,11 @@ const MainLayout = () => {
         }
 
         return (
-            <div className="min-h-screen pt-24 flex flex-col items-center justify-center text-center px-4">
-                <h1 className="text-4xl font-bold mb-4">Page Not Found</h1>
-                <p className="text-gray-400 mb-8">The page you are looking for does not exist.</p>
-                <button
-                    onClick={() => navigate('/home')}
-                    className="px-6 py-2 bg-red-600 text-white rounded font-bold hover:bg-red-700 transition"
-                >
-                    Go Home
-                </button>
-            </div >
+            <NotFound 
+                onBack={() => navigate('/home')}
+                title="404"
+                message="The content you're looking for has glitched out of reality."
+            />
         );
     };
 
@@ -620,12 +626,9 @@ const MainLayout = () => {
                 <ContentDetails
                     content={viewingContent}
                     onClose={() => {
-                        // If coming from another page, go back. If opened directly, go home.
-                        if (window.history.length > 2) {
-                            navigate(-1);
-                        } else {
-                            navigate('/home');
-                        }
+                        // Navigate directly to the current tab's base path instead of going back
+                        const path = activeTab === 'home' ? '/' : `/${activeTab}`;
+                        navigate(path);
                     }}
                     onPlay={handlePlay}
                     onDetails={handleDetails}
@@ -636,11 +639,8 @@ const MainLayout = () => {
                 <VideoPlayer
                     content={playingContent}
                     onClose={() => {
-                        if (window.history.length > 2) {
-                            navigate(-1);
-                        } else {
-                            navigate('/home');
-                        }
+                        const path = activeTab === 'home' ? '/' : `/${activeTab}`;
+                        navigate(path);
                     }}
                 />
             )}

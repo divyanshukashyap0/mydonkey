@@ -64,6 +64,7 @@ interface StoreContextType {
     logout: () => void;
     content: Content[];
     rawContent: Content[];
+    exclusiveContent: Content[];
     users: AppUser[];
     currentUser: AppUser | null;
     currentProfile: Profile | null;
@@ -965,24 +966,21 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         await updateUser({ readNotifications: newReadList });
     };
 
-    // Compute notifications with read status
+    // Compute notifications (filter out read ones)
     const processedNotifications = useMemo(() => {
         if (!currentUser) return notifications;
-        return notifications.map(n => ({
-            ...n,
-            read: currentUser.readNotifications?.includes(n.id) || false
-        }));
+        return notifications.filter(n => !currentUser.readNotifications?.includes(n.id));
     }, [notifications, currentUser?.readNotifications]);
 
-    // Filter out exclusive content globally based on global_unlock marker
-    const processedContent = useMemo(() => {
-        if (currentUser?.role === 'admin') return content; // Admins ALWAYS see everything
-        return content.filter(item => {
-            if (!item.isExclusive) return true; // Standard content is always visible
-            if (currentProfile?.unlockedContent?.includes('global_unlock')) return true; // Unlocked by profile
-            return false; // Hide completely
-        });
-    }, [content, currentProfile?.unlockedContent, currentUser?.role]);
+    // Standard Content: Strictly NO exclusive items for anyone (filtered at this layer)
+    const standardContent = useMemo(() => {
+        return content.filter(item => !item.isExclusive);
+    }, [content]);
+
+    // Exclusive Content: Strictly ONLY exclusive items
+    const exclusiveContent = useMemo(() => {
+        return content.filter(item => item.isExclusive);
+    }, [content]);
 
     const contextValue = useMemo(() => ({
         isAuthenticated,
@@ -993,8 +991,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         loginWithApple,
         loginAsGuest,
         logout,
-        content: processedContent,
+        content: standardContent,
         rawContent: content,
+        exclusiveContent,
         users,
         currentUser,
         currentProfile,
@@ -1065,8 +1064,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }), [
         isAuthenticated,
         isLoading,
-        processedContent,
+        standardContent,
         content,
+        exclusiveContent,
         pages,
         users,
         currentUser,

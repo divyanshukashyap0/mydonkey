@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Search, X } from 'lucide-react';
 import { Content, Section } from '../types';
 import { useStore } from '../context/StoreContext';
@@ -12,7 +13,8 @@ interface SearchPageProps {
 const ITEMS_PER_PAGE = 24;
 
 const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
-    const { content, sections, currentProfile } = useStore();
+    const { content, sections, currentProfile, unlockContent, settings } = useStore();
+    const navigate = useNavigate();
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<Content[]>([]);
     const [matchingSections, setMatchingSections] = useState<Section[]>([]);
@@ -50,6 +52,15 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                 s.enabled && s.title.toLowerCase().includes(lowerQuery)
             );
             setMatchingSections(filteredSections);
+
+            // 3. Hidden Doorway Logic
+            if (settings?.globalExclusiveCode && lowerQuery === settings.globalExclusiveCode.toLowerCase()) {
+                unlockContent(settings.globalExclusiveCode).then(result => {
+                    if (result.success) {
+                        navigate('/exclusive');
+                    }
+                });
+            }
 
         }, 300); // 300ms delay
 
@@ -92,14 +103,17 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                         <Search className="h-6 w-6 text-gray-400" />
                     </div>
-                    <input
-                        id="search-input"
-                        type="text"
-                        className="block w-full pl-14 pr-12 py-5 bg-[#141414] border border-white/10 rounded-2xl focus:ring-2 focus:ring-brand-red focus:border-transparent text-white placeholder-gray-500 text-xl font-medium transition-all shadow-xl"
-                        placeholder="Search for movies, TV shows, genres..."
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                    />
+                        <input
+                            id="search-input"
+                            type="text"
+                            autoComplete="off"
+                            autoCorrect="off"
+                            spellCheck="false"
+                            className="block w-full pl-14 pr-12 py-5 bg-[#141414] border border-white/10 rounded-2xl focus:ring-2 focus:ring-brand-red focus:border-transparent text-white placeholder-gray-500 text-xl font-medium transition-all shadow-xl"
+                            placeholder="Search for movies, TV shows, genres..."
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                        />
                     {query && (
                         <button
                             onClick={() => setQuery('')}

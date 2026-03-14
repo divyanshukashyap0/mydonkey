@@ -1,5 +1,6 @@
 export interface Content {
   id: string;
+  tmdbId?: number; // Store TMDB Series ID
   title: string;
   overview: string;
   poster_path: string;
@@ -63,6 +64,7 @@ export interface Episode {
 
 export interface Season {
   id: string;
+  tmdbId?: number; // Store TMDB Season ID if available
   seasonNumber: number;
   title: string; // e.g. "Season 1"
   trailerYoutubeId?: string; // Trailer specific to this season

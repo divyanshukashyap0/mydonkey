@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Play, Plus, X, ThumbsUp, Volume2, Check, Download, Share2 } from 'lucide-react';
+import { Play, Plus, X, ThumbsUp, Volume2, Check, Download, Share2, Search } from 'lucide-react';
 import { Content, Season, Episode } from '../types';
 import { useStore } from '../context/StoreContext';
 import ContentRail from './ContentRail';
@@ -30,8 +30,13 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
     useEffect(() => {
         if (content.type === 'tv' && content.seasons && content.seasons.length > 0) {
             setSelectedSeasonId(content.seasons[0].id);
+            setVisibleEpisodesCount(20); // Reset on content change
         }
     }, [content]);
+
+    useEffect(() => {
+        setVisibleEpisodesCount(20); // Reset on season change
+    }, [selectedSeasonId]);
 
     const handlePlayEpisode = (season: Season, episode: Episode) => {
         // Construct a temporary Content object for the player
@@ -65,8 +70,36 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
     const currentSeason = content.seasons?.find(s => s.id === selectedSeasonId);
 
 
-    // Download Options State
     const [downloadOptions, setDownloadOptions] = useState<Content | Episode | null>(null);
+
+    // Episode & Search States
+    const [episodeSearchQuery, setEpisodeSearchQuery] = useState<string>("");
+    const [visibleEpisodesCount, setVisibleEpisodesCount] = useState(20);
+
+    // Filter episodes based on search query (number or title)
+    const filteredEpisodes = useMemo(() => {
+        if (!currentSeason) return [];
+        if (!episodeSearchQuery.trim()) return currentSeason.episodes;
+
+        const lowerQuery = episodeSearchQuery.toLowerCase().trim();
+        return currentSeason.episodes.filter((ep, idx) => {
+            const epNumber = (idx + 1).toString();
+            return epNumber === lowerQuery || 
+                   ep.title.toLowerCase().includes(lowerQuery) ||
+                   `episode ${epNumber}`.includes(lowerQuery) ||
+                   `ep ${epNumber}`.includes(lowerQuery);
+        });
+    }, [currentSeason, episodeSearchQuery]);
+
+    const visibleEpisodes = useMemo(() => {
+        return filteredEpisodes.slice(0, visibleEpisodesCount);
+    }, [filteredEpisodes, visibleEpisodesCount]);
+
+    const hasMoreEpisodes = filteredEpisodes.length > visibleEpisodesCount;
+
+    const handleLoadMore = () => {
+        setVisibleEpisodesCount(prev => prev + 20);
+    };
 
     const handleDownload = (item: Content | Episode) => {
         if (currentUser?.isGuest) {
@@ -126,15 +159,15 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                 </div>
             )}
 
-            {/* Backdrop Overlay (Desktop) */}
+            {/* Backdrop Overlay (Universal) */}
             <div
-                className="absolute inset-0 bg-black/80 backdrop-blur-sm hidden md:block"
+                className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
                 onClick={onClose}
             />
 
             {/* Modal Container */}
             {/* Added max-w-full and h-full for mobile to ensure full intersection */}
-            <div className="relative w-full h-full md:h-auto md:max-w-5xl md:max-h-[90vh] bg-[#181818] md:rounded-xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-500 flex flex-col">
+            <div className="relative w-[95%] md:w-full h-[90vh] md:h-auto md:max-w-5xl md:max-h-[90vh] bg-[#181818] rounded-2xl md:rounded-xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-500 flex flex-col">
 
 
                 {/* Close Button */}
@@ -279,42 +312,73 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                     </div>
                                 )}
 
+                                {/* Search Input (Mobile) */}
+                                <div className="mb-4 relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <Search size={16} className="text-gray-500" />
+                                    </div>
+                                    <input
+                                        type="text"
+                                        placeholder="Search episodes by number or title..."
+                                        value={episodeSearchQuery}
+                                        onChange={(e) => setEpisodeSearchQuery(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-brand-red transition"
+                                    />
+                                    {episodeSearchQuery && (
+                                        <button
+                                            onClick={() => setEpisodeSearchQuery('')}
+                                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-white"
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                    )}
+                                </div>
+
                                 {/* Episodes List */}
                                 <div className="space-y-3">
-                                    {currentSeason?.episodes.map((ep, idx) => (
-                                        <div
-                                            key={ep.id}
-                                            onClick={() => handlePlayEpisode(currentSeason, ep)}
-                                            className="flex items-center gap-4 p-3 bg-white/5 rounded-lg active:bg-white/10 transition cursor-pointer"
-                                        >
-                                            <div className="w-24 aspect-video bg-black/40 rounded overflow-hidden flex-shrink-0 relative">
-                                                {ep.stillUrl ? (
-                                                    <img src={ep.stillUrl} className="w-full h-full object-cover" alt={ep.title} />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-gray-600">
-                                                        <Play size={20} fill="currentColor" />
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex justify-between items-center">
-                                                    <div className="flex-1">
-                                                        <div className="flex justify-between items-start">
-                                                            <h4 className="font-bold text-sm text-gray-200 line-clamp-1">{idx + 1}. {ep.title}</h4>
-                                                            <span className="text-[10px] text-gray-500">{ep.duration}</span>
+                                    {filteredEpisodes.length > 0 ? (
+                                        filteredEpisodes.map((ep, idx) => (
+                                            <div
+                                                key={ep.id}
+                                                onClick={() => handlePlayEpisode(currentSeason!, ep)}
+                                                className="flex items-center gap-4 p-3 bg-white/5 rounded-lg active:bg-white/10 transition cursor-pointer"
+                                            >
+                                                <div className="w-24 aspect-video bg-black/40 rounded overflow-hidden flex-shrink-0 relative">
+                                                    {ep.stillUrl ? (
+                                                        <img src={ep.stillUrl} className="w-full h-full object-cover" alt={ep.title} />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center text-gray-600">
+                                                            <Play size={20} fill="currentColor" />
                                                         </div>
-                                                        <p className="text-[10px] text-gray-400 mt-1 line-clamp-2">{ep.overview || ""}</p>
+                                                    )}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex justify-between items-center">
+                                                        <div className="flex-1">
+                                                            <div className="flex justify-between items-start">
+                                                                {/* Calculate original index for episode number display */}
+                                                                <h4 className="font-bold text-sm text-gray-200 line-clamp-1">
+                                                                    {currentSeason?.episodes.findIndex(e => e.id === ep.id) + 1}. {ep.title}
+                                                                </h4>
+                                                                <span className="text-[10px] text-gray-500">{ep.duration}</span>
+                                                            </div>
+                                                            <p className="text-[10px] text-gray-400 mt-1 line-clamp-2">{ep.overview || ""}</p>
+                                                        </div>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleDownload(ep); }}
+                                                            className="ml-3 p-2 bg-white/10 rounded-full hover:bg-white/20 active:scale-95 transition"
+                                                        >
+                                                            <Download size={14} className="text-gray-300" />
+                                                        </button>
                                                     </div>
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); handleDownload(ep); }}
-                                                        className="ml-3 p-2 bg-white/10 rounded-full hover:bg-white/20 active:scale-95 transition"
-                                                    >
-                                                        <Download size={14} className="text-gray-300" />
-                                                    </button>
                                                 </div>
                                             </div>
+                                        ))
+                                    ) : (
+                                        <div className="text-center py-8 text-gray-500 text-sm">
+                                            No episodes found for "{episodeSearchQuery}"
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -441,63 +505,117 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                 {/* Episodes Section (Desktop) */}
                                 {content.type === 'tv' && content.seasons && content.seasons.length > 0 && (
                                     <div id="episodes-section" className="mt-8 pt-8 border-t border-white/10">
-                                        <div className="flex items-center justify-between mb-6">
-                                            <h3 className="text-2xl font-bold text-white">Episodes</h3>
-                                            {content.seasons.length > 1 && (
-                                                <div className="flex gap-2">
-                                                    {content.seasons.map(season => (
+                                        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+                                            <h3 className="text-2xl font-bold text-white shrink-0">Episodes</h3>
+                                            <div className="flex flex-wrap items-center gap-4 flex-1 justify-end min-w-0">
+                                                {/* Desktop Search Input */}
+                                                <div className="relative w-full max-w-[256px] min-w-[200px] group">
+                                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none group-focus-within:text-brand-red transition-colors text-gray-500">
+                                                        <Search size={16} />
+                                                    </div>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Search episodes..."
+                                                        value={episodeSearchQuery}
+                                                        onChange={(e) => setEpisodeSearchQuery(e.target.value)}
+                                                        className="w-full pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-full text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-brand-red focus:bg-white/10 transition-all"
+                                                    />
+                                                    {episodeSearchQuery && (
                                                         <button
-                                                            key={season.id}
-                                                            onClick={() => setSelectedSeasonId(season.id)}
-                                                            className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all border ${selectedSeasonId === season.id
-                                                                ? 'bg-white text-black border-white shadow-md'
-                                                                : 'bg-transparent text-gray-400 border-gray-600 hover:border-white hover:text-white'
-                                                                }`}
+                                                            onClick={() => setEpisodeSearchQuery('')}
+                                                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-white transition-colors"
                                                         >
-                                                            {season.title}
+                                                            <X size={16} />
                                                         </button>
-                                                    ))}
+                                                    )}
                                                 </div>
-                                            )}
+                                                {content.seasons.length > 1 && (
+                                                    <div className="flex gap-2 flex-wrap justify-end">
+                                                        {content.seasons.map(season => (
+                                                            <button
+                                                                key={season.id}
+                                                                onClick={() => {
+                                                                    setSelectedSeasonId(season.id);
+                                                                    setEpisodeSearchQuery(''); // Optional: clear search on season change
+                                                                }}
+                                                                className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all border whitespace-nowrap ${selectedSeasonId === season.id
+                                                                    ? 'bg-white text-black border-white shadow-md'
+                                                                    : 'bg-transparent text-gray-400 border-gray-600 hover:border-white hover:text-white'
+                                                                    }`}
+                                                            >
+                                                                {season.title}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
 
                                         <div className="grid grid-cols-1 gap-4">
-                                            {currentSeason?.episodes.map((ep, idx) => (
-                                                <div
-                                                    key={ep.id}
-                                                    onClick={() => handlePlayEpisode(currentSeason, ep)}
-                                                    className="group flex gap-6 p-4 rounded-xl hover:bg-white/5 transition border border-transparent hover:border-white/10 cursor-pointer"
-                                                >
-                                                    <div className="w-[160px] aspect-video bg-black/40 rounded-lg overflow-hidden relative flex-shrink-0 group-hover:scale-[1.02] transition-transform">
-                                                        {ep.stillUrl ? (
-                                                            <img src={ep.stillUrl} className="w-full h-full object-cover" alt={ep.title} />
-                                                        ) : (
-                                                            <div className="w-full h-full flex items-center justify-center text-gray-600 bg-white/5">
-                                                                <Play size={24} fill="currentColor" />
+                                            {visibleEpisodes.length > 0 ? (
+                                                <>
+                                                    {visibleEpisodes.map((ep, idx) => (
+                                                        <div
+                                                            key={ep.id}
+                                                            onClick={() => handlePlayEpisode(currentSeason!, ep)}
+                                                            className="group flex gap-6 p-4 rounded-xl hover:bg-white/5 transition border border-transparent hover:border-white/10 cursor-pointer"
+                                                        >
+                                                            <div className="w-[160px] aspect-video bg-black/40 rounded-lg overflow-hidden relative flex-shrink-0 group-hover:scale-[1.02] transition-transform">
+                                                                {ep.stillUrl ? (
+                                                                    <img src={ep.stillUrl} className="w-full h-full object-cover" alt={ep.title} loading="lazy" />
+                                                                ) : (
+                                                                    <div className="w-full h-full flex items-center justify-center text-gray-600 bg-white/5">
+                                                                        <Play size={24} fill="currentColor" />
+                                                                    </div>
+                                                                )}
+                                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                                    <Play size={32} className="text-white fill-white" />
+                                                                </div>
                                                             </div>
-                                                        )}
-                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                            <Play size={32} className="text-white fill-white" />
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex-1 flex flex-col justify-center">
-                                                        <div className="flex justify-between items-start mb-2">
-                                                            <h4 className="font-bold text-lg text-white group-hover:text-brand-red transition-colors">{idx + 1}. {ep.title}</h4>
-                                                            <div className="flex items-center gap-4">
-                                                                <span className="text-sm text-gray-400 font-mono">{ep.duration}</span>
-                                                                <button
-                                                                    onClick={(e) => { e.stopPropagation(); handleDownload(ep); }}
-                                                                    className="p-2 hover:bg-white/20 rounded-full transition relative z-20"
-                                                                    title="Download Episode"
-                                                                >
-                                                                    <Download size={18} className="text-gray-400 hover:text-white" />
-                                                                </button>
+                                                            <div className="flex-1 flex flex-col justify-center">
+                                                                <div className="flex justify-between items-start mb-2">
+                                                                    <h4 className="font-bold text-lg text-white group-hover:text-brand-red transition-colors">
+                                                                        {currentSeason?.episodes.findIndex(e => e.id === ep.id) + 1}. {ep.title}
+                                                                    </h4>
+                                                                    <div className="flex items-center gap-4">
+                                                                        <span className="text-sm text-gray-400 font-mono">{ep.duration}</span>
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); handleDownload(ep); }}
+                                                                            className="p-2 hover:bg-white/20 rounded-full transition relative z-20"
+                                                                            title="Download Episode"
+                                                                        >
+                                                                            <Download size={18} className="text-gray-400 hover:text-white" />
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                                <p className="text-gray-400 text-sm line-clamp-2">{ep.overview || `Episode ${currentSeason?.episodes.findIndex(e => e.id === ep.id) + 1} of ${currentSeason?.title}`}</p>
                                                             </div>
                                                         </div>
-                                                        <p className="text-gray-400 text-sm line-clamp-2">{ep.overview || `Episode ${idx + 1} of ${currentSeason.title}`}</p>
-                                                    </div>
+                                                    ))}
+
+                                                    {hasMoreEpisodes && (
+                                                        <div className="flex justify-center py-8">
+                                                            <button 
+                                                                onClick={handleLoadMore}
+                                                                className="px-8 py-3 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/30 text-white font-bold transition-all transform hover:scale-105 active:scale-95"
+                                                            >
+                                                                Load More Episodes ({filteredEpisodes.length - visibleEpisodesCount} remaining)
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <div className="text-center py-20 bg-white/5 rounded-xl border border-dashed border-white/10">
+                                                    <Search size={48} className="mx-auto text-gray-600 mb-4 opacity-20" />
+                                                    <p className="text-gray-400 text-lg">No episodes found matching "<span className="text-white">{episodeSearchQuery}</span>"</p>
+                                                    <button 
+                                                        onClick={() => setEpisodeSearchQuery('')}
+                                                        className="mt-4 text-brand-red hover:underline text-sm font-bold"
+                                                    >
+                                                        Clear search
+                                                    </button>
                                                 </div>
-                                            ))}
+                                            )}
                                         </div>
                                     </div>
                                 )}

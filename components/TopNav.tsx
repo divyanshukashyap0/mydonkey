@@ -81,7 +81,9 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                                 key={item.id}
                                 onClick={() => handleNavClick(item.id)}
                                 className={`text-sm font-bold transition-all duration-300 relative px-5 py-2 rounded-full overflow-hidden group
-                                    ${item.id === 'anime'
+                                    ${item.id === 'exclusive'
+                                        ? `bg-gradient-to-r from-brand-red via-orange-500 to-brand-red bg-[length:200%_auto] animate-shimmer text-white italic tracking-wide shadow-[0_0_20px_rgba(229,9,20,0.6)] hover:shadow-[0_0_30px_rgba(229,9,20,0.8)] hover:scale-110 border border-white/20`
+                                        : item.id === 'anime'
                                         ? `bg-gradient-to-r from-violet-600 via-pink-500 to-violet-600 bg-[length:200%_auto] animate-shimmer text-white italic tracking-wide shadow-[0_0_20px_rgba(168,85,247,0.6)] hover:shadow-[0_0_30px_rgba(236,72,153,0.8)] hover:scale-110 border border-white/20`
                                         : `${activeTab === item.id
                                             ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.4)] scale-105 border-transparent'
@@ -104,12 +106,6 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
 
                     {currentUser ? (
                         <>
-                            <button onClick={onUnlock} className="text-white hover:scale-110 transition relative group p-1" title="Redeem Code">
-                                <div className="bg-white/10 p-1 rounded-full hover:bg-white/20 transition">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="16" r="1" /><rect x="3" y="10" width="22" height="12" rx="2" /><path d="M7 10V7a5 5 0 0 1 10 0v3" /></svg>
-                                </div>
-                            </button>
-
                             {/* Notifications */}
                             <div className="relative" ref={notifRef}>
                                 <button

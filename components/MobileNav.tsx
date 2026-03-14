@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Search, Download, PlayCircle, Sparkles } from 'lucide-react';
+import { Home, Search, Download, PlayCircle, Sparkles, Lock } from 'lucide-react';
 
 interface MobileNavProps {
     activeTab: string;
