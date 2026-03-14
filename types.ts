@@ -18,6 +18,8 @@ export interface Content {
   release_date: string;
   vote_average: number;
   featured?: boolean;
+  views?: number;
+  likes?: number;
   createdAt: string;
   cast?: string[];
   tags?: string[];
@@ -91,6 +93,15 @@ export interface Section {
   showRanking?: boolean;
 }
 
+export interface PopupConfig {
+  enabled: boolean;
+  mode: 'latest' | 'demanded' | 'custom' | 'imdb_top' | 'most_watched' | 'most_liked' | 'rotating';
+  contentId?: string;
+  title?: string;
+  subtitle?: string;
+  showOnce?: boolean;
+}
+
 export interface SiteSettings {
   siteName: string;
   heroContentId?: string;
@@ -103,6 +114,10 @@ export interface SiteSettings {
   heroFont?: string;
   contentVersion?: number;
   sectionsVersion?: number;
+  popup?: PopupConfig;
+  globalExclusiveCode?: string; // Single code to unlock all exclusive content
+  contentLoaderEnabled?: boolean;
+  contentLoaderDuration?: number; // In seconds
 }
 
 export interface Plan {

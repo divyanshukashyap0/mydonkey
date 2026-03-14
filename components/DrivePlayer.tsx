@@ -56,7 +56,7 @@ const DrivePlayer: React.FC<DrivePlayerProps> = ({ driveId, title = 'Video Conte
                         top: '-40px',
                         left: '-2px',
                         width: 'calc(100% + 4px)',
-                        height: 'calc(100% + 100px)',
+                        height: 'calc(100% + 40px)', /* 40px compensates for top -40px, bottom sits precisely at 100% showing native controls */
                     }}
                     src={`https://drive.google.com/file/d/${driveId}/preview?rm=minimal${autoplay ? '&autoplay=1' : ''}`}
                     allow="autoplay; encrypted-media; fullscreen; picture-in-picture"

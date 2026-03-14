@@ -49,8 +49,8 @@ const SettingsManager = () => {
                     onClick={handleSave}
                     disabled={!isDirty || saveStatus === 'saving'}
                     className={`px-6 py-2 rounded font-bold flex items-center gap-2 transition shadow-lg ${saveStatus === 'saved' ? 'bg-green-600 text-white' :
-                            isDirty ? 'bg-brand-red hover:bg-red-700 text-white shadow-red-900/20' :
-                                'bg-white/10 text-gray-500 cursor-not-allowed'
+                        isDirty ? 'bg-brand-red hover:bg-red-700 text-white shadow-red-900/20' :
+                            'bg-white/10 text-gray-500 cursor-not-allowed'
                         }`}
                 >
                     {saveStatus === 'saving' ? <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" /> :
@@ -156,6 +156,43 @@ const SettingsManager = () => {
                             </select>
                             <p className="text-[10px] text-gray-500 mt-2">Forces a specific quality for the background video on desktop. Mobile always uses optimized quality.</p>
                         </div>
+
+                        <div className="pt-6 border-t border-white/10">
+                            <label className="text-xs text-gray-500 uppercase font-bold block mb-4">Content Loader Overlay</label>
+                            <div className="space-y-6">
+                                <label className="flex items-center gap-4 cursor-pointer">
+                                    <div className="relative">
+                                        <input
+                                            type="checkbox"
+                                            className="sr-only peer"
+                                            checked={formData.contentLoaderEnabled || false}
+                                            onChange={(e) => handleChange({ contentLoaderEnabled: e.target.checked })}
+                                        />
+                                        <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-red rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-red"></div>
+                                    </div>
+                                    <div>
+                                        <div className="font-bold">Enable Premium Loader</div>
+                                        <div className="text-xs text-gray-400">Shows a high-class animated loading screen before playing movies or TV shows.</div>
+                                    </div>
+                                </label>
+
+                                {formData.contentLoaderEnabled && (
+                                    <div>
+                                        <label className="text-xs text-gray-300 font-bold block mb-2">Loader Duration (Seconds)</label>
+                                        <input
+                                            type="number"
+                                            step="0.5"
+                                            min="1"
+                                            max="10"
+                                            value={formData.contentLoaderDuration || 2.5}
+                                            onChange={(e) => handleChange({ contentLoaderDuration: parseFloat(e.target.value) })}
+                                            className="w-full bg-black/50 border border-white/10 rounded-lg p-3 outline-none focus:border-brand-red transition"
+                                        />
+                                        <p className="text-[10px] text-gray-500 mt-2">Recommended: 2.5 seconds. Allows users to read the dynamic connection phrases.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -176,6 +213,23 @@ const SettingsManager = () => {
                                     <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-red-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
                                 </label>
                             </div>
+                        </div>
+
+                        <div>
+                            <label className="text-xs text-gray-500 uppercase font-bold block mb-2">Global Exclusive Code</label>
+                            <div className="relative">
+                                <Shield className="absolute left-3 top-3.5 text-gray-500" size={16} />
+                                <input
+                                    type="text"
+                                    value={formData.globalExclusiveCode || ''}
+                                    onChange={(e) => handleChange({ globalExclusiveCode: e.target.value })}
+                                    className="w-full bg-black/50 border border-white/10 rounded-lg p-3 pl-10 outline-none focus:border-brand-red transition font-mono tracking-widest"
+                                    placeholder="e.g. SECRET123"
+                                />
+                            </div>
+                            <p className="text-[10px] text-gray-400 mt-2">
+                                Single universal code required for users to unlock all content marked as <span className="text-brand-red font-bold">Exclusive</span>.
+                            </p>
                         </div>
 
                         <div>

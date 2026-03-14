@@ -11,65 +11,99 @@ const ExportManager = () => {
     const [exporting, setExporting] = React.useState(false);
     const [importStats, setImportStats] = React.useState<{ total: number; success: number; skipped: number; errors: number } | null>(null);
 
-    const [driveFolderId, setDriveFolderId] = React.useState('');
-    const [driveApiKey, setDriveApiKey] = React.useState('');
+    const [driveLinkInput, setDriveLinkInput] = React.useState('');
     const [driveImporting, setDriveImporting] = React.useState(false);
 
+    /**
+     * Extract Google Drive file ID or folder ID from a share URL.
+     * Handles formats:
+     *   https://drive.google.com/file/d/FILE_ID/view
+     *   https://drive.google.com/open?id=FILE_ID
+     *   https://drive.google.com/drive/folders/FOLDER_ID
+     *   https://drive.google.com/uc?id=FILE_ID
+     */
+    const extractDriveFileId = (url: string): { id: string; type: 'file' | 'folder' } | null => {
+        const cleaned = url.trim();
+        // Folder
+        const folderMatch = cleaned.match(/\/folders\/([a-zA-Z0-9_-]{10,})/);
+        if (folderMatch) return { id: folderMatch[1], type: 'folder' };
+        // File /file/d/ID
+        const fileMatch = cleaned.match(/\/file\/d\/([a-zA-Z0-9_-]{10,})/);
+        if (fileMatch) return { id: fileMatch[1], type: 'file' };
+        // open?id= or uc?id=
+        const queryMatch = cleaned.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+        if (queryMatch) return { id: queryMatch[1], type: 'file' };
+        // Bare ID (25+ char alphanumeric)
+        const bareId = cleaned.match(/^([a-zA-Z0-9_-]{25,})$/);
+        if (bareId) return { id: bareId[1], type: 'file' };
+        return null;
+    };
+
     const handleDriveImport = async () => {
-        if (!driveFolderId || !driveApiKey) return alert("Please enter both Folder ID and API Key");
+        const lines = driveLinkInput.split('\n').map(l => l.trim()).filter(Boolean);
+        if (lines.length === 0) return alert('Please paste at least one Google Drive link.');
         setDriveImporting(true);
         setImportStats(null);
-        try {
-            const folderId = driveFolderId.trim();
-            const apiKey = driveApiKey.trim();
-            const url = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents&fields=files(id,name,mimeType,thumbnailLink)&key=${apiKey}&pageSize=1000`;
-            const res = await fetch(url);
-            if (!res.ok) {
-                const errText = await res.text();
-                throw new Error(`Drive API Error ${res.status}: ${errText}`);
-            }
-            const data = await res.json();
 
-            if (data.error) throw new Error(`Google API Error: ${data.error.message}\n\nCheck: API key has Drive API enabled, folder is shared publicly.`);
+        let added = 0;
+        let skipped = 0;
+        let errors = 0;
 
-            const files = data.files || [];
-            if (files.length === 0) throw new Error("No files found. Ensure:\n1) Folder ID is correct\n2) Folder is shared publicly (Anyone with the link)\n3) API Key has Google Drive API enabled");
+        const batch: any[] = [];
 
-            // Accept video files by mimeType or common extension
-            const videos = files.filter((f: any) =>
-                f.mimeType.startsWith('video/') ||
-                f.mimeType === 'application/octet-stream' ||
-                /\.(mp4|mkv|avi|mov|webm|m4v)$/i.test(f.name)
-            );
+        for (const line of lines) {
+            const parsed = extractDriveFileId(line);
+            if (!parsed) { errors++; continue; }
 
-            if (videos.length === 0) {
-                const types = [...new Set(files.map((f: any) => f.mimeType))].join(', ');
-                throw new Error(`Found ${files.length} files but none detected as videos.\nFile types found: ${types}\n\nEnsure the folder contains video files (.mp4, .mkv, etc).`);
-            }
-
-            // Format exactly like Excel imports
-            const contentData = videos.map((file: any) => {
-                const title = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
-                return {
+            if (parsed.type === 'folder') {
+                // For folder links: create a placeholder entry with the folder ID noted in overview
+                // since we can't list folder contents without an API key
+                const title = `Drive Folder ${parsed.id.substring(0, 8)}`;
+                if (content.some(c => c.movieDriveId === parsed.id)) { skipped++; continue; }
+                batch.push({
                     Title: title,
-                    Overview: `Imported from Google Drive.`,
+                    Overview: `Imported from Google Drive folder. ID: ${parsed.id}`,
                     Type: 'movie',
-                    MovieDriveID: file.id,
-                    PosterURL: file.thumbnailLink ? file.thumbnailLink.replace('=s220', '=s1000') : '',
-                    BackdropURL: file.thumbnailLink ? file.thumbnailLink.replace('=s220', '=s1000') : '',
+                    MovieDriveID: parsed.id,
+                    PosterURL: '',
+                    BackdropURL: '',
                     Featured: 'No',
                     Original: 'No',
                     ReleaseDate: new Date().toISOString().split('T')[0],
                     Rating: 0
-                };
-            });
+                });
+            } else {
+                // File link: use the file ID directly as movieDriveId
+                if (content.some(c => c.movieDriveId === parsed.id)) { skipped++; continue; }
+                // Derive a clean title from URL path
+                const urlTitle = line.split('/').reverse().find(p => p && !['view', 'edit', 'preview'].includes(p)) || `Drive Video ${parsed.id.substring(0, 8)}`;
+                batch.push({
+                    Title: urlTitle.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '),
+                    Overview: `Imported from Google Drive.`,
+                    Type: 'movie',
+                    MovieDriveID: parsed.id,
+                    PosterURL: '',
+                    BackdropURL: '',
+                    Featured: 'No',
+                    Original: 'No',
+                    ReleaseDate: new Date().toISOString().split('T')[0],
+                    Rating: 0
+                });
+            }
+        }
 
-            const stats = await processContentBatch(contentData, true);
-            alert(`Drive import complete!\n✅ ${stats?.processed || 0} added\n⏭️ ${stats?.skipped || 0} skipped (duplicates)`);
-            setImportStats({ total: videos.length, success: stats?.processed || 0, skipped: stats?.skipped || 0, errors: 0 });
+        try {
+            if (batch.length > 0) {
+                const stats = await processContentBatch(batch, false);
+                added = stats?.processed || 0;
+                skipped += stats?.skipped || 0;
+            }
+            alert(`Drive import complete!\n✅ ${added} added\n⏭️ ${skipped} skipped (already exist)${errors > 0 ? `\n❌ ${errors} invalid links` : ''}`);
+            setImportStats({ total: lines.length, success: added, skipped, errors });
+            setDriveLinkInput('');
         } catch (error: any) {
-            console.error("Drive Import Error:", error);
-            alert("Drive Import Failed:\n" + error.message);
+            console.error('Drive Import Error:', error);
+            alert('Drive Import Failed:\n' + error.message);
             setImportStats({ total: 0, success: 0, skipped: 0, errors: 1 });
         } finally {
             setDriveImporting(false);
@@ -623,40 +657,38 @@ const ExportManager = () => {
 
             {/* Drive Import Section */}
             <div className="bg-[#141414] border border-blue-500/20 rounded-xl p-6 relative overflow-hidden">
-                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
-                    <div className="flex-1">
-                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                            <FolderSync size={20} className="text-blue-500" /> Google Drive Import
-                        </h3>
-                        <p className="text-gray-400 text-sm mt-1">Automatically import videos directly from a public Google Drive Folder.</p>
-                    </div>
-
-                    <div className="flex flex-col md:flex-row items-center gap-4 w-full lg:w-auto">
-                        <input
-                            type="text"
-                            placeholder="Drive Folder ID"
-                            value={driveFolderId}
-                            onChange={(e) => setDriveFolderId(e.target.value)}
-                            className="bg-black border border-white/10 rounded-lg p-3 text-sm flex-1 lg:w-48 outline-none focus:border-blue-500"
+                <div className="relative z-10">
+                    <h3 className="text-xl font-bold text-white flex items-center gap-2 mb-1">
+                        <FolderSync size={20} className="text-blue-500" /> Google Drive Import
+                    </h3>
+                    <p className="text-gray-400 text-sm mb-4">
+                        Paste one or more Google Drive <strong className="text-white">share links</strong> (one per line) — no API key needed.
+                        Supports file links (<code className="text-blue-300 text-xs">/file/d/ID</code>) and folder links (<code className="text-blue-300 text-xs">/folders/ID</code>).
+                    </p>
+                    <div className="space-y-3">
+                        <textarea
+                            rows={4}
+                            placeholder={`Paste Google Drive links here, one per line:\nhttps://drive.google.com/file/d/1abc.../view\nhttps://drive.google.com/drive/folders/1xyz...`}
+                            value={driveLinkInput}
+                            onChange={(e) => setDriveLinkInput(e.target.value)}
+                            className="w-full bg-black border border-white/10 rounded-lg p-3 text-sm outline-none focus:border-blue-500 resize-none font-mono text-gray-300 placeholder:text-gray-600"
                         />
-                        <input
-                            type="password"
-                            placeholder="Google API Key"
-                            value={driveApiKey}
-                            onChange={(e) => setDriveApiKey(e.target.value)}
-                            className="bg-black border border-white/10 rounded-lg p-3 text-sm flex-1 lg:w-48 outline-none focus:border-blue-500"
-                        />
-                        <button
-                            onClick={handleDriveImport}
-                            disabled={driveImporting}
-                            className={`px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-lg flex items-center gap-2 transition whitespace-nowrap`}
-                        >
-                            {driveImporting ? (
-                                <><FolderSync size={18} className="animate-spin" /> Importing...</>
-                            ) : (
-                                <><FolderSync size={18} /> Import Folder</>
-                            )}
-                        </button>
+                        <div className="flex items-center justify-between gap-4">
+                            <p className="text-[11px] text-gray-600">
+                                💡 Each link creates a content entry. You can edit the title/poster afterward in Content Library.
+                            </p>
+                            <button
+                                onClick={handleDriveImport}
+                                disabled={driveImporting || !driveLinkInput.trim()}
+                                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-lg flex items-center gap-2 transition whitespace-nowrap"
+                            >
+                                {driveImporting ? (
+                                    <><FolderSync size={18} className="animate-spin" /> Importing...</>
+                                ) : (
+                                    <><FolderSync size={18} /> Import Links</>
+                                )}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -167,7 +167,6 @@ const AnimeManager = () => {
                 duration: formData.duration,
                 rating: formData.rating || 'U/A 13+',
                 resolution: formData.resolution || 'HD',
-                accessCode: formData.accessCode || undefined,
                 // Sanitize Seasons/Episodes
                 seasons: formData.type === 'tv' ? (formData.seasons || []).map(s => ({
                     ...s,
@@ -513,18 +512,7 @@ const AnimeManager = () => {
                             </div>
                         </div>
 
-                        <div className="mb-4">
-                            <label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2 mb-1">
-                                <Lock size={14} /> Restricted Access Code
-                            </label>
-                            <input
-                                className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none focus:border-red-600 placeholder:text-gray-700 font-mono"
-                                value={formData.accessCode || ''}
-                                onChange={e => setFormData({ ...formData, accessCode: e.target.value })}
-                                placeholder="Leave empty for public content"
-                            />
-                            <p className="text-[10px] text-gray-500 mt-1">If set, this content will be hidden until the code is entered.</p>
-                        </div>
+
 
                         <div className="flex gap-4 pt-2">
                             <button onClick={() => setFormData({ ...formData, isPublished: !formData.isPublished })}

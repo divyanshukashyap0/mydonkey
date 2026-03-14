@@ -17,18 +17,19 @@ import RequestContent from './components/RequestContent';
 import AdminLayout from './components/admin/AdminLayout';
 import ContentRequestInline from './components/ContentRequestInline';
 import UnlockContentModal from './components/UnlockContentModal';
-import PlayPasswordModal from './components/PlayPasswordModal';
 import SearchPage from './components/SearchPage';
 import ScrollToTop from './components/ScrollToTop';
 import ProfileSelection from './components/ProfileSelection';
 import FontLoader from './components/FontLoader';
 import Loader from './components/Loader';
+import ContentPopup from './components/ContentPopup';
+import Pagination from './components/Pagination';
 import { Content } from './types';
 import { StoreProvider } from './context/StoreContext';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 
 const MainLayout = () => {
-    const { content, currentUser, currentProfile, isLoading, isAuthenticated, sections, pages, settings } = useStore();
+    const { content, currentUser, currentProfile, isLoading, isAuthenticated, sections, pages, settings, incrementViews } = useStore();
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -42,7 +43,6 @@ const MainLayout = () => {
     const [viewingContent, setViewingContent] = useState<Content | null>(null);
     const [playingContent, setPlayingContent] = useState<Content | null>(null);
     const [showUnlockModal, setShowUnlockModal] = useState(false);
-    const [pendingPlay, setPendingPlay] = useState<{ item: Content; mode: 'movie' | 'trailer' } | null>(null);
 
     // --- Anime Intro State ---
     const [showAnimeIntro, setShowAnimeIntro] = useState(false);
@@ -141,7 +141,7 @@ const MainLayout = () => {
                         }
 
                         // Check for Exclusive Content
-                        if (mode === 'movie' && item.accessCode && !currentProfile?.unlockedContent?.includes(item.id)) {
+                        if (mode === 'movie' && item.isExclusive && !currentProfile?.unlockedContent?.includes('global_unlock')) {
                             setShowUnlockModal(true);
                             navigate(-1); // Go back from /watch if locked
                             return;
@@ -149,6 +149,10 @@ const MainLayout = () => {
 
                         if (!playingContent || playingContent.id !== item.id || playingContent.playMode !== mode) {
                             setPlayingContent({ ...item, playMode: mode });
+                            // Increment views when main movie starts
+                            if (mode === 'movie') {
+                                incrementViews(item.id).catch(err => console.error("Error incrementing views:", err));
+                            }
                         }
                     } else {
                         // Optional: Handle episodes correctly if deep linking directly to episode ID
@@ -207,42 +211,11 @@ const MainLayout = () => {
             navigate(`/watch/${item.id}?mode=trailer`, { state: { item } });
         } else {
             if (isAuthenticated && currentUser) {
-                // Whitelisted users skip ALL gates (password + access code)
-                if (currentUser.bypassPassword) {
-                    navigate(`/watch/${item.id}?mode=movie`, { state: { item } });
-                    return;
-                }
-
-                // Check for old accessCode exclusive system
-                if (item.accessCode && !currentProfile?.unlockedContent?.includes(item.id)) {
-                    setShowUnlockModal(true);
-                    return;
-                }
-
-                // YouTube-only content → no password by default
-                const isYouTubeOnly = !item.movieDriveId && !item.videoUrl;
-
-                // Gate: all Drive/direct content, OR any content explicitly marked exclusive
-                if (!isYouTubeOnly || item.isExclusive) {
-                    setPendingPlay({ item, mode });
-                    return;
-                }
-
                 navigate(`/watch/${item.id}?mode=movie`, { state: { item } });
             } else {
                 navigate('/login');
             }
         }
-    };
-
-
-
-    // Called after password modal confirmed
-    const handlePlayConfirmed = () => {
-        if (!pendingPlay) return;
-        const { item, mode } = pendingPlay;
-        setPendingPlay(null);
-        navigate(`/watch/${item.id}?mode=movie`, { state: { item } });
     };
 
     const handleDetails = (item: Content) => {
@@ -297,16 +270,13 @@ const MainLayout = () => {
     };
 
     // Pagination State
-    const [visibleCount, setVisibleCount] = useState(24);
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 24;
 
     useEffect(() => {
-        setVisibleCount(24); // Reset on tab change
+        setCurrentPage(1); // Reset on tab change
         window.scrollTo(0, 0);
     }, [activeTab, animeCategory]);
-
-    const handleLoadMore = () => {
-        setVisibleCount(prev => prev + 24);
-    };
 
     const handleIntroComplete = useCallback(() => {
         setShowAnimeIntro(false);
@@ -397,11 +367,14 @@ const MainLayout = () => {
         }
 
         if (activeTab === 'movies') {
-            const visibleMovies = movies.slice(0, visibleCount);
+            const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+            const visibleMovies = movies.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+            const totalPages = Math.ceil(movies.length / ITEMS_PER_PAGE);
+
             return (
-                <div className="pt-24 px-4 md:px-12 pb-12 min-h-screen">
+                <div className="pt-24 px-4 md:px-12 pb-12 min-h-screen relative z-10">
                     <h1 className="text-3xl font-bold mb-8">Movies</h1>
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-12">
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                         {visibleMovies.map(item => (
                             <div key={item.id} onClick={() => handleDetails(item)} className="cursor-pointer transition-transform hover:scale-105 relative aspect-[2/3]">
                                 <img
@@ -413,24 +386,32 @@ const MainLayout = () => {
                             </div>
                         ))}
                     </div>
-                    {movies.length > visibleCount && (
-                        <div className="flex justify-center mb-12">
-                            <button onClick={handleLoadMore} className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-full font-bold transition">
-                                Load More
-                            </button>
-                        </div>
+                    {totalPages > 1 && (
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            onPageChange={(page) => {
+                                setCurrentPage(page);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                        />
                     )}
-                    <ContentRequestInline />
+                    <div className="mt-12">
+                        <ContentRequestInline />
+                    </div>
                 </div>
             );
         }
 
         if (activeTab === 'tv') {
-            const visibleTV = tvShows.slice(0, visibleCount);
+            const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+            const visibleTV = tvShows.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+            const totalPages = Math.ceil(tvShows.length / ITEMS_PER_PAGE);
+
             return (
-                <div className="pt-24 px-4 md:px-12 pb-12 min-h-screen">
+                <div className="pt-24 px-4 md:px-12 pb-12 min-h-screen relative z-10">
                     <h1 className="text-3xl font-bold mb-8">TV Shows</h1>
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-12">
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                         {visibleTV.map(item => (
                             <div key={item.id} onClick={() => handleDetails(item)} className="cursor-pointer transition-transform hover:scale-105 relative aspect-[2/3]">
                                 <img
@@ -442,14 +423,19 @@ const MainLayout = () => {
                             </div>
                         ))}
                     </div>
-                    {tvShows.length > visibleCount && (
-                        <div className="flex justify-center mb-12">
-                            <button onClick={handleLoadMore} className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-full font-bold transition">
-                                Load More
-                            </button>
-                        </div>
+                    {totalPages > 1 && (
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            onPageChange={(page) => {
+                                setCurrentPage(page);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                        />
                     )}
-                    <ContentRequestInline />
+                    <div className="mt-12">
+                        <ContentRequestInline />
+                    </div>
                 </div>
             );
         }
@@ -465,7 +451,9 @@ const MainLayout = () => {
                 ? animeContent
                 : animeContent.filter(c => c.genres?.includes(animeCategory));
 
-            const visibleAnime = filteredAnime.slice(0, visibleCount);
+            const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+            const visibleAnime = filteredAnime.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+            const totalPages = Math.ceil(filteredAnime.length / ITEMS_PER_PAGE);
 
             return (
                 <div className="min-h-screen pt-24 px-4 md:px-12 pb-12 relative overflow-hidden">
@@ -507,12 +495,15 @@ const MainLayout = () => {
                                         </div>
                                     ))}
                                 </div>
-                                {filteredAnime.length > visibleCount && (
-                                    <div className="flex justify-center mt-12">
-                                        <button onClick={handleLoadMore} className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-full font-bold transition">
-                                            Load More Anime
-                                        </button>
-                                    </div>
+                                {totalPages > 1 && (
+                                    <Pagination
+                                        currentPage={currentPage}
+                                        totalPages={totalPages}
+                                        onPageChange={(page) => {
+                                            setCurrentPage(page);
+                                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                                        }}
+                                    />
                                 )}
                             </>
                         ) : (
@@ -622,6 +613,9 @@ const MainLayout = () => {
             <Footer onNavigate={handleNavigate} />
             <MobileNav activeTab={activeTab} setTab={handleTabChange} />
 
+            {/* Admin-controlled Content Popup */}
+            <ContentPopup onPlay={handlePlay} onDetails={handleDetails} />
+
             {viewingContent && (
                 <ContentDetails
                     content={viewingContent}
@@ -654,16 +648,6 @@ const MainLayout = () => {
                 isOpen={showUnlockModal}
                 onClose={() => setShowUnlockModal(false)}
             />
-
-            {/* Play Password Gate */}
-            {pendingPlay && currentProfile && (
-                <PlayPasswordModal
-                    contentTitle={pendingPlay.item.title}
-                    correctPassword={currentProfile.name}
-                    onConfirm={handlePlayConfirmed}
-                    onCancel={() => setPendingPlay(null)}
-                />
-            )}
 
         </div>
     );

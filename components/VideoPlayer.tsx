@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Hls from 'hls.js';
 import { Play, Pause, Volume2, VolumeX, Maximize, Settings, SkipForward, ArrowLeft, RotateCcw, RotateCw, Subtitles, Layers, BarChart2, Minimize, Headphones, Check, MessageSquare, Wifi, ExternalLink, Scan, Scaling } from 'lucide-react';
 import { Content } from '../types';
 import StatsPanel from './StatsPanel';
 import DrivePlayer from './DrivePlayer';
+import ContentLoader from './ContentLoader';
 import { useStore } from '../context/StoreContext';
 import { logUserActivity, incrementWatchTime } from '../utils/activityLogger';
 
@@ -20,7 +21,7 @@ declare global {
 }
 
 const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
-    const { updatePlaybackProgress, currentUser, updateContentDuration } = useStore();
+    const { updatePlaybackProgress, currentUser, updateContentDuration, settings } = useStore();
 
     // Extract IDs locally for safety
     const getDriveId = (url: string) => {
@@ -134,15 +135,20 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const [isPlayerReady, setIsPlayerReady] = useState(false);
     const [isBuffering, setIsBuffering] = useState(false);
     const [initialLoad, setInitialLoad] = useState(true); // New state to track first play
+    const [loaderStartTime] = useState(Date.now()); // Track when loader appeared
     const [isBoosted, setIsBoosted] = useState(false);
     const [showDataWarning, setShowDataWarning] = useState(false);
     const [isZoomed, setIsZoomed] = useState(false); // Zoom/Fill State
 
-    const isMobile = React.useMemo(() => {
+    const isMobile = useMemo(() => {
         return (window.innerWidth <= 768 || window.innerHeight <= 768) && /Mobile|Android|iPhone|iPad/i.test(navigator.userAgent);
     }, []);
     const [showEmbedOverlay, setShowEmbedOverlay] = useState(isDirectIframeEmbed && isMobile);
     const [showDriveOverlay, setShowDriveOverlay] = useState(isDriveVideo && isMobile);
+
+    // Popup Loader state
+    const [showContentLoader, setShowContentLoader] = useState(() => settings?.contentLoaderEnabled !== false);
+    const [contentLoaderFinished, setContentLoaderFinished] = useState(() => !settings?.contentLoaderEnabled);
 
     // Portrait/Landscape detection for mobile embedded-player layout
     const [isPortrait, setIsPortrait] = useState(() =>
@@ -178,7 +184,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     // Player Options
     const [qualities, setQualities] = useState<string[]>([]);
 
-    const toggleFullscreen = React.useCallback(async () => {
+    const toggleFullscreen = useCallback(async () => {
         try {
             if (!document.fullscreenElement) {
                 await document.documentElement.requestFullscreen();
@@ -247,14 +253,21 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             // Force high quality start for new playbacks
             event.target.setPlaybackQuality('hd1080');
         }
-        if (playing) {
+        if (playing && contentLoaderFinished) {
             event.target.playVideo();
         } else {
-            // If not auto-playing, we must clear initialLoad so the poster/controls are visible
+            // Wait for loader to finish
             setInitialLoad(false);
         }
         event.target.loadModule('captions');
     };
+
+    // Auto-play when loader finishes
+    useEffect(() => {
+        if (contentLoaderFinished && isPlayerReady && playerRef.current?.playVideo && playing) {
+            playerRef.current.playVideo();
+        }
+    }, [contentLoaderFinished, isPlayerReady, playing]);
 
     const onPlayerStateChange = (event: any) => {
         if (event.data === window.YT.PlayerState.PLAYING) {
@@ -272,7 +285,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         }
     };
 
-    const handleSkip = React.useCallback((seconds: number) => {
+    const handleSkip = useCallback((seconds: number) => {
         if (isDriveVideo) return;
         if ((isHls || isNativeVideo) && videoRef.current) {
             videoRef.current.currentTime += seconds;
@@ -308,7 +321,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         }
     };
 
-    const triggerRipple = React.useCallback((side: 'left' | 'right') => {
+    const triggerRipple = useCallback((side: 'left' | 'right') => {
         setRippleSides(prev => [...prev, side]);
         setTimeout(() => {
             setRippleSides(prev => prev.filter(s => s !== side));
@@ -685,7 +698,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const lastTapRef = useRef<{ time: number, x: number } | null>(null);
     const [rippleSides, setRippleSides] = useState<('left' | 'right')[]>([]);
 
-    const startHideTimer = React.useCallback(() => {
+    const startHideTimer = useCallback(() => {
         if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
         controlsTimeoutRef.current = setTimeout(() => {
             setShowControls(false);
@@ -724,6 +737,31 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             lastTapRef.current = { time: now, x };
         }
     };
+
+    const isPlayerReadyRef = useRef(isPlayerReady);
+    const playingRef = useRef(playing);
+    useEffect(() => { isPlayerReadyRef.current = isPlayerReady; }, [isPlayerReady]);
+    useEffect(() => { playingRef.current = playing; }, [playing]);
+
+    const handleLoaderComplete = useCallback(() => {
+        setShowContentLoader(false);
+        setContentLoaderFinished(true);
+        if (isPlayerReadyRef.current && playingRef.current && playerRef.current?.playVideo) {
+            playerRef.current.playVideo();
+        }
+    }, []);
+
+    // Also auto-hide loader if video becomes ready early (after min 1.5s display)
+    useEffect(() => {
+        if (isPlayerReady && showContentLoader) {
+            const elapsed = Date.now() - loaderStartTime;
+            const remaining = Math.max(0, 1500 - elapsed);
+            const timer = setTimeout(() => {
+                handleLoaderComplete();
+            }, remaining);
+            return () => clearTimeout(timer);
+        }
+    }, [isPlayerReady, showContentLoader, handleLoaderComplete, loaderStartTime]);
 
     const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
         if (isDriveVideo) return;
@@ -1007,15 +1045,22 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 </div>
             </div>
 
-            {/* Content Overlays */}
             {
-                (initialLoad || isBuffering) && !isDriveVideo && !isDirectIframeEmbed && (
+                showContentLoader && !isDriveVideo && !isDirectIframeEmbed && (
+                    <ContentLoader
+                        item={content}
+                        duration={settings?.contentLoaderDuration || 2.5}
+                        durationAction={handleLoaderComplete}
+                    />
+                )
+            }
+
+            {/* Standard Buffering Spinner (Appears underneath or after Popup Loader) */}
+            {
+                !showContentLoader && (initialLoad || isBuffering) && !isDriveVideo && !isDirectIframeEmbed && (
                     <div className="absolute inset-0 z-[50] flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm pointer-events-none transition-opacity duration-300">
                         <div className="animate-spin rounded-full h-12 w-12 border-4 border-brand-red border-t-transparent mb-6 shadow-[0_0_15px_rgba(229,9,20,0.5)]"></div>
-                        <div className="text-white font-bold text-xl tracking-wide animate-pulse">Loading Content...</div>
-                        <div className="text-gray-400 text-sm mt-3 font-medium bg-white/10 px-4 py-1.5 rounded-full backdrop-blur-md border border-white/5">
-                            Please wait for up to 1 minute
-                        </div>
+                        <div className="text-white font-bold text-xl tracking-wide animate-pulse">Loading Video Stream...</div>
                     </div>
                 )
             }
@@ -1154,12 +1199,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
             {/* Controls - Floating Glass Bar (Hide for Drive Video and Direct Video) */}
             {
-                !isDriveVideo && !isDirectIframeEmbed && (
-                    <div className={`absolute bottom-0 left-0 right-0 px-2 py-2 md:p-8 transition-all duration-500 pointer-events-none z-[120] ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
-                        style={{ paddingBottom: `calc(0.5rem + env(safe-area-inset-bottom, 0px))` }}>
+                !isDriveVideo && !isDirectIframeEmbed && !showContentLoader && (
+                    <div className={`absolute left-0 right-0 px-2 md:px-8 transition-all duration-500 pointer-events-none z-[200] ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+                        style={{ bottom: '24px' }}>
 
                         {/* Main Control Bar */}
-                        <div className="vp-controls-bar bg-[#0f0f0f]/90 backdrop-blur-2xl border border-white/10 rounded-xl md:rounded-3xl p-2.5 md:px-6 md:py-5 shadow-2xl pointer-events-auto flex flex-col gap-2 md:gap-3 w-full max-w-5xl mx-auto ring-1 ring-white/5">
+                        <div className="bg-[#0f0f0f]/95 backdrop-blur-2xl border border-white/20 rounded-2xl md:rounded-3xl p-3 md:px-6 md:py-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] pointer-events-auto flex flex-col gap-3 w-full max-w-5xl mx-auto ring-1 ring-white/10 relative overflow-visible">
 
                             {/* Slider / Timeline */}
                             <div className="w-full flex items-center gap-2 md:gap-4 group/timeline">

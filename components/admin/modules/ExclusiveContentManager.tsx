@@ -1,16 +1,16 @@
 import React, { useState, useMemo } from 'react';
-import { Lock, Unlock, Search, Film, CheckCircle, XCircle, Eye, EyeOff } from 'lucide-react';
+import { Lock, Unlock, Search, Film, X, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { useStore } from '../../../context/StoreContext';
 import { Content } from '../../../types';
 
+// Removed ExclusiveModal for Global Code System
+
+// --- Main Component ---
 const ExclusiveContentManager = () => {
-    const { content, updateContent } = useStore();
+    const { rawContent: allContent, updateContent } = useStore();
     const [search, setSearch] = useState('');
     const [filterType, setFilterType] = useState<'all' | 'exclusive' | 'free'>('all');
     const [saving, setSaving] = useState<string | null>(null);
-
-    // All content — admin can make any item exclusive (even YouTube)
-    const allContent = content;
 
     const filtered = useMemo(() => {
         let list = allContent;
@@ -23,12 +23,24 @@ const ExclusiveContentManager = () => {
         return list;
     }, [allContent, search, filterType]);
 
-    const toggleExclusive = async (item: Content) => {
+    // Make Exclusive: 1-click toggle on
+    const handleMakeExclusive = async (item: Content) => {
         setSaving(item.id);
         try {
-            await updateContent(item.id, { isExclusive: !item.isExclusive } as any);
+            await updateContent(item.id, { isExclusive: true, accessCode: '' } as any);
         } catch (e) {
-            alert('Failed to update: ' + e);
+            alert('Failed to make exclusive: ' + e);
+        } finally {
+            setSaving(null);
+        }
+    };
+    // Make Free: clear both isExclusive and accessCode
+    const handleMakeFree = async (item: Content) => {
+        setSaving(item.id);
+        try {
+            await updateContent(item.id, { isExclusive: false, accessCode: '' } as any);
+        } catch (e) {
+            alert('Failed to make free: ' + e);
         } finally {
             setSaving(null);
         }
@@ -42,21 +54,28 @@ const ExclusiveContentManager = () => {
 
     return (
         <div className="space-y-6 animate-in fade-in pb-20">
+
             {/* Header */}
             <div>
                 <h2 className="text-3xl font-bold flex items-center gap-3">
                     <Lock className="text-brand-red" /> Exclusive Content
                 </h2>
-                <p className="text-gray-400 mt-2">
-                    Content marked as <span className="text-brand-red font-bold">Exclusive</span> requires a password before playing — for any content type including YouTube.
-                </p>
+                <div className="bg-white/5 border border-white/10 rounded-xl p-4 mt-4 mb-2 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+                    <div>
+                        <p className="text-sm">
+                            Content marked as <span className="text-brand-red font-bold">Exclusive</span> requires a secret code before playing.
+                            <br />
+                            <span className="text-gray-400 text-xs">The global access code is configured in <strong className="text-white">Settings &gt; System</strong>.</span>
+                        </p>
+                    </div>
+                </div>
             </div>
 
             {/* Stats */}
             <div className="grid grid-cols-3 gap-4">
                 <div className="bg-[#141414] border border-white/5 rounded-xl p-4 text-center">
                     <div className="text-2xl font-black text-white">{stats.total}</div>
-                    <div className="text-xs text-gray-400 mt-1">Total (Drive/Direct)</div>
+                    <div className="text-xs text-gray-400 mt-1">Total Content</div>
                 </div>
                 <div className="bg-[#141414] border border-brand-red/20 rounded-xl p-4 text-center">
                     <div className="text-2xl font-black text-brand-red">{stats.exclusive}</div>
@@ -104,24 +123,28 @@ const ExclusiveContentManager = () => {
                     </div>
                 )}
                 {filtered.map(item => {
-                    const isExclusive = (item as any).isExclusive;
+                    const isExclusive = !!item.isExclusive;
                     const isSavingThis = saving === item.id;
                     return (
                         <div
                             key={item.id}
-                            className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${isExclusive
-                                ? 'bg-brand-red/5 border-brand-red/20'
-                                : 'bg-[#141414] border-white/5 hover:border-white/10'
-                                }`}
+                            className="bg-[#1a1a1a] border border-white/5 rounded-xl p-4 flex items-center gap-4 transition hover:bg-white/5"
                         >
                             {/* Poster */}
-                            <div className="w-12 h-16 rounded-lg overflow-hidden bg-black/40 flex-shrink-0">
+                            <div className="w-12 h-16 rounded-lg overflow-hidden bg-black/40 flex-shrink-0 relative">
                                 {item.poster_path_mobile || item.poster_path ? (
-                                    <img
-                                        src={item.poster_path_mobile || item.poster_path}
-                                        className="w-full h-full object-cover"
-                                        alt={item.title}
-                                    />
+                                    <>
+                                        <img
+                                            src={item.poster_path_mobile || item.poster_path}
+                                            className="w-full h-full object-cover"
+                                            alt={item.title}
+                                        />
+                                        {isExclusive && (
+                                            <span className="absolute bottom-0 left-0 text-[10px] bg-red-500/10 text-brand-red px-2 py-0.5 rounded-tr-lg border-t border-r border-red-500/20 flex items-center gap-1 font-mono uppercase font-bold tracking-wider">
+                                                <Lock size={10} /> Exclusive
+                                            </span>
+                                        )}
+                                    </>
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center text-gray-600">
                                         <Film size={20} />
@@ -136,6 +159,9 @@ const ExclusiveContentManager = () => {
                                     <span className="text-xs text-gray-500 uppercase font-bold">{item.type}</span>
                                     {item.movieDriveId && <span className="text-xs text-blue-400">● Drive</span>}
                                     {item.videoUrl && <span className="text-xs text-purple-400">● Direct</span>}
+                                    {isExclusive && item.accessCode && (
+                                        <span className="text-xs text-yellow-400">● Code: {item.accessCode}</span>
+                                    )}
                                 </div>
                             </div>
 
@@ -145,23 +171,26 @@ const ExclusiveContentManager = () => {
                                 {isExclusive ? 'Exclusive' : 'Free'}
                             </div>
 
-                            {/* Toggle Button */}
-                            <button
-                                onClick={() => toggleExclusive(item)}
-                                disabled={isSavingThis}
-                                className={`flex-shrink-0 px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${isExclusive
-                                    ? 'bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20'
-                                    : 'bg-brand-red/10 hover:bg-brand-red/20 text-brand-red border border-brand-red/20'
-                                    } disabled:opacity-50`}
-                            >
-                                {isSavingThis ? (
-                                    <span className="animate-pulse">Saving...</span>
-                                ) : isExclusive ? (
-                                    <><Unlock size={14} /> Make Free</>
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                                {isExclusive ? (
+                                    <button
+                                        onClick={() => handleMakeFree(item)}
+                                        disabled={isSavingThis}
+                                        className="px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20 disabled:opacity-50"
+                                    >
+                                        {isSavingThis ? <span className="animate-pulse">Saving...</span> : <><Unlock size={14} /> Make Free</>}
+                                    </button>
                                 ) : (
-                                    <><Lock size={14} /> Make Exclusive</>
+                                    <button
+                                        onClick={() => handleMakeExclusive(item)}
+                                        disabled={isSavingThis}
+                                        className="px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 bg-brand-red/10 hover:bg-brand-red/20 text-brand-red border border-brand-red/20 disabled:opacity-50"
+                                    >
+                                        {isSavingThis ? <span className="animate-pulse">Saving...</span> : <><Lock size={14} /> Make Exclusive</>}
+                                    </button>
                                 )}
-                            </button>
+                            </div>
                         </div>
                     );
                 })}

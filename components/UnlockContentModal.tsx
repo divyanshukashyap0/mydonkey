@@ -30,11 +30,8 @@ const UnlockContentModal: React.FC<UnlockContentModalProps> = ({ isOpen, onClose
                 setSuccess(result.message);
                 setTimeout(() => {
                     onClose();
-                    // Navigate to the content if ID is returned
-                    if (result.contentId) {
-                        // Content is unlocked in context; no need to refresh.
-                        // Optionally trigger a view update if needed.
-                    }
+                    // Content is globally unlocked in context; UI will auto-refresh
+                    window.location.reload(); // Optional: force refresh to ensure images load
                 }, 1500);
             } else {
                 setError(result.message);

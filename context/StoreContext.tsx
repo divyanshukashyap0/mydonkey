@@ -49,7 +49,8 @@ import {
     orderBy,
     where,
     serverTimestamp,
-    getDocsFromCache
+    getDocsFromCache,
+    increment,
 } from 'firebase/firestore';
 
 interface StoreContextType {
@@ -62,6 +63,7 @@ interface StoreContextType {
     loginAsGuest: () => Promise<void>;
     logout: () => void;
     content: Content[];
+    rawContent: Content[];
     users: AppUser[];
     currentUser: AppUser | null;
     currentProfile: Profile | null;
@@ -105,6 +107,8 @@ interface StoreContextType {
     addPage: (page: Page) => Promise<void>;
     updatePage: (id: string, updates: Partial<Page>) => Promise<void>;
     deletePage: (id: string) => Promise<void>;
+    incrementViews: (contentId: string) => Promise<void>;
+    incrementLikes: (contentId: string) => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -695,6 +699,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     const updateContent = async (id: string, updates: Partial<Content>) => {
         await updateDoc(doc(db, 'content', id), updates);
+        // Optimized: Bump global content version to trigger sync across all users
+        const newVersion = Date.now();
+        await updateSettings({ contentVersion: newVersion });
     };
 
     const deleteContent = async (id: string) => {
@@ -924,32 +931,26 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const unlockContent = async (code: string): Promise<{ success: boolean; contentId?: string; message: string }> => {
         if (!fbUser || !currentProfile) return { success: false, message: 'Please sign in first.' };
 
-        // 1. Find content with this code
-        // Note: In a real app with large DB, this should be a query. For now, client-side filter is okay or query.
-        // Let's use the local content state for speed, then verify with server if needed.
-        // Actually, for security, the code should ideally not be exposed in public 'content' if we didn't want users to inspect it. 
-        // But assumed 'content' collection is readable.
+        if (!settings.globalExclusiveCode) {
+            return { success: false, message: 'No exclusive content available right now.' };
+        }
 
-        const targetContent = content.find(c => c.accessCode === code);
-
-        if (!targetContent) {
+        if (code !== settings.globalExclusiveCode) {
             return { success: false, message: 'Invalid Access Code.' };
         }
 
-        if (currentProfile.unlockedContent?.includes(targetContent.id)) {
-            return { success: true, contentId: targetContent.id, message: 'Content already unlocked!' };
+        if (currentProfile.unlockedContent?.includes('global_unlock')) {
+            return { success: true, message: 'Exclusive content already unlocked!' };
         }
 
-        // 2. Unlock it
-        const newUnlockedList = [...(currentProfile.unlockedContent || []), targetContent.id];
+        const newUnlockedList = [...(currentProfile.unlockedContent || []), 'global_unlock'];
         await updateDoc(doc(db, 'users', fbUser.uid, 'profiles', currentProfile.id), {
             unlockedContent: newUnlockedList
         });
 
-        // 3. Update local state immediately for responsiveness
         setCurrentProfile({ ...currentProfile, unlockedContent: newUnlockedList });
 
-        return { success: true, contentId: targetContent.id, message: `Unlocked: ${targetContent.title}` };
+        return { success: true, message: `Access Granted. Exclusive content unlocked!` };
     };
 
     const markNotificationAsRead = async (notificationId: string) => {
@@ -973,12 +974,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }));
     }, [notifications, currentUser?.readNotifications]);
 
-    // Filter out exclusive content globally
+    // Filter out exclusive content globally based on global_unlock marker
     const processedContent = useMemo(() => {
+        if (currentUser?.role === 'admin') return content; // Admins ALWAYS see everything
         return content.filter(item => {
-            if (!item.accessCode) return true; // Standard content is always visible
-            if (currentUser?.role === 'admin') return true; // Admins see everything
-            if (currentProfile?.unlockedContent?.includes(item.id)) return true; // Unlocked by profile
+            if (!item.isExclusive) return true; // Standard content is always visible
+            if (currentProfile?.unlockedContent?.includes('global_unlock')) return true; // Unlocked by profile
             return false; // Hide completely
         });
     }, [content, currentProfile?.unlockedContent, currentUser?.role]);
@@ -993,6 +994,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         loginAsGuest,
         logout,
         content: processedContent,
+        rawContent: content,
         users,
         currentUser,
         currentProfile,
@@ -1049,11 +1051,22 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         },
         deletePage: async (id: string) => {
             await deleteDoc(doc(db, 'pages', id));
+        },
+        incrementViews: async (id: string) => {
+            await updateDoc(doc(db, 'content', id), {
+                views: increment(1)
+            });
+        },
+        incrementLikes: async (id: string) => {
+            await updateDoc(doc(db, 'content', id), {
+                likes: increment(1)
+            });
         }
     }), [
         isAuthenticated,
         isLoading,
         processedContent,
+        content,
         pages,
         users,
         currentUser,
@@ -1068,7 +1081,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         contentRequests,
         submitContentRequest,
         updateContentRequest,
-        pages
+        pages,
+        db
     ]);
 
     // Safeguard: Force loading to end after 5 seconds if auth hangs

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   LayoutDashboard, Film, Users, Settings, Home, LogOut,
-  Tags, CreditCard, Calendar, MessageSquare, ChevronDown, ChevronRight, Menu, X, FileText, Database, Lock
+  Tags, CreditCard, Calendar, MessageSquare, ChevronDown, ChevronRight, Menu, X, FileText, Database, Lock, Megaphone
 } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import UsersModule from './UsersModule';
@@ -17,9 +17,10 @@ import AppearanceManager from './modules/AppearanceManager';
 import AnimeManager from './modules/AnimeManager';
 import ExportManager from './modules/ExportManager';
 import ExclusiveContentManager from './modules/ExclusiveContentManager';
+import PopupManager from './modules/PopupManager';
 
 // --- Types ---
-type ModuleType = 'content' | 'anime' | 'home' | 'coming_soon' | 'requests' | 'plans' | 'users' | 'settings' | 'pages' | 'appearance' | 'export' | 'exclusive';
+type ModuleType = 'content' | 'anime' | 'home' | 'coming_soon' | 'requests' | 'plans' | 'users' | 'settings' | 'pages' | 'appearance' | 'export' | 'exclusive' | 'popup';
 
 interface SidebarGroup {
   title: string;
@@ -38,6 +39,7 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
       { id: 'pages', label: 'Pages & Footer', icon: FileText },
       { id: 'coming_soon', label: 'Upcoming Releases', icon: Calendar },
       { id: 'requests', label: 'User Requests', icon: MessageSquare },
+      { id: 'popup', label: 'Popup / Promotions', icon: Megaphone },
     ]
   },
   {
@@ -185,6 +187,7 @@ export default function AdminLayout({ onExit }: { onExit: () => void }) {
             {activeModule === 'appearance' && <AppearanceManager />}
             {activeModule === 'export' && <ExportManager />}
             {activeModule === 'exclusive' && <ExclusiveContentManager />}
+            {activeModule === 'popup' && <PopupManager />}
           </div>
         </main>
       </div>

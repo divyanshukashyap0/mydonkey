@@ -3,16 +3,20 @@ import { Search, X } from 'lucide-react';
 import { Content, Section } from '../types';
 import { useStore } from '../context/StoreContext';
 import ContentRail from './ContentRail';
+import Pagination from './Pagination';
 
 interface SearchPageProps {
     onDetails: (item: Content) => void;
 }
+
+const ITEMS_PER_PAGE = 24;
 
 const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
     const { content, sections, currentProfile } = useStore();
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<Content[]>([]);
     const [matchingSections, setMatchingSections] = useState<Section[]>([]);
+    const [currentPage, setCurrentPage] = useState(1);
 
     // Focus input on mount
     useEffect(() => {
@@ -39,6 +43,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                 item.tags?.some(t => t.toLowerCase().includes(lowerQuery)) // Added Tag search for individual items too
             );
             setResults(filteredContent);
+            setCurrentPage(1); // Reset page on new search
 
             // 2. Filter Sections
             const filteredSections = sections.filter(s =>
@@ -138,22 +143,42 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                                 )}
                             </h2>
 
-                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                                {results.map(item => (
-                                    <div key={item.id} onClick={() => onDetails(item)} className="cursor-pointer transition-transform hover:scale-105 relative aspect-[2/3] group rounded-xl overflow-hidden bg-gray-900 border border-white/5">
-                                        <img
-                                            src={item.poster_path_mobile || item.poster_path}
-                                            className="w-full h-full object-cover group-hover:opacity-60 transition-opacity"
-                                            loading="lazy"
-                                            alt={item.title}
-                                        />
-                                        <div className="absolute inset-0 flex flex-col justify-end p-3 bg-gradient-to-t from-black via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <p className="text-white text-sm font-bold leading-tight">{item.title}</p>
-                                            <p className="text-[10px] text-gray-300 mt-1 capitalize">{item.type} • {item.release_date?.split('-')[0]}</p>
+                            {(() => {
+                                const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+                                const visibleResults = results.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+                                const totalPages = Math.ceil(results.length / ITEMS_PER_PAGE);
+
+                                return (
+                                    <>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                                            {visibleResults.map(item => (
+                                                <div key={item.id} onClick={() => onDetails(item)} className="cursor-pointer transition-transform hover:scale-105 relative aspect-[2/3] group rounded-xl overflow-hidden bg-gray-900 border border-white/5">
+                                                    <img
+                                                        src={item.poster_path_mobile || item.poster_path}
+                                                        className="w-full h-full object-cover group-hover:opacity-60 transition-opacity"
+                                                        loading="lazy"
+                                                        alt={item.title}
+                                                    />
+                                                    <div className="absolute inset-0 flex flex-col justify-end p-3 bg-gradient-to-t from-black via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <p className="text-white text-sm font-bold leading-tight">{item.title}</p>
+                                                        <p className="text-[10px] text-gray-300 mt-1 capitalize">{item.type} • {item.release_date?.split('-')[0]}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
+                                        {totalPages > 1 && (
+                                            <Pagination
+                                                currentPage={currentPage}
+                                                totalPages={totalPages}
+                                                onPageChange={(page) => {
+                                                    setCurrentPage(page);
+                                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                                }}
+                                            />
+                                        )}
+                                    </>
+                                );
+                            })()}
                         </div>
                     </div>
                 ) : (
