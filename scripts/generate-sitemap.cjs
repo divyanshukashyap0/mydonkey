@@ -210,7 +210,9 @@ async function generateSitemap() {
                             if (fields.release_date && getStr(fields.release_date)) {
                                 xml += `      <video:publication_date>${escapeXml(getStr(fields.release_date))}</video:publication_date>\n`;
                             }
-                            xml += `      <video:player_loc>${mainUrl}</video:player_loc>\n`;
+                            if (youtubeId) {
+                                xml += `      <video:player_loc>${escapeXml(`https://www.youtube.com/embed/${youtubeId}`)}</video:player_loc>\n`;
+                            }
                             xml += '    </video:video>\n';
                         }
 
@@ -257,7 +259,9 @@ async function generateSitemap() {
                                         xml += `      <video:thumbnail_loc>${epThumb}</video:thumbnail_loc>\n`;
                                         xml += `      <video:title>${escapeXml(epTitle)}</video:title>\n`;
                                         xml += `      <video:description>${escapeXml(epOverview)}</video:description>\n`;
-                                        xml += `      <video:player_loc>${escapeXml(epUrl)}</video:player_loc>\n`;
+                                        if (epYoutubeId) {
+                                            xml += `      <video:player_loc>${escapeXml(`https://www.youtube.com/embed/${epYoutubeId}`)}</video:player_loc>\n`;
+                                        }
                                         xml += '    </video:video>\n';
                                     }
 
