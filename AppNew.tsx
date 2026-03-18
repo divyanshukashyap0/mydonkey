@@ -152,8 +152,6 @@ const MainLayout = () => {
                             navigate('/exclusive', { replace: true });
                             return;
                         }
-                        setPlayingContent(item);
-
                         if (!playingContent || playingContent.id !== item.id || playingContent.playMode !== mode) {
                             setPlayingContent({ ...item, playMode: mode });
                             // Increment views when main movie starts

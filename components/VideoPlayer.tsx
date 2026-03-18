@@ -831,204 +831,22 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     const isSports = content.genres?.includes('Sports') || content.tags?.includes('Sports');
 
-    // ── Mobile Portrait: YouTube-style partial layout ──────────────────────
-    if (isMobile && isPortrait) {
-        const renderVideoCore = () => (
-            <div className="relative w-full" style={{ aspectRatio: '16/9', background: '#000' }}>
-                {/* Actual player(s) */}
-                {directVideoUrl ? (
-                    (isHls || isNativeVideo) ? (
-                        <video
-                            ref={videoRef}
-                            className="w-full h-full object-contain"
-                            playsInline
-                            onClick={() => setPlaying(!playing)}
-                            src={isNativeVideo ? directVideoUrl : undefined}
-                            onLoadedMetadata={(e) => {
-                                if (isNativeVideo) {
-                                    setIsPlayerReady(true);
-                                    setDuration(e.currentTarget.duration);
-                                    if (playing) e.currentTarget.play().catch(console.error);
-                                }
-                            }}
-                        />
-                    ) : (
-                        <iframe
-                            className="w-full h-full"
-                            src={directVideoUrl}
-                            allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-                            title={content.title}
-                        />
-                    )
-                ) : isDriveVideo ? (
-                    <div className="w-full h-full pointer-events-auto">
-                        {driveIdToUse && (
-                            <DrivePlayer driveId={driveIdToUse} title={content.title} autoplay={playing} />
-                        )}
-                    </div>
-                ) : (
-                    <div className="w-full h-full overflow-hidden pointer-events-none">
-                        <div ref={playerContainerRef} id="youtube-player" className="w-full h-full origin-center pointer-events-none" />
-                    </div>
-                )}
-
-                {/* Loading Spinner */}
-                {(initialLoad || isBuffering) && !isDriveVideo && !isDirectIframeEmbed && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80">
-                        <div className="animate-spin rounded-full h-8 w-8 border-4 border-[#E50914] border-t-transparent mb-3" />
-                        <div className="text-white text-sm font-bold animate-pulse">Loading…</div>
-                    </div>
-                )}
-
-                {/* Drive overlay (tap to fullscreen) */}
-                {showDriveOverlay && isDriveVideo && (
-                    <div
-                        className="absolute inset-0 z-20 bg-black/85 flex flex-col items-center justify-center cursor-pointer"
-                        onClick={async (e) => { e.stopPropagation(); await toggleFullscreen(); setShowDriveOverlay(false); }}
-                    >
-                        <div className="bg-[#E50914] text-white p-4 rounded-full mb-3 shadow-[0_0_24px_rgba(229,9,20,0.6)] animate-pulse">
-                            <Play size={36} className="translate-x-0.5" />
-                        </div>
-                        <p className="text-white font-bold text-base">{content.title}</p>
-                        <p className="text-gray-300 text-xs mt-1">Tap to watch fullscreen</p>
-                    </div>
-                )}
-
-                {/* Embed overlay (tap to fullscreen) */}
-                {showEmbedOverlay && isDirectIframeEmbed && (
-                    <div
-                        className="absolute inset-0 z-20 bg-black/85 flex flex-col items-center justify-center cursor-pointer"
-                        onClick={async (e) => { e.stopPropagation(); await toggleFullscreen(); setShowEmbedOverlay(false); }}
-                    >
-                        <div className="bg-[#E50914] text-white p-4 rounded-full mb-3 animate-pulse">
-                            <Play size={36} className="translate-x-0.5" />
-                        </div>
-                        <p className="text-white font-bold text-base">Tap to Start Fullscreen</p>
-                    </div>
-                )}
-
-                {/* Center play/pause controls */}
-                {!isDriveVideo && !isDirectIframeEmbed && (
-                    <div
-                        className={`absolute inset-0 z-10 flex items-center justify-center gap-8 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-                        onClick={handleTap}
-                        style={{ WebkitTapHighlightColor: 'rgba(0,0,0,0)' }}
-                    >
-                        <button className="text-white/80 bg-black/30 backdrop-blur-sm p-3 rounded-full active:scale-90 transition pointer-events-auto" onClick={(e) => { e.stopPropagation(); handleSkip(-10); }}>
-                            <RotateCcw size={22} />
-                        </button>
-                        <button className="text-white bg-black/50 backdrop-blur-md p-4 rounded-full border border-white/10 active:scale-90 transition pointer-events-auto" onClick={(e) => { e.stopPropagation(); setPlaying(!playing); }}>
-                            {playing ? <Pause size={28} className="fill-current" /> : <Play size={28} className="fill-current ml-0.5" />}
-                        </button>
-                        <button className="text-white/80 bg-black/30 backdrop-blur-sm p-3 rounded-full active:scale-90 transition pointer-events-auto" onClick={(e) => { e.stopPropagation(); handleSkip(10); }}>
-                            <RotateCw size={22} />
-                        </button>
-                    </div>
-                )}
-
-                {/* Seek bar */}
-                {!isDriveVideo && !isDirectIframeEmbed && (
-                    <div className={`absolute bottom-0 left-0 right-0 px-3 pb-2 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-gray-400 font-mono">{formatTime(currentTime)}</span>
-                            <div className="flex-1 relative h-8 flex items-center" onClick={handleSeek}>
-                                <div className="absolute left-0 right-0 h-1 bg-white/20 rounded-full overflow-hidden">
-                                    <div className="h-full bg-[#E50914] rounded-full" style={{ width: `${progress}%` }} />
-                                </div>
-                                <div className="absolute w-3 h-3 bg-white rounded-full -translate-x-1/2 shadow" style={{ left: `${progress}%` }} />
-                            </div>
-                            <span className="text-[10px] text-gray-400 font-mono">{formatTime(duration)}</span>
-                            <button className="text-gray-300 ml-1" onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}>
-                                <Maximize size={16} />
-                            </button>
-                        </div>
-                    </div>
-                )}
-            </div>
-        );
-
-        return (
-            <div className="fixed inset-0 z-[100] bg-[#0f0f0f] flex flex-col overflow-y-auto font-sans select-none">
-                {/* Top bar: back + title */}
-                <div className="flex items-center gap-3 px-3 py-3 flex-shrink-0">
-                    <button onClick={onClose} className="text-white p-1.5 rounded-full hover:bg-white/10 transition active:scale-90">
-                        <ArrowLeft size={22} />
-                    </button>
-                    <span className="text-white font-bold text-sm flex-1 truncate">{content.title}</span>
-                    <button onClick={() => toggleFullscreen()} className="text-gray-400 p-1.5 rounded-full hover:bg-white/10 transition">
-                        <Maximize size={18} />
-                    </button>
-                </div>
-
-                {/* 16:9 Video area */}
-                <div className="w-full flex-shrink-0 bg-black">
-                    {renderVideoCore()}
-                </div>
-
-                {/* Content info below the player */}
-                <div className="flex-1 px-4 pt-4 pb-8 space-y-3">
-                    <h2 className="text-white font-black text-xl leading-tight">{content.title}</h2>
-
-                    {/* Metadata badges */}
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400">
-                        {content.release_date && <span>{content.release_date.split('-')[0]}</span>}
-                        {content.rating && <span className="border border-white/30 px-1.5 py-0.5 rounded text-[10px]">{content.rating}</span>}
-                        {content.resolution && <span className="border border-white/30 px-1.5 py-0.5 rounded text-[10px] font-black">{content.resolution}</span>}
-                        {content.genres?.slice(0, 2).map(g => (
-                            <span key={g} className="bg-white/10 px-2 py-0.5 rounded-full text-[10px]">{g}</span>
-                        ))}
-                    </div>
-
-                    {/* Overview */}
-                    {content.overview && (
-                        <p className="text-gray-300 text-sm leading-relaxed line-clamp-4">{content.overview}</p>
-                    )}
-
-                    {/* Volume mute toggle */}
-                    {!isDriveVideo && !isDirectIframeEmbed && (
-                        <div className="flex items-center gap-4 pt-1">
-                            <button
-                                onClick={() => setIsMuted(!isMuted)}
-                                className="flex items-center gap-2 text-gray-300 text-xs bg-white/10 px-3 py-2 rounded-full"
-                            >
-                                {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
-                                {isMuted ? 'Unmute' : 'Muted off'}
-                            </button>
-                            <button
-                                onClick={() => toggleFullscreen()}
-                                className="flex items-center gap-2 text-gray-300 text-xs bg-white/10 px-3 py-2 rounded-full"
-                            >
-                                <Maximize size={14} />
-                                Fullscreen
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Rotate hint */}
-                    <div className="flex items-center gap-2 text-gray-500 text-[11px] pt-1">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z" /><path d="m9 12 2 2 4-4" /></svg>
-                        Rotate phone to landscape for fullscreen
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    // ── Fullscreen layout (desktop + mobile landscape) ─────────────────────
+    // Final Main Render
     return (
-        <div
-            className={`fixed inset-0 z-[100] bg-black flex flex-col justify-center items-center overflow-hidden font-sans select-none ${!showControls ? 'cursor-none' : ''}`}
+        <div 
+            className={`fixed inset-0 z-[100] bg-black flex flex-col font-sans select-none ${isMobile && isPortrait ? 'overflow-y-auto' : 'justify-center items-center overflow-hidden'} ${!showControls && !(isMobile && isPortrait) ? 'cursor-none' : ''}`}
         >
-            {/* Strict Right-Click Block Overlay
-                - For YouTube: pointer-events 'auto' when controls hidden (blocks all clicks to iframe).
-                - For Drive: MUST be 'none' always, otherwise user can't click internal iframe buttons.
-            */}
-
-            {/* Player Container */}
-            <div className="absolute inset-0 z-0 bg-black pointer-events-none overflow-hidden flex items-center justify-center">
+            {/* 1. STABLE VIDEO CONTAINER (Root level, never unmounts) */}
+            <div className={`${isMobile && isPortrait ? 'relative w-full aspect-video' : 'absolute inset-0 z-0'} bg-black overflow-hidden`}>
                 <div className={`w-full h-full relative transition-transform duration-500 ease-in-out ${isZoomed ? 'scale-[1.35]' : 'scale-100'}`}>
-                    {directVideoUrl ? (
-                        <div className="w-full h-full relative pointer-events-auto">
+                    {/* 1. YouTube Player (Always present to prevent removeChild error) */}
+                    <div className={`w-full h-full relative overflow-hidden pointer-events-none ${(!directVideoUrl && !isDriveVideo) ? 'block' : 'hidden'}`}>
+                        <div key="yt-player-container-root" ref={playerContainerRef} id="youtube-player" className="w-full h-full origin-center pointer-events-none" />
+                    </div>
+
+                    {/* 2. Direct Video (HLS/Native/Iframe) */}
+                    {directVideoUrl && (
+                        <div className="absolute inset-0 w-full h-full pointer-events-auto z-10">
                             {(isHls || isNativeVideo) ? (
                                 <video
                                     ref={videoRef}
@@ -1053,166 +871,187 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                 />
                             )}
                         </div>
-                    ) : isDriveVideo ? (
-                        <div className="w-full h-full relative pointer-events-auto">
-                            {driveIdToUse && (
-                                <DrivePlayer
-                                    driveId={driveIdToUse}
-                                    title={content.title}
-                                    autoplay={playing}
-                                />
-                            )}
-                        </div>
-                    ) : (
-                        <div className="w-full h-full relative overflow-hidden pointer-events-none">
-                            {/* Scale up YouTube to hide top title bar and bottom branding */}
-                            <div ref={playerContainerRef} id="youtube-player" className="w-full h-full origin-center pointer-events-none" />
+                    )}
+
+                    {/* 3. Drive Player */}
+                    {isDriveVideo && driveIdToUse && (
+                        <div className="absolute inset-0 w-full h-full pointer-events-auto z-10">
+                            <DrivePlayer
+                                driveId={driveIdToUse}
+                                title={content.title}
+                                autoplay={playing}
+                            />
                         </div>
                     )}
                 </div>
-            </div>
 
-            {
-                showContentLoader && !isDriveVideo && !isDirectIframeEmbed && (
-                    <ContentLoader
-                        item={content}
-                        duration={settings?.contentLoaderDuration || 2.5}
-                        durationAction={handleLoaderComplete}
-                    />
-                )
-            }
-
-            {/* Standard Buffering Spinner (Appears underneath or after Popup Loader) */}
-            {
-                !showContentLoader && (initialLoad || isBuffering) && !isDriveVideo && !isDirectIframeEmbed && (
+                {/* Overlays / Loaders restricted to the video area */}
+                {!showContentLoader && (initialLoad || isBuffering) && !isDriveVideo && !isDirectIframeEmbed && (
                     <div className="absolute inset-0 z-[50] flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm pointer-events-none transition-opacity duration-300">
-                        <div className="animate-spin rounded-full h-12 w-12 border-4 border-brand-red border-t-transparent mb-6 shadow-[0_0_15px_rgba(229,9,20,0.5)]"></div>
-                        <div className="text-white font-bold text-xl tracking-wide animate-pulse">Loading Video Stream...</div>
+                        <div className="animate-spin rounded-full h-8 md:h-12 w-8 md:w-12 border-4 border-brand-red border-t-transparent mb-6 shadow-[0_0_15px_rgba(229,9,20,0.5)]"></div>
+                        <div className="text-white font-bold text-sm md:text-xl tracking-wide animate-pulse">Loading Stream...</div>
                     </div>
-                )
-            }
+                )}
 
-            {/* Data Usage Warning Toast */}
-            {
-                showDataWarning && (
-                    <div className="absolute top-24 left-1/2 -translate-x-1/2 z-[130] animate-in slide-in-from-top-4 fade-in duration-300">
-                        <div className="bg-yellow-500/10 backdrop-blur-md border border-yellow-500/20 text-yellow-200 px-6 py-3 rounded-full flex items-center gap-3 shadow-lg max-w-sm text-center">
-                            <Wifi size={20} className="text-yellow-400 shrink-0" />
-                            <span className="text-sm font-medium">High data usage warning during playback</span>
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* Click to Toggle Controls */}
-            {!isDriveVideo && !isDirectIframeEmbed && <div className="absolute inset-0 z-10" style={{ WebkitTapHighlightColor: 'rgba(0,0,0,0)', outline: 'none' }} onClick={() => setShowControls(!showControls)}></div>}
-
-            {/* Third-Party Embed First-Tap Overlay for Mobile Rotation */}
-            {
-                showEmbedOverlay && isDirectIframeEmbed && (
+                {/* Drive/Embed overlays for mobile tap-to-fullscreen */}
+                {isMobile && (showDriveOverlay && isDriveVideo || showEmbedOverlay && isDirectIframeEmbed) && (
                     <div
-                        className="absolute inset-0 z-[200] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center cursor-pointer"
-                        onClick={async (e) => {
-                            e.stopPropagation();
-                            await toggleFullscreen();
+                        className="absolute inset-0 z-20 bg-black/85 flex flex-col items-center justify-center cursor-pointer"
+                        onClick={async (e) => { 
+                            e.stopPropagation(); 
+                            await toggleFullscreen(); 
+                            setShowDriveOverlay(false);
                             setShowEmbedOverlay(false);
                         }}
                     >
-                        <div className="bg-brand-red text-white p-5 rounded-full mb-4 shadow-[0_0_30px_rgba(229,9,20,0.6)] animate-pulse">
-                            <Play size={48} className="translate-x-1" />
+                        <div className="bg-[#E50914] text-white p-4 rounded-full mb-3 shadow-[0_0_24px_rgba(229,9,20,0.6)] animate-pulse">
+                            <Play size={36} className="translate-x-0.5" />
                         </div>
-                        <h2 className="text-white font-bold text-xl mb-2 text-center">Tap to Start Media</h2>
-                        <p className="text-gray-300 text-sm text-center max-w-xs px-4">
-                            This will enable fullscreen and auto-rotation for the external player.
-                        </p>
+                        <p className="text-white font-bold text-base">{content.title || 'Tap to Play'}</p>
+                        <p className="text-gray-300 text-xs mt-1">Tap to watch fullscreen</p>
                     </div>
-                )
-            }
+                )}
 
-            {/* Drive Video Tap-to-Fullscreen Overlay for Mobile */}
-            {
-                showDriveOverlay && isDriveVideo && (
+                {/* Center playback controls (Mobile Portrait only) */}
+                {isMobile && isPortrait && !isDriveVideo && !isDirectIframeEmbed && (
                     <div
-                        className="absolute inset-0 z-[200] bg-black/85 backdrop-blur-sm flex flex-col items-center justify-center cursor-pointer"
-                        onClick={async (e) => {
-                            e.stopPropagation();
-                            await toggleFullscreen();
-                            setShowDriveOverlay(false);
-                        }}
+                        className={`absolute inset-0 z-10 flex items-center justify-center gap-8 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                        onClick={handleTap}
                     >
-                        <div className="bg-brand-red text-white p-5 rounded-full mb-4 shadow-[0_0_30px_rgba(229,9,20,0.6)] animate-pulse">
-                            <Play size={48} className="translate-x-1" />
-                        </div>
-                        <h2 className="text-white font-bold text-xl mb-2 text-center">{content.title}</h2>
-                        <p className="text-gray-300 text-sm text-center max-w-xs px-4">
-                            Tap to watch in fullscreen
-                        </p>
+                        <button className="text-white/80 bg-black/30 backdrop-blur-sm p-3 rounded-full active:scale-90 transition pointer-events-auto" onClick={(e) => { e.stopPropagation(); handleSkip(-10); }}>
+                            <RotateCcw size={22} />
+                        </button>
+                        <button className="text-white bg-black/50 backdrop-blur-md p-4 rounded-full border border-white/10 active:scale-90 transition pointer-events-auto" onClick={(e) => { e.stopPropagation(); setPlaying(!playing); }}>
+                            {playing ? <Pause size={28} className="fill-current" /> : <Play size={28} className="fill-current ml-0.5" />}
+                        </button>
+                        <button className="text-white/80 bg-black/30 backdrop-blur-sm p-3 rounded-full active:scale-90 transition pointer-events-auto" onClick={(e) => { e.stopPropagation(); handleSkip(10); }}>
+                            <RotateCw size={22} />
+                        </button>
                     </div>
-                )
-            }
+                )}
+            </div>
 
-            {/* Error Overlay */}
-            {playbackError && (
-                <div className="absolute inset-0 z-[250] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in fade-in">
-                    <div className="bg-brand-red/10 p-6 rounded-full mb-6 border border-brand-red/20 shadow-[0_0_50px_rgba(229,9,20,0.2)]">
-                        <AlertCircle size={64} className="text-brand-red" />
+            {/* 2. UI LAYERS (Metadata and Overlays) */}
+            {isMobile && isPortrait ? (
+                <>
+                    {/* Top bar */}
+                    <div className="absolute top-0 left-0 right-0 flex items-center gap-3 px-3 py-3 z-10 bg-[#0f0f0f]/80 backdrop-blur-md">
+                        <button onClick={onClose} className="text-white p-1.5 rounded-full hover:bg-white/10 transition active:scale-90">
+                            <ArrowLeft size={22} />
+                        </button>
+                        <span className="text-white font-bold text-sm flex-1 truncate">{content.title}</span>
+                        <button onClick={() => toggleFullscreen()} className="text-gray-400 p-1.5 rounded-full hover:bg-white/10 transition">
+                            <Maximize size={18} />
+                        </button>
                     </div>
-                    <h2 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">Playback Error</h2>
-                    <p className="text-gray-400 mb-8 max-w-sm leading-relaxed">{playbackError}</p>
-                    <div className="flex gap-4">
-                        <button 
-                            onClick={() => window.location.reload()}
-                            className="bg-white text-black px-8 py-3 rounded-xl font-black hover:bg-gray-200 transition-all active:scale-95 flex items-center gap-2"
+
+                    {/* Metadata section (scrolled below video) */}
+                    <div className="flex-1 px-4 pt-4 pb-8 space-y-3 bg-[#0f0f0f]">
+                        <h2 className="text-white font-black text-xl leading-tight">{content.title}</h2>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400">
+                            {content.release_date && <span>{content.release_date.split('-')[0]}</span>}
+                            {content.rating && <span className="border border-white/30 px-1.5 py-0.5 rounded text-[10px]">{content.rating}</span>}
+                            {content.resolution && <span className="border border-white/30 px-1.5 py-0.5 rounded text-[10px] font-black">{content.resolution}</span>}
+                        </div>
+                        {content.overview && <p className="text-gray-300 text-sm leading-relaxed line-clamp-4">{content.overview}</p>}
+                        
+                        <div className="flex items-center gap-4 pt-1">
+                            <button onClick={() => setIsMuted(!isMuted)} className="flex items-center gap-2 text-gray-300 text-xs bg-white/10 px-3 py-2 rounded-full">
+                                {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                                {isMuted ? 'Unmute' : 'Muted off'}
+                            </button>
+                            <button onClick={toggleFullscreen} className="flex items-center gap-2 text-gray-300 text-xs bg-white/10 px-3 py-2 rounded-full">
+                                <Maximize size={14} /> Fullscreen
+                            </button>
+                        </div>
+                    </div>
+                </>
+            ) : (
+                <>
+                    {/* Landscape/Desktop UI Layers */}
+                    {showContentLoader && !isDriveVideo && !isDirectIframeEmbed && (
+                        <div className="z-[50] w-full h-full relative">
+                            <ContentLoader
+                                item={content}
+                                duration={settings?.contentLoaderDuration || 2.5}
+                                durationAction={handleLoaderComplete}
+                            />
+                        </div>
+                    )}
+
+                    {showDataWarning && (
+                        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-[130] animate-in slide-in-from-top-4 fade-in duration-300">
+                            <div className="bg-yellow-500/10 backdrop-blur-md border border-yellow-500/20 text-yellow-200 px-6 py-3 rounded-full flex items-center gap-3 shadow-lg max-w-sm text-center">
+                                <Wifi size={20} className="text-yellow-400 shrink-0" />
+                                <span className="text-sm font-medium">High data usage warning during playback</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {!isDriveVideo && !isDirectIframeEmbed && (
+                        <div className="absolute inset-0 z-10" onClick={() => setShowControls(!showControls)}></div>
+                    )}
+
+                    {/* Common Overlays (Error, Skip Intro, Stats) */}
+                    {playbackError && (
+                        <div className="absolute inset-0 z-[250] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in fade-in">
+                            <div className="bg-brand-red/10 p-6 rounded-full mb-6 border border-brand-red/20 shadow-[0_0_50px_rgba(229,9,20,0.2)]">
+                                <AlertCircle size={64} className="text-brand-red" />
+                            </div>
+                            <h2 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">Playback Error</h2>
+                            <p className="text-gray-400 mb-8 max-w-sm leading-relaxed">{playbackError}</p>
+                            <div className="flex gap-4">
+                                <button
+                                    onClick={() => window.location.reload()}
+                                    className="bg-white text-black px-8 py-3 rounded-xl font-black hover:bg-gray-200 transition-all active:scale-95 flex items-center gap-2"
+                                >
+                                    <RefreshCw size={18} /> RETRY
+                                </button>
+                                <button
+                                    onClick={onClose}
+                                    className="bg-white/5 border border-white/10 text-white px-8 py-3 rounded-xl font-bold hover:bg-white/10 transition-all"
+                                >
+                                    GO BACK
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {!isDriveVideo && showSkipIntro && (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); handleSkip(90); setShowSkipIntro(false); }}
+                            className="absolute bottom-24 right-4 md:bottom-32 md:right-12 bg-white text-black px-4 py-2 rounded font-bold text-sm shadow-lg hover:bg-gray-200 z-[120] transition pointer-events-auto animate-in fade-in"
                         >
-                            <RefreshCw size={18} /> RETRY
+                            Skip Intro
                         </button>
-                        <button 
-                            onClick={onClose}
-                            className="bg-white/5 border border-white/10 text-white px-8 py-3 rounded-xl font-bold hover:bg-white/10 transition-all"
-                        >
-                            GO BACK
+                    )}
+
+                    {showStats && isSports && (
+                        <div className="pointer-events-auto z-[120]">
+                            <StatsPanel content={content as any} onClose={() => setShowStats(false)} />
+                        </div>
+                    )}
+                </>
+            )}
+
+            {/* Header - Transparent Floating Pill Style (Landscape/Desktop only) */}
+            {!isPortrait && (
+                <div className={`absolute top-0 left-0 w-full p-3 md:p-6 transition-opacity duration-300 pointer-events-none z-[120] ${showControls ? 'opacity-100' : 'opacity-0'}`}>
+                    <div className="bg-black/40 backdrop-blur-md border border-white/5 inline-flex items-center gap-2 md:gap-4 px-3 py-2 md:px-6 md:py-3 rounded-full pointer-events-auto hover:bg-black/60 transition-colors">
+                        <button onClick={onClose} className="text-white hover:text-brand-red transition-colors group">
+                            <ArrowLeft size={20} className="md:w-6 md:h-6 group-hover:-translate-x-1 transition-transform" />
                         </button>
+                        <div className="h-5 w-px bg-white/10 mx-0.5"></div>
+                        <div className="text-left">
+                            <div className="text-white font-bold text-xs md:text-base leading-tight tracking-wide line-clamp-1 max-w-[160px] md:max-w-md">{content.title}</div>
+                        </div>
                     </div>
                 </div>
             )}
 
-            {/* Skip Intro */}
+            {/* Gesture Layer (Mobile Landscape Only) */}
             {
-                !isDriveVideo && showSkipIntro && (
-                    <button
-                        onClick={(e) => { e.stopPropagation(); handleSkip(90); setShowSkipIntro(false); }}
-                        className="absolute bottom-24 right-4 md:bottom-32 md:right-12 bg-white text-black px-4 py-2 rounded font-bold text-sm shadow-lg hover:bg-gray-200 z-[120] transition pointer-events-auto animate-in fade-in"
-                    >
-                        Skip Intro
-                    </button>
-                )
-            }
-
-            {/* Stats Panel */}
-            {
-                showStats && isSports && (
-                    <div className="pointer-events-auto z-[120]">
-                        <StatsPanel content={content as any} onClose={() => setShowStats(false)} />
-                    </div>
-                )
-            }
-
-            {/* Header - Transparent Floating Pill Style */}
-            <div className={`absolute top-0 left-0 w-full p-3 md:p-6 transition-opacity duration-300 pointer-events-none z-[120] ${showControls ? 'opacity-100' : 'opacity-0'}`}>
-                <div className="bg-black/40 backdrop-blur-md border border-white/5 inline-flex items-center gap-2 md:gap-4 px-3 py-2 md:px-6 md:py-3 rounded-full pointer-events-auto hover:bg-black/60 transition-colors">
-                    <button onClick={onClose} className="text-white hover:text-brand-red transition-colors group">
-                        <ArrowLeft size={20} className="md:w-6 md:h-6 group-hover:-translate-x-1 transition-transform" />
-                    </button>
-                    <div className="h-5 w-px bg-white/10 mx-0.5"></div>
-                    <div className="text-left">
-                        <div className="text-white font-bold text-xs md:text-base leading-tight tracking-wide line-clamp-1 max-w-[160px] md:max-w-md">{content.title}</div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Gesture Layer (Mobile Only) */}
-            {
-                !isDriveVideo && (
+                !isDriveVideo && !isPortrait && (
                     <div
                         className="absolute inset-0 z-[115]"
                         onClick={handleTap}
@@ -1230,8 +1069,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 )
             }
 
-            {/* Centered Playback Controls */}
-            {!isDriveVideo && !isDirectIframeEmbed && (
+            {/* Centered Playback Controls (Landscape/Desktop only) */}
+            {!isDriveVideo && !isDirectIframeEmbed && !isPortrait && (
                 <div className={`vp-center-controls absolute inset-0 z-[116] pointer-events-none flex flex-row items-center justify-center gap-4 md:gap-16 transition-all duration-300 ${showControls ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
                     <button className="text-white/80 hover:text-white bg-black/20 hover:bg-black/40 backdrop-blur-sm transition-all p-3 md:p-5 rounded-full pointer-events-auto active:scale-95" onClick={(e) => { e.stopPropagation(); handleSkip(-10); }} title="-10s">
                         <RotateCcw size={24} className="md:w-10 md:h-10" />
@@ -1249,9 +1088,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 </div>
             )}
 
-            {/* Controls - Floating Glass Bar (Hide for Drive Video and Direct Video) */}
+            {/* Controls - Floating Glass Bar (Landscape/Desktop only) */}
             {
-                !isDriveVideo && !isDirectIframeEmbed && !showContentLoader && (
+                !isDriveVideo && !isDirectIframeEmbed && !showContentLoader && !isPortrait && (
                     <div className={`absolute left-0 right-0 px-2 md:px-8 transition-all duration-500 pointer-events-none z-[200] ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
                         style={{ bottom: '24px' }}>
 
