@@ -465,3 +465,9 @@ h6 {
   animation: glitch-bg 0.2s infinite;
   animation-play-state: running;
 }
+
+/* --- Songs Player: Active Track Bounce-Bar --- */
+@keyframes bounce-bar {
+  0%, 100% { transform: scaleY(0.4); }
+  50%       { transform: scaleY(1);   }
+}

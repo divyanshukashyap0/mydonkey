@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Play, Plus, X, ThumbsUp, Volume2, Check, Download, Share2, Search } from 'lucide-react';
+import { Play, Plus, X, ThumbsUp, Check, Download, Share2, Search, Music2 } from 'lucide-react';
 import { Content, Season, Episode } from '../types';
 import { useStore } from '../context/StoreContext';
 import ContentRail from './ContentRail';
+import SongsSection from './SongsSection';
 
 interface ContentDetailsProps {
     content: Content;
@@ -71,6 +72,9 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
 
 
     const [downloadOptions, setDownloadOptions] = useState<Content | Episode | null>(null);
+
+    // Tab state — 'episodes' (TV only) or 'songs'
+    const [activeTab, setActiveTab] = useState<'episodes' | 'songs'>('episodes');
 
     // Episode & Search States
     const [episodeSearchQuery, setEpisodeSearchQuery] = useState<string>("");
@@ -291,8 +295,41 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                             </div>
                         </div>
 
+                        {/* ── Tab Strip (Mobile) ── */}
+                        <div className="flex gap-1 border-b border-white/10 mt-4">
+                            {content.type === 'tv' && content.seasons && content.seasons.length > 0 && (
+                                <button
+                                    onClick={() => setActiveTab('episodes')}
+                                    className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold border-b-2 -mb-px transition ${
+                                        activeTab === 'episodes'
+                                            ? 'text-white border-red-500'
+                                            : 'text-gray-500 border-transparent hover:text-gray-300'
+                                    }`}
+                                >
+                                    <Play size={11} /> Episodes
+                                </button>
+                            )}
+                            <button
+                                onClick={() => setActiveTab('songs')}
+                                className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold border-b-2 -mb-px transition ${
+                                    activeTab === 'songs'
+                                        ? 'text-white border-red-500'
+                                        : 'text-gray-500 border-transparent hover:text-gray-300'
+                                }`}
+                            >
+                                <Music2 size={11} /> Songs
+                            </button>
+                        </div>
+
+                        {/* Songs Tab (Mobile) */}
+                        {activeTab === 'songs' && (
+                            <div className="mt-4 pb-8">
+                                <SongsSection movieName={content.title} contentType={content.type} />
+                            </div>
+                        )}
+
                         {/* Season & Episodes (Mobile) */}
-                        {content.type === 'tv' && content.seasons && content.seasons.length > 0 && (
+                        {activeTab === 'episodes' && content.type === 'tv' && content.seasons && content.seasons.length > 0 && (
                             <div id="episodes-mobile" className="mt-6 pb-20">
                                 {/* Season Selector */}
                                 {content.seasons.length > 1 && (
@@ -502,8 +539,39 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                 </div>
                                 <p className="text-xl leading-relaxed text-gray-200">{content.overview}</p>
 
+                                {/* ── Tab Strip (Desktop) ── */}
+                                <div className="flex gap-1 border-b border-white/10 mt-2 mb-6">
+                                    {content.type === 'tv' && content.seasons && content.seasons.length > 0 && (
+                                        <button
+                                            onClick={() => setActiveTab('episodes')}
+                                            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold border-b-2 -mb-px transition ${
+                                                activeTab === 'episodes'
+                                                    ? 'text-white border-red-500'
+                                                    : 'text-gray-500 border-transparent hover:text-gray-300'
+                                            }`}
+                                        >
+                                            <Play size={14} /> Episodes
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => setActiveTab('songs')}
+                                        className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold border-b-2 -mb-px transition ${
+                                            activeTab === 'songs'
+                                                ? 'text-white border-red-500'
+                                                : 'text-gray-500 border-transparent hover:text-gray-300'
+                                        }`}
+                                    >
+                                        <Music2 size={14} /> Songs
+                                    </button>
+                                </div>
+
+                                {/* Songs Tab (Desktop) */}
+                                {activeTab === 'songs' && (
+                                    <SongsSection movieName={content.title} contentType={content.type} />
+                                )}
+
                                 {/* Episodes Section (Desktop) */}
-                                {content.type === 'tv' && content.seasons && content.seasons.length > 0 && (
+                                {activeTab === 'episodes' && content.type === 'tv' && content.seasons && content.seasons.length > 0 && (
                                     <div id="episodes-section" className="mt-8 pt-8 border-t border-white/10">
                                         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                                             <h3 className="text-2xl font-bold text-white shrink-0">Episodes</h3>

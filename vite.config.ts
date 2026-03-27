@@ -1,7 +1,60 @@
 import path from 'path';
+import { createRequire } from 'module';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+
+// ---------------------------------------------------------------------------
+// Dev-only plugin: runs Vercel serverless handlers inside Vite's dev server
+// so `npm run dev` works without `vercel dev` or the Vercel CLI.
+// ---------------------------------------------------------------------------
+function localApiPlugin() {
+  return {
+    name: 'local-api',
+    configureServer(server: any) {
+      const _require = createRequire(import.meta.url);
+      const projectRoot = process.cwd();
+
+      // Use Vite's own loadEnv with prefix '' to load ALL vars (VITE_ and non-VITE_)
+      // This is the most reliable way to read .env in a Vite project.
+      const localEnv = loadEnv('development', projectRoot, '');
+      Object.assign(process.env, localEnv);
+
+      server.middlewares.use('/api/', async (req: any, res: any, next: any) => {
+        // When mounted at '/api/', connect strips the prefix: req.url = 'songs?movie=Dune'
+        const fullUrl = new URL('/api/' + req.url, 'http://localhost');
+        const pathname = fullUrl.pathname; // e.g. /api/songs
+
+        // Build query object from search params
+        req.query = Object.fromEntries(fullUrl.searchParams.entries());
+
+        // Derive handler path → <project>/api/songs.js
+        const handlerPath = path.join(projectRoot, `.${pathname}.js`);
+
+        let handler: any;
+        try {
+          delete _require.cache[_require.resolve(handlerPath)];
+          handler = _require(handlerPath);
+        } catch {
+          next();
+          return;
+        }
+
+        // Minimal Express-like res shim
+        if (!res.status) res.status = (code: number) => { res.statusCode = code; return res; };
+        if (!res.json)   res.json   = (data: unknown) => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(data)); };
+        if (!res.send)   res.send   = (data: unknown) => res.end(String(data));
+
+        try {
+          await handler(req, res);
+        } catch (e: any) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: e.message }));
+        }
+      });
+    },
+  };
+}
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
@@ -12,6 +65,7 @@ export default defineConfig(({ mode }) => {
       hmr: true
     },
     plugins: [
+      localApiPlugin(),
       react(),
       VitePWA({
         registerType: 'autoUpdate',
@@ -64,3 +118,4 @@ export default defineConfig(({ mode }) => {
     }
   };
 });
+
