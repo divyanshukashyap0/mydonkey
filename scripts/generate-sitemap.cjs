@@ -122,22 +122,28 @@ async function generateSitemap() {
         xml += 'xmlns:image="http://www.google.com/schemas/sitemap-image/1.1" ';
         xml += 'xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">\n';
 
-        // 1. Add Static Routes
+        // 1. Add Static Routes with proper priorities
         const STATIC_ROUTES = [
-            '/',
-            '/home',
-            '/movies',
-            '/tv',
-            '/login',
-            '/register'
+            { path: '/',          priority: '1.0', changefreq: 'daily'   },
+            { path: '/home',      priority: '1.0', changefreq: 'daily'   },
+            { path: '/movies',    priority: '0.95', changefreq: 'daily'  },
+            { path: '/tv',        priority: '0.95', changefreq: 'daily'  },
+            { path: '/anime',     priority: '0.95', changefreq: 'daily'  },
+            { path: '/exclusive', priority: '0.85', changefreq: 'weekly' },
+            { path: '/search',    priority: '0.80', changefreq: 'weekly' },
+            { path: '/my-list',   priority: '0.75', changefreq: 'weekly' },
+            { path: '/request',   priority: '0.70', changefreq: 'monthly'},
+            { path: '/login',     priority: '0.60', changefreq: 'monthly'},
         ];
 
         let staticCount = 0;
+        const today = new Date().toISOString().split('T')[0];
         for (const route of STATIC_ROUTES) {
             xml += '  <url>\n';
-            xml += `    <loc>${BASE_URL}${route}</loc>\n`;
-            xml += `    <changefreq>daily</changefreq>\n`;
-            xml += `    <priority>${route === '/' ? '1.0' : '0.8'}</priority>\n`;
+            xml += `    <loc>${BASE_URL}${route.path}</loc>\n`;
+            xml += `    <lastmod>${today}</lastmod>\n`;
+            xml += `    <changefreq>${route.changefreq}</changefreq>\n`;
+            xml += `    <priority>${route.priority}</priority>\n`;
             xml += '  </url>\n';
             staticCount++;
         }

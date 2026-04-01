@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" prefix="og: https://ogp.me/ns#">
 
 <head>
   <meta charset="UTF-8" />
@@ -35,10 +35,285 @@
 
   <link rel="icon" type="image/png"
     href="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png" />
+  <link rel="apple-touch-icon" href="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png" />
+  <link rel="canonical" href="https://www.mydonkey.in/" />
   <link rel="stylesheet" href="/index.css">
   <link rel="preconnect" href="https://drive.google.com">
   <link rel="preconnect" href="https://content.googleapis.com">
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+  <!-- ===== STRUCTURED DATA FOR GOOGLE SITELINKS & RICH RESULTS ===== -->
+
+  <!-- 1. WebSite + SiteLinksSearchBox: triggers the search box inside Google results -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "My Donkey",
+    "alternateName": ["MyDonkey", "My Donkey OTT", "MyDonkey Streaming"],
+    "url": "https://www.mydonkey.in",
+    "description": "Stream unlimited movies, TV shows, anime, live sports, and exclusive content in HD on My Donkey — India's premium OTT platform.",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": {
+        "@type": "EntryPoint",
+        "urlTemplate": "https://www.mydonkey.in/search?q={search_term_string}"
+      },
+      "query-input": "required name=search_term_string"
+    },
+    "sameAs": [
+      "https://www.mydonkey.in"
+    ]
+  }
+  </script>
+
+  <!-- 2. Organization: shows logo, name, and contact in Google Knowledge Panel -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "My Donkey",
+    "alternateName": "My Donkey OTT Platform",
+    "url": "https://www.mydonkey.in",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png",
+      "width": 512,
+      "height": 512
+    },
+    "description": "My Donkey is a premium OTT streaming platform offering movies, web series, anime, live sports, and exclusive content in HD quality.",
+    "foundingDate": "2024",
+    "areaServed": "IN",
+    "serviceType": "Video Streaming",
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "contactType": "customer support",
+      "availableLanguage": ["en", "hi"]
+    }
+  }
+  </script>
+
+  <!-- 3. ItemList: all major sections — Google uses this to generate deep sitelinks -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    "name": "My Donkey — All Sections",
+    "description": "Browse all content categories and features on My Donkey OTT platform",
+    "url": "https://www.mydonkey.in",
+    "numberOfItems": 8,
+    "itemListElement": [
+      {
+        "@type": "SiteLinksSearchBox",
+        "@id": "https://www.mydonkey.in/#sitelinks-searchbox",
+        "target": "https://www.mydonkey.in/search?q={search_term_string}"
+      },
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Movies",
+        "description": "Stream the latest Bollywood, Hollywood, and regional movies in HD and 4K",
+        "url": "https://www.mydonkey.in/movies"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "TV Shows & Web Series",
+        "description": "Watch popular TV shows and binge-worthy web series with all seasons and episodes",
+        "url": "https://www.mydonkey.in/tv"
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": "Anime",
+        "description": "Discover trending and classic anime series with dedicated anime section",
+        "url": "https://www.mydonkey.in/anime"
+      },
+      {
+        "@type": "ListItem",
+        "position": 4,
+        "name": "Live Sports",
+        "description": "Watch live sports matches and sports highlights on My Donkey",
+        "url": "https://www.mydonkey.in/home"
+      },
+      {
+        "@type": "ListItem",
+        "position": 5,
+        "name": "Exclusive Content",
+        "description": "Access password-protected exclusive and premium content available only on My Donkey",
+        "url": "https://www.mydonkey.in/exclusive"
+      },
+      {
+        "@type": "ListItem",
+        "position": 6,
+        "name": "My List",
+        "description": "Your personal watchlist — save movies and shows to watch later",
+        "url": "https://www.mydonkey.in/my-list"
+      },
+      {
+        "@type": "ListItem",
+        "position": 7,
+        "name": "Search",
+        "description": "Search across all movies, TV shows, anime, and more on My Donkey",
+        "url": "https://www.mydonkey.in/search"
+      },
+      {
+        "@type": "ListItem",
+        "position": 8,
+        "name": "Request Content",
+        "description": "Can't find what you're looking for? Request any movie or show on My Donkey",
+        "url": "https://www.mydonkey.in/request"
+      }
+    ]
+  }
+  </script>
+
+  <!-- 4. WebPage + BreadcrumbList: establishes page hierarchy for each key section -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebPage",
+        "@id": "https://www.mydonkey.in/#home",
+        "url": "https://www.mydonkey.in/home",
+        "name": "Home — My Donkey Streaming",
+        "breadcrumb": {
+          "@type": "BreadcrumbList",
+          "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.mydonkey.in/home" }]
+        }
+      },
+      {
+        "@type": "WebPage",
+        "@id": "https://www.mydonkey.in/#movies",
+        "url": "https://www.mydonkey.in/movies",
+        "name": "Movies — Stream HD & 4K Movies | My Donkey",
+        "description": "Browse and stream thousands of movies in HD and 4K. Bollywood, Hollywood, regional films — all on My Donkey.",
+        "breadcrumb": {
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.mydonkey.in" },
+            { "@type": "ListItem", "position": 2, "name": "Movies", "item": "https://www.mydonkey.in/movies" }
+          ]
+        }
+      },
+      {
+        "@type": "WebPage",
+        "@id": "https://www.mydonkey.in/#tv",
+        "url": "https://www.mydonkey.in/tv",
+        "name": "TV Shows & Web Series | My Donkey",
+        "description": "Stream the best TV shows and web series. Watch all seasons and episodes on My Donkey.",
+        "breadcrumb": {
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.mydonkey.in" },
+            { "@type": "ListItem", "position": 2, "name": "TV Shows", "item": "https://www.mydonkey.in/tv" }
+          ]
+        }
+      },
+      {
+        "@type": "WebPage",
+        "@id": "https://www.mydonkey.in/#anime",
+        "url": "https://www.mydonkey.in/anime",
+        "name": "Anime — Watch Trending & Classic Anime | My Donkey",
+        "description": "Explore a huge library of anime series. Watch trending and classic anime on My Donkey.",
+        "breadcrumb": {
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.mydonkey.in" },
+            { "@type": "ListItem", "position": 2, "name": "Anime", "item": "https://www.mydonkey.in/anime" }
+          ]
+        }
+      },
+      {
+        "@type": "WebPage",
+        "@id": "https://www.mydonkey.in/#exclusive",
+        "url": "https://www.mydonkey.in/exclusive",
+        "name": "Exclusive Content | My Donkey",
+        "description": "Access My Donkey Originals and exclusive premium content available nowhere else.",
+        "breadcrumb": {
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.mydonkey.in" },
+            { "@type": "ListItem", "position": 2, "name": "Exclusive", "item": "https://www.mydonkey.in/exclusive" }
+          ]
+        }
+      },
+      {
+        "@type": "WebPage",
+        "@id": "https://www.mydonkey.in/#search",
+        "url": "https://www.mydonkey.in/search",
+        "name": "Search Movies & Shows | My Donkey",
+        "description": "Search for any movie, TV show, or anime on My Donkey's streaming platform.",
+        "breadcrumb": {
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.mydonkey.in" },
+            { "@type": "ListItem", "position": 2, "name": "Search", "item": "https://www.mydonkey.in/search" }
+          ]
+        }
+      }
+    ]
+  }
+  </script>
+
+  <!-- 5. Streaming Service structured data: shows platform features in rich results -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Service",
+    "name": "My Donkey OTT",
+    "serviceType": "Video Streaming",
+    "provider": {
+      "@type": "Organization",
+      "name": "My Donkey",
+      "url": "https://www.mydonkey.in"
+    },
+    "description": "My Donkey is a premium OTT streaming platform with HD movies, TV shows, anime, live sports, exclusive originals, multi-profile support, and Razorpay-powered subscriptions.",
+    "url": "https://www.mydonkey.in",
+    "areaServed": {
+      "@type": "Country",
+      "name": "India"
+    },
+    "hasOfferCatalog": {
+      "@type": "OfferCatalog",
+      "name": "My Donkey Subscription Plans",
+      "itemListElement": [
+        {
+          "@type": "Offer",
+          "name": "Basic Plan",
+          "description": "HD streaming on 1 device",
+          "priceCurrency": "INR",
+          "eligibleRegion": "IN"
+        },
+        {
+          "@type": "Offer",
+          "name": "Premium Plan",
+          "description": "4K HDR streaming on multiple devices",
+          "priceCurrency": "INR",
+          "eligibleRegion": "IN"
+        }
+      ]
+    },
+    "featureList": [
+      "Unlimited HD & 4K Movie Streaming",
+      "TV Shows & Web Series — All Episodes",
+      "Anime Library with Genre Filters",
+      "Exclusive & Password-Protected Content",
+      "Multi-Profile Support (like Netflix)",
+      "Personal Watchlist (My List)",
+      "Continue Watching across devices",
+      "Live Sports Streaming",
+      "YouTube Music Integration",
+      "Short Videos / Sparks (like Reels)",
+      "Download Links for Offline Viewing",
+      "PWA — Install as Native App",
+      "Multi-language Support (i18n)",
+      "Razorpay Subscription Billing",
+      "Google Gemini AI Descriptions"
+    ]
+  }
+  </script>
 </head>
 
 <body>

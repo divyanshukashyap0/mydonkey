@@ -1,9 +1,18 @@
 User-agent: *
 Allow: /
-Disallow: /browse/*
+Allow: /home
+Allow: /movies
+Allow: /tv
+Allow: /anime
+Allow: /search
+Allow: /exclusive
+Allow: /my-list
+Allow: /request
+Allow: /browse/
 Disallow: /watch/*
 Disallow: /admin/*
 Disallow: /account/*
 Disallow: /activate/*
 
-Sitemap: https://mydonkey.in/sitemap.xml
+# Sitemap
+Sitemap: https://www.mydonkey.in/sitemap.xml
