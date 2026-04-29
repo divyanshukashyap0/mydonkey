@@ -28,7 +28,9 @@ const LoginPage = () => {
                 } else {
                     await login(email, password);
                 }
-                navigate('/', { replace: true });
+                const params = new URLSearchParams(window.location.search);
+                const redirect = params.get('redirect') || '/';
+                navigate(redirect, { replace: true });
             } catch (err: any) {
                 console.error(err);
                 setError(err.message || 'Authentication failed. Check your credentials.');
@@ -129,7 +131,9 @@ const LoginPage = () => {
                         onClick={async () => {
                             try {
                                 await loginAsGuest();
-                                navigate('/', { replace: true });
+                                const params = new URLSearchParams(window.location.search);
+                                const redirect = params.get('redirect') || '/';
+                                navigate(redirect, { replace: true });
                             } catch (err: any) {
                                 setError(err.message);
                             }
@@ -149,7 +153,9 @@ const LoginPage = () => {
                             onClick={async () => {
                                 try {
                                     await loginWithGoogle();
-                                    navigate('/', { replace: true });
+                                    const params = new URLSearchParams(window.location.search);
+                                    const redirect = params.get('redirect') || '/';
+                                    navigate(redirect, { replace: true });
                                 } catch (err: any) {
                                     setError(err.message);
                                 }

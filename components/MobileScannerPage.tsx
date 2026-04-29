@@ -15,17 +15,22 @@ const MobileScannerPage = () => {
     const [errorMessage, setErrorMessage] = useState('');
 
     useEffect(() => {
-        console.log("MobileScannerPage mounted. User:", currentUser?.uid);
+        console.log("Scanner Page Info:", {
+            isAuthenticated,
+            hasUser: !!currentUser,
+            uid: currentUser?.uid,
+            search: location.search
+        });
         
-        // Check for sessionId in URL
         const params = new URLSearchParams(location.search);
         const urlSessionId = params.get('sessionId');
-        if (urlSessionId) {
-            console.log("Session ID found in URL:", urlSessionId);
+        
+        if (urlSessionId && isAuthenticated && currentUser) {
+            console.log("🎯 Session ID detected in URL, switching to confirmation:", urlSessionId);
             setScannedSession(urlSessionId);
             setStatus('confirming');
         }
-    }, [currentUser, location]);
+    }, [currentUser, isAuthenticated, location]);
 
     // If not authenticated, require login first
     if (!isAuthenticated || !currentUser) {
@@ -33,7 +38,12 @@ const MobileScannerPage = () => {
             <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 text-white text-center">
                 <h2 className="text-2xl font-bold mb-4">Login Required</h2>
                 <p className="mb-6 text-gray-400">You must be logged in on this device to approve a QR login.</p>
-                <button onClick={() => navigate('/login')} className="bg-white text-black px-6 py-3 rounded-xl font-bold">Go to Login</button>
+                <button 
+                    onClick={() => navigate(`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`)} 
+                    className="bg-white text-black px-6 py-3 rounded-xl font-bold transition-transform active:scale-95"
+                >
+                    Go to Login
+                </button>
             </div>
         );
     }
