@@ -12,6 +12,7 @@ interface QRLoginProps {
 
 const QRLogin: React.FC<QRLoginProps> = ({ onLoginSuccess, onError }) => {
     const [sessionId, setSessionId] = useState('');
+    const [qrValue, setQrValue] = useState('');
     const [timeLeft, setTimeLeft] = useState(60);
 
     const generateQR = async () => {
@@ -24,10 +25,12 @@ const QRLogin: React.FC<QRLoginProps> = ({ onLoginSuccess, onError }) => {
                 sessionId: newSessionId,
                 status: 'pending',
                 createdAt: serverTimestamp(),
-                // Firestore doesn't support Date natively without timestamp conversion in some contexts, but let's just use server timestamp and we can handle expiration in functions or frontend.
-                // Using a JS Date is converted to Timestamp by Firestore SDK.
                 expiresAt: new Date(Date.now() + 60 * 1000)
             });
+            
+            // Generate a full URL for the QR code
+            const loginUrl = `${window.location.origin}/scan?sessionId=${newSessionId}`;
+            setQrValue(loginUrl);
         } catch (error) {
             console.error("Error creating QR session:", error);
             onError("Failed to generate QR code");
@@ -82,8 +85,8 @@ const QRLogin: React.FC<QRLoginProps> = ({ onLoginSuccess, onError }) => {
             <h3 className="text-xl font-bold mb-2">Log in with QR Code</h3>
             <p className="text-sm text-gray-400 mb-6 text-center max-w-xs">Scan this code using the My Donkey app on your mobile device to log in instantly.</p>
             <div className="bg-white p-4 rounded-2xl mb-6 shadow-2xl shadow-brand-red/20 border-4 border-white/10 transition-transform hover:scale-105">
-                {sessionId ? (
-                    <QRCodeSVG value={JSON.stringify({ sessionId })} size={200} level="H" includeMargin={true} />
+                {qrValue ? (
+                    <QRCodeSVG value={qrValue} size={200} level="H" includeMargin={true} />
                 ) : (
                     <div className="w-[200px] h-[200px] bg-gray-800 rounded-xl animate-pulse flex items-center justify-center">
                         <div className="w-12 h-12 border-4 border-brand-red border-t-transparent rounded-full animate-spin"></div>

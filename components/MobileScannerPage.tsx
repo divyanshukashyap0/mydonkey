@@ -3,15 +3,29 @@ import { Scanner } from '@yudiel/react-qr-scanner';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useStore } from '../context/StoreContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, XCircle } from 'lucide-react';
 
 const MobileScannerPage = () => {
     const { currentUser, isAuthenticated } = useStore();
     const navigate = useNavigate();
+    const location = useLocation();
     const [scannedSession, setScannedSession] = useState<string | null>(null);
     const [status, setStatus] = useState<'scanning' | 'confirming' | 'success' | 'error'>('scanning');
     const [errorMessage, setErrorMessage] = useState('');
+
+    useEffect(() => {
+        console.log("MobileScannerPage mounted. User:", currentUser?.uid);
+        
+        // Check for sessionId in URL
+        const params = new URLSearchParams(location.search);
+        const urlSessionId = params.get('sessionId');
+        if (urlSessionId) {
+            console.log("Session ID found in URL:", urlSessionId);
+            setScannedSession(urlSessionId);
+            setStatus('confirming');
+        }
+    }, [currentUser, location]);
 
     // If not authenticated, require login first
     if (!isAuthenticated || !currentUser) {
@@ -29,15 +43,18 @@ const MobileScannerPage = () => {
         if (!text || status !== 'scanning') return;
         
         try {
-            // Some scanners might return the text directly, some as JSON.
-            // Let's handle both.
+            // Handle both URL and raw JSON
             let sessionId = '';
-            try {
-                const data = JSON.parse(text);
-                sessionId = data.sessionId;
-            } catch (e) {
-                // If not JSON, maybe it's just the sessionId string?
-                sessionId = text;
+            if (text.includes('?sessionId=')) {
+                const url = new URL(text);
+                sessionId = url.searchParams.get('sessionId') || '';
+            } else {
+                try {
+                    const data = JSON.parse(text);
+                    sessionId = data.sessionId;
+                } catch (e) {
+                    sessionId = text;
+                }
             }
 
             if (sessionId && sessionId.length > 20) { // UUID length check
@@ -113,21 +130,47 @@ const MobileScannerPage = () => {
                         <div className="w-full aspect-square rounded-2xl overflow-hidden bg-gray-900 border-4 border-white/10 shadow-2xl relative">
                             <Scanner 
                                 onResult={(result) => {
+                                    console.log("Scanner result received:", result);
                                     if (result && result.length > 0) {
                                         const text = result[0].rawValue;
                                         handleScan(text);
                                     }
                                 }}
                                 onError={(error) => {
-                                    console.error("Scanner Error:", error);
+                                    console.error("Scanner Error (Direct):", error);
                                 }}
-                                options={{ delayBetweenScanAttempts: 1000 }}
                             />
                             {/* Overlay for aesthetic scanning effect */}
                             <div className="absolute inset-0 border-2 border-brand-red opacity-50 z-10 pointer-events-none rounded-xl m-8"></div>
                             <div className="absolute top-0 left-0 right-0 h-1 bg-brand-red opacity-80 animate-scan z-10"></div>
                         </div>
                         <p className="mt-8 text-center text-gray-400">Point your camera at the QR code displayed on the web or TV to log in automatically.</p>
+                        
+                        {/* Manual Fallback */}
+                        <div className="mt-12 w-full pt-8 border-t border-white/10">
+                            <p className="text-sm text-gray-500 mb-4 text-center">Camera not working? Enter the ID manually:</p>
+                            <div className="flex gap-2">
+                                <input 
+                                    type="text" 
+                                    placeholder="Enter Session ID" 
+                                    className="flex-1 bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-sm"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            handleScan((e.target as HTMLInputElement).value);
+                                        }
+                                    }}
+                                />
+                                <button 
+                                    onClick={(e) => {
+                                        const input = e.currentTarget.previousSibling as HTMLInputElement;
+                                        handleScan(input.value);
+                                    }}
+                                    className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm font-bold"
+                                >
+                                    Sync
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 )}
 
