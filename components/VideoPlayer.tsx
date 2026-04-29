@@ -924,7 +924,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                     src={finalUrl}
                                     allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
                                     title={content.title}
-                                    sandbox="allow-forms allow-pointer-lock allow-same-origin allow-scripts"
                                 />
                             )}
                         </div>
