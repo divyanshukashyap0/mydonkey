@@ -223,6 +223,12 @@ const ContentManager = () => {
         return match ? match[0] : url;
     };
 
+    const extractVideoUrl = (url: string) => {
+        if (!url) return '';
+        const iframeMatch = url.match(/<iframe.*?src=["'](.*?)["']/);
+        return iframeMatch ? iframeMatch[1] : url;
+    };
+
     // --- Season & Episode Handlers ---
     const addSeason = () => {
         const newSeason: Season = {
@@ -431,7 +437,7 @@ const ContentManager = () => {
             }
             return true;
         });
-    }, [content, filterType, filterStatus, searchQuery]);
+    }, [rawContent, filterType, filterStatus, searchQuery]);
 
     if (isEditing) {
         return (
@@ -697,7 +703,7 @@ const ContentManager = () => {
                                 <div className="text-[10px] text-gray-400 mb-1">Overrides the Movie Source for playback only. Useful if you want the download link to be different from the player.</div>
                                 <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none font-mono text-sm"
                                     value={formData.videoUrl || ''}
-                                    onChange={e => setFormData({ ...formData, videoUrl: e.target.value })}
+                                    onChange={e => setFormData({ ...formData, videoUrl: extractVideoUrl(e.target.value) })}
                                     placeholder="https://example.com/video.mp4" />
                             </div>
                         )}
@@ -975,7 +981,7 @@ const ContentManager = () => {
                                                                     {/* Hidden input that appears on hover/focus for Player URL */}
                                                                     <input
                                                                         value={ep.videoUrl || ''}
-                                                                        onChange={e => updateEpisode(season.id, ep.id, { videoUrl: e.target.value })}
+                                                                        onChange={e => updateEpisode(season.id, ep.id, { videoUrl: extractVideoUrl(e.target.value) })}
                                                                         className="bg-black/50 border border-white/10 rounded p-1.5 text-[10px] font-mono placeholder:text-gray-600 w-full absolute top-full left-0 z-10 hidden group-hover:block focus:block focus:relative group-hover:relative"
                                                                         placeholder="Player URL (Optional Override)"
                                                                     />

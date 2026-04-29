@@ -17,10 +17,10 @@ import AppearanceManager from './modules/AppearanceManager';
 import AnimeManager from './modules/AnimeManager';
 import ExportManager from './modules/ExportManager';
 import ExclusiveContentManager from './modules/ExclusiveContentManager';
-import PopupManager from './modules/PopupManager';
+import ContributionsManager from './modules/ContributionsManager';
 
 // --- Types ---
-type ModuleType = 'content' | 'anime' | 'home' | 'coming_soon' | 'requests' | 'plans' | 'users' | 'settings' | 'pages' | 'appearance' | 'export' | 'exclusive' | 'popup';
+type ModuleType = 'content' | 'anime' | 'home' | 'coming_soon' | 'requests' | 'plans' | 'users' | 'settings' | 'pages' | 'appearance' | 'export' | 'exclusive' | 'contributions';
 
 interface SidebarGroup {
   title: string;
@@ -38,8 +38,7 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
       { id: 'home', label: 'Sections & Layout', icon: Home },
       { id: 'pages', label: 'Pages & Footer', icon: FileText },
       { id: 'coming_soon', label: 'Upcoming Releases', icon: Calendar },
-      { id: 'requests', label: 'User Requests', icon: MessageSquare },
-      { id: 'popup', label: 'Popup / Promotions', icon: Megaphone },
+      { id: 'contributions', label: 'User Contributions', icon: Megaphone },
     ]
   },
   {
@@ -181,13 +180,12 @@ export default function AdminLayout({ onExit }: { onExit: () => void }) {
             {activeModule === 'plans' && <PlanManager />}
             {activeModule === 'users' && <UsersModule />}
             {activeModule === 'settings' && <SettingsManager />}
-            {activeModule === 'requests' && <RequestsManager />}
 
             {activeModule === 'pages' && <PagesManager />}
             {activeModule === 'appearance' && <AppearanceManager />}
             {activeModule === 'export' && <ExportManager />}
             {activeModule === 'exclusive' && <ExclusiveContentManager />}
-            {activeModule === 'popup' && <PopupManager />}
+            {activeModule === 'contributions' && <ContributionsManager />}
           </div>
         </main>
       </div>

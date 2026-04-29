@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, CreditCard, Monitor, User as UserIcon, Plus, Calendar, Camera, Wifi, Settings, PlayCircle, Smartphone, Download, Send, Maximize, X, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, CreditCard, Monitor, User as UserIcon, Plus, Calendar, Camera, Wifi, Settings, PlayCircle, Smartphone, Download, Send, Maximize, X, Trash2, Film } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import PlanSelectionModal from './account/PlanSelectionModal';
 import PaymentMethodsModal from './account/PaymentMethodsModal';
 import BillingHistoryModal from './account/BillingHistoryModal';
 import DeviceManagementModal from './account/DeviceManagementModal';
-import ContentRequestInline from './ContentRequestInline';
+import MyContributions from './account/MyContributions';
 
 const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) => {
     const {
@@ -34,6 +34,7 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
     const [showDeviceModal, setShowDeviceModal] = useState(false);
     const [requestTitle, setRequestTitle] = useState('');
     const [isRequesting, setIsRequesting] = useState(false);
+    const [showContributions, setShowContributions] = useState(false);
 
     // Profile Management State
     const [editingProfile, setEditingProfile] = useState<any | null>(null);
@@ -384,8 +385,33 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                     </div>
                 </div>
 
+                {/* My Added Content Section */}
+                <div className="bg-white/5 rounded-xl overflow-hidden">
+                    <button
+                        onClick={() => setShowContributions(!showContributions)}
+                        className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition"
+                    >
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-red to-red-700 flex items-center justify-center">
+                                <Film size={18} />
+                            </div>
+                            <div className="text-left">
+                                <div className="font-medium">My Added Content</div>
+                                <div className="text-xs text-gray-500">Movies & shows you've added to the platform</div>
+                            </div>
+                        </div>
+                        {showContributions ? <ChevronUp size={18} className="text-gray-400" /> : <ChevronDown size={18} className="text-gray-400" />}
+                    </button>
+
+                    {showContributions && (
+                        <div className="px-4 pb-4 border-t border-white/5">
+                            <MyContributions userId={currentUser.uid} />
+                        </div>
+                    )}
+                </div>
+
                 {/* Content Request Section */}
-                <ContentRequestInline />
+
 
                 {/* Sign Out */}
                 <button

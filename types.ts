@@ -42,6 +42,7 @@ export interface Content {
   creators?: string[]; // Multiple creators/showrunners for TV
   reviews?: { userId: string; rating: number; comment: string; date: string }[];
   downloadLinks?: DownloadLink[];
+  addedBy?: { userId: string; name: string; email: string; addedAt: string }; // User attribution
 }
 
 export interface DownloadLink {
@@ -95,14 +96,6 @@ export interface Section {
   showRanking?: boolean;
 }
 
-export interface PopupConfig {
-  enabled: boolean;
-  mode: 'latest' | 'demanded' | 'custom' | 'imdb_top' | 'most_watched' | 'most_liked' | 'rotating';
-  contentId?: string;
-  title?: string;
-  subtitle?: string;
-  showOnce?: boolean;
-}
 
 export interface SiteSettings {
   siteName: string;
@@ -116,7 +109,6 @@ export interface SiteSettings {
   heroFont?: string;
   contentVersion?: number;
   sectionsVersion?: number;
-  popup?: PopupConfig;
   globalExclusiveCode?: string; // Single code to unlock all exclusive content
   contentLoaderEnabled?: boolean;
   contentLoaderDuration?: number; // In seconds

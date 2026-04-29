@@ -13,19 +13,14 @@ import MobileNav from './components/MobileNav';
 import Footer from './components/Footer';
 import InfoPage from './components/InfoPage';
 import AccountSettings from './components/AccountSettings';
-import RequestContent from './components/RequestContent';
-import ExclusiveContentPage from './components/ExclusiveContentPage';
 import AdminLayout from './components/admin/AdminLayout';
-import ContentRequestInline from './components/ContentRequestInline';
 import UnlockContentModal from './components/UnlockContentModal';
 import SearchPage from './components/SearchPage';
 import ScrollToTop from './components/ScrollToTop';
 import ProfileSelection from './components/ProfileSelection';
 import FontLoader from './components/FontLoader';
 import Loader from './components/Loader';
-import ContentPopup from './components/ContentPopup';
 import Pagination from './components/Pagination';
-import NotFound from './components/NotFound';
 import { Content } from './types';
 import { StoreProvider } from './context/StoreContext';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
@@ -38,7 +33,7 @@ const MainLayout = () => {
     // Derived activeTab from URL
     const path = location.pathname.substring(1);
     let activeTab = path ? decodeURIComponent(path) : 'home';
-    if (activeTab.startsWith('browse/')) {
+    if (activeTab.startsWith('browse/') || activeTab.startsWith('watch/')) {
         activeTab = 'home';
     }
 
@@ -80,9 +75,11 @@ const MainLayout = () => {
     useEffect(() => {
         if (location.pathname.startsWith('/browse/')) {
             const contentId = location.pathname.split('/')[2];
-            if (rawContent.length > 0) {
+            const stateItem = (location.state as any)?.item;
+            if (rawContent.length > 0 || stateItem) {
+
                 if (contentId) {
-                    const item = rawContent.find(c => c.id === contentId);
+                    const item = stateItem || rawContent.find(c => c.id === contentId);
                     if (item) {
                         // Check for Exclusive access via URL
                         if (item.isExclusive && !currentProfile?.unlockedContent?.includes('global_unlock')) {
@@ -93,7 +90,8 @@ const MainLayout = () => {
                     } else {
                         // Content loaded but ID not found
                         console.warn(`Deep link content not found: ${contentId}`);
-                        navigate('/404', { replace: true });
+                        navigate('/home', { replace: true });
+                        return;
                     }
                 } else {
                     navigate('/home', { replace: true });
@@ -114,6 +112,7 @@ const MainLayout = () => {
 
             // Wait for authentication and content to load
             if (!isLoading && rawContent.length > 0) {
+                console.log("AppNew: Watch deep link check:", { contentId, hasStateItem: !!stateItem, playingId: playingContent?.id });
                 if (contentId) {
                     let item = stateItem || rawContent.find(c => c.id === contentId);
 
@@ -163,7 +162,10 @@ const MainLayout = () => {
                         // Optional: Handle episodes correctly if deep linking directly to episode ID
                         // For now, if ID not in main content list, redirect
                         console.warn(`Watch deep link content not found: ${contentId}`);
-                        navigate('/404', { replace: true });
+                        // PROTECTION: Never redirect if we are already playing or have state
+                        if (playingContent?.id === contentId || !!playingContent || stateItem || (location.state as any)?.item) return;
+                        navigate('/home', { replace: true });
+                        return;
                     }
                 } else {
                     navigate('/home', { replace: true });
@@ -175,7 +177,7 @@ const MainLayout = () => {
             }
         }
 
-    }, [location.pathname, location.search, content, navigate, viewingContent, playingContent, isLoading, isAuthenticated, currentProfile]);
+    }, [location.pathname, location.search, content, rawContent, navigate, viewingContent, playingContent, isLoading, isAuthenticated, currentProfile]);
 
     // Redirect root and /features to /home
     useEffect(() => {
@@ -196,26 +198,58 @@ const MainLayout = () => {
     }, []);
 
     // Derived Content Lists
-    const { originals, trending, movies, tvShows } = useMemo(() => {
-        if (!content) return { originals: [], trending: [], movies: [], tvShows: [] };
+    const { originals, trending, movies, tvShows, userAddedContent } = useMemo(() => {
+        if (!content) return { originals: [], trending: [], movies: [], tvShows: [], userAddedContent: [] };
 
         // Trending logic
         const trendingContent = content.filter(c => c.featured || (c.vote_average && c.vote_average > 7.5));
+        
+        // Content added by users (has addedBy field)
+        const addedByUsers = content.filter(c => c.addedBy !== undefined);
 
         return {
             originals: content.filter(c => c.isOriginal),
             trending: trendingContent,
             movies: content.filter(c => c.type === 'movie'),
             tvShows: content.filter(c => c.type === 'tv'),
+            userAddedContent: addedByUsers.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 15)
         };
     }, [content]);
+ 
+    // State for random heroes (refreshes on tab change)
+    const [randomHeroes, setRandomHeroes] = useState<{ home: any; movie: any; tv: any }>({
+        home: null,
+        movie: null,
+        tv: null
+    });
+ 
+    useEffect(() => {
+        if (!content || content.length === 0) return;
+ 
+        if (activeTab === 'home') {
+            const candidates = trending.length > 0 ? trending : content;
+            setRandomHeroes(prev => ({ ...prev, home: candidates[Math.floor(Math.random() * candidates.length)] }));
+        } else if (activeTab === 'movies') {
+            const candidates = movies.filter(m => m.featured).length > 0 ? movies.filter(m => m.featured) : movies;
+            if (candidates.length > 0) {
+                setRandomHeroes(prev => ({ ...prev, movie: candidates[Math.floor(Math.random() * candidates.length)] }));
+            }
+        } else if (activeTab === 'tv') {
+            const candidates = tvShows.filter(t => t.featured).length > 0 ? tvShows.filter(t => t.featured) : tvShows;
+            if (candidates.length > 0) {
+                setRandomHeroes(prev => ({ ...prev, tv: candidates[Math.floor(Math.random() * candidates.length)] }));
+            }
+        }
+    }, [activeTab, content, trending.length, movies.length, tvShows.length]);
 
     // Handlers
     const handlePlay = (item: Content, mode: 'movie' | 'trailer' = 'movie') => {
         if (mode === 'trailer') {
+            setPlayingContent({ ...item, playMode: 'trailer' });
             navigate(`/watch/${item.id}?mode=trailer`, { state: { item } });
         } else {
             if (isAuthenticated && currentUser) {
+                setPlayingContent({ ...item, playMode: 'movie' });
                 navigate(`/watch/${item.id}?mode=movie`, { state: { item } });
             } else {
                 navigate('/login');
@@ -224,7 +258,8 @@ const MainLayout = () => {
     };
 
     const handleDetails = (item: Content) => {
-        navigate(`/browse/${item.id}`);
+        setViewingContent(item);
+        navigate(`/browse/${item.id}`, { state: { item } });
     };
 
     const handleTabChange = (tabId: string) => {
@@ -287,6 +322,119 @@ const MainLayout = () => {
         setShowAnimeIntro(false);
     }, []);
 
+    // Helper to render sections for a given scope
+    const renderSections = (scope: 'home' | 'tv' | 'movie') => {
+        const scopeSections = sections
+            .filter(s => s.enabled && s.scopes?.includes(scope))
+            .sort((a, b) => a.order - b.order);
+
+        if (scopeSections.length > 0) {
+            return scopeSections.map(section => {
+                let autoItems: Content[] = [];
+
+                // Auto-population logic
+                if (section.type === 'trending') {
+                    autoItems = content.filter(c => c.featured || (c.vote_average && c.vote_average > 7.5)).slice(0, 20);
+                } else if (section.type === 'genre' && section.genreFilter) {
+                    autoItems = content.filter(c => c.genres?.includes(section.genreFilter!)).slice(0, 20);
+                } else if (section.type === 'originals') {
+                    autoItems = content.filter(c => c.isOriginal).slice(0, 20);
+                } else if (section.type === 'new_movies') {
+                    autoItems = content.filter(c => c.type === 'movie').slice(0, 20);
+                } else if (section.type === 'new_tv') {
+                    autoItems = content.filter(c => c.type === 'tv').slice(0, 20);
+                } else if (section.type === 'tag' && section.tagFilter) {
+                    autoItems = content.filter(c => c.tags?.includes(section.tagFilter!) || c.genres?.includes(section.tagFilter!)).slice(0, 20);
+                } else if (section.type === 'my_list') {
+                    if (currentProfile?.myList) {
+                        autoItems = content.filter(c => currentProfile.myList.includes(c.id));
+                    }
+                }
+
+                // Filter by type if scope is movie or tv and it's not a specific type section
+                if (scope === 'movie' && !['new_movies', 'new_tv'].includes(section.type)) {
+                    autoItems = autoItems.filter(c => c.type === 'movie');
+                }
+                if (scope === 'tv' && !['new_movies', 'new_tv'].includes(section.type)) {
+                    autoItems = autoItems.filter(c => c.type === 'tv');
+                }
+
+                // Manual items
+                const manualItems = (section.contentIds || []).map(id => content.find(c => c.id === id)).filter(Boolean) as Content[];
+
+                // Merge: Manual first, then Auto. Deduplicate.
+                const items = [...manualItems, ...autoItems].filter((item, index, self) =>
+                    index === self.findIndex(t => t.id === item.id)
+                );
+
+                if (items.length === 0) return null;
+
+                return (
+                    <ContentRail
+                        key={section.id}
+                        title={section.title}
+                        items={items}
+                        onDetails={handleDetails}
+                        isTop10={section.showRanking}
+                        showRanking={section.showRanking}
+                    />
+                );
+            });
+        }
+
+        // --- Automatic Fallback Sections ---
+        const filteredContent = scope === 'movie' ? movies : (scope === 'tv' ? tvShows : content);
+
+        if (filteredContent.length === 0) return null;
+
+        const trendingItems = filteredContent.filter(c => c.featured || (c.vote_average && c.vote_average > 7.5)).slice(0, 15);
+        const recentlyAdded = [...filteredContent].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 15);
+
+        // Get top genres for this content
+        const genreCounts: Record<string, number> = {};
+        filteredContent.forEach(c => {
+            c.genres?.forEach(g => {
+                genreCounts[g] = (genreCounts[g] || 0) + 1;
+            });
+        });
+        const topGenres = Object.entries(genreCounts)
+            .filter(([genre]) => !['Anime', 'Animation', 'Short'].includes(genre))
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 4)
+            .map(([genre]) => genre);
+
+        return (
+            <div className="space-y-12">
+                {trendingItems.length > 0 && (
+                    <ContentRail
+                        title={`Trending ${scope === 'movie' ? 'Movies' : 'Shows'}`}
+                        items={trendingItems}
+                        onDetails={handleDetails}
+                    />
+                )}
+                {recentlyAdded.length > 0 && (
+                    <ContentRail
+                        title="Recently Added"
+                        items={recentlyAdded}
+                        onDetails={handleDetails}
+                    />
+                )}
+                {topGenres.map(genre => {
+                    const genreItems = filteredContent.filter(c => c.genres?.includes(genre)).slice(0, 15);
+                    if (genreItems.length === 0) return null;
+                    return (
+                        <ContentRail
+                            key={genre}
+                            title={`${genre} ${scope === 'movie' ? 'Movies' : 'Shows'}`}
+                            items={genreItems}
+                            onDetails={handleDetails}
+                        />
+                    );
+                })}
+            </div>
+        );
+    };
+
     // Render Content based on Tab
     const renderContent = () => {
         // Info Pages - Dynamic
@@ -301,7 +449,7 @@ const MainLayout = () => {
         }
 
         if (activeTab === 'home') {
-            const heroItem = (settings?.heroContentId && content.find(c => c.id === settings.heroContentId))
+            const heroItem = randomHeroes.home || (settings?.heroContentId && content.find(c => c.id === settings.heroContentId))
                 || (trending.length > 0 ? trending[0] : (content.length > 0 ? content[0] : null));
 
             return (
@@ -316,56 +464,14 @@ const MainLayout = () => {
                         <HeroSkeleton />
                     )}
                     <div className="pb-24 bg-[#141414] relative z-10 pl-4 md:pl-12 space-y-8">
-                        {/* Dynamic Sections from Admin */}
-                        {sections
-                            .filter(s => s.enabled && s.scopes?.includes('home'))
-                            .sort((a, b) => a.order - b.order)
-                            .map(section => {
-                                let autoItems: Content[] = [];
+                        {userAddedContent.length > 0 && (
+                            <div className="pt-8">
+                                <ContentRail title="Recently Added by Users" items={userAddedContent} onDetails={handleDetails} />
+                            </div>
+                        )}
 
-                                // Auto-population logic
-                                if (section.type === 'trending') {
-                                    autoItems = content.filter(c => c.featured || (c.vote_average && c.vote_average > 7.5)).slice(0, 10);
-                                } else if (section.type === 'genre' && section.genreFilter) {
-                                    autoItems = content.filter(c => c.genres?.includes(section.genreFilter!)).slice(0, 10);
-                                } else if (section.type === 'originals') {
-                                    autoItems = content.filter(c => c.isOriginal).slice(0, 10);
-                                } else if (section.type === 'new_movies') {
-                                    autoItems = content.filter(c => c.type === 'movie').slice(0, 10);
-                                } else if (section.type === 'new_tv') {
-                                    autoItems = content.filter(c => c.type === 'tv').slice(0, 10);
-                                } else if (section.type === 'tag' && section.tagFilter) {
-                                    autoItems = content.filter(c => c.tags?.includes(section.tagFilter!) || c.genres?.includes(section.tagFilter!)).slice(0, 10);
-                                } else if (section.type === 'my_list') {
-                                    if (currentProfile?.myList) {
-                                        autoItems = content.filter(c => currentProfile.myList.includes(c.id));
-                                    }
-                                }
-
-                                // Manual items
-                                const manualItems = (section.contentIds || []).map(id => content.find(c => c.id === id)).filter(Boolean) as Content[];
-
-                                // Merge: Manual first, then Auto. Deduplicate.
-                                const items = [...manualItems, ...autoItems].filter((item, index, self) =>
-                                    index === self.findIndex(t => t.id === item.id)
-                                );
-
-                                if (items.length === 0) return null;
-
-                                return (
-                                    <ContentRail
-                                        key={section.id}
-                                        title={section.title}
-                                        items={items}
-                                        onDetails={handleDetails}
-                                        isTop10={section.showRanking} // Use specific ranking style if enabled
-                                        showRanking={section.showRanking}
-                                    />
-                                );
-                            })}
-                        <div className="pr-4 md:pr-12 pt-8">
-                            <ContentRequestInline />
-                        </div>
+                        {/* Dynamic or Automatic Sections */}
+                        {renderSections('home')}
                     </div>
                 </>
             );
@@ -376,33 +482,47 @@ const MainLayout = () => {
             const visibleMovies = movies.slice(startIndex, startIndex + ITEMS_PER_PAGE);
             const totalPages = Math.ceil(movies.length / ITEMS_PER_PAGE);
 
+            // Random hero for movies
+            const movieHero = randomHeroes.movie || movies.find(m => m.featured) || movies[0];
+
             return (
-                <div className="pt-24 px-4 md:px-12 pb-12 min-h-screen relative z-10">
-                    <h1 className="text-3xl font-bold mb-8">Movies</h1>
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                        {visibleMovies.map(item => (
-                            <div key={item.id} onClick={() => handleDetails(item)} className="cursor-pointer transition-transform hover:scale-105 relative aspect-[2/3]">
-                                <img
-                                    src={item.poster_path_mobile || item.poster_path}
-                                    className="rounded-lg w-full h-full object-cover shadow-lg"
-                                    loading="lazy"
-                                    alt={item.title}
-                                />
-                            </div>
-                        ))}
-                    </div>
-                    {totalPages > 1 && (
-                        <Pagination
-                            currentPage={currentPage}
-                            totalPages={totalPages}
-                            onPageChange={(page) => {
-                                setCurrentPage(page);
-                                window.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
+                <div className="min-h-screen pb-12 bg-[#141414]">
+                    {movieHero && (
+                        <HeroBanner
+                            item={movieHero}
+                            onPlay={(item) => handlePlay(item, 'movie')}
+                            onDetails={handleDetails}
                         />
                     )}
-                    <div className="mt-12">
-                        <ContentRequestInline />
+
+                    <div className="relative z-10 pl-4 md:pl-12 -mt-12 md:-mt-32 space-y-12">
+                        {renderSections('movie')}
+
+                        <div className="pt-8 pr-4 md:pr-12">
+                            <h2 className="text-2xl font-bold mb-6">Explore All Movies</h2>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-4">
+                                {visibleMovies.map(item => (
+                                    <div key={item.id} onClick={() => handleDetails(item)} className="cursor-pointer transition-transform hover:scale-105 relative aspect-[2/3]">
+                                        <img
+                                            src={item.poster_path_mobile || item.poster_path}
+                                            className="rounded-lg w-full h-full object-cover shadow-lg border border-white/5"
+                                            loading="lazy"
+                                            alt={item.title}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                            {totalPages > 1 && (
+                                <Pagination
+                                    currentPage={currentPage}
+                                    totalPages={totalPages}
+                                    onPageChange={(page) => {
+                                        setCurrentPage(page);
+                                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }}
+                                />
+                            )}
+                        </div>
                     </div>
                 </div>
             );
@@ -413,33 +533,46 @@ const MainLayout = () => {
             const visibleTV = tvShows.slice(startIndex, startIndex + ITEMS_PER_PAGE);
             const totalPages = Math.ceil(tvShows.length / ITEMS_PER_PAGE);
 
+            const tvHero = randomHeroes.tv || tvShows.find(t => t.featured) || tvShows[0];
+
             return (
-                <div className="pt-24 px-4 md:px-12 pb-12 min-h-screen relative z-10">
-                    <h1 className="text-3xl font-bold mb-8">TV Shows</h1>
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                        {visibleTV.map(item => (
-                            <div key={item.id} onClick={() => handleDetails(item)} className="cursor-pointer transition-transform hover:scale-105 relative aspect-[2/3]">
-                                <img
-                                    src={item.poster_path_mobile || item.poster_path}
-                                    className="rounded-lg w-full h-full object-cover shadow-lg"
-                                    loading="lazy"
-                                    alt={item.title}
-                                />
-                            </div>
-                        ))}
-                    </div>
-                    {totalPages > 1 && (
-                        <Pagination
-                            currentPage={currentPage}
-                            totalPages={totalPages}
-                            onPageChange={(page) => {
-                                setCurrentPage(page);
-                                window.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
+                <div className="min-h-screen pb-12 bg-[#141414]">
+                    {tvHero && (
+                        <HeroBanner
+                            item={tvHero}
+                            onPlay={(item) => handlePlay(item, 'movie')}
+                            onDetails={handleDetails}
                         />
                     )}
-                    <div className="mt-12">
-                        <ContentRequestInline />
+
+                    <div className="relative z-10 pl-4 md:pl-12 -mt-12 md:-mt-32 space-y-12">
+                        {renderSections('tv')}
+
+                        <div className="pt-8 pr-4 md:pr-12">
+                            <h2 className="text-2xl font-bold mb-6">Explore All TV Shows</h2>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9 gap-4">
+                                {visibleTV.map(item => (
+                                    <div key={item.id} onClick={() => handleDetails(item)} className="cursor-pointer transition-transform hover:scale-105 relative aspect-[2/3]">
+                                        <img
+                                            src={item.poster_path_mobile || item.poster_path}
+                                            className="rounded-lg w-full h-full object-cover shadow-lg border border-white/5"
+                                            loading="lazy"
+                                            alt={item.title}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                            {totalPages > 1 && (
+                                <Pagination
+                                    currentPage={currentPage}
+                                    totalPages={totalPages}
+                                    onPageChange={(page) => {
+                                        setCurrentPage(page);
+                                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }}
+                                />
+                            )}
+                        </div>
                     </div>
                 </div>
             );
@@ -482,7 +615,8 @@ const MainLayout = () => {
 
                         {filteredAnime.length > 0 ? (
                             <>
-                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                                <div className="pt-8 pr-4 md:pr-12">
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-4">
                                     {visibleAnime.map(item => (
                                         <div key={item.id} onClick={() => handleDetails(item)} className="group cursor-pointer relative aspect-[2/3] overflow-hidden rounded-xl border border-white/10 hover:border-brand-red/50 transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(229,9,20,0.4)]">
                                             <img
@@ -499,6 +633,7 @@ const MainLayout = () => {
                                             </div>
                                         </div>
                                     ))}
+                                    </div>
                                 </div>
                                 {totalPages > 1 && (
                                     <Pagination
@@ -517,10 +652,6 @@ const MainLayout = () => {
                                 <p className="text-sm">Check back later for new additions!</p>
                             </div>
                         )}
-
-                        <div className="mt-16">
-                            <ContentRequestInline />
-                        </div>
                     </div>
                 </div>
             );
@@ -550,7 +681,6 @@ const MainLayout = () => {
                     ) : (
                         <div className="text-gray-400 mb-12">Your list is empty.</div>
                     )}
-                    <ContentRequestInline />
                 </div>
             );
         }
@@ -568,17 +698,9 @@ const MainLayout = () => {
             return <AccountSettings setActiveTab={handleTabChange} />;
         }
 
-        if (activeTab === 'request') {
-            return <RequestContent />;
-        }
+        return <Navigate to="/home" replace />;
 
-        return (
-            <NotFound 
-                onBack={() => navigate('/home')}
-                title="404"
-                message="The content you're looking for has glitched out of reality."
-            />
-        );
+        return <Navigate to="/home" replace />;
     };
 
     if (isLoading) {
@@ -617,8 +739,7 @@ const MainLayout = () => {
             <Footer onNavigate={handleNavigate} />
             <MobileNav activeTab={activeTab} setTab={handleTabChange} />
 
-            {/* Admin-controlled Content Popup */}
-            <ContentPopup onPlay={handlePlay} onDetails={handleDetails} />
+
 
             {viewingContent && (
                 <ContentDetails
@@ -652,7 +773,7 @@ const MainLayout = () => {
 };
 
 const AppRoutes = () => {
-    const { currentUser, isLoading } = useStore();
+    const { currentUser, isLoading, isAuthenticated } = useStore();
     const navigate = useNavigate();
 
     return (
@@ -663,7 +784,7 @@ const AppRoutes = () => {
                 element={
                     isLoading ? (
                         <Loader />
-                    ) : currentUser?.role === 'admin' ? (
+                    ) : (currentUser?.role === 'admin' || (isAuthenticated && window.location.pathname.startsWith('/admin'))) ? (
                         <AdminLayout onExit={() => navigate('/')} />
                     ) : (
                         <Navigate to="/home" replace />

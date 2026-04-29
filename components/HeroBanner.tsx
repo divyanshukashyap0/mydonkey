@@ -59,6 +59,7 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
                 }
 
                 playerRef.current = new window.YT.Player('hero-player', {
+                    host: 'https://www.youtube.com',
                     videoId: item.youtubeId,
                     width: '100%',
                     height: '100%',
@@ -75,7 +76,6 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
                         iv_load_policy: 3,
                         disablekb: 1,
                         fs: 0,
-                        origin: window.location.origin,
                         enablejsapi: 1
                     },
                     events: {
@@ -193,10 +193,12 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
                             ))}
                         </div>
 
-                        {/* Overview - Hidden on mobile, only visible on desktop */}
-                        <p className="hidden md:block text-gray-200 text-base line-clamp-3 drop-shadow-md leading-relaxed animate-fade-up delay-200 opacity-0 max-w-xl">
-                            {item.overview}
-                        </p>
+                        {/* Overview - Clamped for professional look */}
+                        <div className="animate-fade-up delay-200 opacity-0 max-w-xl">
+                            <p className="text-gray-200 text-sm md:text-base line-clamp-3 drop-shadow-md leading-relaxed">
+                                {item.overview}
+                            </p>
+                        </div>
 
                         <div className="flex gap-3 pt-2 animate-fade-up delay-300 opacity-0">
                             <button

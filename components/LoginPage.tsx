@@ -26,7 +26,7 @@ const LoginPage = () => {
                 } else {
                     await login(email, password);
                 }
-                navigate('/');
+                navigate('/', { replace: true });
             } catch (err: any) {
                 console.error(err);
                 setError(err.message || 'Authentication failed. Check your credentials.');
@@ -105,7 +105,7 @@ const LoginPage = () => {
                         onClick={async () => {
                             try {
                                 await loginAsGuest();
-                                navigate('/');
+                                navigate('/', { replace: true });
                             } catch (err: any) {
                                 setError(err.message);
                             }
@@ -125,7 +125,7 @@ const LoginPage = () => {
                             onClick={async () => {
                                 try {
                                     await loginWithGoogle();
-                                    navigate('/');
+                                    navigate('/', { replace: true });
                                 } catch (err: any) {
                                     setError(err.message);
                                 }

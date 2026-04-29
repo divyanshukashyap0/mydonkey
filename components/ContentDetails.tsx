@@ -15,6 +15,7 @@ interface ContentDetailsProps {
 const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPlay, onDetails }) => {
     const { currentProfile, toggleWatchlist, currentUser, content: allContent } = useStore();
     const isAdded = currentProfile?.myList.includes(content.id);
+    const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
 
     // Filter Related Content
     const relatedContent = useMemo(() => {
@@ -214,9 +215,19 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                         </div>
 
                         {/* Description - Line Clamp to prevent scrolling, user can expand if absolutely needed but goal is compact */}
-                        <p className="text-sm text-gray-300 line-clamp-3 leading-relaxed drop-shadow-md">
-                            {content.overview}
-                        </p>
+                        <div>
+                            <p className={`text-sm text-gray-300 leading-relaxed drop-shadow-md ${!isOverviewExpanded ? 'line-clamp-3' : ''}`}>
+                                {content.overview}
+                            </p>
+                            {content.overview && content.overview.length > 150 && (
+                                <button 
+                                    onClick={() => setIsOverviewExpanded(!isOverviewExpanded)}
+                                    className="text-brand-red text-xs font-bold mt-1 hover:underline"
+                                >
+                                    {isOverviewExpanded ? 'Show Less' : 'Read More'}
+                                </button>
+                            )}
+                        </div>
 
                         {/* Action Buttons Row */}
                         <div className="grid grid-cols-2 gap-3 mt-1">
@@ -537,7 +548,19 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                     )}
                                     <span className="border border-white/30 px-1.5 rounded text-[10px] font-black tracking-tighter">{content.resolution || 'HD'}</span>
                                 </div>
-                                <p className="text-xl leading-relaxed text-gray-200">{content.overview}</p>
+                                <div className="space-y-2">
+                                    <p className={`text-xl leading-relaxed text-gray-200 ${!isOverviewExpanded ? 'line-clamp-3' : ''}`}>
+                                        {content.overview}
+                                    </p>
+                                    {content.overview && content.overview.length > 250 && (
+                                        <button 
+                                            onClick={() => setIsOverviewExpanded(!isOverviewExpanded)}
+                                            className="text-brand-red font-bold hover:underline"
+                                        >
+                                            {isOverviewExpanded ? 'Show Less' : 'Read More'}
+                                        </button>
+                                    )}
+                                </div>
 
                                 {/* ── Tab Strip (Desktop) ── */}
                                 <div className="flex gap-1 border-b border-white/10 mt-2 mb-6">

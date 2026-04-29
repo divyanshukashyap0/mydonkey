@@ -186,16 +186,16 @@ export const footerContent: Record<string, InfoPageData> = {
     },
     'Cookie Preferences': {
         title: 'Cookie Control',
-        description: 'Manage your digital crumbs.',
+        description: 'Ownership & Policy Agreement',
         category: 'Legal',
         sections: [
             {
-                heading: 'What are they?',
-                content: 'Tiny files that help us remember you. Like a digital high-five.'
+                heading: 'Disclaimer',
+                content: 'We do not own any content; all content is owned by its respective owners and is collected from the internet.'
             },
             {
-                heading: 'Your Call',
-                content: 'You can disable them, but why cripple the experience? Let them run for maximum performance.'
+                heading: 'Agreement',
+                content: 'If you do not agree to our policies, then this website is not for you. Thank you.'
             }
         ]
     },
@@ -249,7 +249,7 @@ export const footerContent: Record<string, InfoPageData> = {
         sections: [
             {
                 heading: '1. Agree to Enter',
-                content: 'By using My Donkey, you agree to our terms. If you don\'t like them, the exit is to your left.'
+                content: 'By using My Donkey, you agree to our terms. If you do not agree to our policies, then this website is not for you. Thank you.'
             },
             {
                 heading: '2. Your Identity',
@@ -261,7 +261,7 @@ export const footerContent: Record<string, InfoPageData> = {
             },
             {
                 heading: '4. Ownership',
-                content: 'We own the content. You enjoy it. Don\'t steal it, or our legal ninjas will find you.'
+                content: 'We do not own any content. All content is owned by its respective owners and is taken from the internet.'
             }
         ],
         lastUpdated: 'February 14, 2026'

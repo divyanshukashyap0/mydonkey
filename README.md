@@ -80,7 +80,6 @@
 | 🔒 **Exclusive Content** | Password-gated hidden content, unlockable with a global or per-item code |
 | 📱 **Content Request** | Users can request specific movies or shows |
 | 🔔 **Notifications** | Admin-controlled push notification banners |
-| 📲 **Content Popup** | Admin-controlled promotional popup (latest, most-watched, custom, etc.) |
 | ⏩ **Continue Watching** | Resume from last stopped timestamp, tracked per profile |
 | 📺 **TV Device Activation** | Enter a code to activate a TV/smart device for streaming |
 | 🎵 **YouTube Music Player** | Browse and play music from YouTube with a built-in songs player |
@@ -101,7 +100,6 @@
 | 🗂️ **Section Manager** | Create and order homepage sections (trending, genre, tags, curated, etc.) |
 | 👥 **Users Manager** | View, block/unblock users, change roles, view watch history |
 | 💰 **Plan Manager** | Create and manage subscription plans with Razorpay integration |
-| 🎯 **Popup Manager** | Configure promotional content popups with display modes |
 | 📜 **Pages Manager** | Create and manage static info pages (About, FAQ, Privacy Policy, etc.) |
 | 🎨 **Appearance Manager** | Set site name, theme, fonts (hero, rank, body), hero content |
 | 🏷️ **Anime Manager** | Dedicated CRUD and bulk episode management for anime content |
@@ -175,7 +173,6 @@ my-donkey-ott/
 │   │       ├── AnimeManager.tsx          # Anime-specific CRUD with bulk episodes
 │   │       ├── SectionManager.tsx        # Homepage section configuration
 │   │       ├── PlanManager.tsx           # Subscription plan management
-│   │       ├── PopupManager.tsx          # Popup configuration
 │   │       ├── PagesManager.tsx          # Static page CMS
 │   │       ├── SettingsManager.tsx       # Global site settings
 │   │       ├── AppearanceManager.tsx     # Theme, fonts, hero config
@@ -197,7 +194,6 @@ my-donkey-ott/
 │   ├── AppleLogo.tsx             # Apple logo SVG component
 │   ├── ContentDetails.tsx        # Content detail modal (largest component ~49KB)
 │   ├── ContentLoader.tsx         # Animated content loading skeleton
-│   ├── ContentPopup.tsx          # Admin-configured promotional popup
 │   ├── ContentRail.tsx           # Horizontal scrollable content row
 │   ├── ContentRequestInline.tsx  # Inline content request form
 │   ├── DrivePlayer.tsx           # Google Drive video player component
@@ -408,8 +404,6 @@ Large modal/sheet showing full content details:
 - Download links
 - Related content
 
-#### `ContentPopup.tsx`
-Admin-configured promotional modal that appears on load. Modes: latest, demanded, custom, most watched, most liked, rotating.
 
 #### `DrivePlayer.tsx`
 Embeds Google Drive hosted videos using an iframe with controls.
@@ -463,13 +457,6 @@ Manage subscription plans visible to users:
 - Link to Razorpay Plan IDs for automated billing
 - Enable/disable plan visibility
 
-### Popup Manager (`PopupManager.tsx`)
-Configure the promotional popup shown to users:
-- Enable/disable popup
-- Set display mode: `latest`, `demanded`, `custom`, `imdb_top`, `most_watched`, `most_liked`, `rotating`
-- For custom mode: pick specific content item
-- Set custom title and subtitle
-- `showOnce` — only show to each user once per session
 
 ### Pages Manager (`PagesManager.tsx`)
 Built-in CMS for static information pages:
@@ -674,7 +661,6 @@ interface SiteSettings {
   websiteFont?: string;
   rankFont?: string;
   heroFont?: string;
-  popup?: PopupConfig;
   globalExclusiveCode?: string;
   contentLoaderEnabled?: boolean;
   contentLoaderDuration?: number;

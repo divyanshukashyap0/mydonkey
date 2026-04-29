@@ -1,8 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, X } from 'lucide-react';
+import { Search, X, Loader2 } from 'lucide-react';
 import { Content, Section } from '../types';
 import { useStore } from '../context/StoreContext';
+import { collection, query, where, getDocs, addDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+import { searchTMDBMulti, fetchTMDBDetails, tmdbPosterUrl, tmdbBackdropUrl, mapTMDBGenres } from '../services/tmdbService';
 import ContentRail from './ContentRail';
 import Pagination from './Pagination';
 
@@ -13,12 +16,14 @@ interface SearchPageProps {
 const ITEMS_PER_PAGE = 24;
 
 const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
-    const { content, sections, currentProfile, unlockContent, settings } = useStore();
+    const { content, sections, currentProfile, unlockContent, settings, currentUser } = useStore();
     const navigate = useNavigate();
-    const [query, setQuery] = useState('');
-    const [results, setResults] = useState<Content[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [results, setResults] = useState<Partial<Content>[]>([]);
     const [matchingSections, setMatchingSections] = useState<Section[]>([]);
     const [currentPage, setCurrentPage] = useState(1);
+    const [isSearching, setIsSearching] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     // Focus input on mount
     useEffect(() => {
@@ -26,48 +31,153 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
         if (input) input.focus();
     }, []);
 
-    // Debounce Query
+    // Debounce Query & Fetch from TMDB
     useEffect(() => {
-        const timer = setTimeout(() => {
-            if (!query.trim()) {
+        const timer = setTimeout(async () => {
+            if (!searchQuery.trim()) {
                 setResults([]);
                 setMatchingSections([]);
+                setIsSearching(false);
                 return;
             }
 
-            const lowerQuery = query.toLowerCase();
+            const lowerQuery = searchQuery.toLowerCase();
+            setIsSearching(true);
 
-            // 1. Filter Content
-            const filteredContent = content.filter(item =>
-                item.title.toLowerCase().includes(lowerQuery) ||
-                item.overview?.toLowerCase().includes(lowerQuery) ||
-                item.genres?.some(g => g.toLowerCase().includes(lowerQuery)) ||
-                item.tags?.some(t => t.toLowerCase().includes(lowerQuery)) // Added Tag search for individual items too
-            );
-            setResults(filteredContent);
-            setCurrentPage(1); // Reset page on new search
+            try {
+                // 1. Hidden Doorway Logic
+                if (settings?.globalExclusiveCode && lowerQuery === settings.globalExclusiveCode.toLowerCase()) {
+                    unlockContent(settings.globalExclusiveCode).then(result => {
+                        if (result.success) {
+                            navigate('/exclusive');
+                        }
+                    });
+                }
 
-            // 2. Filter Sections
-            const filteredSections = sections.filter(s =>
-                s.enabled && s.title.toLowerCase().includes(lowerQuery)
-            );
-            setMatchingSections(filteredSections);
+                // 2. Filter Sections Locally
+                const filteredSections = sections.filter(s =>
+                    s.enabled && s.title.toLowerCase().includes(lowerQuery)
+                );
+                setMatchingSections(filteredSections);
 
-            // 3. Hidden Doorway Logic
-            if (settings?.globalExclusiveCode && lowerQuery === settings.globalExclusiveCode.toLowerCase()) {
-                unlockContent(settings.globalExclusiveCode).then(result => {
-                    if (result.success) {
-                        navigate('/exclusive');
-                    }
-                });
+                // 3. Search TMDB directly
+                const tmdbResults = await searchTMDBMulti(searchQuery);
+
+                // 4. Map TMDB results to partial Content objects for display
+                const mappedResults: Partial<Content>[] = tmdbResults.map(r => ({
+                    id: `tmdb_${r.id}`, // temporary ID
+                    tmdbId: r.id,
+                    title: r.title || r.name || '',
+                    type: r.media_type === 'tv' ? 'tv' : 'movie',
+                    poster_path: r.poster_path ? tmdbPosterUrl(r.poster_path) : '',
+                    release_date: r.release_date || r.first_air_date || '',
+                    vote_average: r.vote_average || 0,
+                    overview: r.overview
+                }));
+
+                setResults(mappedResults);
+                setCurrentPage(1);
+
+            } catch (error) {
+                console.error("TMDB Search Error:", error);
+            } finally {
+                setIsSearching(false);
             }
 
-        }, 300); // 300ms delay
+        }, 500); // 500ms delay to prevent excessive API calls
 
         return () => clearTimeout(timer);
-    }, [query, content, sections]);
+    }, [searchQuery, sections, settings, unlockContent]);
 
-    // Helper to resolve items for a section (Duplicated from AppNew for independence)
+    // Handle clicking a search result
+    const handleResultClick = async (item: Partial<Content>) => {
+        if (!item.tmdbId) {
+            // It's a local section item (already full Content)
+            onDetails(item as Content);
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            // 1. Check if it already exists in Firebase
+            const q = query(collection(db, 'content'), where('tmdbId', '==', item.tmdbId));
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+                const existingDoc = querySnapshot.docs[0];
+                const existingContent = { id: existingDoc.id, ...existingDoc.data() } as Content;
+                onDetails(existingContent);
+                return;
+            }
+
+            // 2. Fetch full TMDB details (includes external_ids for IMDb ID)
+            const detail = await fetchTMDBDetails(item.tmdbId, item.type as 'movie' | 'tv');
+
+            // 3. Generate PlayIMDb URL (ensure EVERY content gets a link)
+            const imdbId = detail.external_ids?.imdb_id;
+            let videoUrl = '';
+            
+            if (imdbId) {
+                videoUrl = `https://www.playimdb.com/title/${imdbId}/`;
+            } else {
+                // Fallback to TMDB-based lookup if IMDB ID is missing to ensure the field is never empty
+                videoUrl = `https://www.playimdb.com/${item.type === 'tv' ? 'tv' : 'movie'}/${item.tmdbId}/`;
+            }
+
+            // 4. Construct new Content object
+            const addedByInfo = currentUser ? {
+                userId: currentUser.uid,
+                name: currentProfile?.name || currentUser.name || 'User',
+                email: currentUser.email || '',
+                addedAt: new Date().toISOString()
+            } : null;
+
+            const newContent: Omit<Content, 'id'> = {
+                tmdbId: detail.id,
+                title: detail.title || detail.name || '',
+                type: detail.title ? 'movie' : 'tv',
+                videoUrl: videoUrl,
+                poster_path: detail.poster_path ? tmdbPosterUrl(detail.poster_path) : '',
+                backdrop_path: detail.backdrop_path ? tmdbBackdropUrl(detail.backdrop_path) : '',
+                overview: detail.overview || '',
+                genres: mapTMDBGenres(detail.genres?.map((g: any) => g.id) || []),
+                release_date: detail.release_date || detail.first_air_date || '',
+                vote_average: detail.vote_average || 0,
+                allowPlayback: true,
+                isPublished: true,
+                createdAt: new Date().toISOString(),
+                ...(addedByInfo && { addedBy: addedByInfo })
+            };
+
+            // 5. Save to Firebase
+            const docRef = await addDoc(collection(db, 'content'), newContent);
+            const savedContent: Content = { id: docRef.id, ...newContent } as Content;
+
+            // 5b. Log to content_contributions for tracking
+            if (addedByInfo) {
+                addDoc(collection(db, 'content_contributions'), {
+                    contentId: docRef.id,
+                    tmdbId: detail.id,
+                    imdbId: imdbId || '',
+                    title: savedContent.title,
+                    poster_path: savedContent.poster_path,
+                    type: savedContent.type,
+                    addedBy: addedByInfo,
+                    addedAt: new Date().toISOString()
+                }).catch(e => console.error('Contribution log failed:', e));
+            }
+
+            // 6. Call onDetails directly — no navigation needed
+            onDetails(savedContent);
+
+        } catch (error) {
+            console.error("Error processing selection:", error);
+            alert("Failed to load title details. Please try again.");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    // Helper to resolve items for a section
     const getSectionItems = (section: Section) => {
         let autoItems: Content[] = [];
 
@@ -97,34 +207,49 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
     };
 
     return (
-        <div className="pt-24 px-4 md:px-12 pb-12 min-h-screen">
+        <div className="pt-24 px-4 md:px-12 pb-12 min-h-screen relative">
+
+            {/* Loading Overlay when Saving to DB */}
+            {isSaving && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                    <div className="flex flex-col items-center">
+                        <Loader2 className="h-12 w-12 text-brand-red animate-spin mb-4" />
+                        <p className="text-white font-bold text-lg">Loading Title...</p>
+                    </div>
+                </div>
+            )}
+
             <div className="max-w-6xl mx-auto">
                 <div className="relative mb-12">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                         <Search className="h-6 w-6 text-gray-400" />
                     </div>
-                        <input
-                            id="search-input"
-                            type="text"
-                            autoComplete="off"
-                            autoCorrect="off"
-                            spellCheck="false"
-                            className="block w-full pl-14 pr-12 py-5 bg-[#141414] border border-white/10 rounded-2xl focus:ring-2 focus:ring-brand-red focus:border-transparent text-white placeholder-gray-500 text-xl font-medium transition-all shadow-xl"
-                            placeholder="Search for movies, TV shows, genres..."
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                        />
-                    {query && (
+                    <input
+                        id="search-input"
+                        type="text"
+                        autoComplete="off"
+                        autoCorrect="off"
+                        spellCheck="false"
+                        className="block w-full pl-14 pr-12 py-5 bg-[#141414] border border-white/10 rounded-2xl focus:ring-2 focus:ring-brand-red focus:border-transparent text-white placeholder-gray-500 text-xl font-medium transition-all shadow-xl"
+                        placeholder="Search for movies, TV shows..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                    {isSearching ? (
+                        <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
+                            <Loader2 className="h-6 w-6 text-gray-400 animate-spin" />
+                        </div>
+                    ) : searchQuery ? (
                         <button
-                            onClick={() => setQuery('')}
+                            onClick={() => setSearchQuery('')}
                             className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-white transition"
                         >
                             <X className="h-6 w-6" />
                         </button>
-                    )}
+                    ) : null}
                 </div>
 
-                {query ? (
+                {searchQuery ? (
                     <div className="space-y-12">
                         {/* 1. Matching Sections */}
                         {matchingSections.length > 0 && (
@@ -138,7 +263,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                                             <ContentRail
                                                 title={section.title}
                                                 items={items}
-                                                onDetails={onDetails}
+                                                onDetails={(item) => handleResultClick(item)}
                                                 showRanking={section.showRanking}
                                             />
                                         </div>
@@ -151,9 +276,9 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                         <div>
                             <h2 className="text-xl text-gray-400 mb-6 flex items-center gap-2">
                                 {results.length > 0 ? (
-                                    <>Found <span className="text-white font-bold">{results.length}</span> titles matching "<span className="text-white">{query}</span>"</>
+                                    <>Found <span className="text-white font-bold">{results.length}</span> titles matching "<span className="text-white">{searchQuery}</span>"</>
                                 ) : (
-                                    matchingSections.length === 0 && <>No results found for "{query}"</>
+                                    matchingSections.length === 0 && !isSearching && <>No results found for "{searchQuery}"</>
                                 )}
                             </h2>
 
@@ -164,18 +289,27 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
 
                                 return (
                                     <>
-                                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                                            {visibleResults.map(item => (
-                                                <div key={item.id} onClick={() => onDetails(item)} className="cursor-pointer transition-transform hover:scale-105 relative aspect-[2/3] group rounded-xl overflow-hidden bg-gray-900 border border-white/5">
-                                                    <img
-                                                        src={item.poster_path_mobile || item.poster_path}
-                                                        className="w-full h-full object-cover group-hover:opacity-60 transition-opacity"
-                                                        loading="lazy"
-                                                        alt={item.title}
-                                                    />
-                                                    <div className="absolute inset-0 flex flex-col justify-end p-3 bg-gradient-to-t from-black via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <p className="text-white text-sm font-bold leading-tight">{item.title}</p>
-                                                        <p className="text-[10px] text-gray-300 mt-1 capitalize">{item.type} • {item.release_date?.split('-')[0]}</p>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9 gap-4">
+                                            {visibleResults.map((item, idx) => (
+                                                <div key={item.id || idx} onClick={() => handleResultClick(item)} className="cursor-pointer transition-transform hover:scale-105 relative aspect-[2/3] group rounded-xl overflow-hidden bg-gray-900 border border-white/5 shadow-lg hover:shadow-brand-red/20 hover:border-brand-red/50">
+                                                    {item.poster_path ? (
+                                                        <img
+                                                            src={item.poster_path}
+                                                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                                            loading="lazy"
+                                                            alt={item.title}
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-500">
+                                                            No Image
+                                                        </div>
+                                                    )}
+                                                    <div className="absolute inset-0 flex flex-col justify-end p-3 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                                        <p className="text-white text-sm font-bold leading-tight drop-shadow-md">{item.title}</p>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <span className="text-[10px] text-white bg-brand-red px-1.5 py-0.5 rounded uppercase font-bold">{item.type}</span>
+                                                            <span className="text-[10px] text-gray-300 drop-shadow">{item.release_date?.split('-')[0]}</span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             ))}
@@ -198,8 +332,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                 ) : (
                     <div className="text-center py-32 opacity-50">
                         <Search className="h-20 w-20 text-gray-600 mx-auto mb-6" />
-                        <p className="text-gray-400 text-2xl font-medium">Find your next favorite story</p>
-                        <p className="text-gray-600 mt-2">Search by title, genre, or check out our collections</p>
+                        <p className="text-gray-400 text-2xl font-medium">Search the movie</p>
+                        <p className="text-gray-600 mt-2">Find any movie or TV show to instantly add it to your collection</p>
                     </div>
                 )}
             </div>

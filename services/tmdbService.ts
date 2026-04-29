@@ -80,6 +80,9 @@ export interface TMDBDetail {
     release_dates?: {
         results: { iso_3166_1: string; release_dates: { certification: string }[] }[];
     };
+    external_ids?: {
+        imdb_id?: string;
+    };
 }
 
 export interface TMDBEpisodeDetail {
@@ -137,6 +140,21 @@ export async function searchTMDB(
     return (data.results || []).slice(0, 6) as TMDBSearchResult[];
 }
 
+/** Multi-search for movies and TV shows on TMDB */
+export async function searchTMDBMulti(query: string): Promise<TMDBSearchResult[]> {
+    if (!API_KEY) throw new Error('VITE_TMDB_API_KEY is not set in .env');
+    if (!query.trim()) return [];
+
+    const url = `${TMDB_BASE}/search/multi?api_key=${API_KEY}&query=${encodeURIComponent(query)}&language=en-US&page=1`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`TMDB multi-search failed: ${res.statusText}`);
+    const data = await res.json();
+    
+    // Filter out person results, keep only movie/tv
+    const results = (data.results || []).filter((r: any) => r.media_type === 'movie' || r.media_type === 'tv');
+    return results.slice(0, 24) as TMDBSearchResult[];
+}
+
 /** Fetch full details (cast, genres, runtime) for a TMDB title */
 export async function fetchTMDBDetails(
     tmdbId: number,
@@ -146,8 +164,8 @@ export async function fetchTMDBDetails(
 
     const appendExtra =
         type === 'movie'
-            ? 'credits,release_dates,videos,images&include_image_language=en,null&include_video_language=en,null'
-            : 'credits,content_ratings,videos,images&include_image_language=en,null&include_video_language=en,null';
+            ? 'credits,release_dates,videos,images,external_ids&include_image_language=en,null&include_video_language=en,null'
+            : 'credits,content_ratings,videos,images,external_ids&include_image_language=en,null&include_video_language=en,null';
 
     const url = `${TMDB_BASE}/${type}/${tmdbId}?api_key=${API_KEY}&language=en-US&append_to_response=${appendExtra}`;
     const res = await fetch(url);
@@ -262,4 +280,29 @@ export function formatRuntime(minutes?: number): string {
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
     return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+/** Find TMDB details by IMDb ID */
+export async function findByIMDbId(imdbId: string): Promise<TMDBDetail | null> {
+    if (!API_KEY) throw new Error('VITE_TMDB_API_KEY is not set in .env');
+    
+    // Extract the exact ttXXXXXXX ID from a full URL if necessary
+    const match = imdbId.match(/(tt\d+)/);
+    if (!match) throw new Error('Invalid IMDb ID');
+    const id = match[1];
+
+    const url = `${TMDB_BASE}/find/${id}?api_key=${API_KEY}&external_source=imdb_id`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`TMDB find failed: ${res.statusText}`);
+    const data = await res.json();
+
+    // Check movie results first, then tv results
+    if (data.movie_results && data.movie_results.length > 0) {
+        return fetchTMDBDetails(data.movie_results[0].id, 'movie');
+    }
+    if (data.tv_results && data.tv_results.length > 0) {
+        return fetchTMDBDetails(data.tv_results[0].id, 'tv');
+    }
+    
+    return null;
 }

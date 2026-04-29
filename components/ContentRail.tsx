@@ -36,7 +36,7 @@ const ContentRail: React.FC<ContentRailProps> = ({
     if (!items || items.length === 0) return null;
 
     return (
-        <div className="relative group/rail pb-8">
+        <div className="relative group/rail pb-4 pt-12">
             <h2 className="text-xl md:text-2xl font-bold mb-4 px-4 md:px-12 flex items-center gap-2 group/title cursor-pointer">
                 {title}
                 <ChevronRight size={20} className="text-brand-red opacity-0 group-hover/title:opacity-100 transition-opacity translate-y-0.5" />
@@ -59,7 +59,7 @@ const ContentRail: React.FC<ContentRailProps> = ({
 
                 <div
                     ref={scrollRef}
-                    className={`flex overflow-x-auto px-4 md:px-12 no-scrollbar scroll-smooth ${showRanking ? 'gap-0 md:gap-0' : 'gap-2 md:gap-4'}`}
+                    className={`flex overflow-x-auto px-4 md:px-12 no-scrollbar scroll-smooth py-12 ${showRanking ? 'gap-0 md:gap-0' : 'gap-2 md:gap-4'}`}
                 >
                     {(!items || items.length === 0) ? (
                         <div className="text-gray-500 text-sm italic p-4">No content available.</div>
@@ -72,17 +72,17 @@ const ContentRail: React.FC<ContentRailProps> = ({
                             return (
                                 <div
                                     key={item.id}
-                                    className={`flex-shrink-0 transition-all duration-500 hover:z-20 cursor-pointer select-none relative flex items-center ${showRanking ? 'w-48 md:w-96' : (layout === 'landscape' ? 'w-36 md:w-80' : 'w-24 md:w-48')}`}
+                                    className={`flex-shrink-0 transition-all duration-500 hover:z-20 cursor-pointer select-none relative flex items-end ${showRanking ? 'w-48 md:w-[380px]' : (layout === 'landscape' ? 'w-32 md:w-64' : 'w-20 md:w-40')}`}
                                     onClick={() => {
                                         if (navigator.vibrate) navigator.vibrate(10);
                                         onDetails(item);
                                     }}
                                 >
                                     {showRanking && (
-                                        <div className="flex-shrink-0 relative z-10 -mr-8 md:-mr-16 translate-y-0 flex items-end pb-4">
+                                        <div className="flex-shrink-0 relative z-10 -mr-10 md:-mr-16 translate-y-6 md:translate-y-10 flex items-end pb-4">
                                             <svg
                                                 viewBox="0 0 140 150"
-                                                className="h-32 md:h-64 w-auto fill-black stroke-white stroke-[2px]"
+                                                className="h-28 md:h-56 w-auto fill-black stroke-white stroke-[2px]"
                                                 style={{ filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.5))' }}
                                             >
                                                 <text
@@ -100,8 +100,8 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                             </svg>
                                         </div>
                                     )}
-
-                                    <div className={`relative flex-1 ${layout === 'landscape' ? 'aspect-video' : 'aspect-[2/3]'} group/card rounded-lg overflow-hidden shadow-xl hover:scale-110 transition-transform duration-300 z-20`}>
+ 
+                                    <div className={`relative ${showRanking ? 'w-32 md:w-60' : 'flex-1'} ${layout === 'landscape' ? 'aspect-video' : 'aspect-[2/3]'} group/card rounded-lg overflow-hidden shadow-xl hover:scale-110 transition-transform duration-300 z-20`}>
                                         {layout === 'landscape' ? (
                                             <picture>
                                                 {item.backdrop_path_mobile && <source media="(max-width: 767px)" srcSet={item.backdrop_path_mobile} />}

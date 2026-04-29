@@ -134,7 +134,7 @@ const RequestContent = () => {
                                             </div>
                                             <button
                                                 type="button"
-                                                onClick={() => navigate(`/browse/${match.id}`)} // Fixed route to match AppNew.tsx
+                                                onClick={() => navigate(`/browse/${match.id}`, { state: { item: match } })} // Fixed route to match AppNew.tsx
                                                 className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-500 flex items-center gap-1"
                                             >
                                                 <Play size={12} fill="currentColor" /> Play

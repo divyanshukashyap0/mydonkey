@@ -53,7 +53,8 @@ service cloud.firestore {
 
     match /content/{contentId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create: if true;
+      allow update, delete: if isAdmin();
     }
 
     match /sections/{sectionId} {
@@ -84,6 +85,12 @@ service cloud.firestore {
     match /pages/{pageId} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    match /content_contributions/{docId} {
+      allow create: if true;
+      allow read: if true;
+      allow update, delete: if isAdmin();
     }
   }
 }

@@ -562,7 +562,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         if (!fbUser) return;
 
         const unsubUserDoc = onSnapshot(doc(db, 'users', fbUser.uid), (doc) => {
-            if (doc.exists()) setCurrentUser(doc.data() as AppUser);
+            if (doc.exists()) {
+                const data = doc.data() as AppUser;
+                if (data.role === 'admin' || !currentUser) setCurrentUser(data);
+            }
         });
 
         const unsubProfiles = onSnapshot(collection(db, 'users', fbUser.uid, 'profiles'), (snap) => {

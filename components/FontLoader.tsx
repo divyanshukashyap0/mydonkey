@@ -7,6 +7,18 @@ const FontLoader: React.FC = () => {
     useEffect(() => {
         console.log('[FontLoader] Applying fonts:', { website: settings.websiteFont, rank: settings.rankFont });
 
+        // Helper to get font URL without causing 400 errors for unsupported weights
+        const getFontUrl = (font: string) => {
+            const singleWeightFonts = ['Alfa Slab One', 'Anton', 'Bebas Neue', 'Abril Fatface', 'Righteous', 'Permanent Marker', 'Bangers', 'Creepster', 'Oswald'];
+            if (singleWeightFonts.includes(font)) {
+                return `https://fonts.googleapis.com/css2?family=${font.replace(/\s+/g, '+')}&display=swap`;
+            }
+            if (font === 'Inter' || font === 'Roboto' || font === 'Poppins' || font === 'Montserrat') {
+                return `https://fonts.googleapis.com/css2?family=${font.replace(/\s+/g, '+')}:wght@300;400;500;600;700;900&display=swap`;
+            }
+            return `https://fonts.googleapis.com/css2?family=${font.replace(/\s+/g, '+')}:wght@400;700&display=swap`;
+        };
+
         // 1. Website Font (Body)
         const webFont = settings.websiteFont || 'Inter';
         if (webFont !== 'Inter') {
@@ -18,9 +30,8 @@ const FontLoader: React.FC = () => {
                 link.rel = 'stylesheet';
                 document.head.appendChild(link);
             }
-            link.href = `https://fonts.googleapis.com/css2?family=${webFont.replace(/\s+/g, '+')}:wght@300;400;500;600;700;900&display=swap`;
+            link.href = getFontUrl(webFont);
         }
-        // Always set the variable
         document.documentElement.style.setProperty('--font-body', `"${webFont}", sans-serif`);
 
         // 2. Rank Font (Special)
@@ -34,10 +45,8 @@ const FontLoader: React.FC = () => {
                 link.rel = 'stylesheet';
                 document.head.appendChild(link);
             }
-            link.href = `https://fonts.googleapis.com/css2?family=${rankFont.replace(/\s+/g, '+')}:wght@400;700;900&display=swap`;
+            link.href = getFontUrl(rankFont);
         }
-        // Always set the variable
-        // Always set the variable
         document.documentElement.style.setProperty('--font-rank', `"${rankFont}", sans-serif`);
 
         // 3. Hero Font (Title)
@@ -51,13 +60,7 @@ const FontLoader: React.FC = () => {
                 link.rel = 'stylesheet';
                 document.head.appendChild(link);
             }
-
-            // Handle single-weight display fonts
-            const singleWeightFonts = ['Alfa Slab One', 'Anton', 'Bebas Neue', 'Abril Fatface', 'Righteous'];
-            const isSingleWeight = singleWeightFonts.includes(heroFont);
-            const weights = isSingleWeight ? 'wght@400' : 'wght@700;900';
-
-            link.href = `https://fonts.googleapis.com/css2?family=${heroFont.replace(/\s+/g, '+')}:${weights}&display=swap`;
+            link.href = getFontUrl(heroFont);
         }
         document.documentElement.style.setProperty('--font-hero', `"${heroFont}", sans-serif`);
 

@@ -58,7 +58,20 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     // Source Resolution Logic
     // 1. Check for overrides in videoUrl (New Decoupled Field)
-    const overrideUrl = content.videoUrl;
+    let overrideUrl = content.videoUrl;
+    
+    // PlayIMDb Trick: Auto-convert IMDb URLs or IDs to PlayIMDb embed
+    if (overrideUrl) {
+        // Handle raw IMDb ID (e.g. tt0371746)
+        if (overrideUrl.match(/^tt\d+$/)) {
+             overrideUrl = `https://www.playimdb.com/title/${overrideUrl}/`;
+        } 
+        // Handle standard IMDb URL
+        else if (overrideUrl.includes('imdb.com/title/') && !overrideUrl.includes('playimdb.com')) {
+             overrideUrl = overrideUrl.replace(/^(https?:\/\/)?(www\.|m\.)?imdb\.com/, 'https://www.playimdb.com');
+        }
+    }
+
     const overrideYoutubeId = overrideUrl ? getYoutubeId(overrideUrl) : '';
     const overrideDriveId = overrideUrl ? getDriveId(overrideUrl) : '';
 
@@ -96,7 +109,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const directVideoUrl = (overrideUrl && !overrideYoutubeId && !overrideDriveId) ? overrideUrl : null;
     const isHls = directVideoUrl?.toLowerCase().includes('.m3u8');
     const isNativeVideo = directVideoUrl && (directVideoUrl.toLowerCase().endsWith('.mp4') || directVideoUrl.toLowerCase().endsWith('.webm') || directVideoUrl.toLowerCase().endsWith('.mkv') || directVideoUrl.toLowerCase().endsWith('.ogg'));
-    const isDirectIframeEmbed = directVideoUrl && !isHls && !isNativeVideo;
+    const isPlayImdb = directVideoUrl?.includes('playimdb.com');
+    const isDirectIframeEmbed = (directVideoUrl && !isHls && !isNativeVideo) || isPlayImdb;
 
     // 3. Final Player Mode Determination
     const useDirect = !!directVideoUrl;
@@ -165,9 +179,17 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const [showEmbedOverlay, setShowEmbedOverlay] = useState(isDirectIframeEmbed && isMobile);
     const [showDriveOverlay, setShowDriveOverlay] = useState(isDriveVideo && isMobile);
 
-    // Popup Loader state
-    const [showContentLoader, setShowContentLoader] = useState(() => settings?.contentLoaderEnabled !== false);
-    const [contentLoaderFinished, setContentLoaderFinished] = useState(() => !settings?.contentLoaderEnabled);
+    // Popup Loader state - Only show once per day
+    const [showContentLoader, setShowContentLoader] = useState(() => {
+        if (settings?.contentLoaderEnabled === false) return false;
+        const lastShown = localStorage.getItem('last_video_loader_date');
+        return lastShown !== new Date().toDateString();
+    });
+    const [contentLoaderFinished, setContentLoaderFinished] = useState(() => {
+        if (settings?.contentLoaderEnabled === false) return true;
+        const lastShown = localStorage.getItem('last_video_loader_date');
+        return lastShown === new Date().toDateString();
+    });
 
     // Portrait/Landscape detection for mobile embedded-player layout
     const [isPortrait, setIsPortrait] = useState(() =>
@@ -204,10 +226,24 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const [qualities, setQualities] = useState<string[]>([]);
 
     const toggleFullscreen = useCallback(async () => {
+        const element = playerContainerRef.current;
+        if (!element) return;
+
         try {
-            if (!document.fullscreenElement) {
-                await document.documentElement.requestFullscreen();
-                setIsFullscreen(true);
+            if (!document.fullscreenElement && 
+                !(document as any).webkitFullscreenElement && 
+                !(document as any).mozFullScreenElement && 
+                !(document as any).msFullscreenElement) {
+                
+                const requestFS = element.requestFullscreen || 
+                                 (element as any).webkitRequestFullscreen || 
+                                 (element as any).mozRequestFullScreen || 
+                                 (element as any).msRequestFullscreen;
+                
+                if (requestFS) {
+                    await requestFS.call(element);
+                    setIsFullscreen(true);
+                }
 
                 // Lock orientation to landscape on mobile after entering fullscreen
                 if (isMobile && screen.orientation && (screen.orientation as any).lock) {
@@ -218,10 +254,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     }
                 }
             } else {
-                if (document.exitFullscreen) {
-                    await document.exitFullscreen();
+                const exitFS = document.exitFullscreen || 
+                              (document as any).webkitExitFullscreen || 
+                              (document as any).mozCancelFullScreen || 
+                              (document as any).msExitFullscreen;
+                
+                if (exitFS) {
+                    await exitFS.call(document);
                     setIsFullscreen(false);
                 }
+
                 // Unlock orientation when exiting fullscreen
                 if (isMobile && screen.orientation && (screen.orientation as any).unlock) {
                     try {
@@ -231,8 +273,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             }
         } catch (err) {
             console.error('Fullscreen toggle failed:', err);
+            // Fallback for browsers that block element-level fullscreen (like some mobile browsers)
+            // We can still toggle the internal state to show fullscreen UI
+            setIsFullscreen(!isFullscreen);
         }
-    }, [isMobile]);
+    }, [isMobile, isFullscreen]);
 
     const [isApiReady, setIsApiReady] = useState(!!window.YT && !!window.YT.Player);
     const [currentQuality, setCurrentQuality] = useState('auto');
@@ -712,13 +757,25 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     // Fullscreen Event Listener
     useEffect(() => {
         const handleFullscreenChange = () => {
-            const isFull = !!document.fullscreenElement;
+            const isFull = !!(document.fullscreenElement || 
+                            (document as any).webkitFullscreenElement || 
+                            (document as any).mozFullScreenElement || 
+                            (document as any).msFullscreenElement);
             setIsFullscreen(isFull);
             if (isFull) setShowControls(false);
         };
 
         document.addEventListener('fullscreenchange', handleFullscreenChange);
-        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+        document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+        return () => {
+            document.removeEventListener('fullscreenchange', handleFullscreenChange);
+            document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+            document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+            document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+        };
     }, []);
 
     // Gesture State
@@ -773,6 +830,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const handleLoaderComplete = useCallback(() => {
         setShowContentLoader(false);
         setContentLoaderFinished(true);
+        
+        // Save today's date so we don't show it again until tomorrow
+        localStorage.setItem('last_video_loader_date', new Date().toDateString());
+
         if (isPlayerReadyRef.current && playingRef.current && playerRef.current?.playVideo) {
             playerRef.current.playVideo();
         }
@@ -831,9 +892,23 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     const isSports = content.genres?.includes('Sports') || content.tags?.includes('Sports');
 
+    // --- PlayIMDB Link Transformer ---
+    const getFinalVideoUrl = (url: string) => {
+        if (!url) return '';
+        if (url.includes('playimdb.com/title/')) {
+            // Convert https://www.playimdb.com/title/tt12345/ to https://www.playimdb.com/embed/tt12345/
+            return url.replace('/title/', '/embed/') + '?autoplay=1';
+        }
+        return url;
+    };
+
+    const finalUrl = useMemo(() => getFinalVideoUrl(directVideoUrl || ''), [directVideoUrl]);
+
     // Final Main Render
     return (
         <div 
+            id="video-player-root"
+            ref={playerContainerRef}
             className={`fixed inset-0 z-[100] bg-black flex flex-col font-sans select-none ${isMobile && isPortrait ? 'overflow-y-auto' : 'justify-center items-center overflow-hidden'} ${!showControls && !(isMobile && isPortrait) ? 'cursor-none' : ''}`}
         >
             {/* 1. STABLE VIDEO CONTAINER (Root level, never unmounts) */}
@@ -841,12 +916,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 <div className={`w-full h-full relative transition-transform duration-500 ease-in-out ${isZoomed ? 'scale-[1.35]' : 'scale-100'}`}>
                     {/* 1. YouTube Player (Always present to prevent removeChild error) */}
                     <div className={`w-full h-full relative overflow-hidden pointer-events-none ${(!directVideoUrl && !isDriveVideo) ? 'block' : 'hidden'}`}>
-                        <div key="yt-player-container-root" ref={playerContainerRef} id="youtube-player" className="w-full h-full origin-center pointer-events-none" />
+                        <div key="yt-player-container-root" id="youtube-player" className="w-full h-full origin-center pointer-events-none" />
                     </div>
 
                     {/* 2. Direct Video (HLS/Native/Iframe) */}
                     {directVideoUrl && (
-                        <div className="absolute inset-0 w-full h-full pointer-events-auto z-10">
+                        <div className="absolute inset-0 w-full h-full pointer-events-auto z-[20]">
                             {(isHls || isNativeVideo) ? (
                                 <video
                                     ref={videoRef}
@@ -863,9 +938,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                     }}
                                 />
                             ) : (
-                                <iframe
-                                    className="w-full h-full"
-                                    src={directVideoUrl}
+                                <iframe className="w-full h-full relative z-[30]"
+                                    src={finalUrl}
                                     allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
                                     title={content.title}
                                 />
@@ -887,7 +961,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
                 {/* Overlays / Loaders restricted to the video area */}
                 {!showContentLoader && (initialLoad || isBuffering) && !isDriveVideo && !isDirectIframeEmbed && (
-                    <div className="absolute inset-0 z-[50] flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm pointer-events-none transition-opacity duration-300">
+                    <div className="absolute inset-0 z-[40] flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm pointer-events-none transition-opacity duration-300">
                         <div className="animate-spin rounded-full h-8 md:h-12 w-8 md:w-12 border-4 border-brand-red border-t-transparent mb-6 shadow-[0_0_15px_rgba(229,9,20,0.5)]"></div>
                         <div className="text-white font-bold text-sm md:text-xl tracking-wide animate-pulse">Loading Stream...</div>
                     </div>
@@ -896,7 +970,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 {/* Drive/Embed overlays for mobile tap-to-fullscreen */}
                 {isMobile && (showDriveOverlay && isDriveVideo || showEmbedOverlay && isDirectIframeEmbed) && (
                     <div
-                        className="absolute inset-0 z-20 bg-black/85 flex flex-col items-center justify-center cursor-pointer"
+                        className="absolute inset-0 z-[60] bg-black/85 flex flex-col items-center justify-center cursor-pointer"
                         onClick={async (e) => { 
                             e.stopPropagation(); 
                             await toggleFullscreen(); 
@@ -1051,7 +1125,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
             {/* Gesture Layer (Mobile Landscape Only) */}
             {
-                !isDriveVideo && !isPortrait && (
+                !isDriveVideo && !isDirectIframeEmbed && !isPortrait && (
                     <div
                         className="absolute inset-0 z-[115]"
                         onClick={handleTap}
