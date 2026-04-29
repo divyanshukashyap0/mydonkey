@@ -1,11 +1,11 @@
-const admin = require('firebase-admin');
+import admin from 'firebase-admin';
 
 // Helper to initialize Admin SDK
 function getAdminApp() {
     if (admin.apps.length > 0) return admin.app();
 
     if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
-        throw new Error('FIREBASE_SERVICE_ACCOUNT is missing in .env.local');
+        throw new Error('FIREBASE_SERVICE_ACCOUNT is missing in your environment variables');
     }
     
     let serviceAccount;
@@ -23,8 +23,8 @@ function getAdminApp() {
     });
 }
 
-const handler = async function (req, res) {
-    console.log('--- QR Approval API Hit ---', req.method);
+export default async function handler(req, res) {
+    console.log('--- QR Approval API Hit (ESM) ---', req.method);
     
     // CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -38,7 +38,7 @@ const handler = async function (req, res) {
     }
 
     try {
-        // Parse body manually if needed
+        // Parse body manually if needed (Vite dev server)
         let body = req.body;
         if (!body) {
             const chunks = [];
@@ -105,10 +105,10 @@ const handler = async function (req, res) {
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify({ success: true }));
-        console.log('✅ Approved:', sessionId);
+        console.log('✅ Approved (ESM):', sessionId);
 
     } catch (error) {
-        console.error('API Error:', error);
+        console.error('API Error (ESM):', error);
         res.statusCode = 500;
         res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify({ 
@@ -116,6 +116,3 @@ const handler = async function (req, res) {
         }));
     }
 };
-
-module.exports = handler;
-module.exports.default = handler;

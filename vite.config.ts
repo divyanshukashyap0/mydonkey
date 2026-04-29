@@ -29,12 +29,8 @@ function localApiPlugin() {
         // Build query object from search params
         req.query = Object.fromEntries(fullUrl.searchParams.entries());
 
-        // Derive handler path → <project>/api/songs.js or .cjs
-        let handlerPath = path.join(projectRoot, `.${pathname}.js`);
-        if (!fs.existsSync(handlerPath)) {
-            handlerPath = path.join(projectRoot, `.${pathname}.cjs`);
-        }
-        
+        // Derive handler path → <project>/api/songs.js
+        const handlerPath = path.resolve(projectRoot, `.${pathname}.js`);
         console.log('[API DEBUG] Attempting to load handler:', handlerPath);
 
         let handler: any;
@@ -42,9 +38,9 @@ function localApiPlugin() {
           if (!fs.existsSync(handlerPath)) {
              throw new Error(`Handler file not found: ${handlerPath}`);
           }
-          const resolvedPath = _require.resolve(handlerPath);
-          delete _require.cache[resolvedPath];
-          handler = _require(resolvedPath);
+          // Use dynamic import with cache busting for development
+          const module = await import(`file://${handlerPath}?update=${Date.now()}`);
+          handler = module.default || module;
         } catch (e: any) {
           console.error('[API ERROR] Failed to load handler:', e.message);
           next();
