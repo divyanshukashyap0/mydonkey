@@ -25,18 +25,32 @@ const MobileScannerPage = () => {
     }
 
     const handleScan = async (text: string) => {
+        console.log("Scanned text:", text);
         if (!text || status !== 'scanning') return;
         
         try {
-            const data = JSON.parse(text);
-            if (data.sessionId) {
-                setScannedSession(data.sessionId);
+            // Some scanners might return the text directly, some as JSON.
+            // Let's handle both.
+            let sessionId = '';
+            try {
+                const data = JSON.parse(text);
+                sessionId = data.sessionId;
+            } catch (e) {
+                // If not JSON, maybe it's just the sessionId string?
+                sessionId = text;
+            }
+
+            if (sessionId && sessionId.length > 20) { // UUID length check
+                console.log("Session ID found:", sessionId);
+                setScannedSession(sessionId);
                 setStatus('confirming');
             } else {
+                console.warn("Invalid session ID format:", text);
                 setStatus('error');
                 setErrorMessage('Invalid QR Code. Please scan a valid My Donkey login code.');
             }
         } catch (err) {
+            console.error("Scan error:", err);
             setStatus('error');
             setErrorMessage('Invalid QR format.');
         }
@@ -98,8 +112,15 @@ const MobileScannerPage = () => {
                     <div className="w-full max-w-md flex flex-col items-center">
                         <div className="w-full aspect-square rounded-2xl overflow-hidden bg-gray-900 border-4 border-white/10 shadow-2xl relative">
                             <Scanner 
-                                onResult={(text, result) => handleScan(text)} 
-                                onError={(error) => console.error(error)}
+                                onResult={(result) => {
+                                    if (result && result.length > 0) {
+                                        const text = result[0].rawValue;
+                                        handleScan(text);
+                                    }
+                                }}
+                                onError={(error) => {
+                                    console.error("Scanner Error:", error);
+                                }}
                                 options={{ delayBetweenScanAttempts: 1000 }}
                             />
                             {/* Overlay for aesthetic scanning effect */}
