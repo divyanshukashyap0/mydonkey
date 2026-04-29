@@ -25,36 +25,9 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
             .slice(0, 10);
     }, [content, allContent]);
 
-    // State for Season Selection (TV Shows)
-    const [selectedSeasonId, setSelectedSeasonId] = useState<string>("");
 
-    // Initialize selected season
-    useEffect(() => {
-        if (content.type === 'tv' && content.seasons && content.seasons.length > 0) {
-            setSelectedSeasonId(content.seasons[0].id);
-            setVisibleEpisodesCount(20); // Reset on content change
-        }
-    }, [content]);
 
-    useEffect(() => {
-        setVisibleEpisodesCount(20); // Reset on season change
-    }, [selectedSeasonId]);
 
-    const handlePlayEpisode = (season: Season, episode: Episode) => {
-        // Construct a temporary Content object for the player
-        // This ensures the player gets the correct title and ID for tracking
-        const episodeContent: Content = {
-            ...content,
-            id: episode.id, // Use episode ID for tracking progress specific to this episode
-            title: `${content.title} - ${season.title} | ${episode.title}`, // "Show Name - S1 | Ep1"
-            movieDriveId: episode.driveId,
-            movieYoutubeId: episode.youtubeId,
-            videoUrl: episode.videoUrl, // Pass the direct video URL
-            playMode: 'movie' as const,
-            duration: episode.duration
-        };
-        onPlay(episodeContent, 'movie');
-    };
 
     // Helper to determine if content is playable
     // Any type except 'tv' is considered a single video play mode (movie, sparks, sports, short)
@@ -66,45 +39,9 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
     // Check if TV show has any seasons with episodes
     const hasEpisodes = content.type === 'tv' && !!content.seasons && content.seasons.length > 0 && content.seasons.some(s => s.episodes.length > 0);
 
-    const isPlayable = isSingleVideoType ? hasVideoSource : hasEpisodes;
-
-    // Get current season object
-    const currentSeason = content.seasons?.find(s => s.id === selectedSeasonId);
-
+    const isPlayable = hasVideoSource || hasEpisodes;
 
     const [downloadOptions, setDownloadOptions] = useState<Content | Episode | null>(null);
-
-    // Tab state — 'episodes' (TV only) or 'songs'
-    const [activeTab, setActiveTab] = useState<'episodes' | 'songs'>('episodes');
-
-    // Episode & Search States
-    const [episodeSearchQuery, setEpisodeSearchQuery] = useState<string>("");
-    const [visibleEpisodesCount, setVisibleEpisodesCount] = useState(20);
-
-    // Filter episodes based on search query (number or title)
-    const filteredEpisodes = useMemo(() => {
-        if (!currentSeason) return [];
-        if (!episodeSearchQuery.trim()) return currentSeason.episodes;
-
-        const lowerQuery = episodeSearchQuery.toLowerCase().trim();
-        return currentSeason.episodes.filter((ep, idx) => {
-            const epNumber = (idx + 1).toString();
-            return epNumber === lowerQuery || 
-                   ep.title.toLowerCase().includes(lowerQuery) ||
-                   `episode ${epNumber}`.includes(lowerQuery) ||
-                   `ep ${epNumber}`.includes(lowerQuery);
-        });
-    }, [currentSeason, episodeSearchQuery]);
-
-    const visibleEpisodes = useMemo(() => {
-        return filteredEpisodes.slice(0, visibleEpisodesCount);
-    }, [filteredEpisodes, visibleEpisodesCount]);
-
-    const hasMoreEpisodes = filteredEpisodes.length > visibleEpisodesCount;
-
-    const handleLoadMore = () => {
-        setVisibleEpisodesCount(prev => prev + 20);
-    };
 
     const handleDownload = (item: Content | Episode) => {
         if (currentUser?.isGuest) {
@@ -232,25 +169,12 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                         {/* Action Buttons Row */}
                         <div className="grid grid-cols-2 gap-3 mt-1">
                             {isPlayable ? (
-                                isSingleVideoType ? (
-                                    <button
-                                        onClick={() => { onPlay(content, 'movie'); }}
-                                        className="bg-white text-black py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-gray-200 active:scale-95 transition"
-                                    >
-                                        <Play size={18} fill="black" /> Play
-                                    </button>
-                                ) : (
-                                    // TV Show - Scroll to episodes
-                                    <button
-                                        onClick={() => {
-                                            const mobileEpisodes = document.getElementById('episodes-mobile');
-                                            if (mobileEpisodes) mobileEpisodes.scrollIntoView({ behavior: 'smooth' });
-                                        }}
-                                        className="bg-white/20 text-white py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-white/30 transition"
-                                    >
-                                        <Check size={18} /> Select Episode
-                                    </button>
-                                )
+                                <button
+                                    onClick={() => { onPlay(content, 'movie'); }}
+                                    className="bg-white text-black py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-gray-200 active:scale-95 transition"
+                                >
+                                    <Play size={18} fill="black" /> Play {content.type === 'tv' ? 'Series' : ''}
+                                </button>
                             ) : (
                                 <button className="bg-white/20 text-white/50 py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 cursor-not-allowed">
                                     {content.comingSoon ? 'Coming Soon' : 'Not Available'}
@@ -306,130 +230,12 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                             </div>
                         </div>
 
-                        {/* ── Tab Strip (Mobile) ── */}
-                        <div className="flex gap-1 border-b border-white/10 mt-4">
-                            {content.type === 'tv' && content.seasons && content.seasons.length > 0 && (
-                                <button
-                                    onClick={() => setActiveTab('episodes')}
-                                    className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold border-b-2 -mb-px transition ${
-                                        activeTab === 'episodes'
-                                            ? 'text-white border-red-500'
-                                            : 'text-gray-500 border-transparent hover:text-gray-300'
-                                    }`}
-                                >
-                                    <Play size={11} /> Episodes
-                                </button>
-                            )}
-                            <button
-                                onClick={() => setActiveTab('songs')}
-                                className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold border-b-2 -mb-px transition ${
-                                    activeTab === 'songs'
-                                        ? 'text-white border-red-500'
-                                        : 'text-gray-500 border-transparent hover:text-gray-300'
-                                }`}
-                            >
-                                <Music2 size={11} /> Songs
-                            </button>
+                        {/* Songs Tab (Mobile) */}
+                        <div className="mt-4 pb-8">
+                            <SongsSection movieName={content.title} contentType={content.type} />
                         </div>
 
-                        {/* Songs Tab (Mobile) */}
-                        {activeTab === 'songs' && (
-                            <div className="mt-4 pb-8">
-                                <SongsSection movieName={content.title} contentType={content.type} />
-                            </div>
-                        )}
 
-                        {/* Season & Episodes (Mobile) */}
-                        {activeTab === 'episodes' && content.type === 'tv' && content.seasons && content.seasons.length > 0 && (
-                            <div id="episodes-mobile" className="mt-6 pb-20">
-                                {/* Season Selector */}
-                                {content.seasons.length > 1 && (
-                                    <div className="mb-6 flex gap-3 overflow-x-auto pb-2 no-scrollbar">
-                                        {content.seasons.map(season => (
-                                            <button
-                                                key={season.id}
-                                                onClick={() => setSelectedSeasonId(season.id)}
-                                                className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all border ${selectedSeasonId === season.id
-                                                    ? 'bg-white text-black border-white shadow-lg'
-                                                    : 'bg-white/10 text-white border-transparent hover:bg-white/20'
-                                                    }`}
-                                            >
-                                                {season.title}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {/* Search Input (Mobile) */}
-                                <div className="mb-4 relative">
-                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <Search size={16} className="text-gray-500" />
-                                    </div>
-                                    <input
-                                        type="text"
-                                        placeholder="Search episodes by number or title..."
-                                        value={episodeSearchQuery}
-                                        onChange={(e) => setEpisodeSearchQuery(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-brand-red transition"
-                                    />
-                                    {episodeSearchQuery && (
-                                        <button
-                                            onClick={() => setEpisodeSearchQuery('')}
-                                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-white"
-                                        >
-                                            <X size={16} />
-                                        </button>
-                                    )}
-                                </div>
-
-                                {/* Episodes List */}
-                                <div className="space-y-3">
-                                    {filteredEpisodes.length > 0 ? (
-                                        filteredEpisodes.map((ep, idx) => (
-                                            <div
-                                                key={ep.id}
-                                                onClick={() => handlePlayEpisode(currentSeason!, ep)}
-                                                className="flex items-center gap-4 p-3 bg-white/5 rounded-lg active:bg-white/10 transition cursor-pointer"
-                                            >
-                                                <div className="w-24 aspect-video bg-black/40 rounded overflow-hidden flex-shrink-0 relative">
-                                                    {ep.stillUrl ? (
-                                                        <img src={ep.stillUrl} className="w-full h-full object-cover" alt={ep.title} />
-                                                    ) : (
-                                                        <div className="w-full h-full flex items-center justify-center text-gray-600">
-                                                            <Play size={20} fill="currentColor" />
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex justify-between items-center">
-                                                        <div className="flex-1">
-                                                            <div className="flex justify-between items-start">
-                                                                {/* Calculate original index for episode number display */}
-                                                                <h4 className="font-bold text-sm text-gray-200 line-clamp-1">
-                                                                    {currentSeason?.episodes.findIndex(e => e.id === ep.id) + 1}. {ep.title}
-                                                                </h4>
-                                                                <span className="text-[10px] text-gray-500">{ep.duration}</span>
-                                                            </div>
-                                                            <p className="text-[10px] text-gray-400 mt-1 line-clamp-2">{ep.overview || ""}</p>
-                                                        </div>
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); handleDownload(ep); }}
-                                                            className="ml-3 p-2 bg-white/10 rounded-full hover:bg-white/20 active:scale-95 transition"
-                                                        >
-                                                            <Download size={14} className="text-gray-300" />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <div className="text-center py-8 text-gray-500 text-sm">
-                                            No episodes found for "{episodeSearchQuery}"
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
                     </div>
                 </div>
 
@@ -448,25 +254,12 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
 
                             <div className="flex flex-wrap items-center gap-4">
                                 {isPlayable ? (
-                                    isSingleVideoType ? (
-                                        <button
-                                            onClick={() => { onPlay(content, 'movie'); }}
-                                            className="bg-white text-black px-8 py-3 rounded font-bold text-lg flex items-center gap-2 hover:bg-gray-200 transition-transform active:scale-95"
-                                        >
-                                            <Play size={24} fill="black" /> Play {content.type === 'movie' ? 'Movie' : 'Now'}
-                                        </button>
-                                    ) : (
-                                        // TV Show - Show "Select Episode" to guide user
-                                        <button
-                                            onClick={() => {
-                                                const episodesSection = document.getElementById('episodes-section');
-                                                if (episodesSection) episodesSection.scrollIntoView({ behavior: 'smooth' });
-                                            }}
-                                            className="bg-white text-black px-8 py-3 rounded font-bold text-lg flex items-center gap-2 cursor-pointer hover:bg-gray-200 transition"
-                                        >
-                                            <Check size={24} /> Select Episode Below
-                                        </button>
-                                    )
+                                    <button
+                                        onClick={() => { onPlay(content, 'movie'); }}
+                                        className="bg-white text-black px-8 py-3 rounded font-bold text-lg flex items-center gap-2 hover:bg-gray-200 transition-transform active:scale-95"
+                                    >
+                                        <Play size={24} fill="black" /> Play {content.type === 'tv' ? 'Series' : 'Now'}
+                                    </button>
                                 ) : (
                                     // Only show Coming Soon if truly coming soon, otherwise Not Available
                                     <button
@@ -562,154 +355,12 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                     )}
                                 </div>
 
-                                {/* ── Tab Strip (Desktop) ── */}
-                                <div className="flex gap-1 border-b border-white/10 mt-2 mb-6">
-                                    {content.type === 'tv' && content.seasons && content.seasons.length > 0 && (
-                                        <button
-                                            onClick={() => setActiveTab('episodes')}
-                                            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold border-b-2 -mb-px transition ${
-                                                activeTab === 'episodes'
-                                                    ? 'text-white border-red-500'
-                                                    : 'text-gray-500 border-transparent hover:text-gray-300'
-                                            }`}
-                                        >
-                                            <Play size={14} /> Episodes
-                                        </button>
-                                    )}
-                                    <button
-                                        onClick={() => setActiveTab('songs')}
-                                        className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold border-b-2 -mb-px transition ${
-                                            activeTab === 'songs'
-                                                ? 'text-white border-red-500'
-                                                : 'text-gray-500 border-transparent hover:text-gray-300'
-                                        }`}
-                                    >
-                                        <Music2 size={14} /> Songs
-                                    </button>
+                                {/* Songs Tab (Desktop) */}
+                                <div className="mt-8 pt-8 border-t border-white/10">
+                                    <SongsSection movieName={content.title} contentType={content.type} />
                                 </div>
 
-                                {/* Songs Tab (Desktop) */}
-                                {activeTab === 'songs' && (
-                                    <SongsSection movieName={content.title} contentType={content.type} />
-                                )}
 
-                                {/* Episodes Section (Desktop) */}
-                                {activeTab === 'episodes' && content.type === 'tv' && content.seasons && content.seasons.length > 0 && (
-                                    <div id="episodes-section" className="mt-8 pt-8 border-t border-white/10">
-                                        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-                                            <h3 className="text-2xl font-bold text-white shrink-0">Episodes</h3>
-                                            <div className="flex flex-wrap items-center gap-4 flex-1 justify-end min-w-0">
-                                                {/* Desktop Search Input */}
-                                                <div className="relative w-full max-w-[256px] min-w-[200px] group">
-                                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none group-focus-within:text-brand-red transition-colors text-gray-500">
-                                                        <Search size={16} />
-                                                    </div>
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Search episodes..."
-                                                        value={episodeSearchQuery}
-                                                        onChange={(e) => setEpisodeSearchQuery(e.target.value)}
-                                                        className="w-full pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-full text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-brand-red focus:bg-white/10 transition-all"
-                                                    />
-                                                    {episodeSearchQuery && (
-                                                        <button
-                                                            onClick={() => setEpisodeSearchQuery('')}
-                                                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-white transition-colors"
-                                                        >
-                                                            <X size={16} />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                                {content.seasons.length > 1 && (
-                                                    <div className="flex gap-2 flex-wrap justify-end">
-                                                        {content.seasons.map(season => (
-                                                            <button
-                                                                key={season.id}
-                                                                onClick={() => {
-                                                                    setSelectedSeasonId(season.id);
-                                                                    setEpisodeSearchQuery(''); // Optional: clear search on season change
-                                                                }}
-                                                                className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all border whitespace-nowrap ${selectedSeasonId === season.id
-                                                                    ? 'bg-white text-black border-white shadow-md'
-                                                                    : 'bg-transparent text-gray-400 border-gray-600 hover:border-white hover:text-white'
-                                                                    }`}
-                                                            >
-                                                                {season.title}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-1 gap-4">
-                                            {visibleEpisodes.length > 0 ? (
-                                                <>
-                                                    {visibleEpisodes.map((ep, idx) => (
-                                                        <div
-                                                            key={ep.id}
-                                                            onClick={() => handlePlayEpisode(currentSeason!, ep)}
-                                                            className="group flex gap-6 p-4 rounded-xl hover:bg-white/5 transition border border-transparent hover:border-white/10 cursor-pointer"
-                                                        >
-                                                            <div className="w-[160px] aspect-video bg-black/40 rounded-lg overflow-hidden relative flex-shrink-0 group-hover:scale-[1.02] transition-transform">
-                                                                {ep.stillUrl ? (
-                                                                    <img src={ep.stillUrl} className="w-full h-full object-cover" alt={ep.title} loading="lazy" />
-                                                                ) : (
-                                                                    <div className="w-full h-full flex items-center justify-center text-gray-600 bg-white/5">
-                                                                        <Play size={24} fill="currentColor" />
-                                                                    </div>
-                                                                )}
-                                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                                    <Play size={32} className="text-white fill-white" />
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex-1 flex flex-col justify-center">
-                                                                <div className="flex justify-between items-start mb-2">
-                                                                    <h4 className="font-bold text-lg text-white group-hover:text-brand-red transition-colors">
-                                                                        {currentSeason?.episodes.findIndex(e => e.id === ep.id) + 1}. {ep.title}
-                                                                    </h4>
-                                                                    <div className="flex items-center gap-4">
-                                                                        <span className="text-sm text-gray-400 font-mono">{ep.duration}</span>
-                                                                        <button
-                                                                            onClick={(e) => { e.stopPropagation(); handleDownload(ep); }}
-                                                                            className="p-2 hover:bg-white/20 rounded-full transition relative z-20"
-                                                                            title="Download Episode"
-                                                                        >
-                                                                            <Download size={18} className="text-gray-400 hover:text-white" />
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-                                                                <p className="text-gray-400 text-sm line-clamp-2">{ep.overview || `Episode ${currentSeason?.episodes.findIndex(e => e.id === ep.id) + 1} of ${currentSeason?.title}`}</p>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-
-                                                    {hasMoreEpisodes && (
-                                                        <div className="flex justify-center py-8">
-                                                            <button 
-                                                                onClick={handleLoadMore}
-                                                                className="px-8 py-3 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/30 text-white font-bold transition-all transform hover:scale-105 active:scale-95"
-                                                            >
-                                                                Load More Episodes ({filteredEpisodes.length - visibleEpisodesCount} remaining)
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </>
-                                            ) : (
-                                                <div className="text-center py-20 bg-white/5 rounded-xl border border-dashed border-white/10">
-                                                    <Search size={48} className="mx-auto text-gray-600 mb-4 opacity-20" />
-                                                    <p className="text-gray-400 text-lg">No episodes found matching "<span className="text-white">{episodeSearchQuery}</span>"</p>
-                                                    <button 
-                                                        onClick={() => setEpisodeSearchQuery('')}
-                                                        className="mt-4 text-brand-red hover:underline text-sm font-bold"
-                                                    >
-                                                        Clear search
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
 
                             </div>
                             <div className="space-y-4 text-sm">

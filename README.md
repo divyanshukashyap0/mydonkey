@@ -90,7 +90,13 @@
 | 📱 **Mobile Navigation** | Dedicated bottom nav bar for mobile devices |
 | 🌙 **Dark UI** | Netflix-style dark theme throughout |
 | 🔢 **Content Rating** | Censor ratings shown (U/A 16+, etc.) |
-| 💫 **Anime Intro Animation** | Animated intro/outro on entering/leaving the Anime section |
+| 🐍 **Snake Game** | Built-in mini-game for user engagement |
+| ✍️ **My Contributions** | Users can contribute content or see their contributions |
+| 🍿 **IMDb Stream** | Support for PlayIMDb URL streams directly in the player |
+| 📖 **Read More** | Long content descriptions are truncated with a "Read More" toggle |
+| 📱 **Compact Grid** | Optimized grid layout with higher column density for mobile/desktop |
+| ⏩ **Smart Loader** | Intro video loader limited to once per day via localStorage |
+| 🛡️ **Admin Hardening** | Improved session stability and routing in the admin dashboard |
 
 ### Admin Dashboard Features
 
@@ -109,6 +115,8 @@
 | 📤 **Export Manager** | Export content data to Excel (XLSX) for offline management |
 | 📋 **Requests Manager** | View and manage user content requests with priority and status |
 | ⚙️ **Settings Manager** | Global site settings: maintenance mode, content loader, exclusive code |
+| 🤝 **Contributions Manager** | Manage user-submitted content contributions |
+| 🛡️ **Stability Tools** | Hardened routing and DevTool visibility for developers |
 
 ### Technical Features
 
@@ -181,10 +189,12 @@ my-donkey-ott/
 │   │       ├── ExclusiveContentManager.tsx # Exclusive content access codes
 │   │       ├── ComingSoonManager.tsx     # Coming soon content
 │   │       ├── ExportManager.tsx         # Data export to Excel
-│   │       └── RequestsManager.tsx       # User content requests
+│   │       ├── RequestsManager.tsx       # User content requests
+│   │       └── ContributionsManager.tsx  # User contributions management
 │   │
 │   ├── account/                  # Account-related sub-components
-│   │   └── BillingHistoryModal.tsx  # Invoice history modal
+│   │   ├── BillingHistoryModal.tsx  # Invoice history modal
+│   │   └── MyContributions.tsx      # User's contribution list
 │   │
 │   ├── ui/                       # Reusable generic UI primitives
 │   │
@@ -202,9 +212,10 @@ my-donkey-ott/
 │   ├── Footer.tsx                # Site footer with dynamic links
 │   ├── HeroBanner.tsx            # Full-screen animated hero banner
 │   ├── HeroSkeleton.tsx          # Skeleton loader for hero
+│   ├── IMDbStreamPage.tsx        # PlayIMDb content integration page
 │   ├── InfoPage.tsx              # Generic info/static page renderer
 │   ├── LiveSportsRail.tsx        # Live sports content scrollable rail
-│   ├── Loader.tsx                # Full-screen loading spinner
+│   ├── Loader.tsx                # Full-screen loading spinner (once-per-day logic)
 │   ├── LoginPage.tsx             # Auth page (email + Google sign-in)
 │   ├── MobileNav.tsx             # Bottom navigation for mobile
 │   ├── NotFound.tsx              # 404 page component
@@ -214,6 +225,7 @@ my-donkey-ott/
 │   ├── RequestContent.tsx        # Full-page content request form
 │   ├── SearchPage.tsx            # Search UI with no history saving
 │   ├── ScrollToTop.tsx           # Auto-scrolls to top on route change
+│   ├── SnakeGame.tsx             # Built-in mini-game component
 │   ├── SongsList.tsx             # List of songs/tracks
 │   ├── SongsPlayer.tsx           # YouTube music player
 │   ├── SongsSection.tsx          # Music section in content details
@@ -221,7 +233,7 @@ my-donkey-ott/
 │   ├── StatsPanel.tsx            # Content statistics panel
 │   ├── TopNav.tsx                # Main top navigation bar
 │   ├── UnlockContentModal.tsx    # Global exclusive content unlock modal
-│   └── VideoPlayer.tsx           # Full-screen video player (largest file ~71KB)
+│   └── VideoPlayer.tsx           # Full-screen player (supports PlayIMDb, HLS, YT)
 │
 ├── context/
 │   └── StoreContext.tsx          # Global state — all Firestore data, auth, actions
@@ -235,6 +247,7 @@ my-donkey-ott/
 │   ├── activityLogger.ts         # Logs user page views/actions to Firestore
 │   ├── emailService.ts           # Email notification utility
 │   ├── haptics.ts                # Mobile haptic feedback utility
+│   ├── snakeGame.ts              # Game logic and high-score management
 │   └── premiumDescriptions.ts   # AI-enhanced content description templates
 │
 ├── scripts/
@@ -379,6 +392,7 @@ Horizontal scrollable row of content thumbnails. Supports:
 Full-featured video player supporting multiple source types:
 - **YouTube IFrame API** — with quality control and full-screen
 - **HLS.js** — for `.m3u8` live/VOD streams
+- **PlayIMDb** — integrated iframe support for IMDb streams
 - **Google Drive** — via embedded DrivePlayer
 - **Direct video URL** — native `<video>` element
 
@@ -410,6 +424,12 @@ Embeds Google Drive hosted videos using an iframe with controls.
 
 #### `ProfileSelection.tsx`
 Netflix-style profile selection screen shown after login. Supports multiple profiles per user including Kids profile.
+
+#### `IMDbStreamPage.tsx`
+Dedicated wrapper for PlayIMDb content, handling the injection of specialized iframe streams and managing playback states for third-party IMDb content.
+
+#### `SnakeGame.tsx`
+A fully functional, retro-style Snake game built with React and Canvas. Features score tracking, speed increments, and high-score persistence for user engagement during downtime.
 
 ### Admin Components
 
@@ -494,6 +514,12 @@ Export all platform data to Excel (`.xlsx`):
 - Export user list
 - Export subscription records
 - Useful for offline backup and reporting
+
+### Contributions Manager (`ContributionsManager.tsx`)
+A dedicated module for managing user contributions:
+- View and approve content suggested by users
+- Track contribution history and status
+- Seamlessly convert approved contributions into platform content
 
 ---
 
@@ -806,6 +832,7 @@ The `VideoPlayer.tsx` component is the heart of the platform. It handles four so
 | Source Type | Detection | Player Used |
 |---|---|---|
 | YouTube | `movieYoutubeId` field | YouTube IFrame API |
+| IMDb Stream | `videoUrl` with `playimdb.com` | `IMDbStreamPage` iframe |
 | HLS Stream | `videoUrl` ending in `.m3u8` | HLS.js |
 | Google Drive | `movieDriveId` field | `DrivePlayer` iframe |
 | Direct Video | any other `videoUrl` | Native `<video>` element |

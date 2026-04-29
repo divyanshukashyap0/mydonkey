@@ -24,122 +24,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const { updatePlaybackProgress, currentUser, updateContentDuration, settings } = useStore();
 
     // Extract IDs locally for safety
-    const getDriveId = (url: string) => {
-        if (!url) return '';
-        // Look for typical Google Drive ID patterns
-        // 1. Full URL with /d/ID/ (most reliable)
-        const driveUrlMatch = url.match(/\/file\/d\/([-\w]{25,})/);
-        if (driveUrlMatch) return driveUrlMatch[1];
-        
-        // 2. Raw ID (25+ chars, typically includes hyphens and underscores)
-        const rawIdMatch = url.match(/^[-\w]{25,}$/);
-        if (rawIdMatch) return url;
 
-        // 3. Fallback: Any 25+ char alphanumeric segment that doesn't look like a whole different URL
-        if (url.includes('youtube.com') || url.includes('youtu.be')) return '';
-        const match = url.match(/[-\w]{25,}/);
-        return match ? match[0] : '';
-    };
-
-    const getYoutubeId = (url: string) => {
-        if (!url) return '';
-        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-        const match = url.match(regExp);
-        if (match && match[2].length === 11) return match[2];
-        
-        // Handle raw 11-char ID
-        if (/^[a-zA-Z0-9_-]{11}$/.test(url)) return url;
-        
-        return '';
-    };
-
-    // Determine play mode
-    const isMovieMode = content.playMode === 'movie';
-
-    // Source Resolution Logic
-    // 1. Check for overrides in videoUrl (New Decoupled Field)
-    let overrideUrl = content.videoUrl;
-    
-    // PlayIMDb Trick: Auto-convert IMDb URLs or IDs to PlayIMDb embed
-    if (overrideUrl) {
-        // Handle raw IMDb ID (e.g. tt0371746)
-        if (overrideUrl.match(/^tt\d+$/)) {
-             overrideUrl = `https://www.playimdb.com/title/${overrideUrl}/`;
-        } 
-        // Handle standard IMDb URL
-        else if (overrideUrl.includes('imdb.com/title/') && !overrideUrl.includes('playimdb.com')) {
-             overrideUrl = overrideUrl.replace(/^(https?:\/\/)?(www\.|m\.)?imdb\.com/, 'https://www.playimdb.com');
-        }
-    }
-
-    const overrideYoutubeId = overrideUrl ? getYoutubeId(overrideUrl) : '';
-    const overrideDriveId = overrideUrl ? getDriveId(overrideUrl) : '';
-
-    // 2. Determine IDs based on override or legacy fields
-
-    // YouTube ID Calculation
-    // Priority: Override YT ID > Legacy Movie YT ID > Legacy Standard YT ID
-    let finalYoutubeId = '';
-    if (overrideYoutubeId) {
-        finalYoutubeId = overrideYoutubeId;
-    } else if (isMovieMode) {
-        finalYoutubeId = getYoutubeId(content.movieYoutubeId || '');
-    } else {
-        // Legacy content.youtubeId could be Drive or YT
-        // Priority to YT detection if it matches an 11-char pattern
-        finalYoutubeId = getYoutubeId(content.youtubeId || '');
-    }
-
-    // Drive ID Calculation
-    // Priority: Override Drive ID > Legacy Movie Drive ID > Legacy Standard Drive ID
-    let finalDriveId = '';
-    if (overrideDriveId) {
-        finalDriveId = overrideDriveId;
-    } else if (isMovieMode) {
-        finalDriveId = getDriveId(content.movieDriveId || '');
-    } else {
-        // If it's not a YT ID, check if it's a Drive ID
-        if (!finalYoutubeId) {
-            finalDriveId = getDriveId(content.youtubeId || '');
-        }
-    }
-
-    // Direct Video URL Calculation
-    // Only used if Override exists AND it's not YT AND it's not Drive
-    const directVideoUrl = (overrideUrl && !overrideYoutubeId && !overrideDriveId) ? overrideUrl : null;
-    const isHls = directVideoUrl?.toLowerCase().includes('.m3u8');
-    const isNativeVideo = directVideoUrl && (directVideoUrl.toLowerCase().endsWith('.mp4') || directVideoUrl.toLowerCase().endsWith('.webm') || directVideoUrl.toLowerCase().endsWith('.mkv') || directVideoUrl.toLowerCase().endsWith('.ogg'));
-    const isPlayImdb = directVideoUrl?.includes('playimdb.com');
-    const isDirectIframeEmbed = (directVideoUrl && !isHls && !isNativeVideo) || isPlayImdb;
-
-    // 3. Final Player Mode Determination
-    const useDirect = !!directVideoUrl;
-    // We use Drive mode if we have a Drive ID AND (No Direct URL) AND (No YouTube ID OR Logic Dictates Drive)
-    // Logic: If Override was Drive, use Drive. If Override was YT, use YT.
-    // If NO Override: Legacy rules apply (Movies often prefer Drive if both exist? Code suggests Drive checked first).
-    // Let's simplified: If `finalDriveId` is valid, checks if we should prefer it.
-    // Use Drive if:
-    // 1. driveId exists
-    // 2. Not using Direct URL
-    // 3. AND (No YouTube ID OR (It's a Movie Mode without Override, where we prefer Drive?))
-    // Actually, simple rule: If overrideUrl was Drive, `finalYoutubeId` is empty (from logic above). So Drive wins.
-    // If overrideUrl was YT, `finalDriveId` is empty. So YT wins.
-    // Conflict only happens if NO OVERRIDE and BOTH Legacy IDs exist.
-    // Original logic: `isDriveVideo = (isMovieMode && !!content.movieDriveId) || ...`
-    // So for Movies, checks Drive first.
-
-    const isLegacyMovieDriveScale = isMovieMode && !overrideUrl && !!finalDriveId && !finalYoutubeId;
-    const isLegacyStandardDrive = !isMovieMode && !overrideUrl && !!finalDriveId && !finalYoutubeId;
-
-    // We use Drive Player if:
-    // A. We have an explicit Drive Override
-    // B. We are in legacy mode and matched Drive criteria
-    const useDrive = (!!overrideDriveId) || isLegacyMovieDriveScale || isLegacyStandardDrive;
-
-    // Export usage vars (mapping to existing component variables)
-    const youtubeVideoId = finalYoutubeId;
-    const driveIdToUse = finalDriveId;
-    const isDriveVideo = useDrive && !useDirect; // Direct takes precedence if valid (though logic ensures mutually exclusive)
 
 
     // Resume Logic
@@ -172,6 +57,103 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const [showDataWarning, setShowDataWarning] = useState(false);
     const [isZoomed, setIsZoomed] = useState(false); // Zoom/Fill State
     const [playbackError, setPlaybackError] = useState<string | null>(null);
+
+    // Season & Episode State (TV Shows)
+    const [currentSeasonIdx, setCurrentSeasonIdx] = useState(0);
+    const [currentEpisodeIdx, setCurrentEpisodeIdx] = useState(0);
+    const [showEpisodesMenu, setShowEpisodesMenu] = useState(false);
+
+    const isTV = content.type === 'tv' && content.seasons && content.seasons.length > 0;
+    const currentSeason = isTV ? content.seasons![currentSeasonIdx] : null;
+    const currentEpisode = (isTV && currentSeason) ? currentSeason.episodes[currentEpisodeIdx] : null;
+
+    // --- Video Source Logic ---
+    const getDriveId = (url: string) => {
+        if (!url) return '';
+        const driveUrlMatch = url.match(/\/file\/d\/([-\w]{25,})/);
+        if (driveUrlMatch) return driveUrlMatch[1];
+        const rawIdMatch = url.match(/^[-\w]{25,}$/);
+        if (rawIdMatch) return url;
+        if (url.includes('youtube.com') || url.includes('youtu.be')) return '';
+        const match = url.match(/[-\w]{25,}/);
+        return match ? match[0] : '';
+    };
+
+    const getYoutubeId = (url: string) => {
+        if (!url) return '';
+        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+        const match = url.match(regExp);
+        if (match && match[2].length === 11) return match[2];
+        if (/^[a-zA-Z0-9_-]{11}$/.test(url)) return url;
+        return '';
+    };
+
+    const isMovieMode = content.playMode === 'movie';
+    let overrideUrl = content.videoUrl;
+    
+    if (overrideUrl) {
+        if (overrideUrl.match(/^tt\d+$/)) {
+             overrideUrl = `https://www.playimdb.com/title/${overrideUrl}/`;
+        } else if (overrideUrl.includes('imdb.com/title/') && !overrideUrl.includes('playimdb.com')) {
+             overrideUrl = overrideUrl.replace(/^(https?:\/\/)?(www\.|m\.)?imdb\.com/, 'https://www.playimdb.com');
+        }
+    }
+
+    const overrideYoutubeId = overrideUrl ? getYoutubeId(overrideUrl) : '';
+    const overrideDriveId = overrideUrl ? getDriveId(overrideUrl) : '';
+
+    let finalYoutubeId = '';
+    if (overrideYoutubeId) {
+        finalYoutubeId = overrideYoutubeId;
+    } else if (isMovieMode) {
+        finalYoutubeId = getYoutubeId(content.movieYoutubeId || '');
+    } else {
+        finalYoutubeId = getYoutubeId(content.youtubeId || '');
+    }
+
+    let finalDriveId = '';
+    if (overrideDriveId) {
+        finalDriveId = overrideDriveId;
+    } else if (isMovieMode) {
+        finalDriveId = getDriveId(content.movieDriveId || '');
+    } else {
+        if (!finalYoutubeId) {
+            finalDriveId = getDriveId(content.youtubeId || '');
+        }
+    }
+
+    let directVideoUrl = (overrideUrl && !overrideYoutubeId && !overrideDriveId) ? overrideUrl : null;
+
+    if (isTV) {
+        if (content.id?.startsWith('tt')) {
+            directVideoUrl = `https://www.playimdb.com/title/${content.id}/`;
+        } else if (content.videoUrl) {
+            directVideoUrl = content.videoUrl;
+        } else if (currentEpisode) {
+            directVideoUrl = currentEpisode.videoUrl || null;
+        }
+    } else if (content.type === 'movie' && content.id?.startsWith('tt')) {
+        directVideoUrl = `https://www.playimdb.com/title/${content.id}/`;
+    } else if (overrideUrl) {
+        directVideoUrl = overrideUrl;
+    } else {
+        directVideoUrl = null;
+    }
+
+    const isHls = directVideoUrl?.toLowerCase().includes('.m3u8');
+    const isNativeVideo = directVideoUrl && (directVideoUrl.toLowerCase().endsWith('.mp4') || directVideoUrl.toLowerCase().endsWith('.webm') || directVideoUrl.toLowerCase().endsWith('.mkv') || directVideoUrl.toLowerCase().endsWith('.ogg'));
+    const isPlayImdb = directVideoUrl?.includes('playimdb.com');
+    const isDirectIframeEmbed = (directVideoUrl && !isHls && !isNativeVideo) || isPlayImdb;
+
+    const useDirect = !!directVideoUrl;
+    const isLegacyMovieDriveScale = isMovieMode && !overrideUrl && !!finalDriveId && !finalYoutubeId;
+    const isLegacyStandardDrive = !isMovieMode && !overrideUrl && !!finalDriveId && !finalYoutubeId;
+    const useDrive = (!!overrideDriveId) || isLegacyMovieDriveScale || isLegacyStandardDrive;
+
+    const youtubeVideoId = finalYoutubeId;
+    const driveIdToUse = finalDriveId;
+    const isDriveVideo = useDrive && !useDirect;
+    // --- End Video Source Logic ---
 
     const isMobile = useMemo(() => {
         return (window.innerWidth <= 768 || window.innerHeight <= 768) && /Mobile|Android|iPhone|iPad/i.test(navigator.userAgent);
@@ -1117,7 +1099,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                         </button>
                         <div className="h-5 w-px bg-white/10 mx-0.5"></div>
                         <div className="text-left">
-                            <div className="text-white font-bold text-xs md:text-base leading-tight tracking-wide line-clamp-1 max-w-[160px] md:max-w-md">{content.title}</div>
+                            <div className="text-white font-bold text-xs md:text-base leading-tight tracking-wide line-clamp-1 max-w-[160px] md:max-w-md">
+                                {content.title}
+                                {isTV && currentEpisode && (
+                                    <span className="text-brand-red ml-2 text-xs md:text-sm">
+                                        S{currentSeason?.seasonNumber} E{currentEpisode.episodeNumber}
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1228,7 +1217,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                     {/* Audio & Subs Button */}
                                     <div className="relative">
                                         <button
-                                            onClick={(e) => { e.stopPropagation(); setShowAudioSubMenu(!showAudioSubMenu); setShowQualityMenu(false); }}
+                                            onClick={(e) => { e.stopPropagation(); setShowAudioSubMenu(!showAudioSubMenu); setShowQualityMenu(false); setShowEpisodesMenu(false); }}
                                             className={`hover:text-white transition-all p-1.5 md:p-2.5 rounded-xl hover:bg-white/5 ${showAudioSubMenu ? 'bg-white/10 text-white' : ''}`}
                                             title="Audio & Subtitles"
                                         >
@@ -1314,9 +1303,67 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                         )}
                                     </div>
 
+                                    {/* Episodes Selector (TV Only) - Only show if we don't have a direct series URL or if explicitly using internal selection */}
+                                    {isTV && !isPlayImdb && (
+                                        <div className="relative">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setShowEpisodesMenu(!showEpisodesMenu); setShowAudioSubMenu(false); setShowQualityMenu(false); }}
+                                                className={`hover:text-white transition-all p-1.5 md:p-2.5 rounded-xl hover:bg-white/5 ${showEpisodesMenu ? 'bg-white/10 text-white' : ''}`}
+                                                title="Episodes"
+                                            >
+                                                <Layers size={18} className="md:w-[22px] md:h-[22px]" />
+                                            </button>
+
+                                            {showEpisodesMenu && (
+                                                <div className="absolute bottom-full right-0 mb-6 bg-[#0f0f0f]/95 backdrop-blur-xl border border-white/10 rounded-2xl p-0 min-w-[340px] flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-200 shadow-2xl z-[150] ring-1 ring-white/5">
+                                                    <div className="p-4 border-b border-white/5 bg-white/5 flex justify-between items-center">
+                                                        <h3 className="text-white font-bold text-sm">Episodes</h3>
+                                                        <select 
+                                                            value={currentSeasonIdx}
+                                                            onChange={(e) => {
+                                                                setCurrentSeasonIdx(parseInt(e.target.value));
+                                                                setCurrentEpisodeIdx(0);
+                                                            }}
+                                                            className="bg-white/10 border border-white/10 rounded px-2 py-1 text-xs text-white outline-none"
+                                                        >
+                                                            {content.seasons?.map((s, idx) => (
+                                                                <option key={s.id} value={idx} className="bg-[#0f0f0f]">
+                                                                    {s.title}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div className="max-h-64 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                                                        {currentSeason?.episodes.map((ep, idx) => (
+                                                            <button
+                                                                key={ep.id}
+                                                                onClick={() => {
+                                                                    setCurrentEpisodeIdx(idx);
+                                                                    setShowEpisodesMenu(false);
+                                                                    setInitialLoad(true);
+                                                                    setPlaying(true);
+                                                                }}
+                                                                className={`w-full text-left p-2 rounded-lg flex items-center gap-3 transition ${currentEpisodeIdx === idx ? 'bg-brand-red text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                                                            >
+                                                                <div className="w-8 h-8 rounded bg-black/40 flex items-center justify-center text-[10px] font-bold shrink-0">
+                                                                    {ep.episodeNumber}
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="text-xs font-bold truncate">{ep.title}</div>
+                                                                    <div className="text-[10px] opacity-60">{ep.duration}</div>
+                                                                </div>
+                                                                {currentEpisodeIdx === idx && <Check size={12} />}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
                                     {/* Quality Settings */}
                                     <div className="relative">
-                                        <button onClick={(e) => { e.stopPropagation(); setShowQualityMenu(!showQualityMenu); setShowAudioSubMenu(false); }}
+                                        <button onClick={(e) => { e.stopPropagation(); setShowQualityMenu(!showQualityMenu); setShowAudioSubMenu(false); setShowEpisodesMenu(false); }}
                                             className={`hover:text-white transition-all p-1.5 md:p-2.5 rounded-xl hover:bg-white/5 ${showQualityMenu ? 'bg-white/10 text-white' : ''}`}
                                             title="Quality & Speed">
                                             <Settings size={18} className="md:w-[22px] md:h-[22px]" />
