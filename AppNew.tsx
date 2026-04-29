@@ -12,6 +12,8 @@ import LoginPage from './components/LoginPage';
 import MobileNav from './components/MobileNav';
 import Footer from './components/Footer';
 import InfoPage from './components/InfoPage';
+import MobileScannerPage from './components/MobileScannerPage';
+
 import AccountSettings from './components/AccountSettings';
 import AdminLayout from './components/admin/AdminLayout';
 import UnlockContentModal from './components/UnlockContentModal';
@@ -779,6 +781,7 @@ const AppRoutes = () => {
     return (
         <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/scan" element={<MobileScannerPage />} />
             <Route
                 path="/admin/*"
                 element={

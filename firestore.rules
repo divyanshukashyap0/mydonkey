@@ -92,5 +92,23 @@ service cloud.firestore {
       allow read: if true;
       allow update, delete: if isAdmin();
     }
+
+    match /qr_sessions/{sessionId} {
+      // Web can create session
+      allow create: if true;
+      // Anyone can read (so web can listen to it, though technically we can restrict by sessionId)
+      allow read: if true;
+      // Mobile app updates to approved
+      allow update: if isAuthenticated() && request.resource.data.status == 'approved' && request.resource.data.userId == request.auth.uid;
+      // Cleanup by function
+      allow delete: if false; 
+    }
+
+    match /user_sessions/{sessionId} {
+      // Users can see their own sessions
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
   }
 }

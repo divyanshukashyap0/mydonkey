@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, QrCode, Mail } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 // import { AppleLogo } from './AppleLogo';
 import { useStore } from '../context/StoreContext';
+import QRLogin from './QRLogin';
 
 const LoginPage = () => {
     const { login, signup, loginWithGoogle, loginWithApple, loginAsGuest } = useStore();
@@ -12,6 +13,7 @@ const LoginPage = () => {
     const [step, setStep] = useState<'email' | 'password'>('email');
     const [isSignUp, setIsSignUp] = useState(false);
     const [error, setError] = useState('');
+    const [loginMethod, setLoginMethod] = useState<'email' | 'qr'>('email');
 
     const handleContinue = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -60,45 +62,67 @@ const LoginPage = () => {
                     <p className="text-gray-300 text-sm text-center">Your gateway to the next generation of streaming.</p>
                 </div>
 
-                <form onSubmit={handleContinue} className="space-y-4">
-                    <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/10 overflow-hidden shadow-lg transition-all focus-within:ring-2 focus-within:ring-white/50">
-                        <div className="p-4 border-b border-white/10">
-                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Email</label>
-                            <input
-                                type="email"
-                                autoFocus
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                disabled={step === 'password'}
-                                className="w-full bg-transparent outline-none text-xl font-medium placeholder-gray-500"
-                                placeholder="name@example.com"
-                            />
-                        </div>
+                <div className="flex bg-white/5 p-1 rounded-xl mb-6">
+                    <button
+                        onClick={() => setLoginMethod('email')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors ${loginMethod === 'email' ? 'bg-white/20 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        <Mail size={16} /> Email
+                    </button>
+                    <button
+                        onClick={() => setLoginMethod('qr')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors ${loginMethod === 'qr' ? 'bg-white/20 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        <QrCode size={16} /> QR Code
+                    </button>
+                </div>
 
-                        {step === 'password' && (
-                            <div className="p-4 animate-in slide-in-from-top-2">
-                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Password</label>
+                {loginMethod === 'email' ? (
+                    <form onSubmit={handleContinue} className="space-y-4">
+                        <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/10 overflow-hidden shadow-lg transition-all focus-within:ring-2 focus-within:ring-white/50">
+                            <div className="p-4 border-b border-white/10">
+                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Email</label>
                                 <input
-                                    type="password"
+                                    type="email"
                                     autoFocus
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    disabled={step === 'password'}
                                     className="w-full bg-transparent outline-none text-xl font-medium placeholder-gray-500"
-                                    placeholder="••••••••"
+                                    placeholder="name@example.com"
                                 />
                             </div>
-                        )}
-                    </div>
 
-                    {error && <div className="text-red-500 text-xs text-center">{error}</div>}
+                            {step === 'password' && (
+                                <div className="p-4 animate-in slide-in-from-top-2">
+                                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Password</label>
+                                    <input
+                                        type="password"
+                                        autoFocus
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="w-full bg-transparent outline-none text-xl font-medium placeholder-gray-500"
+                                        placeholder="••••••••"
+                                    />
+                                </div>
+                            )}
+                        </div>
 
-                    <button
-                        type="submit"
-                        className="w-full bg-white text-black py-4 rounded-xl font-bold text-lg hover:bg-gray-200 transition-transform active:scale-95 shadow-xl flex items-center justify-center gap-2"
-                    >
-                        {step === 'email' ? 'Continue' : (isSignUp ? 'Create Account' : 'Sign In')} <ArrowRight size={20} />
-                    </button>
-                </form>
+                        {error && <div className="text-red-500 text-xs text-center">{error}</div>}
+
+                        <button
+                            type="submit"
+                            className="w-full bg-white text-black py-4 rounded-xl font-bold text-lg hover:bg-gray-200 transition-transform active:scale-95 shadow-xl flex items-center justify-center gap-2"
+                        >
+                            {step === 'email' ? 'Continue' : (isSignUp ? 'Create Account' : 'Sign In')} <ArrowRight size={20} />
+                        </button>
+                    </form>
+                ) : (
+                    <QRLogin 
+                        onLoginSuccess={() => navigate('/', { replace: true })} 
+                        onError={(err) => setError(err)} 
+                    />
+                )}
 
                 <div className="mt-8 flex flex-col gap-4">
                     <button
