@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useStore } from '../context/StoreContext';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -13,6 +13,7 @@ const MobileScannerPage = () => {
     const [scannedSession, setScannedSession] = useState<string | null>(null);
     const [status, setStatus] = useState<'scanning' | 'confirming' | 'success' | 'error'>('scanning');
     const [errorMessage, setErrorMessage] = useState('');
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         console.log("Scanner Page Info:", {
@@ -84,38 +85,37 @@ const MobileScannerPage = () => {
     };
 
     const approveLogin = async () => {
-        if (!scannedSession) return;
+        if (!scannedSession || !currentUser) return;
         
+        setLoading(true);
         try {
-            const sessionRef = doc(db, 'qr_sessions', scannedSession);
-            const sessionSnap = await getDoc(sessionRef);
-            
-            if (!sessionSnap.exists()) {
-                throw new Error("Session not found.");
-            }
-            
-            const sessionData = sessionSnap.data();
-            if (sessionData.status !== 'pending') {
-                throw new Error(`Session is already ${sessionData.status}.`);
-            }
-            
-            // Check expiration
-            if (sessionData.expiresAt.toMillis() < Date.now()) {
-                throw new Error("Session expired. Please refresh the QR code on the TV/Web.");
+            // Call our new Vercel API instead of updating Firestore directly
+            // This allows us to generate the Custom Token on the backend
+            const response = await fetch('/api/approve-qr', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    sessionId: scannedSession,
+                    userId: currentUser.uid,
+                    deviceName: navigator.userAgent.includes('Mobile') ? 'Mobile App' : 'Web Browser'
+                })
+            });
+
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.error || 'Failed to approve login');
             }
 
-            // Update to approved
-            await updateDoc(sessionRef, {
-                status: 'approved',
-                userId: currentUser.uid,
-                deviceName: navigator.userAgent.includes('Mobile') ? 'Mobile App' : 'Web Browser',
-            });
-            
             setStatus('success');
+            setTimeout(() => navigate('/home'), 2000);
         } catch (err: any) {
-            console.error("Error approving login:", err);
+            console.error("Approval error:", err);
             setStatus('error');
             setErrorMessage(err.message || 'Failed to approve login. Please try again.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -195,13 +195,15 @@ const MobileScannerPage = () => {
                         <div className="flex flex-col gap-3 w-full">
                             <button 
                                 onClick={approveLogin} 
-                                className="w-full bg-brand-red text-white py-4 rounded-xl font-bold text-lg hover:bg-brand-red/90 transition-colors shadow-lg shadow-brand-red/20"
+                                disabled={loading}
+                                className="w-full bg-brand-red text-white py-4 rounded-xl font-bold text-lg hover:bg-brand-red/90 transition-colors shadow-lg shadow-brand-red/20 disabled:opacity-50"
                             >
-                                Approve Login
+                                {loading ? 'Approving...' : 'Approve Login'}
                             </button>
                             <button 
                                 onClick={resetScanner} 
-                                className="w-full bg-transparent border border-white/20 text-white py-4 rounded-xl font-bold text-lg hover:bg-white/5 transition-colors"
+                                disabled={loading}
+                                className="w-full bg-transparent border border-white/20 text-white py-4 rounded-xl font-bold text-lg hover:bg-white/5 transition-colors disabled:opacity-50"
                             >
                                 Cancel
                             </button>
@@ -244,7 +246,6 @@ const MobileScannerPage = () => {
                 )}
             </div>
             
-            {/* Add custom CSS for the scan animation inline for simplicity */}
             <style dangerouslySetInnerHTML={{__html: `
                 @keyframes scan {
                     0%, 100% { top: 10%; }
