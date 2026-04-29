@@ -1,4 +1,5 @@
 import path from 'path';
+import fs from 'fs';
 import { createRequire } from 'module';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -28,14 +29,24 @@ function localApiPlugin() {
         // Build query object from search params
         req.query = Object.fromEntries(fullUrl.searchParams.entries());
 
-        // Derive handler path → <project>/api/songs.js
-        const handlerPath = path.join(projectRoot, `.${pathname}.js`);
+        // Derive handler path → <project>/api/songs.js or .cjs
+        let handlerPath = path.join(projectRoot, `.${pathname}.js`);
+        if (!fs.existsSync(handlerPath)) {
+            handlerPath = path.join(projectRoot, `.${pathname}.cjs`);
+        }
+        
+        console.log('[API DEBUG] Attempting to load handler:', handlerPath);
 
         let handler: any;
         try {
-          delete _require.cache[_require.resolve(handlerPath)];
-          handler = _require(handlerPath);
-        } catch {
+          if (!fs.existsSync(handlerPath)) {
+             throw new Error(`Handler file not found: ${handlerPath}`);
+          }
+          const resolvedPath = _require.resolve(handlerPath);
+          delete _require.cache[resolvedPath];
+          handler = _require(resolvedPath);
+        } catch (e: any) {
+          console.error('[API ERROR] Failed to load handler:', e.message);
           next();
           return;
         }
@@ -46,8 +57,13 @@ function localApiPlugin() {
         if (!res.send)   res.send   = (data: unknown) => res.end(String(data));
 
         try {
-          await handler(req, res);
+          const fn = typeof handler === 'function' ? handler : handler.default;
+          if (typeof fn !== 'function') {
+             throw new Error('Handler is not a function');
+          }
+          await fn(req, res);
         } catch (e: any) {
+          console.error('[API EXECUTION ERROR]:', e.message);
           res.statusCode = 500;
           res.end(JSON.stringify({ error: e.message }));
         }
