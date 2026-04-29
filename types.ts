@@ -112,6 +112,11 @@ export interface SiteSettings {
   globalExclusiveCode?: string; // Single code to unlock all exclusive content
   contentLoaderEnabled?: boolean;
   contentLoaderDuration?: number; // In seconds
+  facebookUrl?: string;
+  instagramUrl?: string;
+  twitterUrl?: string;
+  youtubeUrl?: string;
+  linkedinUrl?: string;
 }
 
 export interface Plan {

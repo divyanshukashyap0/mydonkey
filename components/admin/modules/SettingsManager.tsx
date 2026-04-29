@@ -118,6 +118,52 @@ const SettingsManager = () => {
                                 </div>
                             </div>
                         </div>
+
+                        <div className="pt-6 border-t border-white/10">
+                            <label className="text-xs text-gray-500 uppercase font-bold block mb-4">Social Media Links</label>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Facebook URL</label>
+                                    <input
+                                        type="url"
+                                        value={formData.facebookUrl || ''}
+                                        onChange={(e) => handleChange({ facebookUrl: e.target.value })}
+                                        className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-sm outline-none focus:border-brand-red transition"
+                                        placeholder="https://facebook.com/yourpage"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Instagram URL</label>
+                                    <input
+                                        type="url"
+                                        value={formData.instagramUrl || ''}
+                                        onChange={(e) => handleChange({ instagramUrl: e.target.value })}
+                                        className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-sm outline-none focus:border-brand-red transition"
+                                        placeholder="https://instagram.com/yourprofile"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Twitter (X) URL</label>
+                                    <input
+                                        type="url"
+                                        value={formData.twitterUrl || ''}
+                                        onChange={(e) => handleChange({ twitterUrl: e.target.value })}
+                                        className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-sm outline-none focus:border-brand-red transition"
+                                        placeholder="https://twitter.com/yourhandle"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">YouTube URL</label>
+                                    <input
+                                        type="url"
+                                        value={formData.youtubeUrl || ''}
+                                        onChange={(e) => handleChange({ youtubeUrl: e.target.value })}
+                                        className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-sm outline-none focus:border-brand-red transition"
+                                        placeholder="https://youtube.com/@yourchannel"
+                                    />
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
 

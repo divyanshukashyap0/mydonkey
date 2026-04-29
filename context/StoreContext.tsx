@@ -121,7 +121,12 @@ const DEFAULT_SETTINGS: SiteSettings = {
     theme: 'default',
     websiteFont: 'Inter',
     rankFont: 'Anton',
-    heroFont: 'Inter'
+    heroFont: 'Inter',
+    facebookUrl: '',
+    instagramUrl: '',
+    twitterUrl: '',
+    youtubeUrl: '',
+    linkedinUrl: ''
 };
 
 export const PERMANENT_ADMINS = ['divyanshukashyap2430955@gmail.com', 'divyanshu00884466@gmail.com'];

@@ -39,10 +39,26 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
     <footer className="bg-black text-gray-400 py-12 md:py-16 px-6 md:px-12 border-t border-white/10 text-sm mt-12 relative z-20">
       <div className="max-w-7xl mx-auto">
         <div className="flex gap-6 mb-8">
-          <Facebook size={24} className="hover:text-white cursor-pointer transition-colors" />
-          <Instagram size={24} className="hover:text-white cursor-pointer transition-colors" />
-          <Twitter size={24} className="hover:text-white cursor-pointer transition-colors" />
-          <Youtube size={24} className="hover:text-white cursor-pointer transition-colors" />
+          {settings.facebookUrl && (
+            <a href={settings.facebookUrl} target="_blank" rel="noopener noreferrer">
+              <Facebook size={24} className="hover:text-white cursor-pointer transition-colors" />
+            </a>
+          )}
+          {settings.instagramUrl && (
+            <a href={settings.instagramUrl} target="_blank" rel="noopener noreferrer">
+              <Instagram size={24} className="hover:text-white cursor-pointer transition-colors" />
+            </a>
+          )}
+          {settings.twitterUrl && (
+            <a href={settings.twitterUrl} target="_blank" rel="noopener noreferrer">
+              <Twitter size={24} className="hover:text-white cursor-pointer transition-colors" />
+            </a>
+          )}
+          {settings.youtubeUrl && (
+            <a href={settings.youtubeUrl} target="_blank" rel="noopener noreferrer">
+              <Youtube size={24} className="hover:text-white cursor-pointer transition-colors" />
+            </a>
+          )}
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
