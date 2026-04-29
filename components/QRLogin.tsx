@@ -16,7 +16,8 @@ const QRLogin: React.FC<QRLoginProps> = ({ onLoginSuccess, onError }) => {
     const [timeLeft, setTimeLeft] = useState(60);
 
     const generateQR = async () => {
-        const newSessionId = uuidv4();
+        // Generate a 6-digit numeric ID
+        const newSessionId = Math.floor(100000 + Math.random() * 900000).toString();
         setSessionId(newSessionId);
         setTimeLeft(60);
 
@@ -86,7 +87,13 @@ const QRLogin: React.FC<QRLoginProps> = ({ onLoginSuccess, onError }) => {
             <p className="text-sm text-gray-400 mb-6 text-center max-w-xs">Scan this code using the My Donkey app on your mobile device to log in instantly.</p>
             <div className="bg-white p-4 rounded-2xl mb-6 shadow-2xl shadow-brand-red/20 border-4 border-white/10 transition-transform hover:scale-105">
                 {qrValue ? (
-                    <QRCodeSVG value={qrValue} size={200} level="H" includeMargin={true} />
+                    <div className="flex flex-col items-center">
+                        <QRCodeSVG value={qrValue} size={200} level="H" includeMargin={true} />
+                        <div className="mt-4 pt-4 border-t border-gray-100 w-full text-center">
+                            <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-1">Session ID</p>
+                            <p className="text-xs font-mono font-bold text-black select-all">{sessionId}</p>
+                        </div>
+                    </div>
                 ) : (
                     <div className="w-[200px] h-[200px] bg-gray-800 rounded-xl animate-pulse flex items-center justify-center">
                         <div className="w-12 h-12 border-4 border-brand-red border-t-transparent rounded-full animate-spin"></div>

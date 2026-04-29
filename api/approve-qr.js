@@ -1,62 +1,87 @@
 const admin = require('firebase-admin');
 
-// Initialize Firebase Admin (Singleton pattern for Vercel)
-if (!admin.apps.length) {
-    try {
-        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount),
-            databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`
-        });
-    } catch (error) {
-        console.error('Firebase admin initialization error:', error);
+// Helper to initialize Admin SDK
+function getAdminApp() {
+    if (admin.apps.length > 0) return admin.app();
+
+    if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+        throw new Error('FIREBASE_SERVICE_ACCOUNT is missing in .env.local');
     }
+    
+    let serviceAccount;
+    try {
+        serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    } catch (e) {
+        throw new Error('FIREBASE_SERVICE_ACCOUNT is not valid JSON');
+    }
+
+    return admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
 }
 
-const db = admin.firestore();
-const auth = admin.auth();
-
 module.exports = async function handler(req, res) {
+    console.log('--- QR Approval API Hit ---', req.method);
+    
     // CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
     if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
-
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
-
-    const { sessionId, userId, deviceName } = req.body;
-
-    if (!sessionId || !userId) {
-        return res.status(400).json({ error: 'Missing required fields' });
+        res.statusCode = 200;
+        res.end();
+        return;
     }
 
     try {
+        // Parse body manually if needed
+        let body = req.body;
+        if (!body) {
+            const chunks = [];
+            for await (const chunk of req) {
+                chunks.push(chunk);
+            }
+            const rawBody = Buffer.concat(chunks).toString();
+            if (rawBody) body = JSON.parse(rawBody);
+        }
+
+        const { sessionId, userId, deviceName } = body || {};
+
+        if (!sessionId || !userId) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: 'Missing sessionId or userId' }));
+            return;
+        }
+
+        const app = getAdminApp();
+        const db = app.firestore();
+        const auth = app.auth();
+
         const sessionRef = db.collection('qr_sessions').doc(sessionId);
         const doc = await sessionRef.get();
 
         if (!doc.exists) {
-            return res.status(404).json({ error: 'Session not found' });
+            res.statusCode = 404;
+            res.end(JSON.stringify({ error: 'Session not found. Refresh QR code.' }));
+            return;
         }
 
         const data = doc.data();
         
-        // Verify expiration
+        // Expiration check
         const expiresAt = data.expiresAt.toDate ? data.expiresAt.toDate() : new Date(data.expiresAt);
         if (expiresAt < new Date()) {
             await sessionRef.update({ status: 'expired' });
-            return res.status(410).json({ error: 'Session expired' });
+            res.statusCode = 410;
+            res.end(JSON.stringify({ error: 'Session expired' }));
+            return;
         }
 
-        // Generate Custom Token for the user
+        // Generate Token
         const customToken = await auth.createCustomToken(userId);
 
-        // Update session in Firestore
+        // Update Firestore
         await sessionRef.update({
             status: 'approved',
             userId: userId,
@@ -65,19 +90,24 @@ module.exports = async function handler(req, res) {
             approvedAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
-        // Log session for device management
+        // Add to user sessions
         await db.collection('user_sessions').add({
             userId,
             sessionId,
             deviceName: deviceName || 'Web Browser',
             lastActiveAt: admin.firestore.FieldValue.serverTimestamp(),
-            ipAddress: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
             type: 'web'
         });
 
-        return res.status(200).json({ success: true });
+        res.statusCode = 200;
+        res.end(JSON.stringify({ success: true }));
+        console.log('✅ Approved:', sessionId);
+
     } catch (error) {
-        console.error('QR Approval Error:', error);
-        return res.status(500).json({ error: 'Internal Server Error', message: error.message });
+        console.error('API Error:', error);
+        res.statusCode = 500;
+        res.end(JSON.stringify({ 
+            error: error.message || 'Internal Server Error'
+        }));
     }
 };

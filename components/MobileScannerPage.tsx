@@ -68,14 +68,14 @@ const MobileScannerPage = () => {
                 }
             }
 
-            if (sessionId && sessionId.length > 20) { // UUID length check
+            if (sessionId && /^\d{6}$/.test(sessionId)) {
                 console.log("Session ID found:", sessionId);
                 setScannedSession(sessionId);
                 setStatus('confirming');
             } else {
                 console.warn("Invalid session ID format:", text);
                 setStatus('error');
-                setErrorMessage('Invalid QR Code. Please scan a valid My Donkey login code.');
+                setErrorMessage('Invalid ID. Please scan or enter a valid 6-digit login code.');
             }
         } catch (err) {
             console.error("Scan error:", err);
@@ -103,8 +103,14 @@ const MobileScannerPage = () => {
                 })
             });
 
+            let errData: any = {};
             if (!response.ok) {
-                const errData = await response.json();
+                const text = await response.text();
+                try {
+                    errData = JSON.parse(text);
+                } catch (e) {
+                    errData = { error: text || 'Unknown server error' };
+                }
                 throw new Error(errData.error || 'Failed to approve login');
             }
 
