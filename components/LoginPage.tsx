@@ -14,6 +14,9 @@ const LoginPage = () => {
     const [isSignUp, setIsSignUp] = useState(false);
     const [error, setError] = useState('');
     const [loginMethod, setLoginMethod] = useState<'email' | 'qr'>('email');
+    
+    // Check if device is a smartphone
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
     const handleContinue = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -64,20 +67,22 @@ const LoginPage = () => {
                     <p className="text-gray-300 text-sm text-center">Your gateway to the next generation of streaming.</p>
                 </div>
 
-                <div className="flex bg-white/5 p-1 rounded-xl mb-6">
-                    <button
-                        onClick={() => setLoginMethod('email')}
-                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors ${loginMethod === 'email' ? 'bg-white/20 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
-                    >
-                        <Mail size={16} /> Email
-                    </button>
-                    <button
-                        onClick={() => setLoginMethod('qr')}
-                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors ${loginMethod === 'qr' ? 'bg-white/20 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
-                    >
-                        <QrCode size={16} /> QR Code
-                    </button>
-                </div>
+                {!isMobile && (
+                    <div className="flex bg-white/5 p-1 rounded-xl mb-6">
+                        <button
+                            onClick={() => setLoginMethod('email')}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors ${loginMethod === 'email' ? 'bg-white/20 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
+                        >
+                            <Mail size={16} /> Email
+                        </button>
+                        <button
+                            onClick={() => setLoginMethod('qr')}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors ${loginMethod === 'qr' ? 'bg-white/20 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
+                        >
+                            <QrCode size={16} /> QR Code
+                        </button>
+                    </div>
+                )}
 
                 {loginMethod === 'email' ? (
                     <form onSubmit={handleContinue} className="space-y-4">

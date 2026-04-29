@@ -50,37 +50,42 @@ const MobileScannerPage = () => {
     }
 
     const handleScan = async (text: string) => {
-        console.log("Scanned text:", text);
-        if (!text || status !== 'scanning') return;
+        const cleanedText = text.trim();
+        console.log("Processing text:", cleanedText);
+        if (!cleanedText || status !== 'scanning') return;
         
         try {
-            // Handle both URL and raw JSON
             let sessionId = '';
-            if (text.includes('?sessionId=')) {
-                const url = new URL(text);
+            if (cleanedText.includes('?sessionId=')) {
+                const url = new URL(cleanedText);
                 sessionId = url.searchParams.get('sessionId') || '';
-            } else {
+            } else if (cleanedText.startsWith('{')) {
                 try {
-                    const data = JSON.parse(text);
+                    const data = JSON.parse(cleanedText);
                     sessionId = data.sessionId;
                 } catch (e) {
-                    sessionId = text;
+                    sessionId = cleanedText;
                 }
+            } else {
+                sessionId = cleanedText;
             }
 
+            // Remove any potential whitespace or non-digit characters the user might have accidentally typed
+            sessionId = sessionId.trim();
+
             if (sessionId && /^\d{6}$/.test(sessionId)) {
-                console.log("Session ID found:", sessionId);
+                console.log("Valid Session ID found:", sessionId);
                 setScannedSession(sessionId);
                 setStatus('confirming');
             } else {
-                console.warn("Invalid session ID format:", text);
+                console.warn("Invalid session ID format:", cleanedText);
                 setStatus('error');
-                setErrorMessage('Invalid ID. Please scan or enter a valid 6-digit login code.');
+                setErrorMessage('Invalid ID. Please enter exactly 6 digits (e.g. 123456).');
             }
         } catch (err) {
             console.error("Scan error:", err);
             setStatus('error');
-            setErrorMessage('Invalid QR format.');
+            setErrorMessage('Something went wrong. Please try again.');
         }
     };
 
@@ -168,8 +173,16 @@ const MobileScannerPage = () => {
                             <div className="flex gap-2">
                                 <input 
                                     type="text" 
-                                    placeholder="Enter Session ID" 
-                                    className="flex-1 bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-sm"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    placeholder="Enter 6-digit ID" 
+                                    className="flex-1 bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-lg font-mono tracking-[0.2em] text-center"
+                                    maxLength={6}
+                                    onChange={(e) => {
+                                        if (e.target.value.length === 6) {
+                                            handleScan(e.target.value);
+                                        }
+                                    }}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
                                             handleScan((e.target as HTMLInputElement).value);
