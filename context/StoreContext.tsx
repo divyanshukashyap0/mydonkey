@@ -93,6 +93,7 @@ interface StoreContextType {
     deletePaymentMethod: (id: string) => Promise<void>;
     getBillingHistory: () => Promise<Invoice[]>;
     getDevices: () => Promise<Device[]>;
+    logoutDevice: (deviceId: string) => Promise<void>;
     logoutAllDevices: () => Promise<void>;
     updateProfileAvatar: (url: string) => Promise<void>;
     unlockContent: (code: string) => Promise<{ success: boolean; contentId?: string; message: string }>;
@@ -402,11 +403,18 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 if (serverContentVersion !== currentLocalContentVersion || !cachedContentStr) {
                     console.log(`[Cache] Updating Content (Server: ${serverContentVersion} vs Local: ${currentLocalContentVersion}). Reason: ${!cachedContentStr ? 'No Cache' : 'Version Mismatch'}`);
 
-                    // Fetch fresh data with Cache Fallback (for Quota Exceeded)
+                    // Fetch fresh data with Catalog Optimization (1 read vs N reads)
                     let freshContent: Content[] = [];
                     try {
-                        const contentSnap = await getDocs(collection(db, 'content'));
-                        freshContent = contentSnap.docs.map(d => ({ ...d.data(), id: d.id } as Content));
+                        const catalogSnap = await getDoc(doc(db, 'catalogs', 'global'));
+                        if (catalogSnap.exists()) {
+                            console.log("[Cache] Catalog document found. Using optimized fetch.");
+                            freshContent = catalogSnap.data().items || [];
+                        } else {
+                            console.log("[Cache] Catalog document not found. Falling back to full collection fetch.");
+                            const contentSnap = await getDocs(collection(db, 'content'));
+                            freshContent = contentSnap.docs.map(d => ({ ...d.data(), id: d.id } as Content));
+                        }
                     } catch (err) {
                         console.warn("Network fetch failed (Quota/Offline). Trying Cache...", err);
                         try {
@@ -886,8 +894,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             isCurrent: true
         };
         const snap = await getDocs(collection(db, 'users', fbUser.uid, 'devices'));
-        const storedDevices = snap.docs.map(d => d.data() as Device);
+        const storedDevices = snap.docs.map(d => ({ ...d.data(), id: d.id } as Device));
         return [currentDevice, ...storedDevices];
+    };
+    
+    const logoutDevice = async (deviceId: string) => {
+        if (!fbUser) return;
+        await deleteDoc(doc(db, 'users', fbUser.uid, 'devices', deviceId));
     };
 
     const logoutAllDevices = async () => {
@@ -1030,6 +1043,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         deletePaymentMethod,
         getBillingHistory,
         getDevices,
+        logoutDevice,
         logoutAllDevices,
         updateProfileAvatar,
         unlockContent,

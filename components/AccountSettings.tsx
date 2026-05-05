@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChevronDown, ChevronUp, CreditCard, Monitor, User as UserIcon, Plus, Calendar, Camera, Wifi, Settings, PlayCircle, Smartphone, Download, Send, Maximize, X, Trash2, Film } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import PlanSelectionModal from './account/PlanSelectionModal';
@@ -8,6 +9,7 @@ import DeviceManagementModal from './account/DeviceManagementModal';
 import MyContributions from './account/MyContributions';
 
 const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) => {
+    const navigate = useNavigate();
     const {
         currentUser,
         userProfiles,
@@ -268,6 +270,27 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                                 </div>
                             </div>
                             <ChevronDown size={18} className="text-gray-500 -rotate-90" />
+                        </button>
+
+                        {/* Scan to Login - Mobile Only Aesthetic */}
+                        <button 
+                            onClick={() => navigate('/scan')} 
+                            className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition group relative overflow-hidden"
+                        >
+                            <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <div className="flex items-center gap-4 relative z-10">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 group-hover:scale-110 transition-transform">
+                                    <Smartphone size={18} />
+                                </div>
+                                <div className="text-left">
+                                    <div className="font-bold text-cyan-400">Scan QR Code</div>
+                                    <div className="text-xs text-gray-500">Login to TV or Web instantly</div>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 relative z-10">
+                                <span className="bg-cyan-500/20 text-cyan-400 text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse">MOBILE ONLY</span>
+                                <ChevronDown size={18} className="text-gray-500 -rotate-90" />
+                            </div>
                         </button>
                     </div>
 

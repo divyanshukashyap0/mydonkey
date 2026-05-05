@@ -49,6 +49,10 @@ service cloud.firestore {
       match /paymentMethods/{methodId} {
         allow read, write: if isOwner(userId) || isAdmin();
       }
+
+      match /devices/{deviceId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
     }
 
     match /content/{contentId} {

@@ -8,17 +8,21 @@ interface DeviceManagementModalProps {
 }
 
 const DeviceManagementModal: React.FC<DeviceManagementModalProps> = ({ onClose }) => {
-    const { getDevices, logoutAllDevices, currentUser } = useStore();
+    const { getDevices, logoutDevice, logoutAllDevices, currentUser } = useStore();
     const [devices, setDevices] = useState<Device[]>([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
+    const fetchDevices = async () => {
         if (currentUser?.isGuest) return;
-        getDevices().then(data => {
-            setDevices(data);
-            setLoading(false);
-        });
-    }, [getDevices, currentUser]);
+        setLoading(true);
+        const data = await getDevices();
+        setDevices(data);
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        fetchDevices();
+    }, [currentUser]);
 
     if (currentUser?.isGuest) {
         return (
@@ -33,6 +37,13 @@ const DeviceManagementModal: React.FC<DeviceManagementModalProps> = ({ onClose }
             </div>
         );
     }
+
+    const handleSignOutSingle = async (deviceId: string) => {
+        if (confirm("Sign out of this device?")) {
+            await logoutDevice(deviceId);
+            await fetchDevices(); // Refresh list
+        }
+    };
 
     const handleSignOutAll = async () => {
         if (confirm("Are you sure you want to sign out of all devices? You will be signed out immediately.")) {
@@ -85,7 +96,7 @@ const DeviceManagementModal: React.FC<DeviceManagementModalProps> = ({ onClose }
                     ) : (
                         <div className="space-y-4">
                             {devices.map(device => (
-                                <div key={device.id} className="flex items-center justify-between bg-[#222] p-4 rounded-lg border border-white/5">
+                                <div key={device.id} className="flex items-center justify-between bg-[#222] p-4 rounded-lg border border-white/5 group">
                                     <div className="flex items-center gap-4">
                                         <div className="bg-white/10 p-2 rounded text-gray-300">
                                             {getIcon(device.type)}
@@ -104,12 +115,18 @@ const DeviceManagementModal: React.FC<DeviceManagementModalProps> = ({ onClose }
                                         </div>
                                     </div>
                                     {!device.isCurrent && (
-                                        <button className="text-gray-500 hover:text-white text-sm font-medium transition px-3 py-1">
+                                        <button 
+                                            onClick={() => handleSignOutSingle(device.id)}
+                                            className="text-red-500 hover:text-red-400 text-sm font-bold transition px-4 py-2 bg-red-500/10 rounded-lg hover:bg-red-500/20"
+                                        >
                                             Sign Out
                                         </button>
                                     )}
                                 </div>
                             ))}
+                            {devices.length === 0 && !loading && (
+                                <p className="text-center text-gray-500 py-10">No active devices found.</p>
+                            )}
                         </div>
                     )}
                 </div>

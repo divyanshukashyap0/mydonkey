@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import { Plus, Edit, Trash2, Youtube, HardDrive, Star, Check, X, Bell, ChevronDown, ChevronRight, Play, Lock, Search, Filter, MoreVertical, Archive, Sparkles, Loader2 } from 'lucide-react';
 import { useStore } from '../../../context/StoreContext';
 import { Content, Season, Episode } from '../../../types';
-import { doc, setDoc, deleteDoc, updateDoc, collection, addDoc, deleteField, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, updateDoc, collection, addDoc, deleteField, writeBatch, getDocs } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import {
     searchTMDB, fetchTMDBDetails, tmdbPosterUrl, tmdbBackdropUrl,
@@ -17,6 +17,8 @@ const TV_GENRES = ["Drama", "Comedy", "Reality", "Action", "Sci-Fi", "Documentar
 const ContentManager = () => {
     const { content, rawContent, settings, updateSettings } = useStore();
     const [isEditing, setIsEditing] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [syncProgress, setSyncProgress] = useState(0);
 
     // Filters & Search
     const [filterType, setFilterType] = useState<'ALL' | 'movie' | 'tv'>('ALL');
@@ -127,13 +129,13 @@ const ContentManager = () => {
 
                 newSeasons = await Promise.all(resolvedSeasons.filter(Boolean).map(async (seasonData, index) => {
                     const seasonTrailerId = extractTMDBTrailer(seasonData!);
-                    
+
                     const seasonTMDBId = seasonData!.id;
 
                     const totalEpisodes = (seasonData!.episodes || []).length;
                     const episodesToFetch = (seasonData!.episodes || []).slice(0, 5000);
                     const episodeDetails: any[] = [];
-                    
+
                     // Thinning Strategy: To avoid Firestore 1MB limit for massive shows (4000+ episodes)
                     // We omit episode-level overviews if total episodes > 500
                     const shouldThinData = totalEpisodes > 500;
@@ -293,6 +295,30 @@ const ContentManager = () => {
     };
 
 
+    // --- Catalog Management ---
+    const publishCatalog = async () => {
+        try {
+            console.log("[Catalog] Publishing global catalog...");
+            const contentSnap = await getDocs(collection(db, 'content'));
+            const allContent = contentSnap.docs.map(d => ({ ...d.data(), id: d.id } as Content));
+            
+            await setDoc(doc(db, 'catalogs', 'global'), {
+                items: allContent,
+                updatedAt: new Date().toISOString(),
+                count: allContent.length
+            });
+            
+            // Also bump content version to trigger clients to fetch this new catalog
+            await setDoc(doc(db, 'settings', 'global'), {
+                contentVersion: Date.now()
+            }, { merge: true });
+            
+            console.log("[Catalog] Published successfully.");
+        } catch (error) {
+            console.error("[Catalog] Publication failed:", error);
+        }
+    };
+
     const handleSave = async () => {
         if (!formData.title || !formData.poster_path) {
             alert("Title and Poster are required");
@@ -368,6 +394,9 @@ const ContentManager = () => {
             alert("Content saved successfully!");
             setIsEditing(false);
             setFormData({});
+            
+            // Background publish catalog
+            publishCatalog();
         } catch (e: any) {
             console.error(e);
             alert("Error saving content: " + e.message);
@@ -377,9 +406,7 @@ const ContentManager = () => {
     const handleDelete = async (id: string) => {
         if (confirm("Are you sure you want to delete this content?")) {
             await deleteDoc(doc(db, 'content', id));
-            await setDoc(doc(db, 'settings', 'global'), {
-                contentVersion: (settings.contentVersion || 0) + 1
-            }, { merge: true });
+            publishCatalog();
         }
     };
 
@@ -388,6 +415,86 @@ const ContentManager = () => {
             await updateSettings({ heroContentId: deleteField() as any });
         } else {
             await updateSettings({ heroContentId: id });
+        }
+    };
+
+    const handleSyncAll = async () => {
+        const itemsToSync = rawContent.filter(c => c.tmdbId);
+        if (itemsToSync.length === 0) {
+            alert("No content with TMDB IDs found to sync.");
+            return;
+        }
+
+        if (!confirm(`Sync and refresh metadata for ${itemsToSync.length} items from TMDB? This will overwrite existing metadata fields (genres, cast, poster, trailer, etc.) with fresh data.`)) return;
+
+        setIsSyncing(true);
+        setSyncProgress(0);
+        let successCount = 0;
+
+        try {
+            for (let i = 0; i < itemsToSync.length; i++) {
+                const item = itemsToSync[i];
+                try {
+                    const detail = await fetchTMDBDetails(item.tmdbId!, item.type as 'movie' | 'tv');
+
+                    const releaseDate = detail.release_date || detail.first_air_date || '';
+                    const year = releaseDate ? parseInt(releaseDate.split('-')[0]) : 0;
+                    const trailerId = extractTMDBTrailer(detail) || item.youtubeId || '';
+
+                    const imdbId = detail.external_ids?.imdb_id;
+                    let videoUrl = item.videoUrl;
+
+                    // Only update videoUrl if it's currently empty or already a playimdb link
+                    if (!videoUrl || videoUrl.includes('playimdb.com')) {
+                        if (imdbId) {
+                            videoUrl = `https://www.playimdb.com/title/${imdbId}/`;
+                        } else {
+                            videoUrl = `https://www.playimdb.com/${item.type === 'tv' ? 'tv' : 'movie'}/${item.tmdbId}/`;
+                        }
+                    }
+
+                    const updates: any = {
+                        overview: detail.overview || item.overview,
+                        poster_path: tmdbPosterUrl(detail.poster_path, 'w500') || item.poster_path,
+                        backdrop_path: tmdbBackdropUrl(detail.backdrop_path, 'w1280') || item.backdrop_path,
+                        vote_average: Math.round(detail.vote_average * 10) / 10,
+                        genres: mapTMDBGenres([], detail.genres),
+                        cast: detail.credits?.cast?.slice(0, 10).map((c: any) => c.name) || item.cast,
+                        release_date: releaseDate || item.release_date,
+                        year: year || item.year,
+                        youtubeId: trailerId,
+                        videoUrl: videoUrl,
+                        updatedAt: new Date().toISOString()
+                    };
+
+                    await updateDoc(doc(db, 'content', item.id), updates);
+                    successCount++;
+                } catch (err) {
+                    console.error(`Failed to sync ${item.title}:`, err);
+                }
+
+                setSyncProgress(Math.round(((i + 1) / itemsToSync.length) * 100));
+
+                // TMDB rate limit protection
+                if ((i + 1) % 20 === 0) {
+                    await new Promise(r => setTimeout(r, 2000));
+                } else {
+                    await new Promise(r => setTimeout(r, 150));
+                }
+            }
+
+            // Global refresh
+            await setDoc(doc(db, 'settings', 'global'), {
+                contentVersion: (settings.contentVersion || 0) + 1
+            }, { merge: true });
+
+            alert(`Sync completed! Successfully updated ${successCount} items.`);
+            publishCatalog();
+        } catch (error: any) {
+            alert("Sync failed: " + error.message);
+        } finally {
+            setIsSyncing(false);
+            setSyncProgress(0);
         }
     };
 
@@ -403,9 +510,7 @@ const ContentManager = () => {
             batch.delete(doc(db, 'content', id));
         });
         await batch.commit();
-        await setDoc(doc(db, 'settings', 'global'), {
-            contentVersion: (settings.contentVersion || 0) + 1
-        }, { merge: true });
+        publishCatalog();
         setSelectedItems([]);
     };
 
@@ -415,6 +520,7 @@ const ContentManager = () => {
             batch.update(doc(db, 'content', id), { isPublished: status });
         });
         await batch.commit();
+        publishCatalog();
         setSelectedItems([]);
     };
 
@@ -887,7 +993,7 @@ const ContentManager = () => {
                                                                 const defaultThumb = thumbDoc ? thumbDoc.value.trim() : '';
 
                                                                 const processedEpisodes: Episode[] = [];
-                                                                
+
                                                                 // Batch processing (10 at a time) to avoid TMDB rate limits
                                                                 for (let i = 0; i < lines.length; i += 10) {
                                                                     const batchLines = lines.slice(i, i + 10);
@@ -927,7 +1033,7 @@ const ContentManager = () => {
                                                                         };
                                                                     }));
                                                                     processedEpisodes.push(...batchResults);
-                                                                    
+
                                                                     // Small delay between batches if more are coming
                                                                     if (i + 10 < lines.length) {
                                                                         await new Promise(r => setTimeout(r, 200));
@@ -1092,6 +1198,14 @@ const ContentManager = () => {
                         <p className="text-gray-500 text-sm">{filteredContent.length} titles found</p>
                     </div>
                     <div className="flex gap-2">
+                        <button
+                            onClick={handleSyncAll}
+                            disabled={isSyncing}
+                            className="bg-amber-600 px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-amber-700 transition disabled:opacity-50 shadow-lg shadow-amber-900/20"
+                        >
+                            {isSyncing ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
+                            {isSyncing ? `Syncing ${syncProgress}%` : 'Sync TMDB Data'}
+                        </button>
                         <button onClick={() => resetForm('movie')} className="bg-blue-600 px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-700 transition">
                             <Plus size={18} /> Add Movie
                         </button>

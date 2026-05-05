@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { Search, X, Loader2 } from 'lucide-react';
 import { Content, Section } from '../types';
 import { useStore } from '../context/StoreContext';
-import { collection, query, where, getDocs, addDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { searchTMDBMulti, fetchTMDBDetails, tmdbPosterUrl, tmdbBackdropUrl, mapTMDBGenres } from '../services/tmdbService';
+import { searchTMDBMulti, fetchTMDBDetails, tmdbPosterUrl, tmdbBackdropUrl, mapTMDBGenres, extractTMDBTrailer } from '../services/tmdbService';
 import ContentRail from './ContentRail';
 import Pagination from './Pagination';
 
@@ -99,20 +99,10 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
 
         setIsSaving(true);
         try {
-            // 1. Check if it already exists in Firebase
-            const q = query(collection(db, 'content'), where('tmdbId', '==', item.tmdbId));
-            const querySnapshot = await getDocs(q);
-            if (!querySnapshot.empty) {
-                const existingDoc = querySnapshot.docs[0];
-                const existingContent = { id: existingDoc.id, ...existingDoc.data() } as Content;
-                onDetails(existingContent);
-                return;
-            }
-
-            // 2. Fetch full TMDB details (includes external_ids for IMDb ID)
+            // 1. Fetch full TMDB details (includes external_ids for IMDb ID)
             const detail = await fetchTMDBDetails(item.tmdbId, item.type as 'movie' | 'tv');
 
-            // 3. Generate PlayIMDb URL (ensure EVERY content gets a link)
+            // 2. Generate PlayIMDb URL (ensure EVERY content gets a link)
             const imdbId = detail.external_ids?.imdb_id;
             let videoUrl = '';
             
@@ -123,7 +113,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                 videoUrl = `https://www.playimdb.com/${item.type === 'tv' ? 'tv' : 'movie'}/${item.tmdbId}/`;
             }
 
-            // 4. Construct new Content object
+            // 3. Construct base Content object from fresh metadata
             const addedByInfo = currentUser ? {
                 userId: currentUser.uid,
                 name: currentProfile?.name || currentUser.name || 'User',
@@ -131,16 +121,23 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                 addedAt: new Date().toISOString()
             } : null;
 
-            const newContent: Omit<Content, 'id'> = {
+            // Extract Year safely
+            const releaseDate = detail.release_date || detail.first_air_date || '';
+            const year = releaseDate ? parseInt(releaseDate.split('-')[0]) : 0;
+
+            const newMetadata: Omit<Content, 'id'> = {
                 tmdbId: detail.id,
                 title: detail.title || detail.name || '',
                 type: detail.title ? 'movie' : 'tv',
                 videoUrl: videoUrl,
+                youtubeId: extractTMDBTrailer(detail) || '', // Trailer key
                 poster_path: detail.poster_path ? tmdbPosterUrl(detail.poster_path) : '',
                 backdrop_path: detail.backdrop_path ? tmdbBackdropUrl(detail.backdrop_path) : '',
                 overview: detail.overview || '',
                 genres: mapTMDBGenres(detail.genres?.map((g: any) => g.id) || []),
-                release_date: detail.release_date || detail.first_air_date || '',
+                cast: detail.credits?.cast?.slice(0, 10).map((c: any) => c.name) || [], // Top 10 cast
+                release_date: releaseDate,
+                year: year,
                 vote_average: detail.vote_average || 0,
                 allowPlayback: true,
                 isPublished: true,
@@ -148,14 +145,41 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                 ...(addedByInfo && { addedBy: addedByInfo })
             };
 
-            // 5. Save to Firebase
-            const docRef = await addDoc(collection(db, 'content'), newContent);
-            const savedContent: Content = { id: docRef.id, ...newContent } as Content;
+            // 4. Check if it already exists in Firebase to handle "No Duplicates" and "Replace All"
+            const q = query(collection(db, 'content'), where('tmdbId', '==', item.tmdbId));
+            const querySnapshot = await getDocs(q);
+            
+            let savedContent: Content;
 
-            // 5b. Log to content_contributions for tracking
+            if (!querySnapshot.empty) {
+                // UPDATE EXISTING: Replace metadata but preserve some state like views/featured
+                const existingDoc = querySnapshot.docs[0];
+                const existingData = existingDoc.data() as Content;
+                
+                const updatedData = {
+                    ...existingData,
+                    ...newMetadata,
+                    // Preserve state fields
+                    featured: existingData.featured || false,
+                    isOriginal: existingData.isOriginal || false,
+                    views: existingData.views || 0,
+                    likes: existingData.likes || 0,
+                    createdAt: existingData.createdAt || newMetadata.createdAt, // Keep original creation date
+                    updatedAt: new Date().toISOString()
+                };
+
+                await setDoc(doc(db, 'content', existingDoc.id), updatedData);
+                savedContent = { id: existingDoc.id, ...updatedData } as Content;
+            } else {
+                // ADD NEW
+                const docRef = await addDoc(collection(db, 'content'), newMetadata);
+                savedContent = { id: docRef.id, ...newMetadata } as Content;
+            }
+
+            // 5. Log to content_contributions for tracking
             if (addedByInfo) {
                 addDoc(collection(db, 'content_contributions'), {
-                    contentId: docRef.id,
+                    contentId: savedContent.id,
                     tmdbId: detail.id,
                     imdbId: imdbId || '',
                     title: savedContent.title,
@@ -166,7 +190,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                 }).catch(e => console.error('Contribution log failed:', e));
             }
 
-            // 6. Call onDetails directly — no navigation needed
+            // 6. Call onDetails to open the player/details view
             onDetails(savedContent);
 
         } catch (error) {

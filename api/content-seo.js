@@ -1,7 +1,7 @@
 // Vercel Serverless Function - CommonJS
 // Uses Node.js built-in https module (compatible with all Node versions)
 
-const https = require('https');
+import https from 'https';
 
 function httpsGet(url) {
   return new Promise((resolve, reject) => {
@@ -16,7 +16,7 @@ function httpsGet(url) {
   });
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   const urlPath = req.url || '';
   let contentId = null;
 

@@ -2,7 +2,7 @@
 // Route: GET /api/songs?movie=<movieName>&type=<movie|tv>
 // API key is server-side ONLY — never exposed to client.
 
-const https = require('https');
+import https from 'https';
 
 // ------- helpers -------
 
@@ -160,7 +160,7 @@ async function checkAndIncrementQuotaGuard() {
 }
 
 // ------- Main Handler -------
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');

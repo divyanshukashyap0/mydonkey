@@ -1,4 +1,5 @@
-const admin = require('firebase-admin');
+import admin from 'firebase-admin';
+import 'dotenv/config';
 
 // Service Account Configuration from Environment Variables
 const serviceAccount = {

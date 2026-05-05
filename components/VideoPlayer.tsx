@@ -1090,24 +1090,29 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 </>
             )}
 
-            {/* Header - Transparent Floating Pill Style (Landscape/Desktop only) */}
+            {/* Header - Side Middle Floating Pill Style (Landscape/Desktop only) */}
             {!isPortrait && (
-                <div className={`absolute top-0 left-0 w-full p-3 md:p-6 transition-opacity duration-300 pointer-events-none z-[120] ${showControls ? 'opacity-100' : 'opacity-0'}`}>
-                    <div className="bg-black/40 backdrop-blur-md border border-white/5 inline-flex items-center gap-2 md:gap-4 px-3 py-2 md:px-6 md:py-3 rounded-full pointer-events-auto hover:bg-black/60 transition-colors">
-                        <button onClick={onClose} className="text-white hover:text-brand-red transition-colors group">
-                            <ArrowLeft size={20} className="md:w-6 md:h-6 group-hover:-translate-x-1 transition-transform" />
+                <div className={`absolute top-1/2 left-2 md:left-6 -translate-y-1/2 transition-opacity duration-300 pointer-events-none z-[120] ${showControls ? 'opacity-100' : 'opacity-0'}`}>
+                    <div className="bg-black/40 backdrop-blur-xl border border-white/10 inline-flex items-center gap-2 md:gap-3 px-2 py-2 md:px-3 md:py-2.5 rounded-2xl pointer-events-auto hover:bg-black/60 transition-all shadow-2xl ring-1 ring-white/5 group/header">
+                        <button onClick={onClose} className="text-white hover:text-brand-red transition-all p-2 md:p-3 rounded-xl bg-white/5 hover:bg-white/10 active:scale-90">
+                            <ArrowLeft size={18} className="md:w-5 md:h-5 transition-transform group-hover/header:-translate-x-1" />
                         </button>
-                        <div className="h-5 w-px bg-white/10 mx-0.5"></div>
-                        <div className="text-left">
-                            <div className="text-white font-bold text-xs md:text-base leading-tight tracking-wide line-clamp-1 max-w-[160px] md:max-w-md">
+                        <div className="h-6 w-px bg-white/10"></div>
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); setShowEpisodesMenu(!showEpisodesMenu); }}
+                            className="text-left pr-2 md:pr-4 group/title"
+                        >
+                            <div className="text-white font-bold text-[10px] md:text-sm leading-tight tracking-tight line-clamp-1 max-w-[100px] md:max-w-[180px] group-hover/title:text-brand-red transition-colors">
                                 {content.title}
-                                {isTV && currentEpisode && (
-                                    <span className="text-brand-red ml-2 text-xs md:text-sm">
-                                        S{currentSeason?.seasonNumber} E{currentEpisode.episodeNumber}
-                                    </span>
-                                )}
                             </div>
-                        </div>
+                            {isTV && currentEpisode && (
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="text-brand-red font-black text-[8px] md:text-[10px] uppercase tracking-wider bg-brand-red/10 px-1.5 py-0.5 rounded">
+                                        S{currentSeason?.seasonNumber} • E{currentEpisode.episodeNumber}
+                                    </span>
+                                </div>
+                            )}
+                        </button>
                     </div>
                 </div>
             )}
@@ -1303,7 +1308,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                         )}
                                     </div>
 
-                                    {/* Episodes Selector (TV Only) - Only show if we don't have a direct series URL or if explicitly using internal selection */}
+                                    {/* Episodes Selector (TV Only) */}
                                     {isTV && !isPlayImdb && (
                                         <div className="relative">
                                             <button
@@ -1313,51 +1318,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                             >
                                                 <Layers size={18} className="md:w-[22px] md:h-[22px]" />
                                             </button>
-
-                                            {showEpisodesMenu && (
-                                                <div className="absolute bottom-full right-0 mb-6 bg-[#0f0f0f]/95 backdrop-blur-xl border border-white/10 rounded-2xl p-0 min-w-[340px] flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-200 shadow-2xl z-[150] ring-1 ring-white/5">
-                                                    <div className="p-4 border-b border-white/5 bg-white/5 flex justify-between items-center">
-                                                        <h3 className="text-white font-bold text-sm">Episodes</h3>
-                                                        <select 
-                                                            value={currentSeasonIdx}
-                                                            onChange={(e) => {
-                                                                setCurrentSeasonIdx(parseInt(e.target.value));
-                                                                setCurrentEpisodeIdx(0);
-                                                            }}
-                                                            className="bg-white/10 border border-white/10 rounded px-2 py-1 text-xs text-white outline-none"
-                                                        >
-                                                            {content.seasons?.map((s, idx) => (
-                                                                <option key={s.id} value={idx} className="bg-[#0f0f0f]">
-                                                                    {s.title}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-                                                    <div className="max-h-64 overflow-y-auto custom-scrollbar p-2 space-y-1">
-                                                        {currentSeason?.episodes.map((ep, idx) => (
-                                                            <button
-                                                                key={ep.id}
-                                                                onClick={() => {
-                                                                    setCurrentEpisodeIdx(idx);
-                                                                    setShowEpisodesMenu(false);
-                                                                    setInitialLoad(true);
-                                                                    setPlaying(true);
-                                                                }}
-                                                                className={`w-full text-left p-2 rounded-lg flex items-center gap-3 transition ${currentEpisodeIdx === idx ? 'bg-brand-red text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
-                                                            >
-                                                                <div className="w-8 h-8 rounded bg-black/40 flex items-center justify-center text-[10px] font-bold shrink-0">
-                                                                    {ep.episodeNumber}
-                                                                </div>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="text-xs font-bold truncate">{ep.title}</div>
-                                                                    <div className="text-[10px] opacity-60">{ep.duration}</div>
-                                                                </div>
-                                                                {currentEpisodeIdx === idx && <Check size={12} />}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
                                         </div>
                                     )}
 
@@ -1421,6 +1381,81 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                         </div>
                     </div>
                 )}
+
+            {/* Episodes Menu Overlay */}
+            {showEpisodesMenu && isTV && (
+                <div 
+                    className="fixed inset-0 z-[500] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300"
+                    onClick={() => setShowEpisodesMenu(false)}
+                >
+                    <div 
+                        className="bg-[#0f0f0f] border border-white/10 rounded-3xl p-0 w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.8)] ring-1 ring-white/10 animate-in zoom-in-95 duration-300"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="p-5 md:p-6 border-b border-white/5 bg-white/[0.02] flex justify-between items-center">
+                            <div>
+                                <h3 className="text-white font-black text-xl md:text-2xl tracking-tighter">Episodes</h3>
+                                <p className="text-gray-500 text-xs font-bold uppercase tracking-widest mt-0.5">{content.title}</p>
+                            </div>
+                            <select 
+                                value={currentSeasonIdx}
+                                onChange={(e) => {
+                                    setCurrentSeasonIdx(parseInt(e.target.value));
+                                    setCurrentEpisodeIdx(0);
+                                }}
+                                className="bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-xs font-black text-white outline-none focus:ring-2 ring-brand-red/50 transition-all cursor-pointer hover:bg-white/10"
+                            >
+                                {content.seasons?.map((s, idx) => (
+                                    <option key={s.id} value={idx} className="bg-[#0f0f0f]">
+                                        {s.title}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-2">
+                            {currentSeason?.episodes.map((ep, idx) => (
+                                <button
+                                    key={ep.id}
+                                    onClick={() => {
+                                        setCurrentEpisodeIdx(idx);
+                                        setShowEpisodesMenu(false);
+                                        setInitialLoad(true);
+                                        setPlaying(true);
+                                    }}
+                                    className={`w-full text-left p-4 rounded-[1.5rem] flex items-center gap-4 transition-all duration-300 group ${currentEpisodeIdx === idx ? 'bg-brand-red text-white shadow-xl shadow-brand-red/20 scale-[1.02]' : 'text-gray-400 hover:bg-white/5 hover:text-white hover:scale-[1.01]'}`}
+                                >
+                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-sm font-black shrink-0 transition-colors ${currentEpisodeIdx === idx ? 'bg-white/20' : 'bg-black/40 group-hover:bg-white/10'}`}>
+                                        {ep.episodeNumber}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-sm md:text-base font-black truncate">{ep.title}</div>
+                                        <div className={`text-xs mt-0.5 font-bold ${currentEpisodeIdx === idx ? 'text-white/70' : 'text-gray-500'}`}>
+                                            {ep.duration || 'Duration Unknown'}
+                                        </div>
+                                    </div>
+                                    {currentEpisodeIdx === idx ? (
+                                        <Play size={20} className="fill-current" />
+                                    ) : (
+                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Play size={20} />
+                                        </div>
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+                        
+                        <div className="p-4 border-t border-white/5 flex justify-center">
+                            <button 
+                                onClick={() => setShowEpisodesMenu(false)}
+                                className="text-gray-500 hover:text-white font-bold text-xs uppercase tracking-widest p-2 transition-colors"
+                            >
+                                Close Menu
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
