@@ -90,12 +90,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     const isMovieMode = content.playMode === 'movie';
     let overrideUrl = content.videoUrl;
-    
+
     if (overrideUrl) {
         if (overrideUrl.match(/^tt\d+$/)) {
-             overrideUrl = `https://www.playimdb.com/title/${overrideUrl}/`;
+            overrideUrl = `https://www.playimdb.com/title/${overrideUrl}/`;
         } else if (overrideUrl.includes('imdb.com/title/') && !overrideUrl.includes('playimdb.com')) {
-             overrideUrl = overrideUrl.replace(/^(https?:\/\/)?(www\.|m\.)?imdb\.com/, 'https://www.playimdb.com');
+            overrideUrl = overrideUrl.replace(/^(https?:\/\/)?(www\.|m\.)?imdb\.com/, 'https://www.playimdb.com');
         }
     }
 
@@ -212,16 +212,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         if (!element) return;
 
         try {
-            if (!document.fullscreenElement && 
-                !(document as any).webkitFullscreenElement && 
-                !(document as any).mozFullScreenElement && 
+            if (!document.fullscreenElement &&
+                !(document as any).webkitFullscreenElement &&
+                !(document as any).mozFullScreenElement &&
                 !(document as any).msFullscreenElement) {
-                
-                const requestFS = element.requestFullscreen || 
-                                 (element as any).webkitRequestFullscreen || 
-                                 (element as any).mozRequestFullScreen || 
-                                 (element as any).msRequestFullscreen;
-                
+
+                const requestFS = element.requestFullscreen ||
+                    (element as any).webkitRequestFullscreen ||
+                    (element as any).mozRequestFullScreen ||
+                    (element as any).msRequestFullscreen;
+
                 if (requestFS) {
                     await requestFS.call(element);
                     setIsFullscreen(true);
@@ -236,11 +236,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     }
                 }
             } else {
-                const exitFS = document.exitFullscreen || 
-                              (document as any).webkitExitFullscreen || 
-                              (document as any).mozCancelFullScreen || 
-                              (document as any).msExitFullscreen;
-                
+                const exitFS = document.exitFullscreen ||
+                    (document as any).webkitExitFullscreen ||
+                    (document as any).mozCancelFullScreen ||
+                    (document as any).msExitFullscreen;
+
                 if (exitFS) {
                     await exitFS.call(document);
                     setIsFullscreen(false);
@@ -739,10 +739,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     // Fullscreen Event Listener
     useEffect(() => {
         const handleFullscreenChange = () => {
-            const isFull = !!(document.fullscreenElement || 
-                            (document as any).webkitFullscreenElement || 
-                            (document as any).mozFullScreenElement || 
-                            (document as any).msFullscreenElement);
+            const isFull = !!(document.fullscreenElement ||
+                (document as any).webkitFullscreenElement ||
+                (document as any).mozFullScreenElement ||
+                (document as any).msFullscreenElement);
             setIsFullscreen(isFull);
             if (isFull) setShowControls(false);
         };
@@ -812,7 +812,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const handleLoaderComplete = useCallback(() => {
         setShowContentLoader(false);
         setContentLoaderFinished(true);
-        
+
         // Save today's date so we don't show it again until tomorrow
         localStorage.setItem('last_video_loader_date', new Date().toDateString());
 
@@ -888,7 +888,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     // Final Main Render
     return (
-        <div 
+        <div
             id="video-player-root"
             ref={playerContainerRef}
             className={`fixed inset-0 z-[100] bg-black flex flex-col font-sans select-none ${isMobile && isPortrait ? 'overflow-y-auto' : 'justify-center items-center overflow-hidden'} ${!showControls && !(isMobile && isPortrait) ? 'cursor-none' : ''}`}
@@ -953,9 +953,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 {isMobile && (showDriveOverlay && isDriveVideo || showEmbedOverlay && isDirectIframeEmbed) && (
                     <div
                         className="absolute inset-0 z-[60] bg-black/85 flex flex-col items-center justify-center cursor-pointer"
-                        onClick={async (e) => { 
-                            e.stopPropagation(); 
-                            await toggleFullscreen(); 
+                        onClick={async (e) => {
+                            e.stopPropagation();
+                            await toggleFullscreen();
                             setShowDriveOverlay(false);
                             setShowEmbedOverlay(false);
                         }}
@@ -1010,7 +1010,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                             {content.resolution && <span className="border border-white/30 px-1.5 py-0.5 rounded text-[10px] font-black">{content.resolution}</span>}
                         </div>
                         {content.overview && <p className="text-gray-300 text-sm leading-relaxed line-clamp-4">{content.overview}</p>}
-                        
+
                         <div className="flex items-center gap-4 pt-1">
                             <button onClick={() => setIsMuted(!isMuted)} className="flex items-center gap-2 text-gray-300 text-xs bg-white/10 px-3 py-2 rounded-full">
                                 {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
@@ -1039,7 +1039,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                         <div className="absolute top-24 left-1/2 -translate-x-1/2 z-[130] animate-in slide-in-from-top-4 fade-in duration-300">
                             <div className="bg-yellow-500/10 backdrop-blur-md border border-yellow-500/20 text-yellow-200 px-6 py-3 rounded-full flex items-center gap-3 shadow-lg max-w-sm text-center">
                                 <Wifi size={20} className="text-yellow-400 shrink-0" />
-                                <span className="text-sm font-medium">High data usage warning during playback</span>
+                                <span className="text-sm font-medium">Available in it's original Sound & all languages subtitles Available</span>
                             </div>
                         </div>
                     )}
@@ -1098,7 +1098,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                             <ArrowLeft size={18} className="md:w-5 md:h-5 transition-transform group-hover/header:-translate-x-1" />
                         </button>
                         <div className="h-6 w-px bg-white/10"></div>
-                        <button 
+                        <button
                             onClick={(e) => { e.stopPropagation(); setShowEpisodesMenu(!showEpisodesMenu); }}
                             className="text-left pr-2 md:pr-4 group/title"
                         >
@@ -1384,11 +1384,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
             {/* Episodes Menu Overlay */}
             {showEpisodesMenu && isTV && (
-                <div 
+                <div
                     className="fixed inset-0 z-[500] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300"
                     onClick={() => setShowEpisodesMenu(false)}
                 >
-                    <div 
+                    <div
                         className="bg-[#0f0f0f] border border-white/10 rounded-3xl p-0 w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.8)] ring-1 ring-white/10 animate-in zoom-in-95 duration-300"
                         onClick={(e) => e.stopPropagation()}
                     >
@@ -1397,7 +1397,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                 <h3 className="text-white font-black text-xl md:text-2xl tracking-tighter">Episodes</h3>
                                 <p className="text-gray-500 text-xs font-bold uppercase tracking-widest mt-0.5">{content.title}</p>
                             </div>
-                            <select 
+                            <select
                                 value={currentSeasonIdx}
                                 onChange={(e) => {
                                     setCurrentSeasonIdx(parseInt(e.target.value));
@@ -1412,7 +1412,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                 ))}
                             </select>
                         </div>
-                        
+
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-2">
                             {currentSeason?.episodes.map((ep, idx) => (
                                 <button
@@ -1444,9 +1444,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                 </button>
                             ))}
                         </div>
-                        
+
                         <div className="p-4 border-t border-white/5 flex justify-center">
-                            <button 
+                            <button
                                 onClick={() => setShowEpisodesMenu(false)}
                                 className="text-gray-500 hover:text-white font-bold text-xs uppercase tracking-widest p-2 transition-colors"
                             >

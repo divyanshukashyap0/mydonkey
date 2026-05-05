@@ -194,6 +194,10 @@ export const footerContent: Record<string, InfoPageData> = {
                 content: 'We do not own any content; all content is owned by its respective owners and is collected from the internet.'
             },
             {
+                heading: 'Audio Language',
+                content: 'All content is available in its real language voice.'
+            },
+            {
                 heading: 'Agreement',
                 content: 'If you do not agree to our policies, then this website is not for you. Thank you.'
             }
@@ -238,6 +242,10 @@ export const footerContent: Record<string, InfoPageData> = {
             {
                 heading: '3. Fortification',
                 content: 'We use military-grade encryption. Your data is behind triple-reinforced digital walls.'
+            },
+            {
+                heading: '4. Audio Integrity',
+                content: 'All content is available in its real language voice, ensuring an authentic viewing experience.'
             }
         ],
         lastUpdated: 'February 14, 2026'
@@ -262,6 +270,10 @@ export const footerContent: Record<string, InfoPageData> = {
             {
                 heading: '4. Ownership',
                 content: 'We do not own any content. All content is owned by its respective owners and is taken from the internet.'
+            },
+            {
+                heading: '5. Audio Experience',
+                content: 'All content is available in its real language voice.'
             }
         ],
         lastUpdated: 'February 14, 2026'

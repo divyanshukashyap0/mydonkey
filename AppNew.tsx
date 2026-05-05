@@ -466,6 +466,28 @@ const MainLayout = () => {
                         <HeroSkeleton />
                     )}
                     <div className="pb-24 bg-[#141414] relative z-10 pl-4 md:pl-12 space-y-8">
+                        {/* Original Language Announcement */}
+                        <div className="pt-8 pr-4 md:pr-12">
+                            <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-brand-red/20 via-brand-red/5 to-transparent border-l-4 border-brand-red p-5 shadow-2xl group hover:from-brand-red/30 transition-all duration-300">
+                                <div className="flex items-center gap-4">
+                                    <div className="hidden sm:flex w-12 h-12 rounded-full bg-brand-red items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-white font-bold text-lg md:text-xl tracking-tight mb-1">
+                                            Authentic Sound Experience
+                                        </h3>
+                                        <p className="text-gray-300 text-sm md:text-base leading-relaxed">
+                                            Enjoy every story with its original performance. <span className="text-brand-red font-semibold">All content is available in its real language voice.</span>
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 bg-brand-red/10 rounded-full blur-3xl"></div>
+                            </div>
+                        </div>
+
                         {userAddedContent.length > 0 && (
                             <div className="pt-8">
                                 <ContentRail title="Recently Added by Users" items={userAddedContent} onDetails={handleDetails} />
