@@ -60,11 +60,22 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                 );
                 setMatchingSections(filteredSections);
 
-                // 3. Search TMDB directly
-                const tmdbResults = await searchTMDBMulti(searchQuery);
+                // 3. Search Locally (Database Fallback)
+                const localResults: Partial<Content>[] = content.filter(c => 
+                    c.title.toLowerCase().includes(lowerQuery) || 
+                    c.overview?.toLowerCase().includes(lowerQuery)
+                );
 
-                // 4. Map TMDB results to partial Content objects for display
-                const mappedResults: Partial<Content>[] = tmdbResults.map(r => ({
+                // 4. Search TMDB
+                let tmdbResults = [];
+                try {
+                    tmdbResults = await searchTMDBMulti(searchQuery);
+                } catch (e) {
+                    console.warn("TMDB Search failed, using local results only", e);
+                }
+
+                // 5. Map TMDB results
+                const mappedTMDB: Partial<Content>[] = tmdbResults.map(r => ({
                     id: `tmdb_${r.id}`, // temporary ID
                     tmdbId: r.id,
                     title: r.title || r.name || '',
@@ -75,7 +86,17 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                     overview: r.overview
                 }));
 
-                setResults(mappedResults);
+                // 6. Merge and Deduplicate Results
+                // Combine local matches and TMDB matches
+                const finalResults = [...mappedTMDB];
+                localResults.forEach(lc => {
+                    // Avoid duplicates if a local item is also in TMDB results
+                    if (!finalResults.find(tr => tr.tmdbId === lc.tmdbId)) {
+                        finalResults.unshift(lc); // Prioritize local library results
+                    }
+                });
+
+                setResults(finalResults);
                 setCurrentPage(1);
 
             } catch (error) {
@@ -152,26 +173,31 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
             let savedContent: Content;
 
             if (!querySnapshot.empty) {
-                // UPDATE EXISTING: Replace metadata but preserve some state like views/featured
+                // ALREADY EXISTS
                 const existingDoc = querySnapshot.docs[0];
                 const existingData = existingDoc.data() as Content;
                 
-                const updatedData = {
-                    ...existingData,
-                    ...newMetadata,
-                    // Preserve state fields
-                    featured: existingData.featured || false,
-                    isOriginal: existingData.isOriginal || false,
-                    views: existingData.views || 0,
-                    likes: existingData.likes || 0,
-                    createdAt: existingData.createdAt || newMetadata.createdAt, // Keep original creation date
-                    updatedAt: new Date().toISOString()
-                };
-
-                await setDoc(doc(db, 'content', existingDoc.id), updatedData);
-                savedContent = { id: existingDoc.id, ...updatedData } as Content;
+                // Only admins can update existing metadata to prevent permission errors
+                if (currentUser?.role === 'admin') {
+                    const updatedData = {
+                        ...existingData,
+                        ...newMetadata,
+                        // Preserve state fields
+                        featured: existingData.featured || false,
+                        isOriginal: existingData.isOriginal || false,
+                        views: existingData.views || 0,
+                        likes: existingData.likes || 0,
+                        createdAt: existingData.createdAt || newMetadata.createdAt,
+                        updatedAt: new Date().toISOString()
+                    };
+                    await setDoc(doc(db, 'content', existingDoc.id), updatedData);
+                    savedContent = { id: existingDoc.id, ...updatedData } as Content;
+                } else {
+                    // Non-admins just use the existing content
+                    savedContent = { id: existingDoc.id, ...existingData } as Content;
+                }
             } else {
-                // ADD NEW
+                // ADD NEW (Allowed by rules for everyone currently)
                 const docRef = await addDoc(collection(db, 'content'), newMetadata);
                 savedContent = { id: docRef.id, ...newMetadata } as Content;
             }

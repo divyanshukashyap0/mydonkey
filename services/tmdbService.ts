@@ -113,16 +113,25 @@ export interface TMDBSeasonDetail {
     };
 }
 
+/** Helper to call TMDB via server-side proxy to avoid network blocks/timeouts */
+async function callTMDB(path: string, params: Record<string, any> = {}) {
+    const searchParams = new URLSearchParams(params);
+    const url = `/api/tmdb?path=${encodeURIComponent(path)}&${searchParams.toString()}`;
+    
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`TMDB proxy error: ${res.statusText}`);
+    return res.json();
+}
+
 export async function fetchTMDBEpisode(
     tmdbId: number,
     seasonNumber: number,
     episodeNumber: number
 ): Promise<TMDBEpisodeDetail & { videos?: { results: any[] } }> {
-    if (!API_KEY) throw new Error('VITE_TMDB_API_KEY is not set in .env');
-    const url = `${TMDB_BASE}/tv/${tmdbId}/season/${seasonNumber}/episode/${episodeNumber}?api_key=${API_KEY}&language=en-US&append_to_response=videos`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`TMDB episode fetch failed: ${res.statusText}`);
-    return res.json();
+    return callTMDB(`/tv/${tmdbId}/season/${seasonNumber}/episode/${episodeNumber}`, {
+        language: 'en-US',
+        append_to_response: 'videos'
+    });
 }
 
 /** Search for movies or TV shows on TMDB */
@@ -130,29 +139,33 @@ export async function searchTMDB(
     query: string,
     type: 'movie' | 'tv'
 ): Promise<TMDBSearchResult[]> {
-    if (!API_KEY) throw new Error('VITE_TMDB_API_KEY is not set in .env');
     if (!query.trim()) return [];
-
-    const url = `${TMDB_BASE}/search/${type}?api_key=${API_KEY}&query=${encodeURIComponent(query)}&language=en-US&page=1`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`TMDB search failed: ${res.statusText}`);
-    const data = await res.json();
+    const data = await callTMDB(`/search/${type}`, {
+        query: query,
+        language: 'en-US',
+        page: 1
+    });
     return (data.results || []).slice(0, 6) as TMDBSearchResult[];
 }
 
 /** Multi-search for movies and TV shows on TMDB */
 export async function searchTMDBMulti(query: string): Promise<TMDBSearchResult[]> {
-    if (!API_KEY) throw new Error('VITE_TMDB_API_KEY is not set in .env');
     if (!query.trim()) return [];
 
-    const url = `${TMDB_BASE}/search/multi?api_key=${API_KEY}&query=${encodeURIComponent(query)}&language=en-US&page=1`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`TMDB multi-search failed: ${res.statusText}`);
-    const data = await res.json();
-    
-    // Filter out person results, keep only movie/tv
-    const results = (data.results || []).filter((r: any) => r.media_type === 'movie' || r.media_type === 'tv');
-    return results.slice(0, 24) as TMDBSearchResult[];
+    try {
+        const data = await callTMDB('/search/multi', {
+            query: query,
+            language: 'en-US',
+            page: 1
+        });
+        
+        // Filter out person results, keep only movie/tv
+        const results = (data.results || []).filter((r: any) => r.media_type === 'movie' || r.media_type === 'tv');
+        return results.slice(0, 24) as TMDBSearchResult[];
+    } catch (error) {
+        console.error("TMDB Multi-Search Proxy Error:", error);
+        return [];
+    }
 }
 
 /** Fetch full details (cast, genres, runtime) for a TMDB title */
@@ -160,17 +173,15 @@ export async function fetchTMDBDetails(
     tmdbId: number,
     type: 'movie' | 'tv'
 ): Promise<TMDBDetail> {
-    if (!API_KEY) throw new Error('VITE_TMDB_API_KEY is not set in .env');
-
     const appendExtra =
         type === 'movie'
             ? 'credits,release_dates,videos,images,external_ids&include_image_language=en,null&include_video_language=en,null'
             : 'credits,content_ratings,videos,images,external_ids&include_image_language=en,null&include_video_language=en,null';
 
-    const url = `${TMDB_BASE}/${type}/${tmdbId}?api_key=${API_KEY}&language=en-US&append_to_response=${appendExtra}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`TMDB fetch failed: ${res.statusText}`);
-    return res.json() as Promise<TMDBDetail>;
+    return callTMDB(`/${type}/${tmdbId}`, {
+        language: 'en-US',
+        append_to_response: appendExtra
+    });
 }
 
 /** Fetch full details for a TV season, which includes its episodes */
@@ -178,11 +189,10 @@ export async function fetchTMDBSeason(
     tmdbId: number,
     seasonNumber: number
 ): Promise<TMDBSeasonDetail> {
-    if (!API_KEY) throw new Error('VITE_TMDB_API_KEY is not set in .env');
-    const url = `${TMDB_BASE}/tv/${tmdbId}/season/${seasonNumber}?api_key=${API_KEY}&language=en-US&append_to_response=videos`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`TMDB season fetch failed: ${res.statusText}`);
-    return res.json() as Promise<TMDBSeasonDetail>;
+    return callTMDB(`/tv/${tmdbId}/season/${seasonNumber}`, {
+        language: 'en-US',
+        append_to_response: 'videos'
+    });
 }
 
 /** Extract the first official YouTube trailer from TMDB detail */
@@ -284,17 +294,14 @@ export function formatRuntime(minutes?: number): string {
 
 /** Find TMDB details by IMDb ID */
 export async function findByIMDbId(imdbId: string): Promise<TMDBDetail | null> {
-    if (!API_KEY) throw new Error('VITE_TMDB_API_KEY is not set in .env');
-    
     // Extract the exact ttXXXXXXX ID from a full URL if necessary
     const match = imdbId.match(/(tt\d+)/);
     if (!match) throw new Error('Invalid IMDb ID');
     const id = match[1];
 
-    const url = `${TMDB_BASE}/find/${id}?api_key=${API_KEY}&external_source=imdb_id`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`TMDB find failed: ${res.statusText}`);
-    const data = await res.json();
+    const data = await callTMDB(`/find/${id}`, {
+        external_source: 'imdb_id'
+    });
 
     // Check movie results first, then tv results
     if (data.movie_results && data.movie_results.length > 0) {

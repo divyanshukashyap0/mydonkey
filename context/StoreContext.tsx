@@ -244,15 +244,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                         const guestUid = firebaseUser.uid;
                         const guestEmail = `guest-${guestUid.substring(0, 6)}@mydonkey.in`;
 
-                        // Check if guest doc already exists (re-login)
-                        const userRef = doc(db, 'users', guestUid);
-                        const userSnap = await getDocs(query(collection(db, 'users'), where('uid', '==', guestUid))); // Just check doc ref directly below
-
-                        // We can just flow into the main logic, but let's pre-set the currentUser object
-                        // so we don't rely on the 'exists' check later which might confuse email.
-                        // Actually, easiest is to just treat them as a user with a special email.
-
-                        // Let's modify the EXISTING flow below to handle anonymous email.
+                        // Guest logic flows into main logic below
                     }
 
                     // OPTIMISTIC UPDATE: Prevent "Login Page" flash by setting auth state immediately

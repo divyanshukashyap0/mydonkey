@@ -1,4 +1,4 @@
-// rules_version = '2'
+rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -9,10 +9,11 @@ service cloud.firestore {
       return request.auth.uid == userId; 
     }
     function isAdmin() {
-      // CRITICAL: Check if user doc exists first to avoid errors for new users
-      return isAuthenticated() &&
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return request.auth != null && (
+        (request.auth.token.email != null && request.auth.token.email in ['divyanshukashyap2430955@gmail.com', 'divyanshu00884466@gmail.com']) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
     }
 
     // Activity Logs (New)
@@ -58,7 +59,12 @@ service cloud.firestore {
     match /content/{contentId} {
       allow read: if true;
       allow create: if true;
-      allow update, delete: if isAdmin();
+      // Allow everyone to increment views and likes
+      // Allow admins to update anything
+      allow update: if isAdmin() || (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'likes'])
+      );
+      allow delete: if isAdmin();
     }
 
     match /sections/{sectionId} {
@@ -113,6 +119,11 @@ service cloud.firestore {
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /catalogs/{catalogId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
   }
 }

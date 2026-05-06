@@ -44,6 +44,21 @@ self.addEventListener('fetch', (event) => {
 
     const url = new URL(request.url);
 
+    // Skip interception for localhost to prevent conflicts with Vite dev server and HMR
+    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+        return;
+    }
+
+    // 0. Skip interception for external APIs and critical Firebase services
+    // This prevents 404s caused by the SW trying to cache/handle CORS requests incorrectly.
+    if (url.hostname.includes('googleapis.com') || 
+        url.hostname.includes('firebaseio.com') || 
+        url.hostname.includes('themoviedb.org') ||
+        url.hostname.includes('firebasedatabase.app') ||
+        url.pathname.startsWith('/api/')) {
+        return;
+    }
+
     // 1. Navigation Requests (HTML) -> Network First, Fallback to Cache (App Shell)
     if (request.mode === 'navigate') {
         event.respondWith(
