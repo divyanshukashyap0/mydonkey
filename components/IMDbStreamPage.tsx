@@ -52,7 +52,7 @@ const IMDbStreamPage: React.FC = () => {
             id: `imdb_${rawId}`,
             title: detail.title || detail.name || 'IMDb Stream',
             type: isTv ? 'tv' : 'movie',
-            videoUrl: `https://www.playimdb.com/title/${rawId}/`,
+            videoUrl: rawId,
             poster_path: detail.poster_path ? tmdbPosterUrl(detail.poster_path) : '',
             backdrop_path: detail.backdrop_path ? tmdbBackdropUrl(detail.backdrop_path) : '',
             overview: detail.overview || '',

@@ -1,6 +1,7 @@
 export interface Content {
   id: string;
   tmdbId?: number; // Store TMDB Series ID
+  imdbId?: string; // Store IMDb Title ID (ttXXXXX)
   title: string;
   overview: string;
   poster_path: string;

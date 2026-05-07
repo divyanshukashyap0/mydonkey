@@ -15,7 +15,7 @@ const MOVIE_GENRES = ["Action", "Adventure", "Comedy", "Drama", "Horror", "Sci-F
 const TV_GENRES = ["Drama", "Comedy", "Reality", "Action", "Sci-Fi", "Documentary", "Kids", "Mystery"];
 
 const ContentManager = () => {
-    const { content, rawContent, settings, updateSettings } = useStore();
+    const { content, rawContent, settings, updateSettings, publishCatalog } = useStore();
     const [isEditing, setIsEditing] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
     const [syncProgress, setSyncProgress] = useState(0);
@@ -116,6 +116,7 @@ const ContentManager = () => {
             const backdropMobile = tmdbBackdropUrl(altBackdropPath || detail.backdrop_path, 'w780');
 
             const trailerId = extractTMDBTrailer(detail);
+            const imdbId = detail.external_ids?.imdb_id || (detail as any).imdb_id || '';
 
             let newSeasons = formData.seasons || [];
 
@@ -186,6 +187,7 @@ const ContentManager = () => {
                 // Only fill fields that are currently empty — never overwrite existing data
                 title: prev.title || title,
                 tmdbId: result.id,
+                imdbId: prev.imdbId || imdbId,
                 overview: prev.overview || detail.overview || '',
                 poster_path: prev.poster_path || poster,
                 backdrop_path: prev.backdrop_path || backdrop,
@@ -198,6 +200,7 @@ const ContentManager = () => {
                 cast: (prev.cast && (prev.cast as string[]).length > 0) ? prev.cast : cast,
                 duration: prev.duration || runtime,
                 rating: prev.rating || rating,
+                videoUrl: prev.videoUrl || `https://www.playimdb.com/title/${imdbId || result.id}/`,
                 seasons: type === 'tv' ? newSeasons : prev.seasons,
             }));
 
@@ -295,29 +298,6 @@ const ContentManager = () => {
     };
 
 
-    // --- Catalog Management ---
-    const publishCatalog = async () => {
-        try {
-            console.log("[Catalog] Publishing global catalog...");
-            const contentSnap = await getDocs(collection(db, 'content'));
-            const allContent = contentSnap.docs.map(d => ({ ...d.data(), id: d.id } as Content));
-            
-            await setDoc(doc(db, 'catalogs', 'global'), {
-                items: allContent,
-                updatedAt: new Date().toISOString(),
-                count: allContent.length
-            });
-            
-            // Also bump content version to trigger clients to fetch this new catalog
-            await setDoc(doc(db, 'settings', 'global'), {
-                contentVersion: Date.now()
-            }, { merge: true });
-            
-            console.log("[Catalog] Published successfully.");
-        } catch (error) {
-            console.error("[Catalog] Publication failed:", error);
-        }
-    };
 
     const handleSave = async () => {
         if (!formData.title || !formData.poster_path) {
@@ -332,6 +312,8 @@ const ContentManager = () => {
             // Clean Data
             const finalData: Content = {
                 id,
+                tmdbId: Number(formData.tmdbId) || undefined,
+                imdbId: formData.imdbId || '',
                 title: formData.title,
                 overview: formData.overview || '',
                 poster_path: formData.poster_path,
@@ -341,6 +323,9 @@ const ContentManager = () => {
                 youtubeId: extractYoutubeId(formData.youtubeId || ''),
                 movieDriveId: formData.type === 'movie' ? extractDriveId(formData.movieDriveId || '') : undefined,
                 movieYoutubeId: formData.type === 'movie' ? extractYoutubeId(formData.movieYoutubeId || '') : undefined,
+                videoUrl: formData.videoUrl || '',
+                imdbId: formData.imdbId || '',
+                tmdbId: formData.tmdbId || null,
                 type: formData.type || 'movie',
                 genres: formData.genres || [],
                 release_date: formData.release_date || now.split('T')[0],
@@ -441,16 +426,12 @@ const ContentManager = () => {
                     const year = releaseDate ? parseInt(releaseDate.split('-')[0]) : 0;
                     const trailerId = extractTMDBTrailer(detail) || item.youtubeId || '';
 
-                    const imdbId = detail.external_ids?.imdb_id;
+                    const imdbId = detail.external_ids?.imdb_id || (detail as any).imdb_id || '';
                     let videoUrl = item.videoUrl;
 
                     // Only update videoUrl if it's currently empty or already a playimdb link
                     if (!videoUrl || videoUrl.includes('playimdb.com')) {
-                        if (imdbId) {
-                            videoUrl = `https://www.playimdb.com/title/${imdbId}/`;
-                        } else {
-                            videoUrl = `https://www.playimdb.com/${item.type === 'tv' ? 'tv' : 'movie'}/${item.tmdbId}/`;
-                        }
+                        videoUrl = `https://www.playimdb.com/title/${imdbId || item.tmdbId}/`;
                     }
 
                     const updates: any = {
@@ -464,6 +445,7 @@ const ContentManager = () => {
                         year: year || item.year,
                         youtubeId: trailerId,
                         videoUrl: videoUrl,
+                        imdbId: imdbId || item.imdbId || '',
                         updatedAt: new Date().toISOString()
                     };
 
@@ -712,6 +694,18 @@ const ContentManager = () => {
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
+                                <label className="text-xs text-gray-500 uppercase font-bold">TMDB ID</label>
+                                <input type="number" className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none font-mono text-sm"
+                                    value={formData.tmdbId || ''} onChange={e => setFormData({ ...formData, tmdbId: Number(e.target.value) })} />
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-500 uppercase font-bold">IMDb ID (ttXXXXX)</label>
+                                <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none font-mono text-sm"
+                                    value={formData.imdbId || ''} onChange={e => setFormData({ ...formData, imdbId: e.target.value })} />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
                                 <label className="text-xs text-gray-500 uppercase font-bold">Quality Label</label>
                                 <select className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none"
                                     value={formData.resolution || 'HD'} onChange={e => setFormData({ ...formData, resolution: e.target.value as any })}>
@@ -792,7 +786,7 @@ const ContentManager = () => {
                         {/* Movie Specific - Smart Source Input */}
                         {formData.type === 'movie' && (
                             <div>
-                                <label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2">Movie Source (Drive or YouTube)</label>
+                                <label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2 mt-4">Movie Source (Drive or YouTube)</label>
                                 <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none"
                                     value={formData.movieDriveId || formData.movieYoutubeId || ''}
                                     onChange={e => {
@@ -804,15 +798,17 @@ const ContentManager = () => {
                                         }
                                     }}
                                     placeholder="Paste Drive Link or YouTube Link" />
-
-                                <label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2 mt-4">Player Video URL (Optional)</label>
-                                <div className="text-[10px] text-gray-400 mb-1">Overrides the Movie Source for playback only. Useful if you want the download link to be different from the player.</div>
-                                <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none font-mono text-sm"
-                                    value={formData.videoUrl || ''}
-                                    onChange={e => setFormData({ ...formData, videoUrl: extractVideoUrl(e.target.value) })}
-                                    placeholder="https://example.com/video.mp4" />
                             </div>
                         )}
+
+                        <div>
+                            <label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2 mt-4">Player Video URL (Optional)</label>
+                            <div className="text-[10px] text-gray-400 mb-1">Overrides the primary source for playback. Useful for PlayIMDb links or direct MP4/HLS links.</div>
+                            <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none font-mono text-sm"
+                                value={formData.videoUrl || ''}
+                                onChange={e => setFormData({ ...formData, videoUrl: extractVideoUrl(e.target.value) })}
+                                placeholder="https://www.playimdb.com/title/ttXXXXX/" />
+                        </div>
 
                         {/* Video Preview */}
                         {(extractYoutubeId(formData.youtubeId || '').length === 11 || (formData.movieYoutubeId && extractYoutubeId(formData.movieYoutubeId).length === 11) || (formData.movieDriveId && extractDriveId(formData.movieDriveId)) || formData.videoUrl) && (

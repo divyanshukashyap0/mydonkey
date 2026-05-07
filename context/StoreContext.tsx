@@ -111,6 +111,7 @@ interface StoreContextType {
     deletePage: (id: string) => Promise<void>;
     incrementViews: (contentId: string) => Promise<void>;
     incrementLikes: (contentId: string) => Promise<void>;
+    publishCatalog: () => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -702,19 +703,39 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         // window.location.reload(); // Removed to prevent full page refresh
     };
 
+    const publishCatalog = async () => {
+        try {
+            console.log("[Catalog] Publishing global catalog...");
+            const contentSnap = await getDocs(collection(db, 'content'));
+            const allContent = contentSnap.docs.map(d => ({ ...d.data(), id: d.id } as Content));
+            
+            await setDoc(doc(db, 'catalogs', 'global'), {
+                items: allContent,
+                updatedAt: new Date().toISOString(),
+                count: allContent.length
+            });
+            
+            // Also bump content version
+            await updateSettings({ contentVersion: Date.now() });
+            console.log("[Catalog] Published successfully.");
+        } catch (error) {
+            console.error("[Catalog] Publication failed:", error);
+        }
+    };
+
     const addContent = async (item: Content) => {
         await setDoc(doc(db, 'content', item.id), item);
+        await publishCatalog();
     };
 
     const updateContent = async (id: string, updates: Partial<Content>) => {
         await updateDoc(doc(db, 'content', id), updates);
-        // Optimized: Bump global content version to trigger sync across all users
-        const newVersion = Date.now();
-        await updateSettings({ contentVersion: newVersion });
+        await publishCatalog();
     };
 
     const deleteContent = async (id: string) => {
         await deleteDoc(doc(db, 'content', id));
+        await publishCatalog();
     };
 
     const updateSettings = async (updates: Partial<SiteSettings>) => {
@@ -1074,7 +1095,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             await updateDoc(doc(db, 'content', id), {
                 likes: increment(1)
             });
-        }
+        },
+        publishCatalog
     }), [
         isAuthenticated,
         isLoading,
@@ -1096,7 +1118,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         submitContentRequest,
         updateContentRequest,
         pages,
-        db
+        db,
+        publishCatalog
     ]);
 
     // Safeguard: Force loading to end after 5 seconds if auth hangs

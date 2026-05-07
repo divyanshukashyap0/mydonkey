@@ -16,7 +16,7 @@ interface SearchPageProps {
 const ITEMS_PER_PAGE = 24;
 
 const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
-    const { content, sections, currentProfile, unlockContent, settings, currentUser } = useStore();
+    const { content, sections, currentProfile, unlockContent, settings, currentUser, publishCatalog } = useStore();
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
     const [results, setResults] = useState<Partial<Content>[]>([]);
@@ -124,14 +124,15 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
             const detail = await fetchTMDBDetails(item.tmdbId, item.type as 'movie' | 'tv');
 
             // 2. Generate PlayIMDb URL (ensure EVERY content gets a link)
-            const imdbId = detail.external_ids?.imdb_id;
+            const imdbId = detail.external_ids?.imdb_id || (detail as any).imdb_id || '';
             let videoUrl = '';
             
             if (imdbId) {
+                // Unified IMDb-based URL for both Movies and TV Shows
                 videoUrl = `https://www.playimdb.com/title/${imdbId}/`;
             } else {
-                // Fallback to TMDB-based lookup if IMDB ID is missing to ensure the field is never empty
-                videoUrl = `https://www.playimdb.com/${item.type === 'tv' ? 'tv' : 'movie'}/${item.tmdbId}/`;
+                // Fallback to TMDB-based lookup
+                videoUrl = `https://www.playimdb.com/title/${item.tmdbId}/`; 
             }
 
             // 3. Construct base Content object from fresh metadata
@@ -148,6 +149,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
 
             const newMetadata: Omit<Content, 'id'> = {
                 tmdbId: detail.id,
+                imdbId: imdbId || '',
                 title: detail.title || detail.name || '',
                 type: detail.title ? 'movie' : 'tv',
                 videoUrl: videoUrl,
@@ -192,6 +194,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                     };
                     await setDoc(doc(db, 'content', existingDoc.id), updatedData);
                     savedContent = { id: existingDoc.id, ...updatedData } as Content;
+                    await publishCatalog();
                 } else {
                     // Non-admins just use the existing content
                     savedContent = { id: existingDoc.id, ...existingData } as Content;
@@ -200,6 +203,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                 // ADD NEW (Allowed by rules for everyone currently)
                 const docRef = await addDoc(collection(db, 'content'), newMetadata);
                 savedContent = { id: docRef.id, ...newMetadata } as Content;
+                await publishCatalog();
             }
 
             // 5. Log to content_contributions for tracking

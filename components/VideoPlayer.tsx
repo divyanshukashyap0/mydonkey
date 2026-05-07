@@ -877,9 +877,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     // --- PlayIMDB Link Transformer ---
     const getFinalVideoUrl = (url: string) => {
         if (!url) return '';
-        if (url.includes('playimdb.com/title/')) {
-            // Convert https://www.playimdb.com/title/tt12345/ to https://www.playimdb.com/embed/tt12345/
-            return url.replace('/title/', '/embed/') + '?autoplay=1';
+        if (url.includes('playimdb.com')) {
+            // Standardize all PlayIMDb links (title, movie, or tv) to the working embed format
+            return url.replace('/title/', '/embed/')
+                      .replace('/movie/', '/embed/')
+                      .replace('/tv/', '/embed/') + (url.includes('?') ? '' : '?autoplay=1');
         }
         return url;
     };
@@ -920,9 +922,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                     }}
                                 />
                             ) : (
-                                <iframe className="w-full h-full relative z-[30]"
+                                <iframe 
+                                    className="w-full h-full relative z-[30]"
                                     src={finalUrl}
                                     allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                                    allowFullScreen
+                                    frameBorder="0"
+                                    scrolling="no"
                                     title={content.title}
                                 />
                             )}

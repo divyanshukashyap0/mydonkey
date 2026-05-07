@@ -34,6 +34,13 @@ export default async function handler(req, res) {
     const searchParams = new URLSearchParams(finalParams);
     const url = `https://${domain}/3${path}?${searchParams.toString()}`;
 
+    let responseSent = false;
+    const sendResponse = (status, payload) => {
+      if (responseSent) return;
+      responseSent = true;
+      res.status(status).json(payload);
+    };
+
     console.log('[TMDB Proxy] Attempting:', url);
 
     return new Promise((resolve) => {
@@ -43,13 +50,14 @@ export default async function handler(req, res) {
         tmdbRes.on('end', () => {
           try {
             if (tmdbRes.statusCode >= 400) {
-                return res.status(tmdbRes.statusCode).json({ error: 'TMDB returned error', code: tmdbRes.statusCode, details: data });
+              sendResponse(tmdbRes.statusCode, { error: 'TMDB returned error', code: tmdbRes.statusCode, details: data });
+            } else {
+              const json = JSON.parse(data);
+              sendResponse(200, json);
             }
-            const json = JSON.parse(data);
-            res.status(200).json(json);
             resolve();
           } catch (e) {
-            res.status(500).json({ error: 'Failed to parse TMDB response', details: data.substring(0, 100) });
+            sendResponse(500, { error: 'Failed to parse TMDB response', details: data.substring(0, 100) });
             resolve();
           }
         });
@@ -57,13 +65,13 @@ export default async function handler(req, res) {
 
       tmdbReq.on('error', (err) => {
         console.error('[TMDB Proxy Error]:', err.message);
-        res.status(500).json({ error: 'Connection failed', message: err.message, domain });
+        sendResponse(500, { error: 'Connection failed', message: err.message, domain });
         resolve();
       });
 
       tmdbReq.setTimeout(8000, () => {
         tmdbReq.destroy();
-        res.status(504).json({ error: 'Connection timed out', domain });
+        sendResponse(504, { error: 'Connection timed out', domain });
         resolve();
       });
     });

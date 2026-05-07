@@ -31,6 +31,7 @@ export interface TMDBSearchResult {
 
 export interface TMDBDetail {
     id: number;
+    imdb_id?: string;
     title?: string;          // movie
     name?: string;           // tv
     overview: string;
@@ -113,14 +114,34 @@ export interface TMDBSeasonDetail {
     };
 }
 
-/** Helper to call TMDB via server-side proxy to avoid network blocks/timeouts */
+/** Helper to call TMDB via server-side proxy or direct fallback */
 async function callTMDB(path: string, params: Record<string, any> = {}) {
     const searchParams = new URLSearchParams(params);
-    const url = `/api/tmdb?path=${encodeURIComponent(path)}&${searchParams.toString()}`;
+    const proxyUrl = `/api/tmdb?path=${encodeURIComponent(path)}&${searchParams.toString()}`;
     
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`TMDB proxy error: ${res.statusText}`);
-    return res.json();
+    try {
+        const res = await fetch(proxyUrl);
+        if (res.ok) return await res.json();
+        
+        // If proxy fails (e.g., 404 in local dev), try direct call if we have a client-side key
+        if (API_KEY) {
+            console.warn(`TMDB Proxy failed with status ${res.status}. Falling back to direct call.`);
+            const directUrl = `${TMDB_BASE}${path}?api_key=${API_KEY}&${searchParams.toString()}`;
+            const directRes = await fetch(directUrl);
+            if (!directRes.ok) throw new Error(`TMDB direct error: ${directRes.statusText}`);
+            return await directRes.json();
+        }
+        
+        throw new Error(`TMDB proxy error: ${res.statusText}`);
+    } catch (err: any) {
+        // Final fallback to direct if proxy fetch itself fails (e.g., network error)
+        if (API_KEY) {
+            const directUrl = `${TMDB_BASE}${path}?api_key=${API_KEY}&${searchParams.toString()}`;
+            const directRes = await fetch(directUrl);
+            if (directRes.ok) return await directRes.json();
+        }
+        throw err;
+    }
 }
 
 export async function fetchTMDBEpisode(
@@ -160,7 +181,12 @@ export async function searchTMDBMulti(query: string): Promise<TMDBSearchResult[]
         });
         
         // Filter out person results, keep only movie/tv
-        const results = (data.results || []).filter((r: any) => r.media_type === 'movie' || r.media_type === 'tv');
+        const results = (data.results || [])
+            .filter((r: any) => r.media_type === 'movie' || r.media_type === 'tv')
+            .map((r: any) => ({
+                ...r,
+                type: r.media_type // Ensure internal type field is set
+            }));
         return results.slice(0, 24) as TMDBSearchResult[];
     } catch (error) {
         console.error("TMDB Multi-Search Proxy Error:", error);
@@ -173,15 +199,14 @@ export async function fetchTMDBDetails(
     tmdbId: number,
     type: 'movie' | 'tv'
 ): Promise<TMDBDetail> {
-    const appendExtra =
-        type === 'movie'
-            ? 'credits,release_dates,videos,images,external_ids&include_image_language=en,null&include_video_language=en,null'
-            : 'credits,content_ratings,videos,images,external_ids&include_image_language=en,null&include_video_language=en,null';
-
-    return callTMDB(`/${type}/${tmdbId}`, {
+    const params: any = {
         language: 'en-US',
-        append_to_response: appendExtra
-    });
+        append_to_response: 'credits,videos,images,external_ids' + (type === 'movie' ? ',release_dates' : ',content_ratings'),
+        include_image_language: 'en,null',
+        include_video_language: 'en,null'
+    };
+
+    return callTMDB(`/${type}/${tmdbId}`, params);
 }
 
 /** Fetch full details for a TV season, which includes its episodes */

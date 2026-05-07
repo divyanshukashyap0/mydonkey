@@ -184,8 +184,8 @@ const ContributionsManager: React.FC = () => {
                                     {/* IDs */}
                                     <td className="px-4 py-3">
                                         <div className="text-[10px] text-gray-500 space-y-0.5">
-                                            {item.imdbId && <div><span className="text-yellow-500">IMDb:</span> {item.imdbId}</div>}
-                                            {item.tmdbId && <div><span className="text-blue-400">TMDb:</span> {item.tmdbId}</div>}
+                                            <div><span className="text-yellow-500">IMDb:</span> {item.imdbId || 'N/A'}</div>
+                                            <div><span className="text-blue-400">TMDb:</span> {item.tmdbId || 'N/A'}</div>
                                         </div>
                                     </td>
 
