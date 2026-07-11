@@ -1,7 +1,0 @@
-node_modules/
-dist-desktop/
-renderer/vendor/
-build/icon.png
-build/icon.icns
-build/icon.ico
-*.log

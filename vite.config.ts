@@ -87,7 +87,7 @@ export default defineConfig(({ mode }) => {
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
         workbox: {
-          maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MiB
+          maximumFileSizeToCacheInBytes: 15 * 1024 * 1024, // 15 MiB
         },
         manifest: {
           name: 'My Donkey OTT',
@@ -121,9 +121,21 @@ export default defineConfig(({ mode }) => {
     build: {
       rollupOptions: {
         output: {
-          manualChunks: {
-            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-            'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage'],
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              const parts = id.toString().split('node_modules/');
+              const name = parts[parts.length - 1].split('/')[0];
+              if (name === 'react' || name === 'react-dom' || name === 'react-router-dom' || name === 'react-router') {
+                return 'vendor-react';
+              }
+              if (name.includes('firebase')) {
+                return 'vendor-firebase';
+              }
+              if (name === 'shaka-player' || name === 'dashjs' || name === 'hls.js' || name === 'movi-player') {
+                return 'vendor-players';
+              }
+              return `vendor-${name.replace('@', '')}`;
+            }
           }
         }
       },
