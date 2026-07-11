@@ -1,0 +1,315 @@
+{
+  "name": "movi-player-vscode",
+  "displayName": "Movi Player",
+  "description": "A modern video player that handles formats and codecs VS Code can't play natively — right inside your editor.",
+  "version": "0.3.5",
+  "publisher": "mrujjwalg",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
+  "keywords": [
+    "video",
+    "player",
+    "mp4",
+    "mkv",
+    "hevc",
+    "av1",
+    "hdr",
+    "webm",
+    "ffmpeg",
+    "media",
+    "movie"
+  ],
+  "icon": "icons/icon128.png",
+  "galleryBanner": {
+    "color": "#0a0a0f",
+    "theme": "dark"
+  },
+  "homepage": "https://moviplayer.com",
+  "bugs": {
+    "url": "https://github.com/MrUjjwalG/movi-player/issues"
+  },
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "movi.player",
+        "displayName": "Movi Player",
+        "selector": [
+          {
+            "filenamePattern": "*.mp4"
+          },
+          {
+            "filenamePattern": "*.mkv"
+          },
+          {
+            "filenamePattern": "*.webm"
+          },
+          {
+            "filenamePattern": "*.mov"
+          },
+          {
+            "filenamePattern": "*.avi"
+          },
+          {
+            "filenamePattern": "*.flv"
+          },
+          {
+            "filenamePattern": "*.wmv"
+          },
+          {
+            "filenamePattern": "*.m4v"
+          },
+          {
+            "filenamePattern": "*.3gp"
+          },
+          {
+            "filenamePattern": "*.mpg"
+          },
+          {
+            "filenamePattern": "*.mpeg"
+          },
+          {
+            "filenamePattern": "*.m2ts"
+          },
+          {
+            "filenamePattern": "*.mts"
+          },
+          {
+            "filenamePattern": "*.evo"
+          },
+          {
+            "filenamePattern": "*.hevc"
+          },
+          {
+            "filenamePattern": "*.265"
+          },
+          {
+            "filenamePattern": "*.mp3"
+          },
+          {
+            "filenamePattern": "*.m4a"
+          },
+          {
+            "filenamePattern": "*.m4b"
+          },
+          {
+            "filenamePattern": "*.aac"
+          },
+          {
+            "filenamePattern": "*.flac"
+          },
+          {
+            "filenamePattern": "*.wav"
+          },
+          {
+            "filenamePattern": "*.wave"
+          },
+          {
+            "filenamePattern": "*.ogg"
+          },
+          {
+            "filenamePattern": "*.oga"
+          },
+          {
+            "filenamePattern": "*.opus"
+          },
+          {
+            "filenamePattern": "*.ac3"
+          },
+          {
+            "filenamePattern": "*.ec3"
+          },
+          {
+            "filenamePattern": "*.eac3"
+          },
+          {
+            "filenamePattern": "*.mka"
+          },
+          {
+            "filenamePattern": "*.dts"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
+    "commands": [
+      {
+        "command": "movi.openPlayer",
+        "title": "Movi: Open Video File",
+        "category": "Movi"
+      },
+      {
+        "command": "movi.openFileToSide",
+        "title": "Movi: Open Video File to the Side",
+        "category": "Movi"
+      },
+      {
+        "command": "movi.openFileInNewWindow",
+        "title": "Movi: Open Video File in New Window",
+        "category": "Movi"
+      },
+      {
+        "command": "movi.openCurrentFile",
+        "title": "Movi: Play with Movi Player",
+        "category": "Movi"
+      },
+      {
+        "command": "movi.openToSide",
+        "title": "Movi: Play to the Side",
+        "category": "Movi"
+      },
+      {
+        "command": "movi.openInNewWindow",
+        "title": "Movi: Play in New Window",
+        "category": "Movi"
+      },
+      {
+        "command": "movi.openUrl",
+        "title": "Movi: Open Video from URL",
+        "category": "Movi"
+      },
+      {
+        "command": "movi.openUrlToSide",
+        "title": "Movi: Open URL to the Side",
+        "category": "Movi"
+      },
+      {
+        "command": "movi.openUrlInNewWindow",
+        "title": "Movi: Open URL in New Window",
+        "category": "Movi"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "movi.openCurrentFile",
+          "when": "resourceExtname =~ /\\.(mp4|mkv|webm|mov|avi|ts|flv|wmv|m4v|3gp|mpg|mpeg|m2ts|mts|evo|hevc|265|mp3|m4a|m4b|aac|flac|wav|wave|ogg|oga|opus|ac3|ec3|eac3|mka|dts)$/i",
+          "group": "navigation@10"
+        },
+        {
+          "command": "movi.openToSide",
+          "when": "resourceExtname =~ /\\.(mp4|mkv|webm|mov|avi|ts|flv|wmv|m4v|3gp|mpg|mpeg|m2ts|mts|evo|hevc|265|mp3|m4a|m4b|aac|flac|wav|wave|ogg|oga|opus|ac3|ec3|eac3|mka|dts)$/i",
+          "group": "navigation@11"
+        },
+        {
+          "command": "movi.openInNewWindow",
+          "when": "resourceExtname =~ /\\.(mp4|mkv|webm|mov|avi|ts|flv|wmv|m4v|3gp|mpg|mpeg|m2ts|mts|evo|hevc|265|mp3|m4a|m4b|aac|flac|wav|wave|ogg|oga|opus|ac3|ec3|eac3|mka|dts)$/i",
+          "group": "navigation@12"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "movi.openCurrentFile",
+          "when": "resourceExtname =~ /\\.(mp4|mkv|webm|mov|avi|ts|flv|wmv|m4v|3gp|mpg|mpeg|m2ts|mts|evo|hevc|265|mp3|m4a|m4b|aac|flac|wav|wave|ogg|oga|opus|ac3|ec3|eac3|mka|dts)$/i"
+        },
+        {
+          "command": "movi.openToSide",
+          "when": "resourceExtname =~ /\\.(mp4|mkv|webm|mov|avi|ts|flv|wmv|m4v|3gp|mpg|mpeg|m2ts|mts|evo|hevc|265|mp3|m4a|m4b|aac|flac|wav|wave|ogg|oga|opus|ac3|ec3|eac3|mka|dts)$/i"
+        },
+        {
+          "command": "movi.openInNewWindow",
+          "when": "resourceExtname =~ /\\.(mp4|mkv|webm|mov|avi|ts|flv|wmv|m4v|3gp|mpg|mpeg|m2ts|mts|evo|hevc|265|mp3|m4a|m4b|aac|flac|wav|wave|ogg|oga|opus|ac3|ec3|eac3|mka|dts)$/i"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Movi Player",
+      "properties": {
+        "movi.autoplay": {
+          "type": "boolean",
+          "default": false,
+          "description": "Start playback automatically when a video is opened"
+        },
+        "movi.muted": {
+          "type": "boolean",
+          "default": false,
+          "description": "Start playback muted"
+        },
+        "movi.loop": {
+          "type": "boolean",
+          "default": false,
+          "description": "Loop playback when the video reaches the end"
+        },
+        "movi.objectFit": {
+          "type": "string",
+          "enum": [
+            "contain",
+            "cover",
+            "fill",
+            "zoom"
+          ],
+          "default": "contain",
+          "enumDescriptions": [
+            "Fit the whole video inside the player (letterbox)",
+            "Fill the player, cropping the video edges",
+            "Stretch the video to fill the player",
+            "Zoom in on the video"
+          ],
+          "description": "How the video is scaled to fit the player area"
+        },
+        "movi.theme": {
+          "type": "string",
+          "enum": [
+            "dark",
+            "light"
+          ],
+          "default": "dark",
+          "description": "Player UI theme"
+        },
+        "movi.ambientMode": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable ambient mode (color glow around video)"
+        },
+        "movi.resume": {
+          "type": "boolean",
+          "default": true,
+          "description": "Resume playback from last position"
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "moviPlayer",
+          "title": "Movi Player",
+          "icon": "icons/movi-sidebar.svg"
+        }
+      ]
+    },
+    "views": {
+      "moviPlayer": [
+        {
+          "id": "moviPlayer.actions",
+          "name": "Quick Actions",
+          "icon": "icons/movi-sidebar.svg"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.80.0",
+    "@vscode/vsce": "^3.9.1",
+    "typescript": "^5.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MrUjjwalG/movi-player"
+  },
+  "license": "MIT"
+}

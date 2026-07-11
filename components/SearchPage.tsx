@@ -123,17 +123,9 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
             // 1. Fetch full TMDB details (includes external_ids for IMDb ID)
             const detail = await fetchTMDBDetails(item.tmdbId, item.type as 'movie' | 'tv');
 
-            // 2. Generate PlayIMDb URL (ensure EVERY content gets a link)
+            // 2. Clear default PlayIMDb URL fallback
             const imdbId = detail.external_ids?.imdb_id || (detail as any).imdb_id || '';
             let videoUrl = '';
-            
-            if (imdbId) {
-                // Unified IMDb-based URL for both Movies and TV Shows
-                videoUrl = `https://www.playimdb.com/title/${imdbId}/`;
-            } else {
-                // Fallback to TMDB-based lookup
-                videoUrl = `https://www.playimdb.com/title/${item.tmdbId}/`; 
-            }
 
             // 3. Construct base Content object from fresh metadata
             const addedByInfo = currentUser ? {

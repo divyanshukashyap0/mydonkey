@@ -8,6 +8,7 @@ import HeroSkeleton from './components/HeroSkeleton';
 import ContentRail from './components/ContentRail';
 import ContentDetails from './components/ContentDetails';
 import VideoPlayer from './components/VideoPlayer';
+import { MoviVideo } from './components/MoviVideo';
 import LoginPage from './components/LoginPage';
 import MobileNav from './components/MobileNav';
 import Footer from './components/Footer';
@@ -621,12 +622,11 @@ const MainLayout = () => {
                 <div className="min-h-screen pt-24 px-4 md:px-12 pb-12 relative overflow-hidden">
                     {/* Background Video */}
                     <div className="absolute inset-0 z-0">
-                        <video
+                        <MoviVideo
                             src="/Anime.mp4"
                             autoPlay
                             loop
                             muted
-                            playsInline
                             className="w-full h-full object-cover"
                         />
                         <div className="absolute inset-0 bg-black/60" />

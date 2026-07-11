@@ -7,6 +7,7 @@ import DrivePlayer from './DrivePlayer';
 import ContentLoader from './ContentLoader';
 import { useStore } from '../context/StoreContext';
 import { logUserActivity, incrementWatchTime } from '../utils/activityLogger';
+import { MoviVideo } from './MoviVideo';
 
 interface VideoPlayerProps {
     content: Content;
@@ -58,6 +59,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const [isZoomed, setIsZoomed] = useState(false); // Zoom/Fill State
     const [playbackError, setPlaybackError] = useState<string | null>(null);
 
+    const [hasStartedPlaying, setHasStartedPlaying] = useState(false);
+    const [showCopyrightApology, setShowCopyrightApology] = useState(true);
+
     // Season & Episode State (TV Shows)
     const [currentSeasonIdx, setCurrentSeasonIdx] = useState(0);
     const [currentEpisodeIdx, setCurrentEpisodeIdx] = useState(0);
@@ -91,14 +95,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const isMovieMode = content.playMode === 'movie';
     let overrideUrl = content.videoUrl;
 
-    if (overrideUrl) {
-        if (overrideUrl.match(/^tt\d+$/)) {
-            overrideUrl = `https://www.playimdb.com/title/${overrideUrl}/`;
-        } else if (overrideUrl.includes('imdb.com/title/') && !overrideUrl.includes('playimdb.com')) {
-            overrideUrl = overrideUrl.replace(/^(https?:\/\/)?(www\.|m\.)?imdb\.com/, 'https://www.playimdb.com');
-        }
-    }
-
     const overrideYoutubeId = overrideUrl ? getYoutubeId(overrideUrl) : '';
     const overrideDriveId = overrideUrl ? getDriveId(overrideUrl) : '';
 
@@ -125,24 +121,40 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     let directVideoUrl = (overrideUrl && !overrideYoutubeId && !overrideDriveId) ? overrideUrl : null;
 
     if (isTV) {
-        if (content.id?.startsWith('tt')) {
-            directVideoUrl = `https://www.playimdb.com/title/${content.id}/`;
-        } else if (content.videoUrl) {
+        if (content.videoUrl) {
             directVideoUrl = content.videoUrl;
         } else if (currentEpisode) {
             directVideoUrl = currentEpisode.videoUrl || null;
         }
-    } else if (content.type === 'movie' && content.id?.startsWith('tt')) {
-        directVideoUrl = `https://www.playimdb.com/title/${content.id}/`;
     } else if (overrideUrl) {
         directVideoUrl = overrideUrl;
     } else {
         directVideoUrl = null;
     }
 
-    const isHls = directVideoUrl?.toLowerCase().includes('.m3u8');
-    const isNativeVideo = directVideoUrl && (directVideoUrl.toLowerCase().endsWith('.mp4') || directVideoUrl.toLowerCase().endsWith('.webm') || directVideoUrl.toLowerCase().endsWith('.mkv') || directVideoUrl.toLowerCase().endsWith('.ogg'));
-    const isPlayImdb = directVideoUrl?.includes('playimdb.com');
+    const isHls = directVideoUrl ? directVideoUrl.split('?')[0].toLowerCase().includes('.m3u8') : false;
+    const isNativeVideo = useMemo(() => {
+        if (!directVideoUrl) return false;
+        const urlWithoutQuery = directVideoUrl.split('?')[0].toLowerCase();
+        
+        // Standard video extensions
+        const hasExtension = ['.mp4', '.webm', '.mkv', '.ogg', '.mov', '.avi', '.ts', '.flv'].some(ext => 
+            urlWithoutQuery.endsWith(ext)
+        );
+        if (hasExtension) return true;
+
+        // Check if extension is present in the path
+        const hasExtensionAnywhere = ['.mp4', '.webm', '.mkv', '.ogg', '.mov', '.avi', '.ts', '.flv'].some(ext => 
+            urlWithoutQuery.includes(ext)
+        );
+        if (hasExtensionAnywhere) return true;
+        
+        // Cloudflare R2 buckets (often host raw video files like MKV/MP4 without file extensions in the pathname)
+        if (directVideoUrl.toLowerCase().includes('.r2.dev')) return true;
+        
+        return false;
+    }, [directVideoUrl]);
+    const isPlayImdb = directVideoUrl ? directVideoUrl.includes('playimdb.com') : false;
     const isDirectIframeEmbed = (directVideoUrl && !isHls && !isNativeVideo) || isPlayImdb;
 
     const useDirect = !!directVideoUrl;
@@ -203,6 +215,52 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             return () => clearTimeout(timer);
         }
     }, [currentUser?.lowDataMode, isDriveVideo]);
+
+    // Reset playback states when content or episode changes
+    useEffect(() => {
+        setHasStartedPlaying(false);
+        setShowCopyrightApology(true);
+    }, [content.id, currentEpisodeIdx, currentSeasonIdx]);
+
+    // Track focus shifting to iframes (indicates user click/interaction with iframe players)
+    useEffect(() => {
+        const handleBlur = () => {
+            if (document.activeElement?.tagName === 'IFRAME') {
+                console.log("[Iframe Interaction] Focus shifted to iframe. Setting hasStartedPlaying to true.");
+                setHasStartedPlaying(true);
+            }
+        };
+        window.addEventListener('blur', handleBlur);
+        return () => window.removeEventListener('blur', handleBlur);
+    }, []);
+
+    // Trigger copyright apology immediately on playback errors
+    useEffect(() => {
+        if (playbackError) {
+            setShowCopyrightApology(true);
+        }
+    }, [playbackError]);
+
+    // Timeout checking: if content fails to start playing after 12s of trying, show apology
+    useEffect(() => {
+        if (hasStartedPlaying || showCopyrightApology) return;
+        if (!contentLoaderFinished) return;
+
+        // If there are no video sources at all, show apology immediately
+        if (!directVideoUrl && !youtubeVideoId && !driveIdToUse) {
+            setShowCopyrightApology(true);
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            if (!hasStartedPlaying) {
+                console.log("[Playback Timeout] Video failed to start playing after 12s. Showing copyright apology.");
+                setShowCopyrightApology(true);
+            }
+        }, 12000);
+
+        return () => clearTimeout(timer);
+    }, [contentLoaderFinished, hasStartedPlaying, showCopyrightApology, directVideoUrl, youtubeVideoId, driveIdToUse]);
 
     // Player Options
     const [qualities, setQualities] = useState<string[]>([]);
@@ -272,12 +330,22 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const progressRef = useRef(initialProgress);
     const playerContainerRef = useRef<HTMLDivElement>(null);
 
-    // Mock Audio Options
-    const AUDIO_OPTIONS = [
-        { id: 'eng_5.1', label: 'English (Original)', format: '5.1' },
-        { id: 'eng_stereo', label: 'English', format: 'Stereo' },
-        { id: 'hin_5.1', label: 'Hindi', format: '5.1' }
-    ];
+    // Dynamic Audio Options
+    const [audioTracks, setDynamicAudioTracks] = useState<any[]>([]);
+    const AUDIO_OPTIONS = useMemo(() => {
+        if (audioTracks.length > 0) {
+            return audioTracks.map(t => ({
+                id: String(t.id),
+                label: t.label || t.language || `Track ${t.id}`,
+                format: t.codec || ''
+            }));
+        }
+        return [
+            { id: 'eng_5.1', label: 'English (Original)', format: '5.1' },
+            { id: 'eng_stereo', label: 'English', format: 'Stereo' },
+            { id: 'hin_5.1', label: 'Hindi', format: '5.1' }
+        ];
+    }, [audioTracks]);
 
     const onPlayerReady = (event: any) => {
         setIsPlayerReady(true);
@@ -320,6 +388,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             setPlaying(true);
             setIsBuffering(false);
             setInitialLoad(false); // Content has started
+            setHasStartedPlaying(true);
             setDuration(event.target.getDuration());
         } else if (event.data === window.YT.PlayerState.PAUSED) {
             setPlaying(false);
@@ -385,64 +454,62 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     };
 
     // Initialize HLS Player
-    const videoRef = useRef<HTMLVideoElement>(null);
+    const videoRef = useRef<any>(null);
     const hlsRef = useRef<Hls | null>(null);
 
     useEffect(() => {
-        if (!isHls || !directVideoUrl || !videoRef.current) return;
-
-        if (Hls.isSupported()) {
-            const hls = new Hls({
-                enableWorker: true,
-                lowLatencyMode: true,
-                backBufferLength: 60
-            });
-            hlsRef.current = hls;
-            hls.loadSource(directVideoUrl);
-            hls.attachMedia(videoRef.current);
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                setIsPlayerReady(true);
-                if (playing) videoRef.current?.play();
-            });
-            hls.on(Hls.Events.LEVEL_LOADED, (event, data) => {
-                setDuration(data.details.totalduration);
-            });
-            hls.on(Hls.Events.ERROR, (event, data) => {
-                if (data.fatal) {
-                    switch (data.type) {
-                        case Hls.ErrorTypes.NETWORK_ERROR:
-                            console.error("HLS Network Error", data);
-                            hls.startLoad();
-                            break;
-                        case Hls.ErrorTypes.MEDIA_ERROR:
-                            console.error("HLS Media Error", data);
-                            hls.recoverMediaError();
-                            break;
-                        default:
-                            console.error("HLS Fatal Error", data);
-                            setPlaybackError("Failed to load video stream");
-                            hls.destroy();
-                            break;
-                    }
-                }
-            });
-        } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
-            // Native HLS support (Safari)
-            videoRef.current.src = directVideoUrl;
-            videoRef.current.addEventListener('loadedmetadata', () => {
-                setIsPlayerReady(true);
-                setDuration(videoRef.current?.duration || 0);
-                if (playing) videoRef.current?.play();
-            });
-        }
-
-        return () => {
-            if (hlsRef.current) {
-                hlsRef.current.destroy();
-                hlsRef.current = null;
-            }
-        };
+        // HLS initialization is now handled internally by MoviVideo
+        return () => {};
     }, [isHls, directVideoUrl]);
+
+    // Handle loaded metadata and dynamic track extraction
+    const handleLoadedMetadata = useCallback((e: any) => {
+        if (videoRef.current) {
+            setIsPlayerReady(true);
+            setHasStartedPlaying(true);
+            const dur = videoRef.current.duration || e?.target?.duration || 0;
+            setDuration(dur);
+            
+            // Query dynamic tracks from Movi player
+            if (videoRef.current.getSubtitleTracks) {
+                const subs = videoRef.current.getSubtitleTracks();
+                if (subs && subs.length > 0) {
+                    setSubtitleTracks(subs.map((s: any) => ({
+                        id: s.id,
+                        languageCode: s.language || s.label || `sub_${s.id}`,
+                        displayName: s.label || s.language || `Subtitle ${s.id}`
+                    })));
+                }
+            }
+            if (videoRef.current.getAudioTracks) {
+                const auds = videoRef.current.getAudioTracks();
+                if (auds && auds.length > 0) {
+                    setDynamicAudioTracks(auds);
+                    // Find active track and set it
+                    const activeTrack = auds.find((t: any) => t.id === videoRef.current.getActiveAudioTrack?.()?.id) || auds[0];
+                    setSelectedAudio({
+                        id: String(activeTrack.id),
+                        label: activeTrack.label || activeTrack.language || `Track ${activeTrack.id}`,
+                        format: activeTrack.codec || ''
+                    });
+                }
+            }
+            
+            if (playing) {
+                videoRef.current.play().catch(console.error);
+            }
+        }
+    }, [playing]);
+
+    // Sync selectedAudio to Movi player
+    useEffect(() => {
+        if (selectedAudio && videoRef.current && videoRef.current.setAudioTrack) {
+            const trackId = parseInt(selectedAudio.id, 10);
+            if (!isNaN(trackId)) {
+                videoRef.current.setAudioTrack(trackId);
+            }
+        }
+    }, [selectedAudio]);
 
     // Sync HLS/Native Playback state
     useEffect(() => {
@@ -459,6 +526,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 const curr = videoRef.current.currentTime;
                 const dur = videoRef.current.duration;
                 setCurrentTime(curr);
+                if (curr > 0) {
+                    setHasStartedPlaying(true);
+                }
                 if (dur > 0) {
                     setDuration(dur);
                     const prog = (curr / dur) * 100;
@@ -566,6 +636,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 const curr = playerRef.current.getCurrentTime();
                 const dur = playerRef.current.getDuration();
                 setCurrentTime(curr);
+                if (curr > 0) {
+                    setHasStartedPlaying(true);
+                }
                 setDuration(dur);
                 const prog = (curr / dur) * 100;
                 setProgress(prog);
@@ -833,6 +906,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         }
     }, [isPlayerReady, showContentLoader, handleLoaderComplete, loaderStartTime]);
 
+    const handleIframeLoad = () => {
+        console.log("[Iframe Load] Direct iframe loaded successfully. Setting hasStartedPlaying to true.");
+        setHasStartedPlaying(true);
+    };
+
     const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
         if (isDriveVideo) return;
         const rect = e.currentTarget.getBoundingClientRect();
@@ -858,6 +936,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 playerRef.current.setOption('captions', 'track', {}); // Reset
             }
         }
+        if (videoRef.current && videoRef.current.setSubtitle) {
+            videoRef.current.setSubtitle(track ? track.id : null);
+        }
     };
 
     // Fallback if API doesn't return tracks (common for embeds)
@@ -876,13 +957,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     // --- PlayIMDB Link Transformer ---
     const getFinalVideoUrl = (url: string) => {
-        if (!url) return '';
-        if (url.includes('playimdb.com')) {
-            // Standardize all PlayIMDb links (title, movie, or tv) to the working embed format
-            return url.replace('/title/', '/embed/')
-                      .replace('/movie/', '/embed/')
-                      .replace('/tv/', '/embed/') + (url.includes('?') ? '' : '?autoplay=1');
-        }
         return url;
     };
 
@@ -907,19 +981,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     {directVideoUrl && (
                         <div className="absolute inset-0 w-full h-full pointer-events-auto z-[20]">
                             {(isHls || isNativeVideo) ? (
-                                <video
+                                <MoviVideo
                                     ref={videoRef}
                                     className="w-full h-full object-contain"
                                     playsInline
                                     onClick={() => setPlaying(!playing)}
-                                    src={isNativeVideo ? directVideoUrl : undefined}
-                                    onLoadedMetadata={(e) => {
-                                        if (isNativeVideo) {
-                                            setIsPlayerReady(true);
-                                            setDuration(e.currentTarget.duration);
-                                            if (playing) e.currentTarget.play().catch(console.error);
-                                        }
-                                    }}
+                                    src={directVideoUrl}
+                                    onLoadedMetadata={handleLoadedMetadata}
+                                    onError={(err) => setPlaybackError(err.message || 'Movi player playback error')}
                                 />
                             ) : (
                                 <iframe 
@@ -930,6 +999,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                     frameBorder="0"
                                     scrolling="no"
                                     title={content.title}
+                                    onLoad={handleIframeLoad}
                                 />
                             )}
                         </div>
@@ -942,6 +1012,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                 driveId={driveIdToUse}
                                 title={content.title}
                                 autoplay={playing}
+                                onLoad={() => {
+                                    console.log("[DrivePlayer Load] Google Drive loaded successfully. Setting hasStartedPlaying to true.");
+                                    setHasStartedPlaying(true);
+                                }}
                             />
                         </div>
                     )}
@@ -1055,7 +1129,44 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     )}
 
                     {/* Common Overlays (Error, Skip Intro, Stats) */}
-                    {playbackError && (
+                    {showCopyrightApology && (
+                        <div className="absolute inset-0 z-[260] bg-[#0c0c0c]/95 backdrop-blur-md flex items-center justify-center p-4 md:p-6 text-center animate-in fade-in duration-300">
+                            <div className="max-w-md w-full bg-[#141414] border border-white/10 rounded-3xl p-8 md:p-10 shadow-[0_20px_50px_rgba(0,0,0,0.9)] flex flex-col items-center relative overflow-hidden">
+                                {/* Subtle background red glow */}
+                                <div className="absolute -top-24 -left-24 w-48 h-48 bg-brand-red/10 rounded-full blur-3xl pointer-events-none"></div>
+                                <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-brand-red/10 rounded-full blur-3xl pointer-events-none"></div>
+                                
+                                <div className="bg-brand-red/10 p-5 rounded-full mb-6 border border-brand-red/20 ring-4 ring-brand-red/5">
+                                    <AlertCircle size={48} className="text-brand-red animate-pulse-fast" />
+                                </div>
+                                
+                                <h2 className="text-2xl md:text-3xl font-black text-white mb-3 tracking-tight uppercase">
+                                    We are Sorry
+                                </h2>
+                                
+                                <p className="text-red-400/90 font-bold text-xs md:text-sm uppercase tracking-widest mb-6">
+                                    Content Restricted
+                                </p>
+                                
+                                <div className="w-full h-px bg-white/5 mb-6"></div>
+                                
+                                <p className="text-gray-300 text-sm md:text-base leading-relaxed mb-8">
+                                    Due to copyright infringement restrictions, we can't play this {content.type === 'tv' ? 'web series' : 'movie'} at this moment. We apologize for the inconvenience.
+                                </p>
+                                
+                                <div className="flex flex-col sm:flex-row gap-3 w-full justify-center">
+                                    <button
+                                        onClick={onClose}
+                                        className="w-full sm:w-auto bg-white text-black px-8 py-3.5 rounded-xl font-bold hover:bg-gray-200 transition-all active:scale-95 text-sm"
+                                    >
+                                        Go Back
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {playbackError && !showCopyrightApology && (
                         <div className="absolute inset-0 z-[250] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in fade-in">
                             <div className="bg-brand-red/10 p-6 rounded-full mb-6 border border-brand-red/20 shadow-[0_0_50px_rgba(229,9,20,0.2)]">
                                 <AlertCircle size={64} className="text-brand-red" />

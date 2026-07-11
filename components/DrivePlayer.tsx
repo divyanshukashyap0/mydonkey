@@ -5,13 +5,14 @@ interface DrivePlayerProps {
     driveId: string;
     title?: string;
     autoplay?: boolean;
+    onLoad?: () => void;
 }
 
 /**
  * DrivePlayer - A stable Google Drive streaming component.
  * Uses the official /preview iframe method to avoid 403 errors and range request blocks.
  */
-const DrivePlayer: React.FC<DrivePlayerProps> = ({ driveId, title = 'Video Content', autoplay = true }) => {
+const DrivePlayer: React.FC<DrivePlayerProps> = ({ driveId, title = 'Video Content', autoplay = true, onLoad }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
 
@@ -39,7 +40,10 @@ const DrivePlayer: React.FC<DrivePlayerProps> = ({ driveId, title = 'Video Conte
 
     // Handle iframe load event — delay reveal so Drive's disclaimer screen is hidden behind our overlay
     const handleLoad = () => {
-        setTimeout(() => setLoading(false), 2500);
+        setTimeout(() => {
+            setLoading(false);
+            onLoad?.();
+        }, 2500);
     };
 
     return (

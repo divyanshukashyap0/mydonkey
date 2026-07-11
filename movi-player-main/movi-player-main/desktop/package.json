@@ -1,0 +1,28 @@
+{
+  "name": "movi-player-desktop",
+  "productName": "MoviPlayer",
+  "version": "0.3.5",
+  "description": "MoviPlayer",
+  "author": "MoviPlayer",
+  "license": "Apache-2.0",
+  "main": "src/main.js",
+  "scripts": {
+    "prestart": "node scripts/sync-assets.mjs",
+    "start": "node scripts/run-electron.mjs",
+    "smoke": "node scripts/run-electron.mjs scripts/smoke.js",
+    "predist": "node scripts/sync-assets.mjs",
+    "dist": "electron-builder",
+    "predist:mac": "node scripts/sync-assets.mjs",
+    "dist:mac": "electron-builder --mac",
+    "predist:win": "node scripts/sync-assets.mjs",
+    "dist:win": "electron-builder --win",
+    "predist:linux": "node scripts/sync-assets.mjs",
+    "dist:linux": "electron-builder --linux",
+    "sync": "node scripts/sync-assets.mjs"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "png2icons": "^2.0.1"
+  }
+}

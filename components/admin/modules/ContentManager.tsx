@@ -200,7 +200,7 @@ const ContentManager = () => {
                 cast: (prev.cast && (prev.cast as string[]).length > 0) ? prev.cast : cast,
                 duration: prev.duration || runtime,
                 rating: prev.rating || rating,
-                videoUrl: prev.videoUrl || `https://www.playimdb.com/title/${imdbId || result.id}/`,
+                videoUrl: prev.videoUrl || '',
                 seasons: type === 'tv' ? newSeasons : prev.seasons,
             }));
 
@@ -324,8 +324,6 @@ const ContentManager = () => {
                 movieDriveId: formData.type === 'movie' ? extractDriveId(formData.movieDriveId || '') : undefined,
                 movieYoutubeId: formData.type === 'movie' ? extractYoutubeId(formData.movieYoutubeId || '') : undefined,
                 videoUrl: formData.videoUrl || '',
-                imdbId: formData.imdbId || '',
-                tmdbId: formData.tmdbId || null,
                 type: formData.type || 'movie',
                 genres: formData.genres || [],
                 release_date: formData.release_date || now.split('T')[0],
@@ -429,9 +427,9 @@ const ContentManager = () => {
                     const imdbId = detail.external_ids?.imdb_id || (detail as any).imdb_id || '';
                     let videoUrl = item.videoUrl;
 
-                    // Only update videoUrl if it's currently empty or already a playimdb link
-                    if (!videoUrl || videoUrl.includes('playimdb.com')) {
-                        videoUrl = `https://www.playimdb.com/title/${imdbId || item.tmdbId}/`;
+                    // Clear playimdb links
+                    if (videoUrl && videoUrl.includes('playimdb.com')) {
+                        videoUrl = '';
                     }
 
                     const updates: any = {
@@ -803,11 +801,11 @@ const ContentManager = () => {
 
                         <div>
                             <label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2 mt-4">Player Video URL (Optional)</label>
-                            <div className="text-[10px] text-gray-400 mb-1">Overrides the primary source for playback. Useful for PlayIMDb links or direct MP4/HLS links.</div>
+                            <div className="text-[10px] text-gray-400 mb-1">Overrides the primary source for playback. Useful for direct MP4/HLS or tokenized R2 video links.</div>
                             <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none font-mono text-sm"
                                 value={formData.videoUrl || ''}
                                 onChange={e => setFormData({ ...formData, videoUrl: extractVideoUrl(e.target.value) })}
-                                placeholder="https://www.playimdb.com/title/ttXXXXX/" />
+                                placeholder="https://pub-xxx.r2.dev/video.mkv?token=xxx" />
                         </div>
 
                         {/* Video Preview */}

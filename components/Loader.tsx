@@ -1,4 +1,5 @@
 import React from 'react';
+import { MoviVideo } from './MoviVideo';
 
 interface LoaderProps {
     dataReady?: boolean;
@@ -6,7 +7,7 @@ interface LoaderProps {
 }
 
 const Loader: React.FC<LoaderProps> = ({ dataReady = true, onComplete }) => {
-    const videoRef = React.useRef<HTMLVideoElement>(null);
+    const videoRef = React.useRef<any>(null);
     const [shouldShowVideo] = React.useState(() => {
         const lastShown = localStorage.getItem('last_app_loader_date');
         return lastShown !== new Date().toDateString();
@@ -46,12 +47,11 @@ const Loader: React.FC<LoaderProps> = ({ dataReady = true, onComplete }) => {
 
     return (
         <div className="fixed inset-0 z-[9999] bg-black flex items-center justify-center">
-            <video
+            <MoviVideo
                 ref={videoRef}
-                src="/mydoneky%20loader.mp4"
+                src="/mydoneky loader.mp4"
                 autoPlay
                 muted
-                playsInline
                 onEnded={handleVideoEnd}
                 className="w-24 h-24 object-cover rounded-full pointer-events-none"
             />
