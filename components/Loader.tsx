@@ -1,5 +1,4 @@
-import React from 'react';
-import { MoviVideo } from './MoviVideo';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 interface LoaderProps {
     dataReady?: boolean;
@@ -7,54 +6,64 @@ interface LoaderProps {
 }
 
 const Loader: React.FC<LoaderProps> = ({ dataReady = true, onComplete }) => {
-    const videoRef = React.useRef<any>(null);
-    const [shouldShowVideo] = React.useState(() => {
-        const lastShown = localStorage.getItem('last_app_loader_date');
-        return lastShown !== new Date().toDateString();
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const [shouldShowVideo] = useState(() => {
+        try {
+            const lastShown = localStorage.getItem('last_app_loader_date');
+            return lastShown !== new Date().toDateString();
+        } catch (e) {
+            return false;
+        }
     });
 
-    React.useEffect(() => {
+    const finish = useCallback(() => {
+        try {
+            localStorage.setItem('last_app_loader_date', new Date().toDateString());
+        } catch (e) {}
+        if (onComplete) onComplete();
+    }, [onComplete]);
+
+    // Safety timeout: dismiss after 2 seconds max regardless of video state
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            finish();
+        }, 2000);
+        return () => clearTimeout(timer);
+    }, [finish]);
+
+    useEffect(() => {
         if (!shouldShowVideo && dataReady && onComplete) {
-            onComplete();
+            finish();
         }
-    }, [shouldShowVideo, dataReady, onComplete]);
+    }, [shouldShowVideo, dataReady, finish, onComplete]);
 
-    const handleVideoEnd = () => {
-        // Save today's date so we skip the video next time
-        localStorage.setItem('last_app_loader_date', new Date().toDateString());
-        
-        if (dataReady) {
-            if (onComplete) onComplete();
-        } else {
-            // Data not ready, replay
-            if (videoRef.current) {
-                videoRef.current.currentTime = 0;
-                videoRef.current.play();
-            }
-        }
-    };
-
-    if (!shouldShowVideo) {
-        return (
-            <div className="fixed inset-0 z-[9999] bg-black flex items-center justify-center">
+    return (
+        <div
+            onClick={finish}
+            className="fixed inset-0 z-[9999] bg-[#0a0a0a] flex items-center justify-center cursor-pointer select-none transition-opacity duration-300"
+        >
+            {shouldShowVideo ? (
+                <div className="flex flex-col items-center gap-4">
+                    <video
+                        ref={videoRef}
+                        src="/mydoneky loader.mp4"
+                        autoPlay
+                        muted
+                        playsInline
+                        onEnded={finish}
+                        onError={finish}
+                        className="w-28 h-28 object-cover rounded-full pointer-events-none shadow-2xl"
+                    />
+                    <div className="text-white/40 text-xs font-bold tracking-[0.2em] uppercase animate-pulse">
+                        My Donkey
+                    </div>
+                </div>
+            ) : (
                 <div className="flex flex-col items-center gap-4">
                     <div className="w-12 h-12 border-4 border-[#e50914] border-t-transparent rounded-full animate-spin shadow-[0_0_15px_rgba(229,9,20,0.4)]"></div>
                     <div className="text-white/40 text-xs font-bold tracking-[0.2em] uppercase animate-pulse">Loading My Donkey</div>
                 </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="fixed inset-0 z-[9999] bg-black flex items-center justify-center">
-            <MoviVideo
-                ref={videoRef}
-                src="/mydoneky loader.mp4"
-                autoPlay
-                muted
-                onEnded={handleVideoEnd}
-                className="w-24 h-24 object-cover rounded-full pointer-events-none"
-            />
+            )}
         </div>
     );
 };

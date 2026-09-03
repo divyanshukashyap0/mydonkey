@@ -18,7 +18,7 @@ const ExclusiveContentManager = () => {
         if (filterType === 'free') list = list.filter(c => !c.isExclusive);
         if (search.trim()) {
             const q = search.toLowerCase();
-            list = list.filter(c => c.title.toLowerCase().includes(q));
+            list = list.filter(c => (c.title || '').toLowerCase().includes(q));
         }
         return list;
     }, [allContent, search, filterType]);

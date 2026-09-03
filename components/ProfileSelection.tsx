@@ -30,7 +30,7 @@ const ProfileSelection = () => {
     if (!currentUser) return;
     const safetyTimer = setTimeout(() => setLoading(false), 3000);
     const unsub = onSnapshot(collection(db, 'users', currentUser.uid, 'profiles'), (snap) => {
-      setProfiles(snap.docs.map(d => d.data() as Profile));
+      setProfiles(snap.docs.map(d => ({ id: d.id, ...d.data() } as Profile)));
       setLoading(false);
       clearTimeout(safetyTimer);
     }, (err) => {
@@ -72,9 +72,18 @@ const ProfileSelection = () => {
 
   const handleDelete = async () => {
     if (mode === 'edit' && editingProfileId) {
+      if (profiles.length <= 1) {
+        alert('You cannot delete your only profile. An account must keep at least one profile.');
+        return;
+      }
       if (window.confirm('Are you sure you want to delete this profile?')) {
-        await deleteProfile(editingProfileId);
-        setMode('manage');
+        try {
+          await deleteProfile(editingProfileId);
+          setEditingProfileId(null);
+          setMode('select');
+        } catch (err: any) {
+          alert(`Failed to delete profile: ${err.message || err}`);
+        }
       }
     }
   };

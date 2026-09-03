@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { Search, Play, AlertCircle, Film, Loader2 } from 'lucide-react';
 import { findByIMDbId, tmdbPosterUrl, tmdbBackdropUrl, mapTMDBGenres, TMDBDetail } from '../services/tmdbService';
 import { Content } from '../types';
+import { useStore } from '../context/StoreContext';
 
 const IMDbStreamPage: React.FC = () => {
+    const { addToWatchHistory } = useStore();
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
@@ -52,7 +54,8 @@ const IMDbStreamPage: React.FC = () => {
             id: `imdb_${rawId}`,
             title: detail.title || detail.name || 'IMDb Stream',
             type: isTv ? 'tv' : 'movie',
-            videoUrl: rawId,
+            imdbId: rawId,
+            videoUrl: `https://proxy.garageband.rocks/embed/movie/${rawId}`,
             poster_path: detail.poster_path ? tmdbPosterUrl(detail.poster_path) : '',
             backdrop_path: detail.backdrop_path ? tmdbBackdropUrl(detail.backdrop_path) : '',
             overview: detail.overview || '',
@@ -64,7 +67,10 @@ const IMDbStreamPage: React.FC = () => {
             createdAt: new Date().toISOString()
         };
 
-        navigate(`/watch/${mockItem.id}?mode=movie`, { state: { item: mockItem } });
+        addToWatchHistory(mockItem).catch(e => console.error("Error saving watch history:", e));
+        setTimeout(() => {
+            window.location.href = `https://proxy.garageband.rocks/embed/movie/${rawId}`;
+        }, 100);
     };
 
     return (

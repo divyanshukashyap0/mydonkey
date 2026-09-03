@@ -86,6 +86,7 @@ interface StoreContextType {
     updateProfile: (profileId: string, updates: Partial<Profile>) => Promise<void>;
     deleteProfile: (profileId: string) => Promise<void>;
     updatePlaybackProgress: (movieId: string, progress: number, stoppedAt: number, duration: number) => Promise<void>;
+    addToWatchHistory: (contentOrId: Content | string) => Promise<void>;
     updateUserEmail: (newEmail: string) => Promise<void>;
     triggerPasswordReset: () => Promise<void>;
     updateSubscriptionPlan: (planId: string, paymentResponse?: any) => Promise<void>;
@@ -575,12 +576,26 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         });
 
         const unsubProfiles = onSnapshot(collection(db, 'users', fbUser.uid, 'profiles'), (snap) => {
-            const profiles = snap.docs.map(d => d.data() as Profile);
+            const profiles = snap.docs.map(d => ({ id: d.id, ...d.data() } as Profile));
             setUserProfiles(profiles);
 
             if (currentProfile) {
                 const updated = profiles.find(p => p.id === currentProfile.id);
-                if (updated) setCurrentProfile(updated);
+                if (updated) {
+                    setCurrentProfile(updated);
+                } else if (profiles.length > 0) {
+                    setCurrentProfile(profiles[0]);
+                    localStorage.setItem('selectedProfileId', profiles[0].id);
+                } else {
+                    setCurrentProfile(null);
+                    localStorage.removeItem('selectedProfileId');
+                }
+            } else if (profiles.length > 0) {
+                const savedId = localStorage.getItem('selectedProfileId');
+                const matched = savedId ? profiles.find(p => p.id === savedId) : null;
+                const active = matched || profiles[0];
+                setCurrentProfile(active);
+                localStorage.setItem('selectedProfileId', active.id);
             }
         });
 
@@ -735,6 +750,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     const deleteContent = async (id: string) => {
         await deleteDoc(doc(db, 'content', id));
+        setContent(prev => prev.filter(c => c.id !== id));
         await publishCatalog();
     };
 
@@ -787,25 +803,47 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         const id = `profile_${Date.now()}`;
         const newProfile: Profile = { id, name, isKids, avatarUrl, myList: [] };
         await setDoc(doc(db, 'users', fbUser.uid, 'profiles', id), newProfile);
+        setUserProfiles(prev => [...prev, newProfile]);
         return newProfile;
     };
 
     const updateProfile = async (profileId: string, updates: Partial<Profile>) => {
-        if (!fbUser) return;
+        if (!fbUser || !profileId) return;
         await updateDoc(doc(db, 'users', fbUser.uid, 'profiles', profileId), updates);
+        setUserProfiles(prev => prev.map(p => p.id === profileId ? { ...p, ...updates } : p));
 
         // Update local state if it's the current profile
         if (currentProfile?.id === profileId) {
-            setCurrentProfile({ ...currentProfile, ...updates });
+            setCurrentProfile(prev => prev ? { ...prev, ...updates } : null);
         }
     };
 
     const deleteProfile = async (profileId: string) => {
-        if (!fbUser) return;
-        await deleteDoc(doc(db, 'users', fbUser.uid, 'profiles', profileId));
+        if (!fbUser || !profileId) return;
+
+        if (userProfiles.length <= 1) {
+            alert("Cannot delete your only profile. You must keep at least one profile.");
+            return;
+        }
+
+        try {
+            await deleteDoc(doc(db, 'users', fbUser.uid, 'profiles', profileId));
+        } catch (err) {
+            console.error("Failed to delete profile document from Firestore:", err);
+            throw err;
+        }
+
+        const remaining = userProfiles.filter(p => p.id !== profileId);
+        setUserProfiles(remaining);
+
         if (currentProfile?.id === profileId) {
-            setCurrentProfile(null);
-            localStorage.removeItem('selectedProfileId');
+            const nextProfile = remaining[0] || null;
+            setCurrentProfile(nextProfile);
+            if (nextProfile) {
+                localStorage.setItem('selectedProfileId', nextProfile.id);
+            } else {
+                localStorage.removeItem('selectedProfileId');
+            }
         }
     };
 
@@ -835,6 +873,55 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         else updatedHistory.unshift(newEntry);
         updatedHistory = updatedHistory.slice(0, 20);
         await updateUser({ continueWatching: updatedHistory });
+    };
+
+    const addToWatchHistory = async (contentOrId: Content | string) => {
+        const movieId = typeof contentOrId === 'string' ? contentOrId : contentOrId.id;
+        const now = new Date().toISOString();
+
+        // 1. Synchronous localStorage write to survive immediate page redirect
+        try {
+            const raw = localStorage.getItem('my_donkey_watch_history');
+            const list = raw ? JSON.parse(raw) : [];
+            const filtered = list.filter((i: any) => i.movieId !== movieId);
+            filtered.unshift({
+                movieId,
+                progress: 15,
+                stoppedAt: 60,
+                duration: 7200,
+                lastWatchedAt: now
+            });
+            localStorage.setItem('my_donkey_watch_history', JSON.stringify(filtered.slice(0, 30)));
+        } catch (e) {
+            console.warn("Local watch history update failed:", e);
+        }
+
+        // 2. Update currentUser continueWatching in Firestore
+        if (currentUser) {
+            const history = currentUser.continueWatching || [];
+            const existingIdx = history.findIndex(h => h.movieId === movieId);
+            const newEntry: ContinueWatchingItem = {
+                movieId,
+                progress: 15,
+                stoppedAt: 60,
+                duration: 7200,
+                lastWatchedAt: now
+            };
+            let updatedHistory = [...history];
+            if (existingIdx > -1) updatedHistory[existingIdx] = newEntry;
+            else updatedHistory.unshift(newEntry);
+            updatedHistory = updatedHistory.slice(0, 30);
+
+            setCurrentUser(prev => prev ? { ...prev, continueWatching: updatedHistory } : null);
+
+            if (fbUser) {
+                try {
+                    await updateDoc(doc(db, 'users', fbUser.uid), { continueWatching: updatedHistory });
+                } catch (err) {
+                    console.error("Failed to save continueWatching to Firestore:", err);
+                }
+            }
+        }
     };
 
     // --- New Account Management Methods ---
@@ -1049,6 +1136,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         updateProfile,
         deleteProfile,
         updatePlaybackProgress,
+        addToWatchHistory,
         updateUserEmail,
         triggerPasswordReset,
         updateSubscriptionPlan,
@@ -1135,6 +1223,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     // Minimum Loading Time Logic
     const [minLoadFinished, setMinLoadFinished] = useState(false);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setMinLoadFinished(true);
+        }, 2200);
+        return () => clearTimeout(timer);
+    }, []);
 
     return (
         <StoreContext.Provider value={contextValue}>

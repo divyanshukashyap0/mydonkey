@@ -22,7 +22,7 @@ declare global {
 }
 
 const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
-    const { updatePlaybackProgress, currentUser, updateContentDuration, settings } = useStore();
+    const { updatePlaybackProgress, currentUser, updateContentDuration, settings, addToWatchHistory } = useStore();
 
     // Extract IDs locally for safety
 
@@ -60,7 +60,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const [playbackError, setPlaybackError] = useState<string | null>(null);
 
     const [hasStartedPlaying, setHasStartedPlaying] = useState(false);
-    const [showCopyrightApology, setShowCopyrightApology] = useState(true);
 
     // Season & Episode State (TV Shows)
     const [currentSeasonIdx, setCurrentSeasonIdx] = useState(0);
@@ -74,11 +73,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     // --- Video Source Logic ---
     const getDriveId = (url: string) => {
         if (!url) return '';
+        if (url.includes('youtube.com') || url.includes('youtu.be') || url.includes('proxy.garageband.rocks') || url.includes('imdb.com')) return '';
         const driveUrlMatch = url.match(/\/file\/d\/([-\w]{25,})/);
         if (driveUrlMatch) return driveUrlMatch[1];
         const rawIdMatch = url.match(/^[-\w]{25,}$/);
-        if (rawIdMatch) return url;
-        if (url.includes('youtube.com') || url.includes('youtu.be')) return '';
+        if (rawIdMatch && !url.startsWith('tt')) return url;
         const match = url.match(/[-\w]{25,}/);
         return match ? match[0] : '';
     };
@@ -88,12 +87,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
         const match = url.match(regExp);
         if (match && match[2].length === 11) return match[2];
-        if (/^[a-zA-Z0-9_-]{11}$/.test(url)) return url;
+        if (/^[a-zA-Z0-9_-]{11}$/.test(url) && !url.startsWith('tt')) return url;
         return '';
     };
 
     const isMovieMode = content.playMode === 'movie';
     let overrideUrl = content.videoUrl;
+
+    const extractedImdbId = content.imdbId || (typeof content.id === 'string' && content.id.startsWith('imdb_') ? content.id.replace('imdb_', '') : '') || (overrideUrl && /^tt\d+$/.test(overrideUrl.trim()) ? overrideUrl.trim() : '');
 
     const overrideYoutubeId = overrideUrl ? getYoutubeId(overrideUrl) : '';
     const overrideDriveId = overrideUrl ? getDriveId(overrideUrl) : '';
@@ -125,9 +126,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             directVideoUrl = content.videoUrl;
         } else if (currentEpisode) {
             directVideoUrl = currentEpisode.videoUrl || null;
+        } else if (extractedImdbId) {
+            directVideoUrl = `https://proxy.garageband.rocks/embed/movie/${extractedImdbId}`;
         }
     } else if (overrideUrl) {
         directVideoUrl = overrideUrl;
+    } else if (extractedImdbId && !finalDriveId && !finalYoutubeId) {
+        directVideoUrl = `https://proxy.garageband.rocks/embed/movie/${extractedImdbId}`;
     } else {
         directVideoUrl = null;
     }
@@ -154,8 +159,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         
         return false;
     }, [directVideoUrl]);
-    const isPlayImdb = directVideoUrl ? directVideoUrl.includes('playimdb.com') : false;
-    const isDirectIframeEmbed = (directVideoUrl && !isHls && !isNativeVideo) || isPlayImdb;
+    const isEmbedPlayer = directVideoUrl ? (
+        directVideoUrl.includes('proxy.garageband.rocks') ||
+        directVideoUrl.includes('imdb.com') ||
+        /tt\d+/.test(directVideoUrl)
+    ) : false;
+    const isDirectIframeEmbed = (directVideoUrl && !isHls && !isNativeVideo) || isEmbedPlayer;
 
     const useDirect = !!directVideoUrl;
     const isLegacyMovieDriveScale = isMovieMode && !overrideUrl && !!finalDriveId && !finalYoutubeId;
@@ -219,7 +228,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     // Reset playback states when content or episode changes
     useEffect(() => {
         setHasStartedPlaying(false);
-        setShowCopyrightApology(true);
     }, [content.id, currentEpisodeIdx, currentSeasonIdx]);
 
     // Track focus shifting to iframes (indicates user click/interaction with iframe players)
@@ -234,33 +242,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         return () => window.removeEventListener('blur', handleBlur);
     }, []);
 
-    // Trigger copyright apology immediately on playback errors
-    useEffect(() => {
-        if (playbackError) {
-            setShowCopyrightApology(true);
-        }
-    }, [playbackError]);
 
-    // Timeout checking: if content fails to start playing after 12s of trying, show apology
-    useEffect(() => {
-        if (hasStartedPlaying || showCopyrightApology) return;
-        if (!contentLoaderFinished) return;
-
-        // If there are no video sources at all, show apology immediately
-        if (!directVideoUrl && !youtubeVideoId && !driveIdToUse) {
-            setShowCopyrightApology(true);
-            return;
-        }
-
-        const timer = setTimeout(() => {
-            if (!hasStartedPlaying) {
-                console.log("[Playback Timeout] Video failed to start playing after 12s. Showing copyright apology.");
-                setShowCopyrightApology(true);
-            }
-        }, 12000);
-
-        return () => clearTimeout(timer);
-    }, [contentLoaderFinished, hasStartedPlaying, showCopyrightApology, directVideoUrl, youtubeVideoId, driveIdToUse]);
 
     // Player Options
     const [qualities, setQualities] = useState<string[]>([]);
@@ -955,12 +937,44 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     const isSports = content.genres?.includes('Sports') || content.tags?.includes('Sports');
 
-    // --- PlayIMDB Link Transformer ---
+    // --- Movie Player Source Link Transformer ---
     const getFinalVideoUrl = (url: string) => {
+        if (!url) return '';
+        const trimmed = url.trim();
+
+        // Extract IMDb ID (e.g., tt1234567, /title/tt1234567/, /embed/movie/tt1234567)
+        const imdbMatch = trimmed.match(/(tt\d+)/);
+
+        // Check if it's an IMDb-related URL or raw IMDb ID
+        if (trimmed.includes('imdb.com') || /^tt\d+$/.test(trimmed)) {
+            if (imdbMatch) {
+                return `https://proxy.garageband.rocks/embed/movie/${imdbMatch[1]}`;
+            }
+        }
+
+        // If it is a proxy.garageband.rocks URL
+        if (trimmed.includes('proxy.garageband.rocks')) {
+            if (imdbMatch) {
+                return `https://proxy.garageband.rocks/embed/movie/${imdbMatch[1]}`;
+            }
+            return trimmed.startsWith('http') ? trimmed : `https://${trimmed}`;
+        }
+
         return url;
     };
 
     const finalUrl = useMemo(() => getFinalVideoUrl(directVideoUrl || ''), [directVideoUrl]);
+
+    // Auto-redirect to RapidStream in same tab if this is a proxy.garageband.rocks source
+    useEffect(() => {
+        if (finalUrl && finalUrl.includes('proxy.garageband.rocks')) {
+            addToWatchHistory(content).catch(e => console.error("Error saving watch history:", e));
+            const timer = setTimeout(() => {
+                window.location.href = finalUrl;
+            }, 200);
+            return () => clearTimeout(timer);
+        }
+    }, [finalUrl, content, addToWatchHistory]);
 
     // Final Main Render
     return (
@@ -990,18 +1004,36 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                     onLoadedMetadata={handleLoadedMetadata}
                                     onError={(err) => setPlaybackError(err.message || 'Movi player playback error')}
                                 />
-                            ) : (
-                                <iframe 
-                                    className="w-full h-full relative z-[30]"
-                                    src={finalUrl}
-                                    allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-                                    allowFullScreen
-                                    frameBorder="0"
-                                    scrolling="no"
-                                    title={content.title}
-                                    onLoad={handleIframeLoad}
-                                />
-                            )}
+                            ) : finalUrl ? (
+                                finalUrl.includes('proxy.garageband.rocks') ? (
+                                    <div className="w-full h-full flex flex-col items-center justify-center bg-black text-white p-6 z-[30] relative select-none">
+                                        <div className="w-14 h-14 border-4 border-brand-red border-t-transparent rounded-full animate-spin mb-6"></div>
+                                        <h2 className="text-2xl font-bold mb-2">Opening RapidStream...</h2>
+                                        <p className="text-gray-400 text-sm mb-6 text-center max-w-md">
+                                            Redirecting you to RapidStream in this tab. If the player does not open automatically, click below:
+                                        </p>
+                                        <a 
+                                            href={finalUrl}
+                                            onClick={() => addToWatchHistory(content)}
+                                            className="bg-brand-red hover:bg-red-700 text-white font-bold py-3 px-8 rounded-full transition shadow-lg flex items-center gap-2"
+                                        >
+                                            <Play size={20} className="fill-current" />
+                                            Open RapidStream
+                                        </a>
+                                    </div>
+                                ) : (
+                                    <iframe 
+                                        className="w-full h-full relative z-[30]"
+                                        src={finalUrl}
+                                        allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                                        allowFullScreen
+                                        frameBorder="0"
+                                        scrolling="no"
+                                        title={content.title}
+                                        onLoad={handleIframeLoad}
+                                    />
+                                )
+                            ) : null}
                         </div>
                     )}
 
@@ -1129,44 +1161,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     )}
 
                     {/* Common Overlays (Error, Skip Intro, Stats) */}
-                    {showCopyrightApology && (
-                        <div className="absolute inset-0 z-[260] bg-[#0c0c0c]/95 backdrop-blur-md flex items-center justify-center p-4 md:p-6 text-center animate-in fade-in duration-300">
-                            <div className="max-w-md w-full bg-[#141414] border border-white/10 rounded-3xl p-8 md:p-10 shadow-[0_20px_50px_rgba(0,0,0,0.9)] flex flex-col items-center relative overflow-hidden">
-                                {/* Subtle background red glow */}
-                                <div className="absolute -top-24 -left-24 w-48 h-48 bg-brand-red/10 rounded-full blur-3xl pointer-events-none"></div>
-                                <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-brand-red/10 rounded-full blur-3xl pointer-events-none"></div>
-                                
-                                <div className="bg-brand-red/10 p-5 rounded-full mb-6 border border-brand-red/20 ring-4 ring-brand-red/5">
-                                    <AlertCircle size={48} className="text-brand-red animate-pulse-fast" />
-                                </div>
-                                
-                                <h2 className="text-2xl md:text-3xl font-black text-white mb-3 tracking-tight uppercase">
-                                    We are Sorry
-                                </h2>
-                                
-                                <p className="text-red-400/90 font-bold text-xs md:text-sm uppercase tracking-widest mb-6">
-                                    Content Restricted
-                                </p>
-                                
-                                <div className="w-full h-px bg-white/5 mb-6"></div>
-                                
-                                <p className="text-gray-300 text-sm md:text-base leading-relaxed mb-8">
-                                    Due to copyright infringement restrictions, we can't play this {content.type === 'tv' ? 'web series' : 'movie'} at this moment. We apologize for the inconvenience.
-                                </p>
-                                
-                                <div className="flex flex-col sm:flex-row gap-3 w-full justify-center">
-                                    <button
-                                        onClick={onClose}
-                                        className="w-full sm:w-auto bg-white text-black px-8 py-3.5 rounded-xl font-bold hover:bg-gray-200 transition-all active:scale-95 text-sm"
-                                    >
-                                        Go Back
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {playbackError && !showCopyrightApology && (
+                    {playbackError && (
                         <div className="absolute inset-0 z-[250] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in fade-in">
                             <div className="bg-brand-red/10 p-6 rounded-full mb-6 border border-brand-red/20 shadow-[0_0_50px_rgba(229,9,20,0.2)]">
                                 <AlertCircle size={64} className="text-brand-red" />
@@ -1426,7 +1421,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                     </div>
 
                                     {/* Episodes Selector (TV Only) */}
-                                    {isTV && !isPlayImdb && (
+                                    {isTV && !isEmbedPlayer && (
                                         <div className="relative">
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); setShowEpisodesMenu(!showEpisodesMenu); setShowAudioSubMenu(false); setShowQualityMenu(false); }}

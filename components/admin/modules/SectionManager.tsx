@@ -145,8 +145,9 @@ const SectionManager = () => {
 
     // --- Content Picker Logic ---
     const availableContent = useMemo(() => {
+        const query = (pickerSearch || '').toLowerCase();
         return content.filter(c =>
-            c.title.toLowerCase().includes(pickerSearch.toLowerCase()) &&
+            c && (c.title || '').toLowerCase().includes(query) &&
             !formData.contentIds?.includes(c.id)
         );
     }, [content, pickerSearch, formData.contentIds]);

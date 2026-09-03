@@ -83,7 +83,7 @@ const RequestContent = () => {
                         Submit Another
                     </button>
                     <button
-                        onClick={() => navigate('/home')}
+                        onClick={() => navigate('/')}
                         className="block w-full mt-4 text-sm text-gray-500 hover:text-white"
                     >
                         Return Home

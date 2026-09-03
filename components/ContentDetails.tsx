@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Play, Plus, X, ThumbsUp, Check, Download, Share2, Search, Music2 } from 'lucide-react';
+import { Play, Plus, X, ThumbsUp, Check, Download, Share2, Search, Music2, Trash2 } from 'lucide-react';
 import { Content, Season, Episode } from '../types';
 import { useStore } from '../context/StoreContext';
 import ContentRail from './ContentRail';
@@ -13,7 +13,8 @@ interface ContentDetailsProps {
 }
 
 const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPlay, onDetails }) => {
-    const { currentProfile, toggleWatchlist, currentUser, content: allContent } = useStore();
+    const { currentProfile, toggleWatchlist, currentUser, content: allContent, deleteContent } = useStore();
+    const isAdmin = currentUser?.role === 'admin';
     const isAdded = currentProfile?.myList.includes(content.id);
     const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
 
@@ -230,6 +231,40 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                             </div>
                         </div>
 
+                        {/* Admin Action Bar (Mobile) */}
+                        {isAdmin && (
+                            <div className="mt-4 p-3 bg-red-950/40 border border-red-500/30 rounded-xl flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                    <div className="text-xs font-bold text-red-400 flex items-center gap-1.5">
+                                        <span>Admin Control</span>
+                                        {content.addedBy && (
+                                            <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[9px] px-1.5 py-0.2 rounded font-medium">
+                                                User Added
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="text-[10px] text-gray-400 truncate">
+                                        {content.addedBy?.email ? `Added by: ${content.addedBy.name || content.addedBy.email}` : 'Remove content & explicit images'}
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={async () => {
+                                        if (window.confirm(`Admin: Remove "${content.title}" from the platform?\n\nThis will immediately remove this content and its images from Recently Added by Users and the catalog.`)) {
+                                            try {
+                                                await deleteContent(content.id);
+                                                onClose();
+                                            } catch (err: any) {
+                                                alert(`Delete failed: ${err.message || err}`);
+                                            }
+                                        }
+                                    }}
+                                    className="flex-shrink-0 flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition active:scale-95 shadow"
+                                >
+                                    <Trash2 size={13} /> Remove
+                                </button>
+                            </div>
+                        )}
+
                         {/* Songs Tab (Mobile) */}
                         <div className="mt-4 pb-8">
                             <SongsSection movieName={content.title} contentType={content.type} />
@@ -323,6 +358,25 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                 >
                                     <Download size={24} className={content.allowDownload ? 'text-white' : 'text-gray-600'} />
                                 </button>
+
+                                {isAdmin && (
+                                    <button
+                                        onClick={async () => {
+                                            if (window.confirm(`Admin: Remove "${content.title}" from platform?\n\nThis will immediately remove this content and its images from Recently Added by Users and the catalog.`)) {
+                                                try {
+                                                    await deleteContent(content.id);
+                                                    onClose();
+                                                } catch (err: any) {
+                                                    alert(`Delete failed: ${err.message || err}`);
+                                                }
+                                            }
+                                        }}
+                                        className="bg-red-600/20 hover:bg-red-600 border border-red-500/40 hover:border-red-500 text-red-400 hover:text-white px-5 py-3 rounded-full font-bold text-sm flex items-center gap-2 transition ml-auto active:scale-95 shadow-lg"
+                                        title="Admin: Remove content from platform"
+                                    >
+                                        <Trash2 size={20} /> Remove (Admin)
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>

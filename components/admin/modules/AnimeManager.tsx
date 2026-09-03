@@ -254,9 +254,9 @@ const AnimeManager = () => {
             // Search Filter
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
-                return item.title.toLowerCase().includes(q) ||
-                    item.genres.some(g => g.toLowerCase().includes(q)) ||
-                    item.tags?.some(t => t.toLowerCase().includes(q));
+                return (item.title || '').toLowerCase().includes(q) ||
+                    (item.genres || []).some(g => (g || '').toLowerCase().includes(q)) ||
+                    item.tags?.some(t => (t || '').toLowerCase().includes(q));
             }
             return true;
         });

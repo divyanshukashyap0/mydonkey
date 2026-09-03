@@ -49,12 +49,18 @@
   --border-color: rgba(212, 175, 55, 0.2);
 }
 
+html {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Apply variables to body */
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
   overflow-x: hidden;
+  scroll-behavior: smooth;
   background-color: var(--bg-primary);
   color: var(--text-primary);
   font-family: var(--font-body, 'Inter'), sans-serif;

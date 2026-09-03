@@ -56,14 +56,14 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
 
                 // 2. Filter Sections Locally
                 const filteredSections = sections.filter(s =>
-                    s.enabled && s.title.toLowerCase().includes(lowerQuery)
+                    s.enabled && s.title && s.title.toLowerCase().includes(lowerQuery)
                 );
                 setMatchingSections(filteredSections);
 
                 // 3. Search Locally (Database Fallback)
-                const localResults: Partial<Content>[] = content.filter(c => 
-                    c.title.toLowerCase().includes(lowerQuery) || 
-                    c.overview?.toLowerCase().includes(lowerQuery)
+                const localResults: Partial<Content>[] = (content || []).filter(c => 
+                    (c.title && c.title.toLowerCase().includes(lowerQuery)) || 
+                    (c.overview && c.overview.toLowerCase().includes(lowerQuery))
                 );
 
                 // 4. Search TMDB
@@ -108,7 +108,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
         }, 500); // 500ms delay to prevent excessive API calls
 
         return () => clearTimeout(timer);
-    }, [searchQuery, sections, settings, unlockContent]);
+    }, [searchQuery, sections, settings, unlockContent, content]);
 
     // Handle clicking a search result
     const handleResultClick = async (item: Partial<Content>) => {
@@ -123,9 +123,10 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
             // 1. Fetch full TMDB details (includes external_ids for IMDb ID)
             const detail = await fetchTMDBDetails(item.tmdbId, item.type as 'movie' | 'tv');
 
-            // 2. Clear default PlayIMDb URL fallback
+            // 2. Set stream source URL with IMDb ID
             const imdbId = detail.external_ids?.imdb_id || (detail as any).imdb_id || '';
-            let videoUrl = '';
+            const isMovie = !detail.name;
+            let videoUrl = (isMovie && imdbId) ? `https://proxy.garageband.rocks/embed/movie/${imdbId}` : '';
 
             // 3. Construct base Content object from fresh metadata
             const addedByInfo = currentUser ? {

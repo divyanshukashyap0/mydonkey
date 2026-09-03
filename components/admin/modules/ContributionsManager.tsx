@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, getDocs, limit } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, limit, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
-import { Film, User, Clock, ExternalLink, RefreshCw, Loader2, Search } from 'lucide-react';
+import { Film, User, Clock, ExternalLink, RefreshCw, Loader2, Search, Trash2 } from 'lucide-react';
+import { useStore } from '../../../context/StoreContext';
 
 interface Contribution {
     id: string;
@@ -16,9 +17,11 @@ interface Contribution {
 }
 
 const ContributionsManager: React.FC = () => {
+    const { publishCatalog, deleteContent } = useStore();
     const [contributions, setContributions] = useState<Contribution[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [search, setSearch] = useState('');
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
     const fetchContributions = async () => {
         setIsLoading(true);
@@ -41,11 +44,32 @@ const ContributionsManager: React.FC = () => {
         fetchContributions();
     }, []);
 
+    const handleDeleteContribution = async (item: Contribution) => {
+        if (!window.confirm(`Are you sure you want to remove "${item.title}"?\n\nThis will delete the content from the catalog (Recently Added by Users) and remove this contribution record.`)) {
+            return;
+        }
+
+        setDeletingId(item.id);
+        try {
+            const contentIdToDelete = item.contentId || item.id;
+            if (contentIdToDelete) {
+                await deleteContent(contentIdToDelete);
+            }
+            await deleteDoc(doc(db, 'content_contributions', item.id));
+            setContributions(prev => prev.filter(c => c.id !== item.id));
+        } catch (err: any) {
+            console.error('Failed to delete contribution:', err);
+            alert(`Failed to delete: ${err.message || err}`);
+        } finally {
+            setDeletingId(null);
+        }
+    };
+
     const filtered = contributions.filter(c =>
         !search ||
-        c.title.toLowerCase().includes(search.toLowerCase()) ||
-        c.addedBy?.name?.toLowerCase().includes(search.toLowerCase()) ||
-        c.addedBy?.email?.toLowerCase().includes(search.toLowerCase()) ||
+        (c.title || '').toLowerCase().includes(search.toLowerCase()) ||
+        (c.addedBy?.name || '').toLowerCase().includes(search.toLowerCase()) ||
+        (c.addedBy?.email || '').toLowerCase().includes(search.toLowerCase()) ||
         c.addedBy?.userId?.includes(search)
     );
 
@@ -125,6 +149,7 @@ const ContributionsManager: React.FC = () => {
                                 <th className="px-4 py-3 text-left">Date & Time</th>
                                 <th className="px-4 py-3 text-left">IMDb / TMDb</th>
                                 <th className="px-4 py-3 text-left">Links</th>
+                                <th className="px-4 py-3 text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
@@ -204,6 +229,23 @@ const ContributionsManager: React.FC = () => {
                                                 </a>
                                             )}
                                         </div>
+                                    </td>
+
+                                    {/* Actions */}
+                                    <td className="px-4 py-3 text-right">
+                                        <button
+                                            onClick={() => handleDeleteContribution(item)}
+                                            disabled={deletingId === item.id}
+                                            className="inline-flex items-center gap-1.5 bg-red-600/20 hover:bg-red-600 border border-red-500/40 hover:border-red-500 text-red-400 hover:text-white px-2.5 py-1.5 rounded-lg text-xs font-semibold transition active:scale-95 disabled:opacity-50"
+                                            title="Remove content and explicit image from platform"
+                                        >
+                                            {deletingId === item.id ? (
+                                                <Loader2 size={13} className="animate-spin" />
+                                            ) : (
+                                                <Trash2 size={13} />
+                                            )}
+                                            Remove
+                                        </button>
                                     </td>
                                 </tr>
                             ))}

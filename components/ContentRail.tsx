@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { ChevronRight, ChevronLeft, PlayCircle, Plus, Check } from 'lucide-react';
+import { ChevronRight, ChevronLeft, PlayCircle, Plus, Check, Trash2 } from 'lucide-react';
 import { Content } from '../types';
 import { useStore } from '../context/StoreContext';
 
@@ -7,6 +7,7 @@ interface ContentRailProps {
     title: string;
     items: Content[];
     onDetails: (item: Content) => void;
+    onPlay?: (item: Content, mode?: 'trailer' | 'movie') => void;
     isTop10?: boolean;
     isOriginal?: boolean;
     layout?: 'portrait' | 'landscape';
@@ -17,13 +18,15 @@ const ContentRail: React.FC<ContentRailProps> = ({
     title,
     items,
     onDetails,
+    onPlay,
     isTop10 = false,
     isOriginal = false,
     layout = 'portrait',
     showRanking = false
 }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
-    const { currentProfile, toggleWatchlist } = useStore();
+    const { currentProfile, toggleWatchlist, currentUser, deleteContent } = useStore();
+    const isAdmin = currentUser?.role === 'admin';
 
     const scroll = (direction: 'left' | 'right') => {
         if (scrollRef.current) {
@@ -103,23 +106,42 @@ const ContentRail: React.FC<ContentRailProps> = ({
  
                                     <div className={`relative ${showRanking ? 'w-32 md:w-60' : 'flex-1'} ${layout === 'landscape' ? 'aspect-video' : 'aspect-[2/3]'} group/card rounded-lg overflow-hidden shadow-xl hover:scale-110 transition-transform duration-300 z-20`}>
                                         {layout === 'landscape' ? (
-                                            <picture>
-                                                {item.backdrop_path_mobile && <source media="(max-width: 767px)" srcSet={item.backdrop_path_mobile} />}
-                                                <img src={item.backdrop_path} className="w-full h-full object-cover aspect-video" alt={item.title} draggable={false} />
-                                            </picture>
+                                            (item.backdrop_path || item.poster_path) ? (
+                                                <picture>
+                                                    {item.backdrop_path_mobile && <source media="(max-width: 767px)" srcSet={item.backdrop_path_mobile} />}
+                                                    <img src={item.backdrop_path || item.poster_path} className="w-full h-full object-cover aspect-video" alt={item.title || ''} draggable={false} />
+                                                </picture>
+                                            ) : (
+                                                <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-xs text-gray-500 aspect-video">No Image</div>
+                                            )
                                         ) : (
-                                            <img
-                                                src={item.poster_path_mobile || item.poster_path}
-                                                className="w-full h-full object-cover"
-                                                alt={item.title}
-                                                draggable={false}
-                                            />
+                                            (item.poster_path_mobile || item.poster_path) ? (
+                                                <img
+                                                    src={item.poster_path_mobile || item.poster_path}
+                                                    className="w-full h-full object-cover"
+                                                    alt={item.title || ''}
+                                                    draggable={false}
+                                                />
+                                            ) : (
+                                                <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-xs text-gray-500 aspect-[2/3]">No Poster</div>
+                                            )
                                         )}
 
                                         {/* Overlay on hover */}
                                         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent opacity-0 group-hover/card:opacity-100 transition-all duration-300 flex flex-col justify-end p-4 translate-y-4 group-hover/card:translate-y-0">
-                                            <div className="flex gap-2 mb-3">
-                                                <PlayCircle size={32} className="text-white fill-white hover:text-brand-red hover:fill-brand-red transition-colors" />
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <PlayCircle 
+                                                    size={32} 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (onPlay) {
+                                                            onPlay(item, 'movie');
+                                                        } else {
+                                                            onDetails(item);
+                                                        }
+                                                    }}
+                                                    className="text-white fill-white hover:text-brand-red hover:fill-brand-red transition-colors cursor-pointer active:scale-95" 
+                                                />
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); toggleWatchlist(item.id); }}
                                                     className="bg-gray-600/50 p-1.5 rounded-full border border-white/20 hover:border-white transition"
@@ -131,8 +153,33 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                             <div className="flex items-center gap-2 text-[10px] mt-1">
                                                 <span className="text-green-400 font-bold">{(item.vote_average * 10).toFixed(0)}% Match</span>
                                                 <span className="border border-white/30 px-1 rounded">HD</span>
+                                                {item.addedBy && (
+                                                    <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.2 rounded font-medium truncate max-w-[80px]">
+                                                        User Added
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
+
+                                        {/* Admin Corner Delete Button on Hover */}
+                                        {isAdmin && (
+                                            <button
+                                                onClick={async (e) => {
+                                                    e.stopPropagation();
+                                                    if (window.confirm(`Admin: Remove "${item.title}" from the platform?\n\nThis will immediately remove this content and its poster from the platform.`)) {
+                                                        try {
+                                                            await deleteContent(item.id);
+                                                        } catch (err: any) {
+                                                            alert(`Failed to delete: ${err.message || err}`);
+                                                        }
+                                                    }
+                                                }}
+                                                className="absolute top-2 right-2 z-30 p-2 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-2xl opacity-0 group-hover/card:opacity-100 transition-all duration-200 hover:scale-110 active:scale-95 border border-white/20"
+                                                title="Admin: Remove Content"
+                                            >
+                                                <Trash2 size={15} />
+                                            </button>
+                                        )}
 
                                         {/* Progress Bar (if available) */}
                                         {item.progress && item.progress > 0 && (

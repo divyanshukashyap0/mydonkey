@@ -110,7 +110,7 @@ const ExclusiveContentPage: React.FC<ExclusiveContentPageProps> = ({ onDetails }
 
                         <button
                             type="button"
-                            onClick={() => navigate('/home')}
+                            onClick={() => navigate('/')}
                             className="w-full bg-white/5 border border-white/10 text-gray-400 font-bold py-4 rounded-xl hover:bg-white/10 hover:text-white transition-all flex items-center justify-center gap-2"
                         >
                             <Home size={18} /> BACK TO HOME

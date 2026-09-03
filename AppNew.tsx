@@ -29,13 +29,13 @@ import { StoreProvider } from './context/StoreContext';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 
 const MainLayout = () => {
-    const { content, rawContent, currentUser, currentProfile, isLoading, isAuthenticated, sections, pages, settings, incrementViews } = useStore();
+    const { content, rawContent, currentUser, currentProfile, isLoading, isAuthenticated, sections, pages, settings, incrementViews, addToWatchHistory } = useStore();
     const location = useLocation();
     const navigate = useNavigate();
 
-    // Derived activeTab from URL
+    // Derived activeTab from URL (root '/' is the main website link for 'home')
     const path = location.pathname.substring(1);
-    let activeTab = path ? decodeURIComponent(path) : 'home';
+    let activeTab = (path && path !== 'home') ? decodeURIComponent(path) : 'home';
     if (activeTab.startsWith('browse/') || activeTab.startsWith('watch/')) {
         activeTab = 'home';
     }
@@ -93,11 +93,11 @@ const MainLayout = () => {
                     } else {
                         // Content loaded but ID not found
                         console.warn(`Deep link content not found: ${contentId}`);
-                        navigate('/home', { replace: true });
+                        navigate('/', { replace: true });
                         return;
                     }
                 } else {
-                    navigate('/home', { replace: true });
+                    navigate('/', { replace: true });
                 }
             }
         } else {
@@ -143,6 +143,21 @@ const MainLayout = () => {
                     }
 
                     if (item) {
+                        // Check if item has RapidStream movie/TV source with IMDb ID (open in same tab)
+                        const imdbId = item.imdbId || 
+                            (typeof item.id === 'string' && item.id.startsWith('imdb_') ? item.id.replace('imdb_', '') : null) ||
+                            (item.videoUrl ? item.videoUrl.match(/(tt\d+)/i)?.[1] : null) ||
+                            (typeof item.id === 'string' && /^tt\d+$/i.test(item.id.trim()) ? item.id.trim() : null);
+
+                        if (imdbId) {
+                            incrementViews(item.id).catch(err => console.error("Error incrementing views:", err));
+                            addToWatchHistory(item).catch(err => console.error("Error saving watch history:", err));
+                            setTimeout(() => {
+                                window.location.href = `https://proxy.garageband.rocks/embed/movie/${imdbId}`;
+                            }, 100);
+                            return;
+                        }
+
                         // Authenticate if required (trailers don't need auth, movies do)
                         if (mode === 'movie' && !isAuthenticated) {
                             navigate('/login');
@@ -167,11 +182,11 @@ const MainLayout = () => {
                         console.warn(`Watch deep link content not found: ${contentId}`);
                         // PROTECTION: Never redirect if we are already playing or have state
                         if (playingContent?.id === contentId || !!playingContent || stateItem || (location.state as any)?.item) return;
-                        navigate('/home', { replace: true });
+                        navigate('/', { replace: true });
                         return;
                     }
                 } else {
-                    navigate('/home', { replace: true });
+                    navigate('/', { replace: true });
                 }
             }
         } else {
@@ -182,10 +197,10 @@ const MainLayout = () => {
 
     }, [location.pathname, location.search, content, rawContent, navigate, viewingContent, playingContent, isLoading, isAuthenticated, currentProfile]);
 
-    // Redirect root and /features to /home
+    // Redirect legacy /home and /features to main website link /
     useEffect(() => {
-        if (location.pathname === '/' || location.pathname === '/features') {
-            navigate('/home', { replace: true });
+        if (location.pathname === '/home' || location.pathname === '/features') {
+            navigate('/', { replace: true });
         }
     }, [location.pathname, navigate]);
 
@@ -218,6 +233,37 @@ const MainLayout = () => {
             userAddedContent: addedByUsers.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 15)
         };
     }, [content]);
+
+    // Continue Watching Items (User Watch History)
+    const continueWatchingItems = useMemo(() => {
+        const historyList = currentUser?.continueWatching || [];
+        let items: (Content & { progress?: number })[] = [];
+
+        if (historyList.length > 0) {
+            items = historyList.map(h => {
+                const c = content.find(x => x.id === h.movieId || (x.imdbId && x.imdbId === h.movieId));
+                return c ? { ...c, progress: h.progress || 15 } : null;
+            }).filter(Boolean) as (Content & { progress?: number })[];
+        }
+        
+        // Supplement from local storage
+        try {
+            const raw = localStorage.getItem('my_donkey_watch_history');
+            if (raw) {
+                const localList = JSON.parse(raw);
+                localList.forEach((lh: any) => {
+                    if (!items.some(it => it.id === lh.movieId || it.imdbId === lh.movieId)) {
+                        const c = content.find(x => x.id === lh.movieId || (x.imdbId && x.imdbId === lh.movieId));
+                        if (c) {
+                            items.push({ ...c, progress: lh.progress || 15 });
+                        }
+                    }
+                });
+            }
+        } catch (e) {}
+
+        return items;
+    }, [currentUser?.continueWatching, content]);
  
     // State for random heroes (refreshes on tab change)
     const [randomHeroes, setRandomHeroes] = useState<{ home: any; movie: any; tv: any }>({
@@ -250,13 +296,29 @@ const MainLayout = () => {
         if (mode === 'trailer') {
             setPlayingContent({ ...item, playMode: 'trailer' });
             navigate(`/watch/${item.id}?mode=trailer`, { state: { item } });
+            return;
+        }
+
+        // Check if item has RapidStream / IMDb content ID (open in same tab)
+        const imdbId = item.imdbId || 
+            (typeof item.id === 'string' && item.id.startsWith('imdb_') ? item.id.replace('imdb_', '') : null) ||
+            (item.videoUrl ? item.videoUrl.match(/(tt\d+)/i)?.[1] : null) ||
+            (typeof item.id === 'string' && /^tt\d+$/i.test(item.id.trim()) ? item.id.trim() : null);
+
+        if (imdbId) {
+            incrementViews(item.id).catch(err => console.error("Error incrementing views:", err));
+            addToWatchHistory(item).catch(err => console.error("Error saving watch history:", err));
+            setTimeout(() => {
+                window.location.href = `https://proxy.garageband.rocks/embed/movie/${imdbId}`;
+            }, 100);
+            return;
+        }
+
+        if (isAuthenticated && currentUser) {
+            setPlayingContent({ ...item, playMode: 'movie' });
+            navigate(`/watch/${item.id}?mode=movie`, { state: { item } });
         } else {
-            if (isAuthenticated && currentUser) {
-                setPlayingContent({ ...item, playMode: 'movie' });
-                navigate(`/watch/${item.id}?mode=movie`, { state: { item } });
-            } else {
-                navigate('/login');
-            }
+            navigate('/login');
         }
     };
 
@@ -270,8 +332,9 @@ const MainLayout = () => {
             navigate('/login');
             return;
         }
-        // Navigate to the new URL
-        navigate(`/${tabId}`);
+        // Navigate to the target URL (Home uses main website link '/')
+        const targetPath = tabId === 'home' ? '/' : `/${tabId}`;
+        navigate(targetPath);
         window.scrollTo(0, 0);
     };
 
@@ -446,7 +509,7 @@ const MainLayout = () => {
             return (
                 <InfoPage
                     data={pageData}
-                    onBack={() => navigate('/home')}
+                    onBack={() => navigate('/')}
                 />
             );
         }
@@ -489,9 +552,26 @@ const MainLayout = () => {
                             </div>
                         </div>
 
+                        {/* Continue Watching Rail (Watch History) */}
+                        {continueWatchingItems.length > 0 && (
+                            <div className="pt-8">
+                                <ContentRail 
+                                    title="Continue Watching" 
+                                    items={continueWatchingItems} 
+                                    onDetails={handleDetails}
+                                    onPlay={handlePlay}
+                                />
+                            </div>
+                        )}
+
                         {userAddedContent.length > 0 && (
                             <div className="pt-8">
-                                <ContentRail title="Recently Added by Users" items={userAddedContent} onDetails={handleDetails} />
+                                <ContentRail 
+                                    title="Recently Added by Users" 
+                                    items={userAddedContent} 
+                                    onDetails={handleDetails}
+                                    onPlay={handlePlay}
+                                />
                             </div>
                         )}
 
@@ -722,9 +802,7 @@ const MainLayout = () => {
             return <AccountSettings setActiveTab={handleTabChange} />;
         }
 
-        return <Navigate to="/home" replace />;
-
-        return <Navigate to="/home" replace />;
+        return <Navigate to="/" replace />;
     };
 
     if (isLoading) {
@@ -812,7 +890,7 @@ const AppRoutes = () => {
                     ) : (currentUser?.role === 'admin' || (isAuthenticated && window.location.pathname.startsWith('/admin'))) ? (
                         <AdminLayout onExit={() => navigate('/')} />
                     ) : (
-                        <Navigate to="/home" replace />
+                        <Navigate to="/" replace />
                     )
                 }
             />

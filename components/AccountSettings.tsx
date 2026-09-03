@@ -59,8 +59,16 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
     };
 
     const handleDeleteProfile = async (id: string) => {
+        if (userProfiles.length <= 1) {
+            alert("You cannot delete your only profile. Your account must keep at least one profile.");
+            return;
+        }
         if (window.confirm("Delete this profile?")) {
-            await deleteProfile(id);
+            try {
+                await deleteProfile(id);
+            } catch (err: any) {
+                alert(`Failed to delete profile: ${err.message || err}`);
+            }
         }
     };
 
@@ -524,12 +532,21 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                                     {editingProfile && (
                                         <button
                                             onClick={async () => {
+                                                if (userProfiles.length <= 1) {
+                                                    alert("You cannot delete your only profile. Your account must keep at least one profile.");
+                                                    return;
+                                                }
                                                 if (confirm("Delete this profile?")) {
-                                                    await deleteProfile(editingProfile.id);
-                                                    setEditingProfile(null);
+                                                    try {
+                                                        await deleteProfile(editingProfile.id);
+                                                        setEditingProfile(null);
+                                                    } catch (err: any) {
+                                                        alert(`Failed to delete profile: ${err.message || err}`);
+                                                    }
                                                 }
                                             }}
                                             className="px-4 py-3 border border-red-500/50 text-red-500 hover:bg-red-500/10 font-bold rounded-lg transition"
+                                            title="Delete profile"
                                         >
                                             <Trash2 size={20} />
                                         </button>

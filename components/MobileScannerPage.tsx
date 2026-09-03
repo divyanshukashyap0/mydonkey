@@ -120,7 +120,7 @@ const MobileScannerPage = () => {
             }
 
             setStatus('success');
-            setTimeout(() => navigate('/home'), 2000);
+            setTimeout(() => navigate('/'), 2000);
         } catch (err: any) {
             console.error("Approval error:", err);
             setStatus('error');

@@ -21,7 +21,7 @@ const ContentManager = () => {
     const [syncProgress, setSyncProgress] = useState(0);
 
     // Filters & Search
-    const [filterType, setFilterType] = useState<'ALL' | 'movie' | 'tv'>('ALL');
+    const [filterType, setFilterType] = useState<'ALL' | 'movie' | 'tv' | 'userAdded'>('ALL');
     const [filterStatus, setFilterStatus] = useState<'ALL' | 'published' | 'draft'>('ALL');
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -424,12 +424,11 @@ const ContentManager = () => {
                     const year = releaseDate ? parseInt(releaseDate.split('-')[0]) : 0;
                     const trailerId = extractTMDBTrailer(detail) || item.youtubeId || '';
 
-                    const imdbId = detail.external_ids?.imdb_id || (detail as any).imdb_id || '';
-                    let videoUrl = item.videoUrl;
-
-                    // Clear playimdb links
-                    if (videoUrl && videoUrl.includes('playimdb.com')) {
-                        videoUrl = '';
+                    // Ensure movie source uses proxy.garageband.rocks when IMDb ID is present
+                    if (item.type === 'movie' && (imdbId || item.imdbId) && (!videoUrl || videoUrl.includes('imdb.com'))) {
+                        const match = videoUrl ? videoUrl.match(/(tt\d+)/) : null;
+                        const idToUse = match ? match[1] : (imdbId || item.imdbId);
+                        videoUrl = idToUse ? `https://proxy.garageband.rocks/embed/movie/${idToUse}` : videoUrl;
                     }
 
                     const updates: any = {
@@ -508,7 +507,11 @@ const ContentManager = () => {
     const filteredContent = useMemo(() => {
         return rawContent.filter(item => {
             // Type Filter
-            if (filterType !== 'ALL' && item.type !== filterType) return false;
+            if (filterType === 'userAdded') {
+                if (!item.addedBy) return false;
+            } else if (filterType !== 'ALL' && item.type !== filterType) {
+                return false;
+            }
 
             // Status Filter
             if (filterStatus === 'published' && !item.isPublished) return false;
@@ -517,9 +520,9 @@ const ContentManager = () => {
             // Search Filter
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
-                return item.title.toLowerCase().includes(q) ||
-                    item.genres.some(g => g.toLowerCase().includes(q)) ||
-                    item.tags?.some(t => t.toLowerCase().includes(q));
+                return (item.title || '').toLowerCase().includes(q) ||
+                    (item.genres || []).some(g => (g || '').toLowerCase().includes(q)) ||
+                    item.tags?.some(t => (t || '').toLowerCase().includes(q));
             }
             return true;
         });
@@ -1236,6 +1239,7 @@ const ContentManager = () => {
                             className="bg-black/50 pl-3 pr-8 py-2 rounded border border-white/10 outline-none appearance-none cursor-pointer hover:bg-white/5"
                         >
                             <option value="ALL">All Content</option>
+                            <option value="userAdded">Recently Added by Users</option>
                             <option value="movie">Movies Only</option>
                             <option value="tv">TV Shows Only</option>
                         </select>
