@@ -22,7 +22,7 @@ import ScrollToTop from './components/ScrollToTop';
 import ProfileSelection from './components/ProfileSelection';
 import FontLoader from './components/FontLoader';
 import Loader from './components/Loader';
-import { buildEmbedUrl } from './utils/embedUrl';
+import { buildEmbedUrl, parseEmbedContentType } from './utils/embedUrl';
 import Pagination from './components/Pagination';
 import { Content } from './types';
 import { StoreProvider } from './context/StoreContext';
