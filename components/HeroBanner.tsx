@@ -174,6 +174,8 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onDetails, onPlay 
                             className="w-full h-full object-cover md:hidden"
                             alt={slide.title}
                             loading={idx === 0 ? 'eager' : 'lazy'}
+                            fetchPriority={idx === 0 ? 'high' : 'auto'}
+                            decoding="async"
                         />
                     )}
                     {/* Desktop backdrop */}
@@ -183,6 +185,8 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onDetails, onPlay 
                             className="w-full h-full object-cover hidden md:block"
                             alt={slide.title}
                             loading={idx === 0 ? 'eager' : 'lazy'}
+                            fetchPriority={idx === 0 ? 'high' : 'auto'}
+                            decoding="async"
                         />
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-cinema-black via-cinema-black/20 to-transparent md:bg-gradient-to-r md:from-black md:via-black/40 md:to-transparent" />

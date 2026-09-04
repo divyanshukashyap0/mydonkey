@@ -140,7 +140,7 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                             (item.backdrop_path || item.poster_path) ? (
                                                 <picture>
                                                     {item.backdrop_path_mobile && <source media="(max-width: 767px)" srcSet={item.backdrop_path_mobile} />}
-                                                    <img src={item.backdrop_path || item.poster_path} className="w-full h-full object-cover aspect-video" alt={item.title || ''} draggable={false} />
+                                                    <img src={item.backdrop_path || item.poster_path} className="w-full h-full object-cover aspect-video" alt={item.title || ''} draggable={false} loading="lazy" decoding="async" />
                                                 </picture>
                                             ) : (
                                                 <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-xs text-gray-500 aspect-video">No Image</div>
@@ -152,6 +152,8 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                                     className="w-full h-full object-cover"
                                                     alt={item.title || ''}
                                                     draggable={false}
+                                                    loading="lazy"
+                                                    decoding="async"
                                                 />
                                             ) : (
                                                 <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-xs text-gray-500 aspect-[2/3]">No Poster</div>
