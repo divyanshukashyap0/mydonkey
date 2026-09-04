@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, X, Loader2 } from 'lucide-react';
 import { Content, Section } from '../types';
 import { useStore } from '../context/StoreContext';
@@ -19,12 +19,31 @@ const ITEMS_PER_PAGE = 24;
 const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
     const { content, sections, currentProfile, unlockContent, settings, currentUser, publishCatalog } = useStore();
     const navigate = useNavigate();
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchParams, setSearchParams] = useSearchParams();
+    const initialQuery = searchParams.get('q') || '';
+    const [searchQuery, setSearchQuery] = useState(initialQuery);
     const [results, setResults] = useState<Partial<Content>[]>([]);
     const [matchingSections, setMatchingSections] = useState<Section[]>([]);
     const [currentPage, setCurrentPage] = useState(1);
     const [isSearching, setIsSearching] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+
+    // Sync state if URL query param changes
+    useEffect(() => {
+        const q = searchParams.get('q');
+        if (q !== null && q !== searchQuery) {
+            setSearchQuery(q);
+        }
+    }, [searchParams]);
+
+    const handleQueryChange = (val: string) => {
+        setSearchQuery(val);
+        if (val.trim()) {
+            setSearchParams({ q: val }, { replace: true });
+        } else {
+            setSearchParams({}, { replace: true });
+        }
+    };
 
     // Focus input on mount
     useEffect(() => {
@@ -281,7 +300,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                         className="block w-full pl-14 pr-12 py-5 bg-[#141414] border border-white/10 rounded-2xl focus:ring-2 focus:ring-brand-red focus:border-transparent text-white placeholder-gray-500 text-xl font-medium transition-all shadow-xl"
                         placeholder="Search for movies, TV shows..."
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onChange={(e) => handleQueryChange(e.target.value)}
                     />
                     {isSearching ? (
                         <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
@@ -289,7 +308,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                         </div>
                     ) : searchQuery ? (
                         <button
-                            onClick={() => setSearchQuery('')}
+                            onClick={() => handleQueryChange('')}
                             className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-white transition"
                         >
                             <X className="h-6 w-6" />

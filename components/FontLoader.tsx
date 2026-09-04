@@ -5,8 +5,6 @@ const FontLoader: React.FC = () => {
     const { settings } = useStore();
 
     useEffect(() => {
-        console.log('[FontLoader] Applying fonts:', { website: settings.websiteFont, rank: settings.rankFont });
-
         // Helper to get font URL without causing 400 errors for unsupported weights
         const getFontUrl = (font: string) => {
             const singleWeightFonts = ['Alfa Slab One', 'Anton', 'Bebas Neue', 'Abril Fatface', 'Righteous', 'Permanent Marker', 'Bangers', 'Creepster', 'Oswald'];

@@ -13,20 +13,20 @@ interface QRLoginProps {
 const QRLogin: React.FC<QRLoginProps> = ({ onLoginSuccess, onError }) => {
     const [sessionId, setSessionId] = useState('');
     const [qrValue, setQrValue] = useState('');
-    const [timeLeft, setTimeLeft] = useState(60);
+    const [timeLeft, setTimeLeft] = useState(120);
 
     const generateQR = async () => {
         // Generate a 6-digit numeric ID
         const newSessionId = Math.floor(100000 + Math.random() * 900000).toString();
         setSessionId(newSessionId);
-        setTimeLeft(60);
+        setTimeLeft(120);
 
         try {
             await setDoc(doc(db, 'qr_sessions', newSessionId), {
                 sessionId: newSessionId,
                 status: 'pending',
                 createdAt: serverTimestamp(),
-                expiresAt: new Date(Date.now() + 60 * 1000)
+                expiresAt: new Date(Date.now() + 120 * 1000)
             });
             
             // Generate a full URL for the QR code
@@ -85,10 +85,20 @@ const QRLogin: React.FC<QRLoginProps> = ({ onLoginSuccess, onError }) => {
         <div className="flex flex-col items-center justify-center py-6 animate-in fade-in duration-500">
             <h3 className="text-xl font-bold mb-2">Log in with QR Code</h3>
             <p className="text-sm text-gray-400 mb-6 text-center max-w-xs">Scan this code using the My Donkey app on your mobile device to log in instantly.</p>
-            <div className="bg-white p-4 rounded-2xl mb-6 shadow-2xl shadow-brand-red/20 border-4 border-white/10 transition-transform hover:scale-105">
+            <div className="bg-white p-5 rounded-2xl mb-6 shadow-2xl shadow-brand-red/20 border-4 border-white/15 transition-transform hover:scale-105 relative group">
+                {/* Precision HUD Corner Reticles */}
+                <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-brand-red pointer-events-none" />
+                <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-brand-red pointer-events-none" />
+                <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-brand-red pointer-events-none" />
+                <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-brand-red pointer-events-none" />
+
                 {qrValue ? (
-                    <div className="flex flex-col items-center">
-                        <QRCodeSVG value={qrValue} size={200} level="H" includeMargin={true} />
+                    <div className="flex flex-col items-center relative">
+                        <div className="relative overflow-hidden rounded-lg">
+                            <QRCodeSVG value={qrValue} size={200} level="H" includeMargin={true} />
+                            {/* Subtle ambient scan line */}
+                            <div className="absolute left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-brand-red/60 to-transparent pointer-events-none animate-qr-ambient" />
+                        </div>
                         <div className="mt-4 pt-4 border-t border-gray-100 w-full text-center">
                             <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-1">Session ID</p>
                             <p className="text-xs font-mono font-bold text-black select-all">{sessionId}</p>
@@ -104,6 +114,18 @@ const QRLogin: React.FC<QRLoginProps> = ({ onLoginSuccess, onError }) => {
                 <div className="w-2 h-2 rounded-full bg-brand-red animate-pulse"></div>
                 Auto-refreshing in <span className="font-bold text-white">{timeLeft}s</span>
             </div>
+
+            <style dangerouslySetInnerHTML={{__html: `
+                @keyframes qrAmbient {
+                    0% { top: 2%; opacity: 0; }
+                    15% { opacity: 0.8; }
+                    85% { opacity: 0.8; }
+                    100% { top: 96%; opacity: 0; }
+                }
+                .animate-qr-ambient {
+                    animation: qrAmbient 3s ease-in-out infinite;
+                }
+            `}} />
         </div>
     );
 };

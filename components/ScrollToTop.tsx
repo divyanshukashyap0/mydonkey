@@ -1,25 +1,27 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
 const ScrollToTop = () => {
-    const { pathname } = useLocation();
-    const prevPathnameRef = useRef(pathname);
+    const { pathname, search } = useLocation();
 
     useEffect(() => {
-        const prev = prevPathnameRef.current;
-        prevPathnameRef.current = pathname;
-
-        // Don't scroll when entering browse or watch modal
-        if (pathname.startsWith('/browse/') || pathname.startsWith('/watch/')) {
-            return;
-        }
-        // Don't scroll when closing browse or watch modal and returning to the same screen
-        if (prev.startsWith('/browse/') || prev.startsWith('/watch/')) {
-            return;
-        }
-
-        window.scrollTo(0, 0);
-    }, [pathname]);
+        // Ensure every page transition (including movie cards /browse/ and /watch/) starts smoothly from top
+        window.scrollTo({
+            top: 0,
+            left: 0,
+            behavior: 'smooth'
+        });
+        document.documentElement.scrollTo({
+            top: 0,
+            left: 0,
+            behavior: 'smooth'
+        });
+        document.body.scrollTo({
+            top: 0,
+            left: 0,
+            behavior: 'smooth'
+        });
+    }, [pathname, search]);
 
     return null;
 };

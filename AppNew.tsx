@@ -213,7 +213,6 @@ const MainLayout = () => {
 
             // Wait for authentication and content to load
             if (!isLoading && rawContent.length > 0) {
-                console.log("AppNew: Watch deep link check:", { contentId, hasStateItem: !!stateItem, playingId: playingContent?.id });
                 if (contentId) {
                     let item = stateItem || rawContent.find(c => c.id === contentId);
 
@@ -254,8 +253,8 @@ const MainLayout = () => {
                         if (isEmbed && imdbId) {
                             const existingType = item.videoUrl ? parseEmbedContentType(item.videoUrl) : null;
                             const streamUrl = buildEmbedUrl(imdbId, existingType || item.type || 'movie', settings);
-                            incrementViews(item.id).catch(err => console.error("Error incrementing views:", err));
-                            addToWatchHistory(item).catch(err => console.error("Error saving watch history:", err));
+                            incrementViews(item.id).catch(() => {});
+                            addToWatchHistory(item).catch(() => {});
                             setTimeout(() => {
                                 window.location.href = streamUrl;
                             }, 100);
@@ -277,7 +276,7 @@ const MainLayout = () => {
                             setPlayingContent({ ...item, playMode: mode });
                             // Increment views when main movie starts
                             if (mode === 'movie') {
-                                incrementViews(item.id).catch(err => console.error("Error incrementing views:", err));
+                                incrementViews(item.id).catch(() => {});
                             }
                         }
                     } else {
@@ -564,8 +563,8 @@ const MainLayout = () => {
             const existingType = item.videoUrl ? parseEmbedContentType(item.videoUrl) : null;
             const streamUrl = effectiveStreamId ? buildEmbedUrl(effectiveStreamId, existingType || item.type || 'movie', settings) : item.videoUrl;
             if (streamUrl) {
-                incrementViews(item.id).catch(err => console.error("Error incrementing views:", err));
-                addToWatchHistory(item).catch(err => console.error("Error saving watch history:", err));
+                incrementViews(item.id).catch(() => {});
+                addToWatchHistory(item).catch(() => {});
                 setTimeout(() => {
                     window.location.href = streamUrl;
                 }, 100);
@@ -636,6 +635,7 @@ const MainLayout = () => {
                 fromTab: fromTab
             }
         });
+        window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
     };
 
     const handleCloseDetails = () => {
@@ -672,7 +672,7 @@ const MainLayout = () => {
         // Navigate to the target URL (Home uses main website link '/')
         const targetPath = tabId === 'home' ? '/' : `/${tabId}`;
         navigate(targetPath);
-        window.scrollTo(0, 0);
+        window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
     };
 
     const handleNavigate = (page: string) => {
@@ -681,14 +681,14 @@ const MainLayout = () => {
                 navigate('/login');
             } else {
                 navigate('/account');
-                window.scrollTo(0, 0);
+                window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
             }
             return;
         }
 
         if (page === 'adblocker' || page === 'adblockers' || page === 'Adblocker' || page === 'Adblockers') {
             navigate('/adblocker');
-            window.scrollTo(0, 0);
+            window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
             return;
         }
 
@@ -696,7 +696,7 @@ const MainLayout = () => {
         const existingPage = pages.find(p => p.id === page);
         if (existingPage) {
             navigate(`/${page}`);
-            window.scrollTo(0, 0);
+            window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
             return;
         }
 
@@ -711,7 +711,7 @@ const MainLayout = () => {
             if (page === 'Categories' || page === 'Category') target = 'categories';
 
             navigate(`/${target}`);
-            window.scrollTo(0, 0);
+            window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
             return;
         }
 
@@ -729,7 +729,7 @@ const MainLayout = () => {
             prevActiveTabRef.current = activeTab;
             setCurrentPage(1); // Reset on actual tab change
             if (!isModalRoute) {
-                window.scrollTo(0, 0);
+                window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
             }
         }
     }, [activeTab, animeCategory, isModalRoute]);
@@ -1284,16 +1284,12 @@ const MainLayout = () => {
     // Force Profile Selection if logged in but no profile selected
     if (isAuthenticated && !currentProfile) {
         return (
-            <>
-                <ScrollToTop />
-                <ProfileSelection />
-            </>
+            <ProfileSelection />
         );
     }
 
     return (
         <div className="bg-[#141414] min-h-screen text-white font-sans selection:bg-red-600 selection:text-white">
-            <ScrollToTop />
 
             {/* Anime Intro Overlay */}
             {showAnimeIntro && <AnimeIntro mode={animeIntroMode} onComplete={handleIntroComplete} />}
@@ -1376,6 +1372,7 @@ export default function AppNew() {
     return (
         <StoreProvider>
             <FontLoader />
+            <ScrollToTop />
             <AppRoutes />
         </StoreProvider>
     );

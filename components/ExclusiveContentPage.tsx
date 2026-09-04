@@ -76,7 +76,7 @@ const ExclusiveContentPage: React.FC<ExclusiveContentPageProps> = ({ onDetails }
                         Exclusive Library
                     </h1>
                     <p className="text-gray-400 text-lg mb-8 leading-relaxed">
-                        This section is restricted. Enter your professional access code to reveal our premium collection.
+                        This section is restricted. Enter your professional access code to reveal our exclusive collection.
                     </p>
 
                     <form onSubmit={handleUnlock} className="space-y-4">
@@ -132,7 +132,7 @@ const ExclusiveContentPage: React.FC<ExclusiveContentPageProps> = ({ onDetails }
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
                     <div>
                         <div className="flex items-center gap-3 mb-2">
-                            <span className="bg-brand-red text-white text-[10px] font-black px-2 py-0.5 rounded tracking-tighter uppercase">Premium</span>
+                            <span className="bg-brand-red text-white text-[10px] font-black px-2 py-0.5 rounded tracking-tighter uppercase">Exclusive</span>
                             <span className="text-gray-500 text-xs font-bold uppercase tracking-widest">Unlocked</span>
                         </div>
                         <h1 className="text-4xl font-black text-white tracking-tight flex items-center gap-3">

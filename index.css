@@ -67,6 +67,22 @@ body {
   transition: background-color 0.3s, color 0.3s;
 }
 
+/* Global Smooth Scroll across the whole website and all scrollable containers */
+*,
+*::before,
+*::after {
+  scroll-behavior: smooth;
+}
+
+#root,
+.overflow-y-auto,
+.overflow-x-auto,
+.no-scrollbar,
+[data-radix-scroll-area-viewport] {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* --- Typography Overrides --- */
 h1,
 h2,

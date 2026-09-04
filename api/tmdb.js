@@ -41,8 +41,6 @@ export default async function handler(req, res) {
       res.status(status).json(payload);
     };
 
-    console.log('[TMDB Proxy] Attempting:', url);
-
     return new Promise((resolve) => {
       const tmdbReq = https.get(url, (tmdbRes) => {
         let data = '';

@@ -400,28 +400,21 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 const cachedContentStr = localStorage.getItem('cachedContent');
 
                 if (serverContentVersion !== currentLocalContentVersion || !cachedContentStr) {
-                    console.log(`[Cache] Updating Content (Server: ${serverContentVersion} vs Local: ${currentLocalContentVersion}). Reason: ${!cachedContentStr ? 'No Cache' : 'Version Mismatch'}`);
-
                     // Fetch fresh data with Catalog Optimization (1 read vs N reads)
                     let freshContent: Content[] = [];
                     try {
                         const catalogSnap = await getDoc(doc(db, 'catalogs', 'global'));
                         if (catalogSnap.exists()) {
-                            console.log("[Cache] Catalog document found. Using optimized fetch.");
                             freshContent = catalogSnap.data().items || [];
                         } else {
-                            console.log("[Cache] Catalog document not found. Falling back to full collection fetch.");
                             const contentSnap = await getDocs(collection(db, 'content'));
                             freshContent = contentSnap.docs.map(d => ({ ...d.data(), id: d.id } as Content));
                         }
                     } catch (err) {
-                        console.warn("Network fetch failed (Quota/Offline). Trying Cache...", err);
                         try {
                             const contentSnap = await getDocsFromCache(collection(db, 'content'));
                             freshContent = contentSnap.docs.map(d => ({ ...d.data(), id: d.id } as Content));
-                            console.log(`[Cache] Recovered ${freshContent.length} items from offline cache.`);
                         } catch (cacheErr) {
-                            console.error("Cache recovery failed:", cacheErr);
                             // Last resort: Keep existing state or empty
                         }
                     }
@@ -436,17 +429,16 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                         localStorage.setItem('cachedContent', JSON.stringify(freshContent));
                         localStorage.setItem('contentVersion', serverContentVersion.toString());
                     } catch (e) {
-                        console.error("LocalStorage Write Failed (Quota Exceeded). Content updated in memory only.", e);
+                        // LocalStorage write full, memory updated
                     }
                 } else {
-                    console.log(`[Cache] Content up to date (v${currentLocalContentVersion}). Loading from Cache.`);
                     // Load from Cache
                     if (cachedContentStr) {
                         try {
                             const parsedContent = JSON.parse(cachedContentStr);
                             setContent(parsedContent);
                         } catch (e) {
-                            console.error("Error parsing cached content:", e);
+                            // Ignore parse error
                         }
                     }
                 }
@@ -464,17 +456,15 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     cachedSectionsStr.length < 5; // Empty array "[]" is length 2
 
                 if (shouldFetchSections) {
-                    console.log(`[Cache] Updating Sections. Reason: ${serverSectionsVersion !== currentLocalSectionsVersion ? 'Version Mismatch' : 'Missing/Empty Cache'}`);
                     let freshSections: Section[] = [];
                     try {
                         const sectionsSnap = await getDocs(query(collection(db, 'sections'), orderBy('order')));
                         freshSections = sectionsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Section));
                     } catch (err) {
-                        console.warn("Sections fetch failed. Trying Cache...", err);
                         try {
                             const sectionsSnap = await getDocsFromCache(query(collection(db, 'sections'), orderBy('order')));
                             freshSections = sectionsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Section));
-                        } catch (cacheErr) { console.error(cacheErr); }
+                        } catch (cacheErr) { }
                     }
 
                     setSections(freshSections);
@@ -485,46 +475,40 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     try {
                         localStorage.setItem('cachedSections', JSON.stringify(freshSections));
                         localStorage.setItem('sectionsVersion', serverSectionsVersion.toString());
-                    } catch (e) { console.warn("LS Full (Sections)", e); }
+                    } catch (e) { }
                 } else {
-                    console.log(`[Cache] Sections up to date (v${currentLocalSectionsVersion}). Loading from Cache.`);
                     if (cachedSectionsStr) {
                         setSections(JSON.parse(cachedSectionsStr));
                     }
                 }
             }
         }, (error) => {
-            console.error("Settings Listener Failed (Quota/Offline). Initiating Safe Mode Load.", error);
             // FAILSAFE: Try to load from LocalStorage / Cache anyway
             const cachedContentStr = localStorage.getItem('cachedContent');
             if (cachedContentStr) {
                 try {
                     setContent(JSON.parse(cachedContentStr));
-                    console.log("Safe Mode: Loaded Content from LocalStorage.");
-                } catch (e) { console.error("Safe Mode Content Parse Failed", e); }
+                } catch (e) { }
             } else {
                 // Try Firestore Cache if LS is empty
                 getDocsFromCache(collection(db, 'content')).then(snap => {
                     if (!snap.empty) {
                         setContent(snap.docs.map(d => ({ ...d.data(), id: d.id } as Content)));
-                        console.log("Safe Mode: Loaded Content from Firestore Cache.");
                     }
-                }).catch(e => console.error("Safe Mode Firestore Cache Failed", e));
+                }).catch(() => {});
             }
 
             const cachedSectionsStr = localStorage.getItem('cachedSections');
             if (cachedSectionsStr) {
                 try {
                     setSections(JSON.parse(cachedSectionsStr));
-                    console.log("Safe Mode: Loaded Sections from LocalStorage.");
-                } catch (e) { console.error("Safe Mode Sections Parse Failed", e); }
+                } catch (e) { }
             } else {
                 getDocsFromCache(query(collection(db, 'sections'), orderBy('order'))).then(snap => {
                     if (!snap.empty) {
                         setSections(snap.docs.map(d => ({ ...d.data(), id: d.id } as Section)));
-                        console.log("Safe Mode: Loaded Sections from Firestore Cache.");
                     }
-                }).catch(e => console.error("Safe Mode Sections Cache Failed", e));
+                }).catch(() => {});
             }
         });
 
@@ -725,7 +709,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     const publishCatalog = async () => {
         try {
-            console.log("[Catalog] Publishing global catalog...");
             const contentSnap = await getDocs(collection(db, 'content'));
             const allContent = contentSnap.docs.map(d => ({ ...d.data(), id: d.id } as Content));
             
@@ -737,7 +720,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             
             // Also bump content version
             await updateSettings({ contentVersion: Date.now() });
-            console.log("[Catalog] Published successfully.");
         } catch (error) {
             console.error("[Catalog] Publication failed:", error);
         }
@@ -1223,14 +1205,24 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             await deleteDoc(doc(db, 'pages', id));
         },
         incrementViews: async (id: string) => {
-            await updateDoc(doc(db, 'content', id), {
-                views: increment(1)
-            });
+            try {
+                if (!id) return;
+                await setDoc(doc(db, 'content', id), {
+                    views: increment(1)
+                }, { merge: true });
+            } catch {
+                // Silently ignore
+            }
         },
         incrementLikes: async (id: string) => {
-            await updateDoc(doc(db, 'content', id), {
-                likes: increment(1)
-            });
+            try {
+                if (!id) return;
+                await setDoc(doc(db, 'content', id), {
+                    likes: increment(1)
+                }, { merge: true });
+            } catch {
+                // Silently ignore
+            }
         },
         publishCatalog
     }), [

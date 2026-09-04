@@ -340,7 +340,7 @@ The application uses **React Router v7** with `BrowserRouter`. All routing is ma
 | `/anime` | `MainLayout` → Anime | ❌ | Anime section with animated BG video |
 | `/my-list` | `MainLayout` → My List | ✅ | Personal watchlist |
 | `/search` | `SearchPage` | ❌ | Search content |
-| `/exclusive` | `ExclusiveContentPage` | ❌ (code-gated) | Password-protected premium content |
+| `/exclusive` | `ExclusiveContentPage` | ❌ (code-gated) | Password-protected exclusive content |
 | `/account` | `AccountSettings` | ✅ | Profile, billing, devices |
 | `/request` | `RequestContent` | ❌ | Request a movie or show |
 | `/login` | `LoginPage` | ❌ | Email & Google login |

@@ -67,7 +67,18 @@ const SparksFeed: React.FC<SparksFeedProps> = ({ items }) => {
                      </div>
 
                      <button
-                        className="p-3.5 bg-gray-800/40 backdrop-blur-md border border-white/10 rounded-full cursor-pointer transition-colors"
+                        onClick={async () => {
+                           const shareUrl = `${window.location.origin}/browse/${item.id}`;
+                           const text = `🎬 Watch "${item.title}" on My Donkey!\n\n🍿 Stream Free: ${shareUrl}`;
+                           if (navigator.share) {
+                              try { await navigator.share({ title: `${item.title} | My Donkey`, text, url: shareUrl }); } catch {}
+                           } else {
+                              await navigator.clipboard.writeText(text);
+                              alert('🎬 Link copied to clipboard! Paste it into your chat to share.');
+                           }
+                        }}
+                        className="p-3.5 bg-gray-800/40 backdrop-blur-md border border-white/10 rounded-full cursor-pointer transition-colors active:scale-90"
+                        title="Share"
                      >
                         <Share2 size={30} className="text-white" />
                      </button>

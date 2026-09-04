@@ -5,6 +5,17 @@
             "destination": "/api/$1"
         },
         {
+            "source": "/(browse|watch)/:id",
+            "has": [
+                {
+                    "type": "header",
+                    "key": "user-agent",
+                    "value": ".*(facebookexternalhit|Facebot|WhatsApp|TelegramBot|Twitterbot|Pinterest|Googlebot|bingbot|Discordbot|Slackbot|LinkedInBot|Applebot|SkypeUriPreview|Embedly|redditbot|vkShare|line|viber|snapchat|meta-externalagent).*"
+                }
+            ],
+            "destination": "/api/content-seo?id=:id&type=$1"
+        },
+        {
             "source": "/(.*)",
             "destination": "/index.html"
         }

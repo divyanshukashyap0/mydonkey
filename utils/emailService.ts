@@ -24,7 +24,7 @@ export const sendSubscriptionEmail = async (toEmail: string, planName: string, a
                         <p>Hi there,</p>
                         <p>Thank you for subscribing to the <strong>${planName}</strong> plan.</p>
                         <p><strong>Amount Paid:</strong> ${amount}</p>
-                        <p>You now have access to premium entertainment. Sit back, relax, and enjoy!</p>
+                        <p>You now have access to unlimited entertainment. Sit back, relax, and enjoy!</p>
                         <br/>
                         <p>Best regards,</p>
                         <p>The My Donkey Team</p>

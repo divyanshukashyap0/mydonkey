@@ -4,29 +4,54 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useStore } from '../context/StoreContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, Loader2, Sparkles, Scan } from 'lucide-react';
 
 const MobileScannerPage = () => {
-    const { currentUser, isAuthenticated } = useStore();
+    const { currentUser, isAuthenticated, isLoading } = useStore();
     const navigate = useNavigate();
     const location = useLocation();
     const manualInputRef = useRef<HTMLInputElement>(null);
     const [scannedSession, setScannedSession] = useState<string | null>(null);
-    const [status, setStatus] = useState<'scanning' | 'confirming' | 'success' | 'error'>('scanning');
+    const [status, setStatus] = useState<'scanning' | 'captured' | 'confirming' | 'success' | 'error'>('scanning');
     const [errorMessage, setErrorMessage] = useState('');
     const [loading, setLoading] = useState(false);
 
-    // Detect if accessed from a PC / desktop browser
+    // Audio chirp synthesizer for camera shutter / scanner lock-on
+    const playCaptureChirp = () => {
+        try {
+            const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+            if (AudioCtx) {
+                const ctx = new AudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.12);
+                gain.gain.setValueAtTime(0.12, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.15);
+            }
+        } catch (_) {}
+    };
+
+    // Detect if accessed from a desktop PC without touch or direct session link
     const isPC = useMemo(() => {
         if (typeof window === 'undefined') return false;
+        // Never treat as blocked PC if direct sessionId is provided in URL (e.g. from camera scan)
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('sessionId')) return false;
+
+        const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
         const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent);
-        return !isMobileUA || (!('ontouchstart' in window) && window.innerWidth >= 1024);
+        return !isMobileUA && !isTouch;
     }, []);
 
-    // If opened on PC, automatically navigate back to previous page
+    // If opened on PC without camera intent, automatically navigate back to previous page
     useEffect(() => {
         if (isPC) {
-            console.log("Scanner page opened on PC. Redirecting back to previous page...");
             const hasHistory = (window.history.state && typeof window.history.state.idx === 'number' && window.history.state.idx > 0) || (window.history.length > 1 && !!document.referrer);
             if (hasHistory) {
                 navigate(-1);
@@ -44,24 +69,11 @@ const MobileScannerPage = () => {
         }
     }, [isPC, navigate]);
 
-    // Don't render scanner on PC to prevent webcam/permission activation
-    if (isPC) {
-        return null;
-    }
-
     useEffect(() => {
-        console.log("Scanner Page Info:", {
-            isAuthenticated,
-            hasUser: !!currentUser,
-            uid: currentUser?.uid,
-            search: location.search
-        });
-        
         const params = new URLSearchParams(location.search);
         const urlSessionId = params.get('sessionId');
         
         if (urlSessionId && isAuthenticated && currentUser) {
-            console.log("🎯 Session ID detected in URL, switching to confirmation:", urlSessionId);
             setScannedSession(urlSessionId);
             setStatus('confirming');
         } else if (params.get('mode') === 'manual') {
@@ -71,6 +83,20 @@ const MobileScannerPage = () => {
             }, 300);
         }
     }, [currentUser, isAuthenticated, location]);
+
+    // Don't render scanner on pure PC without touch/sessionId
+    if (isPC) {
+        return null;
+    }
+
+    // Wait for auth initialization
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-black flex items-center justify-center">
+                <Loader2 className="w-10 h-10 text-brand-red animate-spin" />
+            </div>
+        );
+    }
 
     // If not authenticated, require login first
     if (!isAuthenticated || !currentUser) {
@@ -90,36 +116,58 @@ const MobileScannerPage = () => {
 
     const handleScan = async (text: string) => {
         const cleanedText = text.trim();
-        console.log("Processing text:", cleanedText);
         if (!cleanedText || status !== 'scanning') return;
         
         try {
             let sessionId = '';
-            if (cleanedText.includes('?sessionId=')) {
-                const url = new URL(cleanedText);
-                sessionId = url.searchParams.get('sessionId') || '';
+
+            // 1. Direct query parameter regex match (handles full URLs, partial URLs, with or without protocol)
+            const paramMatch = cleanedText.match(/sessionId=([0-9]{6})/i);
+            if (paramMatch) {
+                sessionId = paramMatch[1];
+            } else if (/^\d{6}$/.test(cleanedText)) {
+                // 2. Direct 6-digit numeric ID
+                sessionId = cleanedText;
             } else if (cleanedText.startsWith('{')) {
+                // 3. JSON payload
                 try {
                     const data = JSON.parse(cleanedText);
-                    sessionId = data.sessionId;
+                    sessionId = String(data.sessionId || '').trim();
                 } catch (e) {
                     sessionId = cleanedText;
                 }
             } else {
-                sessionId = cleanedText;
+                // 4. URL fallback
+                try {
+                    const urlStr = cleanedText.startsWith('http') ? cleanedText : `https://${cleanedText}`;
+                    const url = new URL(urlStr);
+                    sessionId = url.searchParams.get('sessionId') || '';
+                } catch (_) {
+                    sessionId = cleanedText;
+                }
             }
 
-            // Remove any potential whitespace or non-digit characters the user might have accidentally typed
             sessionId = sessionId.trim();
 
             if (sessionId && /^\d{6}$/.test(sessionId)) {
-                console.log("Valid Session ID found:", sessionId);
                 setScannedSession(sessionId);
-                setStatus('confirming');
+                setStatus('captured');
+                playCaptureChirp();
+
+                // Haptic feedback on supported mobile devices
+                if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                    try {
+                        navigator.vibrate([40, 60, 40]);
+                    } catch (_) {}
+                }
+
+                // Smooth display of capture animation before showing confirmation
+                setTimeout(() => {
+                    setStatus('confirming');
+                }, 850);
             } else {
-                console.warn("Invalid session ID format:", cleanedText);
                 setStatus('error');
-                setErrorMessage('Invalid ID. Please enter exactly 6 digits (e.g. 123456).');
+                setErrorMessage('Invalid QR Code. Please ensure the QR code is clearly visible, or enter the 6-digit ID below.');
             }
         } catch (err) {
             console.error("Scan error:", err);
@@ -133,8 +181,6 @@ const MobileScannerPage = () => {
         
         setLoading(true);
         try {
-            // Call our new Vercel API instead of updating Firestore directly
-            // This allows us to generate the Custom Token on the backend
             const response = await fetch('/api/approve-qr', {
                 method: 'POST',
                 headers: {
@@ -177,7 +223,7 @@ const MobileScannerPage = () => {
 
     return (
         <div className="min-h-screen bg-black text-white flex flex-col">
-            <div className="p-4 flex items-center border-b border-white/10 bg-black/50 sticky top-0 z-10">
+            <div className="p-4 flex items-center border-b border-white/10 bg-black/50 sticky top-0 z-10 backdrop-blur-md">
                 <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-gray-400 hover:text-white transition-colors" aria-label="Go back">
                     <ArrowLeft size={24} />
                 </button>
@@ -185,29 +231,112 @@ const MobileScannerPage = () => {
             </div>
 
             <div className="flex-1 flex flex-col items-center justify-center p-6">
-                {status === 'scanning' && (
+                {(status === 'scanning' || status === 'captured') && (
                     <div className="w-full max-w-md flex flex-col items-center">
-                        <div className="w-full aspect-square rounded-2xl overflow-hidden bg-gray-900 border-4 border-white/10 shadow-2xl relative">
+                        <div className="w-full aspect-square max-w-[360px] rounded-3xl overflow-hidden bg-gray-950 border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.8)] relative flex items-center justify-center">
                             <Scanner 
-                                onResult={(result) => {
-                                    console.log("Scanner result received:", result);
-                                    if (result && result.length > 0) {
-                                        const text = result[0].rawValue;
-                                        handleScan(text);
+                                onScan={(detectedCodes) => {
+                                    if (detectedCodes && detectedCodes.length > 0) {
+                                        const text = detectedCodes[0]?.rawValue;
+                                        if (text) {
+                                            handleScan(text);
+                                        }
                                     }
                                 }}
                                 onError={(error) => {
                                     console.error("Scanner Error (Direct):", error);
                                 }}
+                                components={{
+                                    finder: false,
+                                }}
+                                styles={{
+                                    container: { width: '100%', height: '100%' },
+                                    video: { objectFit: 'cover', width: '100%', height: '100%' }
+                                }}
                             />
-                            {/* Overlay for aesthetic scanning effect */}
-                            <div className="absolute inset-0 border-2 border-brand-red opacity-50 z-10 pointer-events-none rounded-xl m-8"></div>
-                            <div className="absolute top-0 left-0 right-0 h-1 bg-brand-red opacity-80 animate-scan z-10"></div>
+
+                            {/* Vignette mask around central target */}
+                            <div className="absolute inset-0 pointer-events-none z-10 bg-[radial-gradient(ellipse_at_center,_transparent_45%,_rgba(0,0,0,0.7)_85%)]" />
+
+                            {/* Viewfinder Target HUD Box */}
+                            <div className="absolute w-[240px] h-[240px] sm:w-[270px] sm:h-[270px] pointer-events-none z-20 flex items-center justify-center">
+                                {/* 4 Precision HUD Corners with dynamic glow & snap on capture */}
+                                <div className={`absolute top-0 left-0 w-8 h-8 sm:w-10 sm:h-10 border-t-[3.5px] border-l-[3.5px] rounded-tl-xl transition-all duration-300 ${status === 'captured' ? 'border-emerald-400 scale-95 shadow-[0_0_25px_#10b981]' : 'border-brand-red shadow-[0_0_15px_rgba(229,9,20,0.8)]'}`} />
+                                <div className={`absolute top-0 right-0 w-8 h-8 sm:w-10 sm:h-10 border-t-[3.5px] border-r-[3.5px] rounded-tr-xl transition-all duration-300 ${status === 'captured' ? 'border-emerald-400 scale-95 shadow-[0_0_25px_#10b981]' : 'border-brand-red shadow-[0_0_15px_rgba(229,9,20,0.8)]'}`} />
+                                <div className={`absolute bottom-0 left-0 w-8 h-8 sm:w-10 sm:h-10 border-b-[3.5px] border-l-[3.5px] rounded-bl-xl transition-all duration-300 ${status === 'captured' ? 'border-emerald-400 scale-95 shadow-[0_0_25px_#10b981]' : 'border-brand-red shadow-[0_0_15px_rgba(229,9,20,0.8)]'}`} />
+                                <div className={`absolute bottom-0 right-0 w-8 h-8 sm:w-10 sm:h-10 border-b-[3.5px] border-r-[3.5px] rounded-br-xl transition-all duration-300 ${status === 'captured' ? 'border-emerald-400 scale-95 shadow-[0_0_25px_#10b981]' : 'border-brand-red shadow-[0_0_15px_rgba(229,9,20,0.8)]'}`} />
+
+                                {/* Center crosshair alignment marks */}
+                                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-4 h-[2px] bg-white/40" />
+                                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-[2px] bg-white/40" />
+                                <div className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-[2px] bg-white/40" />
+                                <div className="absolute right-0 top-1/2 -translate-y-1/2 h-4 w-[2px] bg-white/40" />
+
+                                {/* Scanning Laser Beam with Light Curtain (Active when searching) */}
+                                {status === 'scanning' && (
+                                    <div className="absolute left-1 right-1 pointer-events-none animate-laser-sweep z-20">
+                                        {/* Upper trailing light curtain */}
+                                        <div className="h-16 -mt-16 bg-gradient-to-t from-red-500/25 via-red-500/5 to-transparent w-full" />
+                                        {/* Luminous laser line */}
+                                        <div className="h-[3px] w-full bg-gradient-to-r from-transparent via-red-500 to-transparent shadow-[0_0_14px_#ff0033,0_0_28px_#e50914] relative">
+                                            <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-red-400 shadow-[0_0_8px_#ff0033]" />
+                                            <div className="absolute right-1 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-red-400 shadow-[0_0_8px_#ff0033]" />
+                                        </div>
+                                        {/* Lower subtle glow */}
+                                        <div className="h-8 bg-gradient-to-b from-red-500/15 to-transparent w-full" />
+                                    </div>
+                                )}
+
+                                {/* Capturing / Locked-On Animation (Active when captured) */}
+                                {status === 'captured' && (
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center z-30 rounded-2xl bg-emerald-500/15 border-2 border-emerald-400 shadow-[0_0_40px_rgba(16,185,129,0.7),inset_0_0_30px_rgba(16,185,129,0.3)] animate-capture-pulse">
+                                        {/* Sonic radar wave expanding */}
+                                        <div className="absolute w-36 h-36 sm:w-48 sm:h-48 rounded-full border-2 border-emerald-400 animate-ping opacity-75" />
+                                        <div className="absolute w-28 h-28 rounded-full border border-emerald-300/50 animate-pulse" />
+
+                                        {/* Target Acquired Icon Badge */}
+                                        <div className="relative flex flex-col items-center scale-up-spring">
+                                            <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 backdrop-blur-md border border-emerald-400/80 flex items-center justify-center text-emerald-400 shadow-[0_0_35px_rgba(16,185,129,0.85)]">
+                                                <CheckCircle2 size={38} className="text-emerald-400 stroke-[2.5]" />
+                                            </div>
+                                            <div className="mt-3 px-3.5 py-1 bg-black/85 backdrop-blur-md border border-emerald-400/50 rounded-full text-[11px] font-bold tracking-widest text-emerald-300 uppercase shadow-lg flex items-center gap-1.5">
+                                                <Sparkles size={12} className="text-emerald-400 animate-spin-slow" />
+                                                <span>Code Captured</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Top Floating Status Indicator */}
+                            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+                                {status === 'scanning' ? (
+                                    <div className="bg-black/75 backdrop-blur-md px-3.5 py-1 rounded-full border border-white/15 text-xs text-gray-200 flex items-center gap-2 shadow-lg">
+                                        <span className="relative flex h-2 w-2">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-red"></span>
+                                        </span>
+                                        <span className="font-medium tracking-wide">Scanning for QR Code</span>
+                                    </div>
+                                ) : (
+                                    <div className="bg-emerald-950/85 backdrop-blur-md px-3.5 py-1 rounded-full border border-emerald-400/50 text-xs text-emerald-300 flex items-center gap-2 shadow-lg animate-in fade-in">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                                        <span className="font-semibold tracking-wide">Target Acquired</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                        <p className="mt-8 text-center text-gray-400">Point your camera at the QR code displayed on the web or TV to log in automatically.</p>
+
+                        <p className="mt-8 text-center text-gray-400 text-sm max-w-xs">
+                            {status === 'captured' ? (
+                                <span className="text-emerald-400 font-semibold animate-pulse">Processing secure session approval...</span>
+                            ) : (
+                                "Point your camera at the QR code displayed on the web or TV to log in automatically."
+                            )}
+                        </p>
                         
                         {/* Manual Fallback */}
-                        <div className="mt-12 w-full pt-8 border-t border-white/10">
+                        <div className="mt-10 w-full pt-8 border-t border-white/10">
                             <p className="text-sm text-gray-500 mb-4 text-center">Camera not working? Enter the ID manually:</p>
                             <div className="flex gap-2">
                                 <input 
@@ -234,7 +363,7 @@ const MobileScannerPage = () => {
                                         const input = e.currentTarget.previousSibling as HTMLInputElement;
                                         handleScan(input.value);
                                     }}
-                                    className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm font-bold"
+                                    className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm font-bold transition-colors"
                                 >
                                     Sync
                                 </button>
@@ -306,12 +435,69 @@ const MobileScannerPage = () => {
             </div>
             
             <style dangerouslySetInnerHTML={{__html: `
-                @keyframes scan {
-                    0%, 100% { top: 10%; }
-                    50% { top: 90%; }
+                @keyframes laserSweep {
+                    0% {
+                        top: 2%;
+                        opacity: 0.85;
+                    }
+                    48% {
+                        opacity: 1;
+                    }
+                    50% {
+                        top: calc(98% - 3px);
+                        opacity: 0.85;
+                    }
+                    98% {
+                        opacity: 1;
+                    }
+                    100% {
+                        top: 2%;
+                        opacity: 0.85;
+                    }
                 }
-                .animate-scan {
-                    animation: scan 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+                @keyframes capturePulse {
+                    0% {
+                        transform: scale(0.96);
+                        opacity: 0.5;
+                    }
+                    50% {
+                        transform: scale(1.02);
+                        opacity: 1;
+                    }
+                    100% {
+                        transform: scale(1);
+                        opacity: 1;
+                    }
+                }
+                @keyframes scaleUpSpring {
+                    0% {
+                        transform: scale(0.65);
+                        opacity: 0;
+                    }
+                    70% {
+                        transform: scale(1.08);
+                        opacity: 1;
+                    }
+                    100% {
+                        transform: scale(1);
+                        opacity: 1;
+                    }
+                }
+                .animate-laser-sweep {
+                    animation: laserSweep 2.2s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+                }
+                .animate-capture-pulse {
+                    animation: capturePulse 0.4s ease-out forwards;
+                }
+                .scale-up-spring {
+                    animation: scaleUpSpring 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+                }
+                .animate-spin-slow {
+                    animation: spin 6s linear infinite;
+                }
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
                 }
             `}} />
         </div>

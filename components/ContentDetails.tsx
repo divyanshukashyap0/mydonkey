@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Play, Plus, X, ThumbsUp, Check, Download, Share2, Search, Music2, Trash2 } from 'lucide-react';
 import { Content, Season, Episode } from '../types';
 import { useStore } from '../context/StoreContext';
@@ -19,6 +19,20 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
     const isAdmin = currentUser?.role === 'admin';
     const isAdded = currentProfile?.myList.includes(content.id);
     const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
+
+    const mobileScrollRef = useRef<HTMLDivElement>(null);
+    const desktopScrollRef = useRef<HTMLDivElement>(null);
+
+    // Ensure movie card details always start from top smoothly
+    useEffect(() => {
+        setIsOverviewExpanded(false);
+        if (mobileScrollRef.current) {
+            mobileScrollRef.current.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+        }
+        if (desktopScrollRef.current) {
+            desktopScrollRef.current.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+        }
+    }, [content.id]);
 
     // Close on Escape key
     useEffect(() => {
@@ -88,6 +102,68 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
         }
     };
 
+    const handleShareContent = async () => {
+        const shareUrl = `${window.location.origin}/browse/${content.id}`;
+        const titleText = content.title || 'Movie';
+        const year = content.release_date?.split('-')[0] || '';
+        const descText = content.overview ? `${content.overview.slice(0, 110)}...` : 'Watch in HD for free on My Donkey';
+        const shareText = `🎬 Watch "${titleText}${year ? ` (${year})` : ''}" on My Donkey!\n${descText}\n\n🍿 Stream Free: ${shareUrl}`;
+
+        // Attempt rich file share with image if device supports Web Share API with files
+        const thumbnailToShare = content.backdrop_path || content.poster_path;
+        let shareFiles: File[] | undefined;
+
+        if (thumbnailToShare && typeof navigator !== 'undefined' && (navigator as any).canShare) {
+            try {
+                const res = await fetch(thumbnailToShare, { mode: 'cors' });
+                if (res.ok) {
+                    const blob = await res.blob();
+                    const cleanName = titleText.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+                    const ext = blob.type.includes('png') ? 'png' : 'jpg';
+                    const file = new File([blob], `${cleanName}_thumbnail.${ext}`, { type: blob.type || 'image/jpeg' });
+                    if ((navigator as any).canShare({ files: [file] })) {
+                        shareFiles = [file];
+                    }
+                }
+            } catch {
+                // Fallback to text & URL share
+            }
+        }
+
+        const sharePayload: ShareData = {
+            title: `${titleText} | My Donkey`,
+            text: shareText,
+            url: shareUrl,
+            ...(shareFiles ? { files: shareFiles } : {})
+        };
+
+        try {
+            if (navigator.share) {
+                await navigator.share(sharePayload);
+            } else {
+                await navigator.clipboard.writeText(shareText);
+                alert('🎬 Link copied to clipboard! Paste it into your chat to share.');
+            }
+        } catch (err: any) {
+            if (err.name !== 'AbortError') {
+                try {
+                    if (navigator.share) {
+                        await navigator.share({
+                            title: `${titleText} | My Donkey`,
+                            text: shareText,
+                            url: shareUrl
+                        });
+                        return;
+                    }
+                } catch { }
+                try {
+                    await navigator.clipboard.writeText(shareText);
+                    alert('🎬 Link copied to clipboard! Paste it into your chat to share.');
+                } catch { }
+            }
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-[200] flex items-center justify-center md:p-8 animate-in fade-in duration-300">
             {/* Download Options Modal */}
@@ -142,7 +218,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                 </button>
 
                 {/* --- Mobile: Full Screen Layout (Single Frame) --- */}
-                <div className="md:hidden relative h-full w-full flex flex-col overflow-y-auto no-scrollbar">
+                <div ref={mobileScrollRef} className="md:hidden relative h-full w-full flex flex-col overflow-y-auto no-scrollbar scroll-smooth">
                     {/* Full Height Background Image */}
                     <div className="absolute inset-0 z-0 h-[50vh]">
                         {/* Prefer Poster for mobile aspect ratio if available, else Backdrop */}
@@ -226,24 +302,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                 <ThumbsUp size={20} className="text-white" />
                                 <span className="text-[10px] text-gray-400">Rate</span>
                             </div>
-                            <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-90 transition" onClick={async () => {
-                                const shareUrl = `${window.location.origin}/browse/${content.id}`;
-                                const shareData = {
-                                    title: content.title,
-                                    text: `🎬 Watch "${content.title}" on My Donkey! ${content.overview?.slice(0, 100)}...`,
-                                    url: shareUrl
-                                };
-                                try {
-                                    if (navigator.share) {
-                                        await navigator.share(shareData);
-                                    } else {
-                                        await navigator.clipboard.writeText(shareUrl);
-                                        alert('Link copied! Share it with your friends.');
-                                    }
-                                } catch (err) {
-                                    // Share cancelled
-                                }
-                            }}>
+                            <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-90 transition" onClick={handleShareContent}>
                                 <Share2 size={20} className="text-white" />
                                 <span className="text-[10px] text-gray-400">Share</span>
                             </div>
@@ -297,7 +356,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                 </div>
 
                 {/* --- Desktop: Existing Layout --- */}
-                <div className="hidden md:flex flex-col h-full bg-[#181818] overflow-y-auto no-scrollbar">
+                <div ref={desktopScrollRef} className="hidden md:flex flex-col h-full bg-[#181818] overflow-y-auto no-scrollbar scroll-smooth">
                     <div className="relative h-[400px] md:h-[500px] flex-shrink-0">
                         {(content.backdrop_path || content.poster_path) ? (
                             <img
@@ -352,24 +411,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                     <ThumbsUp size={24} />
                                 </button>
                                 <button
-                                    onClick={async () => {
-                                        const shareUrl = `${window.location.origin}/browse/${content.id}`;
-                                        const shareData = {
-                                            title: content.title,
-                                            text: `🎬 Watch "${content.title}" on My Donkey! ${content.overview?.slice(0, 100)}...`,
-                                            url: shareUrl
-                                        };
-                                        try {
-                                            if (navigator.share) {
-                                                await navigator.share(shareData);
-                                            } else {
-                                                await navigator.clipboard.writeText(shareUrl);
-                                                alert('Link copied! Share it with your friends.');
-                                            }
-                                        } catch (err) {
-                                            // Share cancelled or clipboard write failed
-                                        }
-                                    }}
+                                    onClick={handleShareContent}
                                     className="bg-gray-600/40 backdrop-blur-md p-3 rounded-full border border-white/20 hover:border-white transition"
                                     title="Share"
                                 >
@@ -463,8 +505,8 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                     items={relatedContent}
                                     onDetails={(item) => {
                                         if (onDetails) onDetails(item);
-                                        // Scroll to top if we stay in same modal, but here we likely switch item props
-                                        // The parent viewingItem changes, so this component re-renders with new content.
+                                        mobileScrollRef.current?.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+                                        desktopScrollRef.current?.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
                                     }}
                                 />
                             </div>

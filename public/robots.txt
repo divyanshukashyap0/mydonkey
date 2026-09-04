@@ -4,15 +4,29 @@ Allow: /home
 Allow: /movies
 Allow: /tv
 Allow: /anime
-Allow: /search
+Allow: /categories
+Allow: /category
+Allow: /search*
 Allow: /exclusive
 Allow: /my-list
-Allow: /request
+Allow: /adblocker
+Allow: /about
+Allow: /help
+Allow: /contact
+Allow: /careers
+Allow: /press
+Allow: /blog
+Allow: /investors
+Allow: /terms
+Allow: /devices
 Allow: /browse/
 Disallow: /watch/*
 Disallow: /admin/*
 Disallow: /account/*
 Disallow: /activate/*
+
+# Host
+Host: https://www.mydonkey.in
 
 # Sitemap
 Sitemap: https://www.mydonkey.in/sitemap.xml

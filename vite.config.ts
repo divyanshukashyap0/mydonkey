@@ -21,6 +21,17 @@ function localApiPlugin() {
       const localEnv = loadEnv('development', projectRoot, '');
       Object.assign(process.env, localEnv);
 
+      // Dev-only: Route crawler user-agents on /browse/ or /watch/ to /api/content-seo
+      server.middlewares.use(async (req: any, res: any, next: any) => {
+        const userAgent = req.headers['user-agent'] || '';
+        const isBot = /facebookexternalhit|whatsapp|telegrambot|twitterbot|discordbot|slackbot|applebot|googlebot|bingbot/i.test(userAgent);
+        const match = req.url?.match(/^\/(browse|watch)\/([^\/?#]+)/i);
+        if (isBot && match) {
+          req.url = `/api/content-seo?id=${encodeURIComponent(match[2])}&type=${match[1]}`;
+        }
+        next();
+      });
+
       server.middlewares.use('/api/', async (req: any, res: any, next: any) => {
         // When mounted at '/api/', connect strips the prefix: req.url = 'songs?movie=Dune'
         const fullUrl = new URL('/api/' + req.url, 'http://localhost');
@@ -31,7 +42,6 @@ function localApiPlugin() {
 
         // Derive handler path → <project>/api/songs.js
         const handlerPath = path.resolve(projectRoot, `.${pathname}.js`);
-        console.log('[API DEBUG] Attempting to load handler:', handlerPath);
 
         let handler: any;
         try {
@@ -88,7 +98,7 @@ export default defineConfig(({ mode }) => {
         manifest: {
           name: 'My Donkey OTT',
           short_name: 'MyDonkey',
-          description: 'Premium OTT Platform',
+          description: 'Free OTT Platform',
           theme_color: '#ffffff',
           icons: [
             {

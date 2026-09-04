@@ -240,7 +240,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     useEffect(() => {
         const handleBlur = () => {
             if (document.activeElement?.tagName === 'IFRAME') {
-                console.log("[Iframe Interaction] Focus shifted to iframe. Setting hasStartedPlaying to true.");
                 setHasStartedPlaying(true);
             }
         };
@@ -278,7 +277,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     try {
                         await (screen.orientation as any).lock('landscape');
                     } catch (e) {
-                        console.log('Orientation lock failed:', e);
+                        // Orientation lock ignored
                     }
                 }
             } else {
@@ -654,9 +653,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
                     // Only update if missing or different (and valid)
                     if (mins > 0 && content.duration !== durationStr) {
-                        console.log(`[AutoFix] Updating duration to ${durationStr}`);
                         updateContentDuration(content.id, durationStr)
-                            .catch(e => console.error("Duration update failed", e));
+                            .catch(() => {});
                         hasUpdatedDuration.current = true; // Block future updates
                     }
                 }
@@ -895,7 +893,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     }, [isPlayerReady, showContentLoader, handleLoaderComplete, loaderStartTime]);
 
     const handleIframeLoad = () => {
-        console.log("[Iframe Load] Direct iframe loaded successfully. Setting hasStartedPlaying to true.");
         setHasStartedPlaying(true);
     };
 
@@ -1057,7 +1054,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                 title={content.title}
                                 autoplay={playing}
                                 onLoad={() => {
-                                    console.log("[DrivePlayer Load] Google Drive loaded successfully. Setting hasStartedPlaying to true.");
                                     setHasStartedPlaying(true);
                                 }}
                             />
