@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronUp, CreditCard, Monitor, User as UserIcon, Plus, Calendar, Camera, Wifi, Settings, PlayCircle, Smartphone, Download, Send, Maximize, X, Trash2, Film, QrCode, ScanLine, Tv, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronRight, CreditCard, Monitor, User as UserIcon, Plus, Calendar, Camera, Wifi, Settings, PlayCircle, Smartphone, Download, Send, Maximize, X, Trash2, Film, QrCode, ScanLine, Tv, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import PlanSelectionModal from './account/PlanSelectionModal';
 import PaymentMethodsModal from './account/PaymentMethodsModal';
 import BillingHistoryModal from './account/BillingHistoryModal';
 import DeviceManagementModal from './account/DeviceManagementModal';
 import MyContributions from './account/MyContributions';
+import GenrePreferenceModal from './GenrePreferenceModal';
+import { normalizeGenre } from '../services/recommendationService';
 
 const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) => {
     const navigate = useNavigate();
     const {
         currentUser,
+        currentProfile,
         userProfiles,
         logout,
         addProfile,
@@ -34,9 +37,27 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [showBillingModal, setShowBillingModal] = useState(false);
     const [showDeviceModal, setShowDeviceModal] = useState(false);
+    const [showGenreModal, setShowGenreModal] = useState(false);
     const [requestTitle, setRequestTitle] = useState('');
     const [isRequesting, setIsRequesting] = useState(false);
     const [showContributions, setShowContributions] = useState(false);
+
+    const userFavoriteGenres = React.useMemo(() => {
+        if (currentProfile?.favoriteGenres && currentProfile.favoriteGenres.length > 0) {
+            return currentProfile.favoriteGenres.map(normalizeGenre);
+        }
+        if (currentUser?.favoriteGenres && currentUser.favoriteGenres.length > 0) {
+            return currentUser.favoriteGenres.map(normalizeGenre);
+        }
+        try {
+            const raw = localStorage.getItem('my_donkey_favorite_genres');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) return parsed.map(normalizeGenre);
+            }
+        } catch (e) {}
+        return [];
+    }, [currentProfile?.favoriteGenres, currentUser?.favoriteGenres]);
 
     // Profile Management State
     const [editingProfile, setEditingProfile] = useState<any | null>(null);
@@ -368,6 +389,33 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                             <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Preferences</span>
                         </div>
 
+                        <button
+                            onClick={() => setShowGenreModal(true)}
+                            className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition border-b border-white/5 group text-left cursor-pointer"
+                        >
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-600 to-amber-600 flex items-center justify-center text-white shadow-md shadow-red-600/20 group-hover:scale-105 transition-transform">
+                                    <Sparkles size={18} />
+                                </div>
+                                <div className="text-left">
+                                    <div className="font-medium flex items-center gap-2 text-white">
+                                        Favourite Genres & Taste
+                                        {userFavoriteGenres.length > 0 && (
+                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30">
+                                                {userFavoriteGenres.length} Selected
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="text-xs text-gray-400">
+                                        {userFavoriteGenres.length > 0
+                                            ? userFavoriteGenres.slice(0, 4).join(', ') + (userFavoriteGenres.length > 4 ? '...' : '')
+                                            : 'Choose genres to personalize recommendations'}
+                                    </div>
+                                </div>
+                            </div>
+                            <ChevronRight size={18} className="text-gray-500 group-hover:text-white group-hover:translate-x-1 transition-transform" />
+                        </button>
+
                         <button onClick={toggleLowDataMode} className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition border-b border-white/5">
                             <div className="flex items-center gap-4">
                                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center">
@@ -643,6 +691,7 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
             {showPaymentModal && <PaymentMethodsModal onClose={() => setShowPaymentModal(false)} />}
             {showBillingModal && <BillingHistoryModal onClose={() => setShowBillingModal(false)} />}
             {showDeviceModal && <DeviceManagementModal onClose={() => setShowDeviceModal(false)} />}
+            {showGenreModal && <GenrePreferenceModal isOpen={showGenreModal} onClose={() => setShowGenreModal(false)} />}
         </div >
     );
 };

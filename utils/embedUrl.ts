@@ -10,14 +10,15 @@ export const DEFAULT_TV_TYPE = 'tv';
  *      https://proxy.garageband.rocks/embed/tv/tt0903747
  */
 export const buildEmbedUrl = (
-    imdbId: string,
+    imdbId: string | number,
     type: 'movie' | 'tv' | string = 'movie',
     settings?: Partial<SiteSettings>,
     seasonNumber?: number,
     episodeNumber?: number
 ): string => {
-    if (!imdbId) return '';
-    const cleanId = imdbId.trim();
+    if (imdbId === undefined || imdbId === null || imdbId === '') return '';
+    const cleanId = String(imdbId).trim();
+    if (!cleanId) return '';
     const base = (settings?.embedProxyBaseUrl || DEFAULT_EMBED_PROXY_BASE).replace(/\/+$/, '');
 
     let typeSegment = type;

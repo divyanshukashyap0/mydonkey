@@ -5,6 +5,8 @@ import { useStore } from '../context/StoreContext';
 import ContentRail from './ContentRail';
 import SongsSection from './SongsSection';
 
+import { buildEmbedUrl } from '../utils/embedUrl';
+
 interface ContentDetailsProps {
     content: Content;
     onClose: () => void;
@@ -13,10 +15,21 @@ interface ContentDetailsProps {
 }
 
 const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPlay, onDetails }) => {
-    const { currentProfile, toggleWatchlist, currentUser, content: allContent, deleteContent } = useStore();
+    const { currentProfile, toggleWatchlist, currentUser, content: allContent, deleteContent, settings } = useStore();
     const isAdmin = currentUser?.role === 'admin';
     const isAdded = currentProfile?.myList.includes(content.id);
     const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
+
+    // Close on Escape key
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                onClose();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onClose]);
 
     // Filter Related Content
     const relatedContent = useMemo(() => {
@@ -26,21 +39,28 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
             .slice(0, 10);
     }, [content, allContent]);
 
-
-
-
-
     // Helper to determine if content is playable
     // Any type except 'tv' is considered a single video play mode (movie, sparks, sports, short)
     const isSingleVideoType = content.type !== 'tv';
 
+    // Content from TMDB or IMDb is always playable
+    const isTmdbOrImdb = !!content.tmdbId || (typeof content.id === 'string' && (content.id.startsWith('tmdb_') || content.id.startsWith('imdb_'))) || !!content.imdbId;
+
     // Check for ANY valid video source
-    const hasVideoSource = !!(content.movieDriveId || content.movieYoutubeId || content.videoUrl || content.youtubeId);
+    const hasVideoSource = !!(content.movieDriveId || content.movieYoutubeId || content.videoUrl || content.youtubeId || isTmdbOrImdb);
 
     // Check if TV show has any seasons with episodes
     const hasEpisodes = content.type === 'tv' && !!content.seasons && content.seasons.length > 0 && content.seasons.some(s => s.episodes.length > 0);
 
     const isPlayable = hasVideoSource || hasEpisodes;
+
+    // Ensure videoUrl is ready for playback if from TMDB/IMDb and missing
+    if (isTmdbOrImdb && !content.videoUrl) {
+        const streamId = content.imdbId || (content.tmdbId ? String(content.tmdbId) : (typeof content.id === 'string' ? content.id.replace(/^(tmdb_|imdb_)/, '') : ''));
+        if (streamId) {
+            content.videoUrl = buildEmbedUrl(streamId, content.type || 'movie', settings);
+        }
+    }
 
     const [downloadOptions, setDownloadOptions] = useState<Content | Episode | null>(null);
 
@@ -147,7 +167,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                 <span>•</span>
                                 <span>{content.release_date?.split('-')[0] || '2026'}</span>
                                 <span>•</span>
-                                <span className="border border-white/30 px-1 rounded text-[10px]">{content.rating || 'U/A 13+'}</span>
+                                {content.rating && <span className="border border-white/30 px-1 rounded text-[10px]">{content.rating}</span>}
                                 <span>•</span>
                                 <span>{content.genres?.[0]}</span>
                             </div>
@@ -391,11 +411,11 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                 <div className="flex flex-wrap items-center gap-3 text-lg font-medium">
                                     <span className="text-green-400 font-bold">{(content.vote_average * 10).toFixed(0)}% Match</span>
                                     <span className="text-gray-400">{content.release_date?.split('-')[0]}</span>
-                                    <span className="border border-gray-600 px-2 py-0.5 rounded text-xs">{content.rating || 'U/A 13+'}</span>
+                                    {content.rating && <span className="border border-gray-600 px-2 py-0.5 rounded text-xs">{content.rating}</span>}
                                     {(content.type?.toLowerCase() === 'tv' || (content.seasons && content.seasons.length > 0)) ? (
                                         <span className="text-gray-400">{content.seasons?.length || 1} Season{(content.seasons?.length || 1) !== 1 ? 's' : ''}</span>
                                     ) : (
-                                        <span className="text-gray-400">{content.duration || '0m'}</span>
+                                        content.duration && content.duration !== '0m' && <span className="text-gray-400">{content.duration}</span>
                                     )}
                                     <span className="border border-white/30 px-1.5 rounded text-[10px] font-black tracking-tighter">{content.resolution || 'HD'}</span>
                                 </div>
@@ -428,7 +448,9 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                 {content.creators && content.creators.length > 0 && (
                                     <div><span className="text-gray-500">Creators: </span><span className="text-white">{content.creators.join(', ')}</span></div>
                                 )}
-                                <div><span className="text-gray-500">Cast: </span><span className="text-gray-300">{content.cast?.join(', ')}</span></div>
+                                {content.cast && content.cast.length > 0 && (
+                                    <div><span className="text-gray-500">Cast: </span><span className="text-gray-300">{content.cast.join(', ')}</span></div>
+                                )}
                                 <div><span className="text-gray-500">Genres: </span><span className="text-gray-300">{content.genres?.join(', ')}</span></div>
                             </div>
                         </div>

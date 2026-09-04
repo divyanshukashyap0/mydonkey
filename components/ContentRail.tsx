@@ -12,6 +12,9 @@ interface ContentRailProps {
     isOriginal?: boolean;
     layout?: 'portrait' | 'landscape';
     showRanking?: boolean;
+    badge?: string;
+    subtitle?: string;
+    actionButton?: React.ReactNode;
 }
 
 const ContentRail: React.FC<ContentRailProps> = ({
@@ -22,7 +25,10 @@ const ContentRail: React.FC<ContentRailProps> = ({
     isTop10 = false,
     isOriginal = false,
     layout = 'portrait',
-    showRanking = false
+    showRanking = false,
+    badge,
+    subtitle,
+    actionButton
 }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
     const { currentProfile, toggleWatchlist, currentUser, deleteContent } = useStore();
@@ -39,11 +45,30 @@ const ContentRail: React.FC<ContentRailProps> = ({
     if (!items || items.length === 0) return null;
 
     return (
-        <div className="relative group/rail pb-4 pt-12">
-            <h2 className="text-xl md:text-2xl font-bold mb-4 px-4 md:px-12 flex items-center gap-2 group/title cursor-pointer">
-                {title}
-                <ChevronRight size={20} className="text-brand-red opacity-0 group-hover/title:opacity-100 transition-opacity translate-y-0.5" />
-            </h2>
+        <div className="relative group/rail py-2 md:py-3">
+            <div className="px-4 md:px-12 mb-2 md:mb-3 flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+                <div>
+                    {badge && (
+                        <div className="mb-1.5 flex items-center">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-500/15 border border-red-500/30 text-red-300 shadow-sm">
+                                {badge}
+                            </span>
+                        </div>
+                    )}
+                    <h2 className="text-xl md:text-2xl font-bold flex items-center gap-2 group/title cursor-pointer text-white">
+                        {title}
+                        <ChevronRight size={20} className="text-brand-red opacity-0 group-hover/title:opacity-100 transition-opacity translate-y-0.5" />
+                    </h2>
+                    {subtitle && (
+                        <p className="text-xs md:text-sm text-gray-400 mt-1 font-normal leading-relaxed">{subtitle}</p>
+                    )}
+                </div>
+                {actionButton && (
+                    <div className="flex-shrink-0 self-start sm:self-auto">
+                        {actionButton}
+                    </div>
+                )}
+            </div>
 
             <div className="relative">
                 {/* Navigation Buttons */}
@@ -62,7 +87,7 @@ const ContentRail: React.FC<ContentRailProps> = ({
 
                 <div
                     ref={scrollRef}
-                    className={`flex overflow-x-auto px-4 md:px-12 no-scrollbar scroll-smooth py-12 ${showRanking ? 'gap-0 md:gap-0' : 'gap-2 md:gap-4'}`}
+                    className={`flex overflow-x-auto px-4 md:px-12 no-scrollbar scroll-smooth py-2 md:py-3 ${showRanking ? 'gap-0 md:gap-0' : 'gap-3 md:gap-4'}`}
                 >
                     {(!items || items.length === 0) ? (
                         <div className="text-gray-500 text-sm italic p-4">No content available.</div>
@@ -75,7 +100,13 @@ const ContentRail: React.FC<ContentRailProps> = ({
                             return (
                                 <div
                                     key={item.id}
-                                    className={`flex-shrink-0 transition-all duration-500 hover:z-20 cursor-pointer select-none relative flex items-end ${showRanking ? 'w-48 md:w-[380px]' : (layout === 'landscape' ? 'w-32 md:w-64' : 'w-20 md:w-40')}`}
+                                    className={`flex-shrink-0 transition-all duration-300 hover:z-20 cursor-pointer select-none relative flex items-end ${
+                                        showRanking
+                                            ? 'w-56 xs:w-64 sm:w-80 md:w-[420px]'
+                                            : layout === 'landscape'
+                                            ? 'w-56 xs:w-64 sm:w-72 md:w-88 lg:w-96'
+                                            : 'w-36 xs:w-44 sm:w-52 md:w-60 lg:w-64 xl:w-72'
+                                    }`}
                                     onClick={() => {
                                         if (navigator.vibrate) navigator.vibrate(10);
                                         onDetails(item);
@@ -104,7 +135,7 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                         </div>
                                     )}
  
-                                    <div className={`relative ${showRanking ? 'w-32 md:w-60' : 'flex-1'} ${layout === 'landscape' ? 'aspect-video' : 'aspect-[2/3]'} group/card rounded-lg overflow-hidden shadow-xl hover:scale-110 transition-transform duration-300 z-20`}>
+                                    <div className={`relative ${showRanking ? 'w-36 xs:w-44 sm:w-52 md:w-64' : 'flex-1'} ${layout === 'landscape' ? 'aspect-video' : 'aspect-[2/3]'} group/card rounded-xl overflow-hidden shadow-xl hover:scale-105 transition-transform duration-300 z-20`}>
                                         {layout === 'landscape' ? (
                                             (item.backdrop_path || item.poster_path) ? (
                                                 <picture>
@@ -151,7 +182,11 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                             </div>
                                             <div className="text-sm font-bold truncate">{item.title}</div>
                                             <div className="flex items-center gap-2 text-[10px] mt-1">
-                                                <span className="text-green-400 font-bold">{(item.vote_average * 10).toFixed(0)}% Match</span>
+                                                <span className="text-green-400 font-bold">
+                                                    {(item as any).matchPercentage
+                                                        ? `${(item as any).matchPercentage}% Match`
+                                                        : `${(item.vote_average ? item.vote_average * 10 : 85).toFixed(0)}% Match`}
+                                                </span>
                                                 <span className="border border-white/30 px-1 rounded">HD</span>
                                                 {item.addedBy && (
                                                     <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.2 rounded font-medium truncate max-w-[80px]">
@@ -159,6 +194,11 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                                     </span>
                                                 )}
                                             </div>
+                                            {(item as any).matchReason && (
+                                                <div className="text-[10px] text-amber-300/90 font-medium truncate mt-0.5">
+                                                    {(item as any).matchReason}
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Admin Corner Delete Button on Hover */}

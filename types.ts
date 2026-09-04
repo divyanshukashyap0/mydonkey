@@ -89,7 +89,7 @@ export interface Section {
   id: string;
   title: string;
   order: number;
-  type: 'trending' | 'genre' | 'curated' | 'originals' | 'new_movies' | 'new_tv' | 'my_list' | 'tag';
+  type: 'trending' | 'genre' | 'curated' | 'originals' | 'new_movies' | 'new_tv' | 'my_list' | 'tag' | 'recommended';
   genreFilter?: string;
   tagFilter?: string;
   contentIds?: string[];
@@ -174,6 +174,7 @@ export interface User {
   isGuest?: boolean;
   createdAt?: string;
   bypassPassword?: boolean; // If true, user skips password gate and access codes
+  favoriteGenres?: string[]; // User's preferred genres for personalized recommendations
 }
 
 export interface ContinueWatchingItem {
@@ -266,6 +267,7 @@ export interface Profile {
   myList: string[];
   unlockedContent?: string[];
   subscription?: Subscription;
+  favoriteGenres?: string[];
 }
 
 export enum ContentType {

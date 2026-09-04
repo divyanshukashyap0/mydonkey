@@ -87,6 +87,7 @@ interface StoreContextType {
     deleteProfile: (profileId: string) => Promise<void>;
     updatePlaybackProgress: (movieId: string, progress: number, stoppedAt: number, duration: number) => Promise<void>;
     addToWatchHistory: (contentOrId: Content | string) => Promise<void>;
+    updateFavoriteGenres: (genres: string[]) => Promise<void>;
     updateUserEmail: (newEmail: string) => Promise<void>;
     triggerPasswordReset: () => Promise<void>;
     updateSubscriptionPlan: (planId: string, paymentResponse?: any) => Promise<void>;
@@ -928,6 +929,48 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
     };
 
+    const updateFavoriteGenres = async (genres: string[]) => {
+        const uniqueGenres = Array.from(new Set(genres.map(g => g.trim()).filter(Boolean)));
+
+        // 1. Immediate localStorage persist
+        try {
+            localStorage.setItem('my_donkey_favorite_genres', JSON.stringify(uniqueGenres));
+        } catch (e) {
+            console.warn("Local favorite genres update failed:", e);
+        }
+
+        // 2. Update Current Profile if present
+        if (currentProfile) {
+            const updatedProfile = { ...currentProfile, favoriteGenres: uniqueGenres };
+            setCurrentProfile(updatedProfile);
+            setUserProfiles(prev => prev.map(p => p.id === currentProfile.id ? updatedProfile : p));
+
+            if (fbUser) {
+                try {
+                    await updateDoc(doc(db, 'users', fbUser.uid, 'profiles', currentProfile.id), {
+                        favoriteGenres: uniqueGenres
+                    });
+                } catch (err) {
+                    console.error("Failed to update profile favorite genres in Firestore:", err);
+                }
+            }
+        }
+
+        // 3. Update User account level
+        if (currentUser) {
+            setCurrentUser(prev => prev ? { ...prev, favoriteGenres: uniqueGenres } : null);
+            if (fbUser) {
+                try {
+                    await updateDoc(doc(db, 'users', fbUser.uid), {
+                        favoriteGenres: uniqueGenres
+                    });
+                } catch (err) {
+                    console.error("Failed to update user favorite genres in Firestore:", err);
+                }
+            }
+        }
+    };
+
     // --- New Account Management Methods ---
 
     const updateUserEmail = async (newEmail: string) => {
@@ -1141,6 +1184,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         deleteProfile,
         updatePlaybackProgress,
         addToWatchHistory,
+        updateFavoriteGenres,
         updateUserEmail,
         triggerPasswordReset,
         updateSubscriptionPlan,

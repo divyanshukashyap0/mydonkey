@@ -19,13 +19,32 @@ import AccountSettings from './components/AccountSettings';
 import AdminLayout from './components/admin/AdminLayout';
 import UnlockContentModal from './components/UnlockContentModal';
 import SearchPage from './components/SearchPage';
+import CategoriesPage from './components/CategoriesPage';
 import ScrollToTop from './components/ScrollToTop';
 import ProfileSelection from './components/ProfileSelection';
 import FontLoader from './components/FontLoader';
 import Loader from './components/Loader';
 import { buildEmbedUrl, parseEmbedContentType } from './utils/embedUrl';
 import Pagination from './components/Pagination';
-import { Content } from './types';
+import GenrePreferenceModal from './components/GenrePreferenceModal';
+import PersonalizeBanner from './components/PersonalizeBanner';
+import {
+    getPersonalizedRecommendations,
+    getBecauseYouWatchedSection,
+    getTopPicksForGenre,
+    normalizeGenre
+} from './services/recommendationService';
+import {
+    fetchTMDBDetails,
+    tmdbPosterUrl,
+    tmdbBackdropUrl,
+    mapTMDBGenres,
+    extractTMDBTrailer,
+    fetchCuratedHeroContent,
+    INDIAN_LANGUAGES
+} from './services/tmdbService';
+import { SlidersHorizontal } from 'lucide-react';
+import { Content, ContinueWatchingItem } from './types';
 import { StoreProvider } from './context/StoreContext';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, Link } from 'react-router-dom';
 
@@ -34,16 +53,41 @@ const MainLayout = () => {
     const location = useLocation();
     const navigate = useNavigate();
 
+    // Preserve previous tab and URL when entering modal routes (/browse/ or /watch/)
+    const lastActiveTabRef = useRef<string>('home');
+    const lastNonModalUrlRef = useRef<string>('/');
+
     // Derived activeTab from URL (root '/' is the main website link for 'home')
     const path = location.pathname.substring(1);
-    let activeTab = (path && path !== 'home') ? decodeURIComponent(path) : 'home';
-    if (activeTab.startsWith('browse/') || activeTab.startsWith('watch/')) {
-        activeTab = 'home';
+    const isModalRoute = path.startsWith('browse/') || path.startsWith('watch/');
+
+    let currentTab = (path && path !== 'home') ? decodeURIComponent(path.split('/')[0]) : 'home';
+    if (currentTab === 'category') currentTab = 'categories';
+
+    if (!isModalRoute) {
+        lastActiveTabRef.current = currentTab;
+        lastNonModalUrlRef.current = location.pathname + location.search;
     }
+
+    const stateFromTab = (location.state as any)?.fromTab;
+    const stateFrom = (location.state as any)?.from;
+
+    let extractedFromTab: string | undefined;
+    if (stateFrom) {
+        const cleanFrom = stateFrom.replace(/^\//, '').split('?')[0].split('/')[0];
+        extractedFromTab = (cleanFrom && cleanFrom !== 'home') ? decodeURIComponent(cleanFrom) : 'home';
+        if (extractedFromTab === 'category') extractedFromTab = 'categories';
+    }
+
+    // Active tab stays on the underlying screen when viewing content or playing video
+    const activeTab = isModalRoute
+        ? (stateFromTab || extractedFromTab || lastActiveTabRef.current || 'home')
+        : currentTab;
 
     const [viewingContent, setViewingContent] = useState<Content | null>(null);
     const [playingContent, setPlayingContent] = useState<Content | null>(null);
     const [showUnlockModal, setShowUnlockModal] = useState(false);
+    const [showGenreModal, setShowGenreModal] = useState(false);
 
     // --- Anime Intro State ---
     const [showAnimeIntro, setShowAnimeIntro] = useState(false);
@@ -91,14 +135,67 @@ const MainLayout = () => {
                             return;
                         }
                         setViewingContent(item);
+                    } else if (contentId.startsWith('tmdb_')) {
+                        const rawId = parseInt(contentId.replace('tmdb_', ''));
+                        if (!isNaN(rawId)) {
+                            const hintType = (stateItem?.type as 'movie' | 'tv') || (location.search.includes('type=tv') ? 'tv' : undefined);
+                            const fetchResolved = async () => {
+                                let detail: any = null;
+                                let resolvedType: 'movie' | 'tv' = hintType || 'movie';
+                                if (hintType === 'tv') {
+                                    try { detail = await fetchTMDBDetails(rawId, 'tv'); } catch (_) { }
+                                    if (!detail) { try { detail = await fetchTMDBDetails(rawId, 'movie'); resolvedType = 'movie'; } catch (_) { } }
+                                } else {
+                                    try { detail = await fetchTMDBDetails(rawId, 'movie'); } catch (_) { }
+                                    if (!detail) { try { detail = await fetchTMDBDetails(rawId, 'tv'); resolvedType = 'tv'; } catch (_) { } }
+                                }
+                                if (!detail) throw new Error(`TMDB ID ${rawId} not found`);
+
+                                const trailerUrl = extractTMDBTrailer(detail);
+                                const imdbId = detail.external_ids?.imdb_id || (detail as any).imdb_id || '';
+                                const effectiveType: 'movie' | 'tv' = (detail.name || detail.media_type === 'tv' || resolvedType === 'tv') ? 'tv' : 'movie';
+                                const streamId = imdbId || String(detail.id);
+
+                                const resolved: Content = {
+                                    id: `tmdb_${detail.id}`,
+                                    title: detail.title || detail.name || 'Untitled',
+                                    type: effectiveType,
+                                    imdbId: imdbId || undefined,
+                                    genres: mapTMDBGenres(detail.genres?.map((g: any) => g.id) || []),
+                                    poster_path: detail.poster_path ? tmdbPosterUrl(detail.poster_path) : '',
+                                    backdrop_path: detail.backdrop_path ? tmdbBackdropUrl(detail.backdrop_path) : '',
+                                    description: detail.overview || '',
+                                    overview: detail.overview || '',
+                                    year: (detail.release_date || detail.first_air_date) ? parseInt((detail.release_date || detail.first_air_date)!.split('-')[0]) : new Date().getFullYear(),
+                                    rating: detail.vote_average || 0,
+                                    vote_average: detail.vote_average || 0,
+                                    trailerUrl: trailerUrl ? `https://www.youtube.com/watch?v=${trailerUrl}` : undefined,
+                                    youtubeId: trailerUrl || undefined,
+                                    videoUrl: buildEmbedUrl(streamId, effectiveType, settings),
+                                    tmdbId: detail.id,
+                                    totalSeasons: detail.number_of_seasons,
+                                    totalEpisodes: detail.number_of_episodes,
+                                    allowPlayback: true,
+                                    isPublished: true
+                                };
+                                setViewingContent(resolved);
+                            };
+
+                            fetchResolved().catch(() => {
+                                const from = (location.state as any)?.from || lastNonModalUrlRef.current;
+                                navigate(from || '/', { replace: true });
+                            });
+                        }
                     } else {
                         // Content loaded but ID not found
                         console.warn(`Deep link content not found: ${contentId}`);
-                        navigate('/', { replace: true });
+                        const from = (location.state as any)?.from || lastNonModalUrlRef.current;
+                        navigate(from || '/', { replace: true });
                         return;
                     }
                 } else {
-                    navigate('/', { replace: true });
+                    const from = (location.state as any)?.from || lastNonModalUrlRef.current;
+                    navigate(from || '/', { replace: true });
                 }
             }
         } else {
@@ -189,11 +286,13 @@ const MainLayout = () => {
                         console.warn(`Watch deep link content not found: ${contentId}`);
                         // PROTECTION: Never redirect if we are already playing or have state
                         if (playingContent?.id === contentId || !!playingContent || stateItem || (location.state as any)?.item) return;
-                        navigate('/', { replace: true });
+                        const from = (location.state as any)?.from || lastNonModalUrlRef.current;
+                        navigate(from || '/', { replace: true });
                         return;
                     }
                 } else {
-                    navigate('/', { replace: true });
+                    const from = (location.state as any)?.from || lastNonModalUrlRef.current;
+                    navigate(from || '/', { replace: true });
                 }
             }
         } else {
@@ -272,9 +371,107 @@ const MainLayout = () => {
         return items;
     }, [currentUser?.continueWatching, content]);
 
+    // Combined Watch History (Firestore + LocalStorage fallback)
+    const combinedWatchHistory = useMemo(() => {
+        const list: (ContinueWatchingItem | { movieId: string; progress?: number; lastWatchedAt?: string })[] = [];
+        if (currentUser?.continueWatching) {
+            list.push(...currentUser.continueWatching);
+        }
+        try {
+            const raw = localStorage.getItem('my_donkey_watch_history');
+            if (raw) {
+                const localList = JSON.parse(raw);
+                if (Array.isArray(localList)) {
+                    localList.forEach((lh: any) => {
+                        if (!list.some(it => it.movieId === lh.movieId)) {
+                            list.push(lh);
+                        }
+                    });
+                }
+            }
+        } catch (e) { }
+        return list;
+    }, [currentUser?.continueWatching]);
+
+    // Resolved User Favorite Genres (Profile -> Account -> LocalStorage)
+    const userFavoriteGenres = useMemo(() => {
+        if (currentProfile?.favoriteGenres && currentProfile.favoriteGenres.length > 0) {
+            return currentProfile.favoriteGenres.map(normalizeGenre);
+        }
+        if (currentUser?.favoriteGenres && currentUser.favoriteGenres.length > 0) {
+            return currentUser.favoriteGenres.map(normalizeGenre);
+        }
+        try {
+            const raw = localStorage.getItem('my_donkey_favorite_genres');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) return parsed.map(normalizeGenre);
+            }
+        } catch (e) { }
+        return [];
+    }, [currentProfile?.favoriteGenres, currentUser?.favoriteGenres]);
+
+    // Personalized Recommendations for Home Tab
+    const homePersonalized = useMemo(() => {
+        return getPersonalizedRecommendations({
+            allContent: content,
+            watchHistory: combinedWatchHistory,
+            favoriteGenres: userFavoriteGenres,
+            currentProfile,
+            limit: 20
+        });
+    }, [content, combinedWatchHistory, userFavoriteGenres, currentProfile]);
+
+    // Personalized Recommendations for Movies Tab
+    const moviePersonalized = useMemo(() => {
+        return getPersonalizedRecommendations({
+            allContent: content,
+            watchHistory: combinedWatchHistory,
+            favoriteGenres: userFavoriteGenres,
+            currentProfile,
+            limit: 20,
+            filterType: 'movie'
+        });
+    }, [content, combinedWatchHistory, userFavoriteGenres, currentProfile]);
+
+    // Personalized Recommendations for TV Tab
+    const tvPersonalized = useMemo(() => {
+        return getPersonalizedRecommendations({
+            allContent: content,
+            watchHistory: combinedWatchHistory,
+            favoriteGenres: userFavoriteGenres,
+            currentProfile,
+            limit: 20,
+            filterType: 'tv'
+        });
+    }, [content, combinedWatchHistory, userFavoriteGenres, currentProfile]);
+
+    // "Because You Watched [Title]" Section
+    const becauseYouWatched = useMemo(() => {
+        return getBecauseYouWatchedSection({
+            watchHistory: combinedWatchHistory,
+            allContent: content,
+            limit: 15
+        });
+    }, [combinedWatchHistory, content]);
+
+    // Curated Rails for User's Explicit Favorite Genres
+    const favoriteGenreRails = useMemo(() => {
+        if (!userFavoriteGenres || userFavoriteGenres.length === 0) return [];
+        const watchedIds = new Set(combinedWatchHistory.map(w => w.movieId));
+        return userFavoriteGenres.slice(0, 2).map(genre => {
+            const items = getTopPicksForGenre({
+                genre,
+                allContent: content,
+                watchedIds,
+                limit: 15
+            });
+            return { genre, items };
+        }).filter(r => r.items.length > 0);
+    }, [userFavoriteGenres, combinedWatchHistory, content]);
+
     // State for random heroes (refreshes on tab change)
-    const [randomHeroes, setRandomHeroes] = useState<{ home: any; movie: any; tv: any }>({
-        home: null,
+    const [randomHeroes, setRandomHeroes] = useState<{ movie: any; tv: any }>({
         movie: null,
         tv: null
     });
@@ -282,10 +479,7 @@ const MainLayout = () => {
     useEffect(() => {
         if (!content || content.length === 0) return;
 
-        if (activeTab === 'home') {
-            const candidates = trending.length > 0 ? trending : content;
-            setRandomHeroes(prev => ({ ...prev, home: candidates[Math.floor(Math.random() * candidates.length)] }));
-        } else if (activeTab === 'movies') {
+        if (activeTab === 'movies') {
             const candidates = movies.filter(m => m.featured).length > 0 ? movies.filter(m => m.featured) : movies;
             if (candidates.length > 0) {
                 setRandomHeroes(prev => ({ ...prev, movie: candidates[Math.floor(Math.random() * candidates.length)] }));
@@ -296,40 +490,135 @@ const MainLayout = () => {
                 setRandomHeroes(prev => ({ ...prev, tv: candidates[Math.floor(Math.random() * candidates.length)] }));
             }
         }
-    }, [activeTab, content, trending.length, movies.length, tvShows.length]);
+    }, [activeTab, content, movies.length, tvShows.length]);
+
+    // ── Curated Hero Carousel (Indian + Marvel + DC, rating >= 7.5) ──────────
+    const [heroItems, setHeroItems] = useState<Content[]>([]);
+    useEffect(() => {
+        // Derive preferred language from combined watch history
+        const langCount: Record<string, number> = {};
+        const watchIds = combinedWatchHistory.map(h => h.movieId);
+        content.filter(c => watchIds.includes(c.id) || watchIds.includes(c.imdbId || '')).forEach(c => {
+            const lang = (c as any).original_language || (INDIAN_LANGUAGES.includes((c as any).lang) ? (c as any).lang : null);
+            if (lang) langCount[lang] = (langCount[lang] || 0) + 1;
+        });
+        const preferredLang = Object.entries(langCount).sort((a, b) => b[1] - a[1])[0]?.[0] || 'hi';
+
+        fetchCuratedHeroContent(preferredLang).then(results => {
+            const mapped: Content[] = results.map(r => ({
+                id: `tmdb_${r.id}`,
+                title: r.title || r.name || 'Untitled',
+                type: (r.media_type === 'tv' ? 'tv' : 'movie') as 'movie' | 'tv',
+                poster_path: r.poster_path ? tmdbPosterUrl(r.poster_path) : '',
+                backdrop_path: r.backdrop_path ? tmdbBackdropUrl(r.backdrop_path) : '',
+                overview: r.overview || '',
+                description: r.overview || '',
+                vote_average: r.vote_average,
+                release_date: r.release_date || r.first_air_date || '',
+                year: parseInt((r.release_date || r.first_air_date || '0').split('-')[0]) || new Date().getFullYear(),
+                genres: mapTMDBGenres(r.genre_ids || []),
+                tmdbId: r.id,
+                allowPlayback: true,
+                isPublished: true,
+                resolution: '4K',
+            }));
+            setHeroItems(mapped);
+        }).catch(err => {
+            console.error('fetchCuratedHeroContent error:', err);
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Handlers
     const handlePlay = (item: Content, mode: 'movie' | 'trailer' = 'movie') => {
+        const fromUrl = (location.state as any)?.from || (isModalRoute ? lastNonModalUrlRef.current : (location.pathname + location.search));
+        const fromTab = (location.state as any)?.fromTab || activeTab;
+
         if (mode === 'trailer') {
             setPlayingContent({ ...item, playMode: 'trailer' });
-            navigate(`/watch/${item.id}?mode=trailer`, { state: { item } });
+            navigate(`/watch/${item.id}?mode=trailer`, {
+                state: {
+                    item,
+                    from: fromUrl,
+                    fromTab: fromTab
+                }
+            });
             return;
         }
 
         const embedBaseHost = (settings?.embedProxyBaseUrl || 'https://proxy.garageband.rocks').replace(/^https?:\/\//, '').replace(/\/+$/, '');
 
-        // Check if item has RapidStream / IMDb content ID (open in same tab)
+        // Check if item has RapidStream / IMDb content ID or TMDB ID (open in stream player)
         const imdbId = item.imdbId ||
             (typeof item.id === 'string' && item.id.startsWith('imdb_') ? item.id.replace('imdb_', '') : null) ||
             (item.videoUrl ? item.videoUrl.match(/(tt\d+)/i)?.[1] : null) ||
             (typeof item.id === 'string' && /^tt\d+$/i.test(item.id.trim()) ? item.id.trim() : null);
 
-        const isEmbed = (item.videoUrl && (item.videoUrl.includes('proxy.garageband.rocks') || (embedBaseHost && item.videoUrl.includes(embedBaseHost)) || item.videoUrl.includes('/embed/'))) || !!imdbId;
+        const tmdbNumId = item.tmdbId || (typeof item.id === 'string' && item.id.startsWith('tmdb_') ? item.id.replace('tmdb_', '') : null);
 
-        if (isEmbed && imdbId) {
+        const isEmbed = (item.videoUrl && (item.videoUrl.includes('proxy.garageband.rocks') || (embedBaseHost && item.videoUrl.includes(embedBaseHost)) || item.videoUrl.includes('/embed/'))) || !!imdbId || !!tmdbNumId;
+
+        const effectiveStreamId = imdbId || tmdbNumId;
+
+        if (isEmbed && (effectiveStreamId || item.videoUrl)) {
             const existingType = item.videoUrl ? parseEmbedContentType(item.videoUrl) : null;
-            const streamUrl = buildEmbedUrl(imdbId, existingType || item.type || 'movie', settings);
-            incrementViews(item.id).catch(err => console.error("Error incrementing views:", err));
-            addToWatchHistory(item).catch(err => console.error("Error saving watch history:", err));
+            const streamUrl = effectiveStreamId ? buildEmbedUrl(effectiveStreamId, existingType || item.type || 'movie', settings) : item.videoUrl;
+            if (streamUrl) {
+                incrementViews(item.id).catch(err => console.error("Error incrementing views:", err));
+                addToWatchHistory(item).catch(err => console.error("Error saving watch history:", err));
+                setTimeout(() => {
+                    window.location.href = streamUrl;
+                }, 100);
+                return;
+            }
+        }
+
+        // ── Guard: block internal player if no playable source exists ──────────
+        const hasAnyPlayableSource = !!(
+            item.videoUrl ||
+            item.movieDriveId ||
+            item.movieYoutubeId ||
+            imdbId ||
+            tmdbNumId
+        );
+
+        if (!hasAnyPlayableSource) {
+            // Show a friendly "not available" toast instead of opening an empty player
+            const toast = document.createElement('div');
+            toast.innerHTML = `
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    <span><b>Content not available</b><br/><span style="font-size:13px;opacity:0.8">No stream link found for "<em>${item.title}</em>"</span></span>
+                </div>`;
+            Object.assign(toast.style, {
+                position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
+                background: '#1a1a1a', color: '#fff', border: '1px solid rgba(255,255,255,0.12)',
+                borderLeft: '4px solid #e50914', padding: '14px 20px', borderRadius: '10px',
+                zIndex: '99999', boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                fontFamily: 'inherit', maxWidth: '90vw', animation: 'fadeInUp 0.3s ease',
+                lineHeight: '1.5',
+            });
+            document.body.appendChild(toast);
             setTimeout(() => {
-                window.location.href = streamUrl;
-            }, 100);
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.4s ease';
+                setTimeout(() => document.body.removeChild(toast), 400);
+            }, 3500);
             return;
         }
+        // ── End guard ──────────────────────────────────────────────────────────
 
         if (isAuthenticated && currentUser) {
             setPlayingContent({ ...item, playMode: 'movie' });
-            navigate(`/watch/${item.id}?mode=movie`, { state: { item } });
+            navigate(`/watch/${item.id}?mode=movie`, {
+                state: {
+                    item,
+                    from: fromUrl,
+                    fromTab: fromTab
+                }
+            });
         } else {
             navigate('/login');
         }
@@ -337,7 +626,42 @@ const MainLayout = () => {
 
     const handleDetails = (item: Content) => {
         setViewingContent(item);
-        navigate(`/browse/${item.id}`, { state: { item } });
+        const fromUrl = (location.state as any)?.from || (isModalRoute ? lastNonModalUrlRef.current : (location.pathname + location.search));
+        const fromTab = (location.state as any)?.fromTab || activeTab;
+        const search = (!isModalRoute && location.search) ? location.search : '';
+        navigate(`/browse/${item.id}${search}`, {
+            state: {
+                item,
+                from: fromUrl,
+                fromTab: fromTab
+            }
+        });
+    };
+
+    const handleCloseDetails = () => {
+        setViewingContent(null);
+        const from = (location.state as any)?.from || lastNonModalUrlRef.current;
+        if (from) {
+            navigate(from);
+        } else if (window.history.state && window.history.state.idx > 0) {
+            navigate(-1);
+        } else {
+            const path = activeTab === 'home' ? '/' : `/${activeTab}`;
+            navigate(path);
+        }
+    };
+
+    const handleClosePlayer = () => {
+        setPlayingContent(null);
+        const from = (location.state as any)?.from || lastNonModalUrlRef.current;
+        if (from) {
+            navigate(from);
+        } else if (window.history.state && window.history.state.idx > 0) {
+            navigate(-1);
+        } else {
+            const path = activeTab === 'home' ? '/' : `/${activeTab}`;
+            navigate(path);
+        }
     };
 
     const handleTabChange = (tabId: string) => {
@@ -377,13 +701,14 @@ const MainLayout = () => {
         }
 
         // Navigate to the page (standard tabs)
-        if (['Home', 'Movies', 'TV Shows', 'My List'].includes(page)) {
+        if (['Home', 'Movies', 'TV Shows', 'My List', 'Categories', 'Category'].includes(page)) {
             // Map standard pages to IDs if needed, else use page name
             let target = page;
             if (page === 'Home') target = 'home';
             if (page === 'Movies') target = 'movies';
             if (page === 'TV Shows') target = 'tv';
             if (page === 'My List') target = 'my-list';
+            if (page === 'Categories' || page === 'Category') target = 'categories';
 
             navigate(`/${target}`);
             window.scrollTo(0, 0);
@@ -398,10 +723,16 @@ const MainLayout = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const ITEMS_PER_PAGE = 24;
 
+    const prevActiveTabRef = useRef(activeTab);
     useEffect(() => {
-        setCurrentPage(1); // Reset on tab change
-        window.scrollTo(0, 0);
-    }, [activeTab, animeCategory]);
+        if (prevActiveTabRef.current !== activeTab) {
+            prevActiveTabRef.current = activeTab;
+            setCurrentPage(1); // Reset on actual tab change
+            if (!isModalRoute) {
+                window.scrollTo(0, 0);
+            }
+        }
+    }, [activeTab, animeCategory, isModalRoute]);
 
     const handleIntroComplete = useCallback(() => {
         setShowAnimeIntro(false);
@@ -418,7 +749,11 @@ const MainLayout = () => {
                 let autoItems: Content[] = [];
 
                 // Auto-population logic
-                if (section.type === 'trending') {
+                if (section.type === 'recommended') {
+                    autoItems = scope === 'movie'
+                        ? moviePersonalized.recommendations
+                        : (scope === 'tv' ? tvPersonalized.recommendations : homePersonalized.recommendations);
+                } else if (section.type === 'trending') {
                     autoItems = content.filter(c => c.featured || (c.vote_average && c.vote_average > 7.5)).slice(0, 20);
                 } else if (section.type === 'genre' && section.genreFilter) {
                     autoItems = content.filter(c => c.genres?.includes(section.genreFilter!)).slice(0, 20);
@@ -534,23 +869,30 @@ const MainLayout = () => {
         }
 
         if (activeTab === 'home') {
-            const heroItem = randomHeroes.home || (settings?.heroContentId && content.find(c => c.id === settings.heroContentId))
+            // Fallback single item while TMDB carousel loads
+            const fallbackHero = (settings?.heroContentId && content.find(c => c.id === settings.heroContentId))
                 || (trending.length > 0 ? trending[0] : (content.length > 0 ? content[0] : null));
 
             return (
                 <>
-                    {heroItem ? (
+                    {heroItems.length > 0 ? (
                         <HeroBanner
-                            item={heroItem}
+                            items={heroItems}
+                            onPlay={(item) => handlePlay(item, 'movie')}
+                            onDetails={handleDetails}
+                        />
+                    ) : fallbackHero ? (
+                        <HeroBanner
+                            item={fallbackHero}
                             onPlay={(item) => handlePlay(item, 'movie')}
                             onDetails={handleDetails}
                         />
                     ) : (
                         <HeroSkeleton />
                     )}
-                    <div className="pb-24 bg-[#141414] relative z-10 pl-4 md:pl-12 space-y-8">
+                    <div className="pb-24 bg-[#141414] relative z-10 space-y-3 md:space-y-5">
                         {/* Original Language Announcement */}
-                        <div className="pt-8 pr-4 md:pr-12">
+                        <div className="pt-4 px-4 md:px-12">
                             <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-brand-red/20 via-brand-red/5 to-transparent border-l-4 border-brand-red p-5 shadow-2xl group hover:from-brand-red/30 transition-all duration-300">
                                 <div className="flex items-center gap-4">
                                     <div className="hidden sm:flex w-12 h-12 rounded-full bg-brand-red items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
@@ -566,7 +908,7 @@ const MainLayout = () => {
                                             <span className="text-brand-red font-semibold">Enjoy All content is available in its real language voice.</span>
                                         </p>
                                         <p className="text-gray-300 text-sm md:text-base leading-relaxed">
-                                            we suggest to use <Link to="/adblocker" className="text-brand-red underline hover:text-brand-red/80">Adblockers & Mobile DNS</Link> for smooth experience and to enjoy content with better quality.  cause we use links of internet which contains ads.
+                                            we suggest to use <Link to="/adblocker" className="text-brand-red underline hover:text-brand-red/80">Adblockers & Mobile DNS</Link> for smooth experience and to enjoy content with better quality.  cause we use links of internet which can contains ads.
                                         </p>
                                     </div>
                                 </div>
@@ -574,27 +916,82 @@ const MainLayout = () => {
                             </div>
                         </div>
 
-                        {/* Continue Watching Rail (Watch History) */}
-                        {continueWatchingItems.length > 0 && (
-                            <div className="pt-8">
-                                <ContentRail
-                                    title="Continue Watching"
-                                    items={continueWatchingItems}
-                                    onDetails={handleDetails}
-                                    onPlay={handlePlay}
-                                />
+                        {/* Quick Personalize Banner if user hasn't selected favorite genres yet */}
+                        {userFavoriteGenres.length === 0 && (
+                            <div className="px-4 md:px-12">
+                                <PersonalizeBanner onOpenModal={() => setShowGenreModal(true)} />
                             </div>
                         )}
 
+                        {/* Continue Watching Rail (Watch History) */}
+                        {continueWatchingItems.length > 0 && (
+                            <ContentRail
+                                title="Continue Watching"
+                                items={continueWatchingItems}
+                                onDetails={handleDetails}
+                                onPlay={handlePlay}
+                            />
+                        )}
+
+                        {/* Personalized Recommendations Rail ("Recommended For You") */}
+                        {homePersonalized.recommendations.length > 0 && (
+                            <ContentRail
+                                title="Recommended For You"
+                                items={homePersonalized.recommendations}
+                                onDetails={handleDetails}
+                                onPlay={handlePlay}
+                                badge="✨ Top Picks For You"
+                                subtitle={
+                                    userFavoriteGenres.length > 0
+                                        ? `Curated from your watch history & ${userFavoriteGenres.length} favourite ${userFavoriteGenres.length === 1 ? 'genre' : 'genres'}`
+                                        : (continueWatchingItems.length > 0
+                                            ? 'Curated from your recent watch history'
+                                            : 'Tailored suggestions based on trending and top-rated titles')
+                                }
+                                actionButton={
+                                    <button
+                                        onClick={() => setShowGenreModal(true)}
+                                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/10 hover:bg-white/15 text-gray-300 hover:text-white border border-white/10 flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm"
+                                    >
+                                        <SlidersHorizontal size={13} />
+                                        <span>Tune Taste</span>
+                                    </button>
+                                }
+                            />
+                        )}
+
+                        {/* "Because You Watched [Title]" Rail */}
+                        {becauseYouWatched && becauseYouWatched.recommendations.length > 0 && (
+                            <ContentRail
+                                title={`Because You Watched ${becauseYouWatched.sourceItem.title}`}
+                                items={becauseYouWatched.recommendations}
+                                onDetails={handleDetails}
+                                onPlay={handlePlay}
+                                badge="🎯 Watch Next"
+                                subtitle={`Similar to ${becauseYouWatched.sourceItem.title}`}
+                            />
+                        )}
+
+                        {/* Dedicated Rails for User's Explicit Favorite Genres */}
+                        {favoriteGenreRails.map(({ genre, items }) => (
+                            <ContentRail
+                                key={genre}
+                                title={`Because You Love ${genre}`}
+                                items={items}
+                                onDetails={handleDetails}
+                                onPlay={handlePlay}
+                                badge="❤️ Favourite Genre"
+                                subtitle={`Top picks in ${genre} handpicked for you`}
+                            />
+                        ))}
+
                         {userAddedContent.length > 0 && (
-                            <div className="pt-8">
-                                <ContentRail
-                                    title="Recently Added by Users"
-                                    items={userAddedContent}
-                                    onDetails={handleDetails}
-                                    onPlay={handlePlay}
-                                />
-                            </div>
+                            <ContentRail
+                                title="Recently Added by Users"
+                                items={userAddedContent}
+                                onDetails={handleDetails}
+                                onPlay={handlePlay}
+                            />
                         )}
 
                         {/* Dynamic or Automatic Sections */}
@@ -622,7 +1019,31 @@ const MainLayout = () => {
                         />
                     )}
 
-                    <div className="relative z-10 pl-4 md:pl-12 -mt-12 md:-mt-32 space-y-12">
+                    <div className="relative z-10 pl-4 md:pl-12 -mt-12 md:-mt-32 space-y-4 md:space-y-6">
+                        {moviePersonalized.recommendations.length > 0 && (
+                            <ContentRail
+                                title="Recommended Movies For You"
+                                items={moviePersonalized.recommendations}
+                                onDetails={handleDetails}
+                                onPlay={handlePlay}
+                                badge="✨ Tailored Movies"
+                                subtitle={
+                                    userFavoriteGenres.length > 0
+                                        ? `Based on your watch history & ${userFavoriteGenres.join(', ')}`
+                                        : 'Personalized movie picks matching your taste'
+                                }
+                                actionButton={
+                                    <button
+                                        onClick={() => setShowGenreModal(true)}
+                                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/10 hover:bg-white/15 text-gray-300 hover:text-white border border-white/10 flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm"
+                                    >
+                                        <SlidersHorizontal size={13} />
+                                        <span>Tune Taste</span>
+                                    </button>
+                                }
+                            />
+                        )}
+
                         {renderSections('movie')}
 
                         <div className="pt-8 pr-4 md:pr-12">
@@ -672,7 +1093,31 @@ const MainLayout = () => {
                         />
                     )}
 
-                    <div className="relative z-10 pl-4 md:pl-12 -mt-12 md:-mt-32 space-y-12">
+                    <div className="relative z-10 pl-4 md:pl-12 -mt-12 md:-mt-32 space-y-4 md:space-y-6">
+                        {tvPersonalized.recommendations.length > 0 && (
+                            <ContentRail
+                                title="Recommended Shows For You"
+                                items={tvPersonalized.recommendations}
+                                onDetails={handleDetails}
+                                onPlay={handlePlay}
+                                badge="✨ Tailored Shows"
+                                subtitle={
+                                    userFavoriteGenres.length > 0
+                                        ? `Based on your watch history & ${userFavoriteGenres.join(', ')}`
+                                        : 'Personalized series & TV picks matching your taste'
+                                }
+                                actionButton={
+                                    <button
+                                        onClick={() => setShowGenreModal(true)}
+                                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/10 hover:bg-white/15 text-gray-300 hover:text-white border border-white/10 flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm"
+                                    >
+                                        <SlidersHorizontal size={13} />
+                                        <span>Tune Taste</span>
+                                    </button>
+                                }
+                            />
+                        )}
+
                         {renderSections('tv')}
 
                         <div className="pt-8 pr-4 md:pr-12">
@@ -820,6 +1265,10 @@ const MainLayout = () => {
             return <ExclusiveContentPage onDetails={handleDetails} />;
         }
 
+        if (activeTab === 'categories' || activeTab === 'category') {
+            return <CategoriesPage onDetails={handleDetails} onPlay={handlePlay} />;
+        }
+
         if (activeTab === 'account') {
             if (!isAuthenticated) return <Navigate to="/home" />;
             return <AccountSettings setActiveTab={handleTabChange} />;
@@ -869,11 +1318,7 @@ const MainLayout = () => {
             {viewingContent && (
                 <ContentDetails
                     content={viewingContent}
-                    onClose={() => {
-                        // Navigate directly to the current tab's base path instead of going back
-                        const path = activeTab === 'home' ? '/' : `/${activeTab}`;
-                        navigate(path);
-                    }}
+                    onClose={handleCloseDetails}
                     onPlay={handlePlay}
                     onDetails={handleDetails}
                 />
@@ -882,16 +1327,19 @@ const MainLayout = () => {
             {playingContent && (
                 <VideoPlayer
                     content={playingContent}
-                    onClose={() => {
-                        const path = activeTab === 'home' ? '/' : `/${activeTab}`;
-                        navigate(path);
-                    }}
+                    onClose={handleClosePlayer}
                 />
             )}
             <UnlockContentModal
                 isOpen={showUnlockModal}
                 onClose={() => setShowUnlockModal(false)}
             />
+            {showGenreModal && (
+                <GenrePreferenceModal
+                    isOpen={showGenreModal}
+                    onClose={() => setShowGenreModal(false)}
+                />
+            )}
 
         </div>
     );

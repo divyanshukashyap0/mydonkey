@@ -1,102 +1,114 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { PlayCircle, Info, Volume2, VolumeX } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { PlayCircle, Info, Volume2, VolumeX, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Content } from '../types';
 import { useStore } from '../context/StoreContext';
 
-import { MessageSquarePlus, Send, X, CheckCircle } from 'lucide-react';
-
-// RequestOverlay removed
-
 interface HeroBannerProps {
-    item: Content;
+    /** Support both single item (legacy) and multi-item carousel */
+    item?: Content;
+    items?: Content[];
     onDetails: (item: Content) => void;
     onPlay: (item: Content) => void;
 }
 
-const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
+const AUTO_ADVANCE_MS = 7000;
+
+const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onDetails, onPlay }) => {
     const { settings, currentUser } = useStore();
+
+    // Normalise to array
+    const slides: Content[] = items && items.length > 0 ? items : (item ? [item] : []);
+
+    const [activeIdx, setActiveIdx] = useState(0);
     const [showVideo, setShowVideo] = useState(false);
     const [videoPlaying, setVideoPlaying] = useState(false);
     const [isMuted, setIsMuted] = useState(true);
+    const [isPaused, setIsPaused] = useState(false);
+    const [touchStart, setTouchStart] = useState<number | null>(null);
     const playerRef = useRef<any>(null);
+    const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Detect mobile device
     const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-
     const shouldAutoplay = isMobile
         ? (currentUser?.autoplayEnabled === true)
         : (currentUser?.autoplayEnabled !== false);
 
-    // Reset state on item change
-    useEffect(() => {
-        if (!item) return;
+    const currentItem = slides[activeIdx] ?? null;
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+
+    const destroyPlayer = () => {
+        if (playerRef.current) {
+            try { playerRef.current.destroy(); } catch (_) { }
+            playerRef.current = null;
+        }
+    };
+
+    const resetVideoState = () => {
         setShowVideo(false);
         setVideoPlaying(false);
         setIsMuted(true);
-        if (playerRef.current) {
-            playerRef.current.destroy();
-            playerRef.current = null;
-        }
+        destroyPlayer();
+    };
 
-        if (!shouldAutoplay) return;
+    const goTo = useCallback((idx: number) => {
+        const target = (idx + slides.length) % slides.length;
+        setShowVideo(false);
+        setVideoPlaying(false);
+        setIsMuted(true);
+        destroyPlayer();
+        setActiveIdx(target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [slides.length]);
 
-        const timer = setTimeout(() => {
-            setShowVideo(true);
-        }, 3000); // reduced delay to 3s for faster start if ready
+    const goNext = useCallback(() => goTo(activeIdx + 1), [goTo, activeIdx]);
+    const goPrev = useCallback(() => goTo(activeIdx - 1), [goTo, activeIdx]);
 
-        return () => clearTimeout(timer);
-    }, [item?.id, shouldAutoplay]);
+    // ── Auto-advance ──────────────────────────────────────────────────────
 
-    // Initialize Player when showVideo is true
     useEffect(() => {
-        if (!showVideo || !item?.youtubeId) return;
+        if (slides.length <= 1 || isPaused) return;
+        if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
+        autoTimerRef.current = setTimeout(goNext, AUTO_ADVANCE_MS);
+        return () => { if (autoTimerRef.current) clearTimeout(autoTimerRef.current); };
+    }, [activeIdx, isPaused, goNext, slides.length]);
+
+    // ── Trailer autoplay ──────────────────────────────────────────────────
+
+    useEffect(() => {
+        if (!currentItem) return;
+        resetVideoState();
+        if (!shouldAutoplay) return;
+        const timer = setTimeout(() => { setShowVideo(true); }, 3000);
+        return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeIdx, shouldAutoplay]);
+
+    useEffect(() => {
+        if (!showVideo || !currentItem?.youtubeId) return;
 
         const initPlayer = () => {
             if (window.YT && window.YT.Player) {
-                // Destroy existing if any
-                if (playerRef.current) {
-                    try { playerRef.current.destroy(); } catch (e) { }
-                }
-
+                destroyPlayer();
                 playerRef.current = new window.YT.Player('hero-player', {
                     host: 'https://www.youtube.com',
-                    videoId: item.youtubeId,
+                    videoId: currentItem.youtubeId,
                     width: '100%',
                     height: '100%',
                     playerVars: {
-                        autoplay: 1,
-                        controls: 0,
-                        mute: 1,
-                        start: 0, // Start from beginning to avoid seeking issues
-                        loop: 1,
-                        playlist: item.youtubeId,
-                        modestbranding: 1,
-                        playsinline: 1,
-                        rel: 0,
-                        iv_load_policy: 3,
-                        disablekb: 1,
-                        fs: 0,
-                        enablejsapi: 1
+                        autoplay: 1, controls: 0, mute: 1, start: 0,
+                        loop: 1, playlist: currentItem.youtubeId,
+                        modestbranding: 1, playsinline: 1, rel: 0,
+                        iv_load_policy: 3, disablekb: 1, fs: 0, enablejsapi: 1,
                     },
                     events: {
-                        onReady: (event: any) => {
-                            event.target.mute(); // Ensure mute first
-                            event.target.playVideo();
+                        onReady: (e: any) => { e.target.mute(); e.target.playVideo(); },
+                        onStateChange: (e: any) => {
+                            if (e.data === 1) setVideoPlaying(true);
+                            if (e.data === 0) e.target.playVideo();
                         },
-                        onStateChange: (event: any) => {
-                            // YT.PlayerState.PLAYING = 1
-                            if (event.data === 1) {
-                                setVideoPlaying(true);
-                            }
-                            // Loop manually if needed
-                            if (event.data === 0) {
-                                event.target.playVideo();
-                            }
-                        },
-                        onError: (e: any) => {
-                            console.error('Hero Player Error:', e.data);
-                        }
-                    }
+                        onError: (e: any) => console.error('Hero Player Error:', e.data),
+                    },
                 });
             }
         };
@@ -104,70 +116,93 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
         if (window.YT && window.YT.Player) {
             initPlayer();
         } else {
-            // Retry once if API not ready
             setTimeout(initPlayer, 1000);
         }
 
-        return () => {
-            if (playerRef.current) {
-                try { playerRef.current.destroy(); } catch (e) { }
-            }
-        };
-    }, [showVideo, item?.youtubeId]);
+        return destroyPlayer;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [showVideo, currentItem?.youtubeId]);
+
+    // ── Touch swipe ────────────────────────────────────────────────────────
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        setTouchStart(e.touches[0].clientX);
+    };
+
+    const handleTouchEnd = (e: React.TouchEvent) => {
+        if (touchStart === null) return;
+        const diff = touchStart - e.changedTouches[0].clientX;
+        if (Math.abs(diff) > 50) {
+            diff > 0 ? goNext() : goPrev();
+        }
+        setTouchStart(null);
+    };
+
+    // ── Mute toggle ────────────────────────────────────────────────────────
 
     const handleMuteToggle = () => {
-        const newMuteState = !isMuted;
-        setIsMuted(newMuteState);
-        if (playerRef.current && playerRef.current.mute) {
-            if (newMuteState) playerRef.current.mute();
-            else playerRef.current.unMute();
+        const next = !isMuted;
+        setIsMuted(next);
+        if (playerRef.current?.mute) {
+            next ? playerRef.current.mute() : playerRef.current.unMute();
         }
     };
 
-    if (!item) return null;
-    const isOriginal = item.tags?.includes('Original');
-    const ratingScore = item.vote_average ? item.vote_average.toFixed(1) : '';
+    if (!currentItem) return null;
+
+    const isOriginal = currentItem.tags?.includes('Original');
+    const ratingScore = currentItem.vote_average ? currentItem.vote_average.toFixed(1) : '';
 
     return (
-        <div className="relative w-full overflow-hidden group bg-cinema-black h-[70vh] lg:h-[85vh]">
+        <div
+            className="relative w-full overflow-hidden group bg-cinema-black h-[70vh] lg:h-[85vh] select-none"
+            onMouseEnter={() => setIsPaused(true)}
+            onMouseLeave={() => setIsPaused(false)}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+        >
+            {/* ── Slides (stacked, cross-fade) ─────────────────────────── */}
+            {slides.map((slide, idx) => (
+                <div
+                    key={slide.id + idx}
+                    className={`absolute inset-0 transition-opacity duration-700 ${idx === activeIdx ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}
+                >
+                    {/* Mobile poster */}
+                    {(slide.poster_path_mobile || slide.poster_path) && (
+                        <img
+                            src={slide.poster_path_mobile || slide.poster_path}
+                            className="w-full h-full object-cover md:hidden"
+                            alt={slide.title}
+                            loading={idx === 0 ? 'eager' : 'lazy'}
+                        />
+                    )}
+                    {/* Desktop backdrop */}
+                    {(slide.backdrop_path || slide.poster_path) && (
+                        <img
+                            src={slide.backdrop_path || slide.poster_path}
+                            className="w-full h-full object-cover hidden md:block"
+                            alt={slide.title}
+                            loading={idx === 0 ? 'eager' : 'lazy'}
+                        />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-cinema-black via-cinema-black/20 to-transparent md:bg-gradient-to-r md:from-black md:via-black/40 md:to-transparent" />
+                </div>
+            ))}
 
-            {/* Background Layer: Image (Always visible initially, fades out when video playing) */}
-            {/* Background Layer: Image (Always visible initially, fades out when video playing) */}
-            <div className={`absolute inset-0 transition-opacity duration-1000 z-10 ${videoPlaying ? 'opacity-0' : 'opacity-100'}`}>
-                {/* Mobile: Poster (Smartphone Image) */}
-                {(item.poster_path_mobile || item.poster_path) ? (
-                    <img
-                        src={item.poster_path_mobile || item.poster_path}
-                        className="w-full h-full object-cover md:hidden"
-                        alt="Hero Poster"
-                    />
-                ) : null}
-
-                {/* Desktop: Backdrop (Desktop Image) - Full Screen */}
-                {(item.backdrop_path || item.poster_path) ? (
-                    <img
-                        src={item.backdrop_path || item.poster_path}
-                        className="w-full h-full object-cover hidden md:block"
-                        alt="Hero Backdrop"
-                    />
-                ) : null}
-                <div className="absolute inset-0 bg-gradient-to-t from-cinema-black via-cinema-black/20 to-transparent md:bg-gradient-to-r md:from-black md:via-black/40 md:to-transparent" />
-            </div>
-
-            {/* Background Layer: Video (Oversized for cinematic fill) */}
-            {showVideo && item.youtubeId && (
-                <div className={`absolute inset-0 z-0 overflow-hidden pointer-events-none transition-opacity duration-1000 ${videoPlaying ? 'opacity-100' : 'opacity-0'}`}>
+            {/* ── YouTube player ────────────────────────────────────────── */}
+            {showVideo && currentItem.youtubeId && (
+                <div className={`absolute inset-0 z-20 overflow-hidden pointer-events-none transition-opacity duration-1000 ${videoPlaying ? 'opacity-100' : 'opacity-0'}`}>
                     <div className="w-[135%] h-[135%] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-60">
                         <div id="hero-player" className="w-full h-full" />
                     </div>
                 </div>
             )}
 
-            {/* Cinematic Gradient Overlays - Reduced center coverage */}
-            <div className="absolute inset-0 bg-gradient-to-t from-cinema-black via-cinema-black/30 to-transparent z-20" />
-            <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-cinema-black to-transparent z-20" />
+            {/* ── Gradient overlays ─────────────────────────────────────── */}
+            <div className="absolute inset-0 bg-gradient-to-t from-cinema-black via-cinema-black/30 to-transparent z-30" />
+            <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-cinema-black to-transparent z-30" />
 
-            {/* Content Layer - Positioned at BOTTOM to not cover video */}
+            {/* ── Content overlay ───────────────────────────────────────── */}
             <div className="absolute bottom-0 left-0 right-0 z-40 px-6 md:px-12 lg:px-16 pb-6 md:pb-12 pointer-events-none">
                 <div className="max-w-4xl flex items-end justify-between">
                     <div className="max-w-2xl space-y-4 pointer-events-auto">
@@ -182,37 +217,36 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
                             className="text-3xl md:text-5xl lg:text-7xl font-black text-white leading-none drop-shadow-2xl animate-fade-up"
                             style={{ fontFamily: 'var(--font-hero)' }}
                         >
-                            {item.title}
+                            {currentItem.title}
                         </h1>
 
                         <div className="flex flex-wrap items-center gap-2 md:gap-4 text-white font-medium text-sm md:text-base animate-fade-up delay-100 opacity-0">
                             {ratingScore && (
                                 <span className="text-green-400 font-bold">{ratingScore}/10 Rating</span>
                             )}
-                            <span>{item.release_date ? item.release_date.split('-')[0] : ''}</span>
-                            <span className="bg-gray-800 px-2 py-0.5 rounded border border-gray-600 text-xs">{item.rating || 'U/A 13+'}</span>
-                            <span className="bg-brand-red/20 text-brand-red border border-brand-red px-2 py-0.5 rounded text-xs">{item.resolution || '4K'}</span>
-                            {(item.genres || []).slice(0, 3).map(g => (
+                            <span>{currentItem.release_date ? currentItem.release_date.split('-')[0] : ''}</span>
+                            {currentItem.rating && <span className="bg-gray-800 px-2 py-0.5 rounded border border-gray-600 text-xs">{currentItem.rating}</span>}
+                            <span className="bg-brand-red/20 text-brand-red border border-brand-red px-2 py-0.5 rounded text-xs">{currentItem.resolution || '4K'}</span>
+                            {(currentItem.genres || []).slice(0, 3).map(g => (
                                 <span key={g} className="text-gray-400 text-sm hidden md:inline">• {g}</span>
                             ))}
                         </div>
 
-                        {/* Overview - Clamped for professional look */}
                         <div className="animate-fade-up delay-200 opacity-0 max-w-xl">
                             <p className="text-gray-200 text-sm md:text-base line-clamp-3 drop-shadow-md leading-relaxed">
-                                {item.overview}
+                                {currentItem.overview}
                             </p>
                         </div>
 
                         <div className="flex gap-3 pt-2 animate-fade-up delay-300 opacity-0">
                             <button
-                                onClick={() => onPlay({ ...item, playMode: 'movie' })}
+                                onClick={() => onPlay({ ...currentItem, playMode: 'movie' })}
                                 className="bg-white text-black px-5 md:px-8 py-2.5 md:py-3 rounded-full font-bold text-base md:text-lg flex items-center gap-2 hover:bg-gray-200 transition-transform hover:scale-105 active:scale-95"
                             >
                                 <PlayCircle size={22} fill="black" /> Play
                             </button>
                             <button
-                                onClick={() => onDetails(item)}
+                                onClick={() => onDetails(currentItem)}
                                 className="bg-gray-600/40 backdrop-blur-md text-white px-5 md:px-8 py-2.5 md:py-3 rounded-full font-bold text-base md:text-lg flex items-center gap-2 hover:bg-gray-600/60 transition-transform hover:scale-105 active:scale-95"
                             >
                                 <Info size={22} /> More Info
@@ -222,7 +256,55 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
                 </div>
             </div>
 
-            {/* Mute Toggle (Only if video is active) */}
+            {/* ── Arrow navigation ──────────────────────────────────────── */}
+            {slides.length > 1 && (
+                <>
+                    <button
+                        onClick={goPrev}
+                        aria-label="Previous slide"
+                        className="absolute left-3 md:left-6 top-1/2 -translate-y-1/2 z-50 bg-black/40 border border-white/20 p-2 md:p-3 rounded-full text-white hover:bg-white/10 transition opacity-0 group-hover:opacity-100 focus:opacity-100 hidden md:flex items-center justify-center"
+                    >
+                        <ChevronLeft size={22} />
+                    </button>
+                    <button
+                        onClick={goNext}
+                        aria-label="Next slide"
+                        className="absolute right-3 md:right-6 top-1/2 -translate-y-1/2 z-50 bg-black/40 border border-white/20 p-2 md:p-3 rounded-full text-white hover:bg-white/10 transition opacity-0 group-hover:opacity-100 focus:opacity-100 hidden md:flex items-center justify-center"
+                    >
+                        <ChevronRight size={22} />
+                    </button>
+                </>
+            )}
+
+            {/* ── Dot indicators ────────────────────────────────────────── */}
+            {slides.length > 1 && (
+                <div className="absolute bottom-4 md:bottom-6 right-6 md:right-16 z-50 flex gap-1.5 items-center">
+                    {slides.map((_, idx) => (
+                        <button
+                            key={idx}
+                            onClick={() => goTo(idx)}
+                            aria-label={`Go to slide ${idx + 1}`}
+                            className={`rounded-full transition-all duration-300 ${idx === activeIdx
+                                ? 'w-6 h-2 bg-white'
+                                : 'w-2 h-2 bg-white/40 hover:bg-white/70'
+                            }`}
+                        />
+                    ))}
+                </div>
+            )}
+
+            {/* ── Progress bar ──────────────────────────────────────────── */}
+            {slides.length > 1 && !videoPlaying && !isPaused && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 z-50 bg-white/10">
+                    <div
+                        key={`prog-${activeIdx}`}
+                        className="h-full bg-brand-red origin-left"
+                        style={{ animation: `hero-progress ${AUTO_ADVANCE_MS}ms linear forwards` }}
+                    />
+                </div>
+            )}
+
+            {/* ── Mute toggle ───────────────────────────────────────────── */}
             {videoPlaying && (
                 <button
                     onClick={handleMuteToggle}
@@ -231,6 +313,14 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
                     {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
                 </button>
             )}
+
+            {/* ── CSS keyframe for progress bar ─────────────────────────── */}
+            <style>{`
+                @keyframes hero-progress {
+                    from { transform: scaleX(0); }
+                    to   { transform: scaleX(1); }
+                }
+            `}</style>
         </div>
     );
 };

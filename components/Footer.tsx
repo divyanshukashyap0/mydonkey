@@ -31,6 +31,7 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
       title: 'Connect',
       links: [
         ...pages.filter(p => p.category === 'Connect').map(p => ({ label: p.title, action: p.id })),
+        { label: 'Browse Categories', action: 'categories' },
         { label: 'Account', action: 'Account' }
       ]
     }
@@ -60,6 +61,53 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               <Youtube size={24} className="hover:text-white cursor-pointer transition-colors" />
             </a>
           )}
+        </div>
+
+        {/* Sincere Apology & Language Policy Notices */}
+        <div className="mb-12 grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Card 1: Huge Sorry for Unavailable Content */}
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500/10 via-red-950/20 to-black/80 border border-amber-500/20 p-6 md:p-8 backdrop-blur-sm shadow-xl">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0 text-2xl shadow-inner">
+                🙏
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-extrabold uppercase tracking-widest px-2.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    A Huge Sincere Apology
+                  </span>
+                </div>
+                <h3 className="text-lg md:text-xl font-bold text-white tracking-tight">
+                  Can't Find Your Wished Content? We Are Deeply Sorry!
+                </h3>
+                <p className="text-gray-300 text-sm leading-relaxed">
+                  If the specific movie, series, or episode you wished to watch is currently unavailable or missing, please accept our biggest, most heartfelt apologies. While we continuously scour indexes and catalogue thousands of titles daily, some requested titles may not be available yet. Our team is constantly working to expand the catalog to bring your desired content here.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Apology for Original Language Support Only */}
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-500/10 via-red-950/20 to-black/80 border border-purple-500/20 p-6 md:p-8 backdrop-blur-sm shadow-xl">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center shrink-0 text-2xl shadow-inner">
+                🎧
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-extrabold uppercase tracking-widest px-2.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                    Audio Language Notice
+                  </span>
+                </div>
+                <h3 className="text-lg md:text-xl font-bold text-white tracking-tight">
+                  Apologies: Only Original Language Audio Is Supported
+                </h3>
+                <p className="text-gray-300 text-sm leading-relaxed">
+                  We also offer our sincerest apologies that all movies and shows on our platform are provided exclusively in their authentic original voice and language. We currently do not provide dubbed audio tracks or secondary language voiceovers. We understand many viewers prefer localized dubbing, and we truly regret any inconvenience this may cause to your entertainment experience.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">

@@ -338,3 +338,225 @@ export async function findByIMDbId(imdbId: string): Promise<TMDBDetail | null> {
     
     return null;
 }
+
+export const TMDB_CATEGORY_MAPPING: Record<string, { movieGenreId?: number; tvGenreId?: number; keywordId?: number }> = {
+    'Action': { movieGenreId: 28, tvGenreId: 10759 },
+    'Adventure': { movieGenreId: 12, tvGenreId: 10759 },
+    'Animation': { movieGenreId: 16, tvGenreId: 16 },
+    'Biography': { keywordId: 5565, movieGenreId: 36 },
+    'Comedy': { movieGenreId: 35, tvGenreId: 35 },
+    'Crime': { movieGenreId: 80, tvGenreId: 80 },
+    'Documentary': { movieGenreId: 99, tvGenreId: 99 },
+    'Drama': { movieGenreId: 18, tvGenreId: 18 },
+    'Family': { movieGenreId: 10751, tvGenreId: 10751 },
+    'Fantasy': { movieGenreId: 14, tvGenreId: 10765 },
+    'History': { movieGenreId: 36, tvGenreId: 10768 },
+    'Horror': { movieGenreId: 27, tvGenreId: 9648 },
+    'Mystery': { movieGenreId: 9648, tvGenreId: 9648 },
+    'Romance': { movieGenreId: 10749, tvGenreId: 10749 },
+    'Sci-Fi': { movieGenreId: 878, tvGenreId: 10765 },
+    'Sport': { keywordId: 6075 },
+    'Thriller': { movieGenreId: 53, tvGenreId: 9648 },
+    'War': { movieGenreId: 10752, tvGenreId: 10768 },
+};
+
+export const INDIAN_LANGUAGES = ['hi', 'ta', 'te', 'ml', 'kn', 'pa', 'bn', 'mr', 'gu'];
+
+// ── Curated Hero Carousel ─────────────────────────────────────────────────────
+// Company IDs: Marvel=420,7505  DC=429,9993,128064
+const MARVEL_COMPANY_IDS = '420,7505';
+const DC_COMPANY_IDS = '429,9993,128064';
+const MIN_HERO_RATING = 7.5;
+const MIN_VOTE_COUNT = 100;
+
+async function fetchUniverseMovies(withCompanies: string, page = 1): Promise<TMDBSearchResult[]> {
+    try {
+        const data = await callTMDB('/discover/movie', {
+            sort_by: 'vote_average.desc',
+            'vote_average.gte': MIN_HERO_RATING,
+            'vote_count.gte': MIN_VOTE_COUNT,
+            with_companies: withCompanies,
+            language: 'en-US',
+            page,
+        });
+        return ((data.results || []) as any[]).map(r => ({ ...r, media_type: 'movie' }));
+    } catch (e) {
+        console.error('fetchUniverseMovies error', e);
+        return [];
+    }
+}
+
+async function fetchIndianMovies(language: string, page = 1): Promise<TMDBSearchResult[]> {
+    try {
+        const data = await callTMDB('/discover/movie', {
+            sort_by: 'vote_average.desc',
+            'vote_average.gte': MIN_HERO_RATING,
+            'vote_count.gte': MIN_VOTE_COUNT,
+            with_origin_country: 'IN',
+            with_original_language: language,
+            language: 'en-US',
+            page,
+        });
+        return ((data.results || []) as any[]).map(r => ({ ...r, media_type: 'movie' }));
+    } catch (e) {
+        console.error('fetchIndianMovies error', e);
+        return [];
+    }
+}
+
+/**
+ * Fetches a curated list of hero banner items:
+ * - Indian cinema (top-rated IN origin, honoring preferredLanguage if provided)
+ * - Marvel Cinematic content
+ * - DC Cinematic content
+ * All items have vote_average >= 7.5.
+ * Results are shuffled with preferred-language content surfaced first.
+ */
+export async function fetchCuratedHeroContent(preferredLanguage?: string): Promise<TMDBSearchResult[]> {
+    const preferredLang = preferredLanguage || 'hi';
+
+    // Pick random pages to widen the candidate pool each session
+    const rndPage = () => (Math.random() < 0.5 ? 1 : 2);
+
+    const [
+        marvelItems,
+        dcItems,
+        indianPreferred,
+        indianHindi,
+    ] = await Promise.all([
+        fetchUniverseMovies(MARVEL_COMPANY_IDS, rndPage()),
+        fetchUniverseMovies(DC_COMPANY_IDS, rndPage()),
+        fetchIndianMovies(preferredLang, rndPage()),
+        preferredLang !== 'hi' ? fetchIndianMovies('hi', rndPage()) : Promise.resolve([] as TMDBSearchResult[]),
+    ]);
+
+    // Full Fisher-Yates shuffle
+    const shuffle = <T>(arr: T[]): T[] => {
+        const a = [...arr];
+        for (let i = a.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+    };
+
+    // Deduplicate by id
+    const seen = new Set<number>();
+    const dedup = (items: TMDBSearchResult[]) =>
+        items.filter(i => { if (seen.has(i.id)) return false; seen.add(i.id); return true; });
+
+    // Shuffle each group independently so order is never predictable
+    const ordered = [
+        ...dedup(shuffle(indianPreferred)),
+        ...dedup(shuffle(indianHindi)),
+        ...dedup(shuffle([...marvelItems, ...dcItems])),
+    ];
+
+    // Final full shuffle of the merged list for maximum variety
+    return shuffle(ordered.filter(i => i.backdrop_path || i.poster_path)).slice(0, 20);
+}
+
+export async function fetchTMDBDiscoverByCategory(options: {
+    category: string;
+    type?: 'all' | 'movie' | 'tv';
+    sortBy?: 'popular' | 'rating' | 'newest' | 'title';
+    page?: number;
+    region?: 'all' | 'indian' | 'global';
+    subRegion?: string;
+}): Promise<{ results: TMDBSearchResult[]; totalPages: number }> {
+    const { 
+        category, 
+        type = 'all', 
+        sortBy = 'popular', 
+        page = 1,
+        region = 'all',
+        subRegion = 'all'
+    } = options;
+    const mapping = TMDB_CATEGORY_MAPPING[category];
+
+    const getSortString = (mediaType: 'movie' | 'tv') => {
+        if (sortBy === 'rating') return 'vote_average.desc';
+        if (sortBy === 'newest') return mediaType === 'movie' ? 'primary_release_date.desc' : 'first_air_date.desc';
+        if (sortBy === 'title') return mediaType === 'movie' ? 'title.asc' : 'name.asc';
+        return 'popularity.desc';
+    };
+
+    const fetchEndpoint = async (mediaType: 'movie' | 'tv', p: number) => {
+        const params: Record<string, any> = {
+            language: 'en-US',
+            sort_by: getSortString(mediaType),
+            page: p,
+            include_adult: false,
+        };
+
+        if (sortBy === 'rating') {
+            params['vote_count.gte'] = 25;
+        }
+
+        // Apply Regional / Language constraints
+        if (region === 'indian') {
+            if (subRegion && subRegion !== 'all') {
+                params.with_original_language = subRegion;
+            } else {
+                params.with_origin_country = 'IN';
+            }
+        } else if (region === 'global') {
+            if (subRegion && subRegion !== 'all') {
+                params.with_original_language = subRegion;
+            } else {
+                params.without_original_language = INDIAN_LANGUAGES.join('|');
+            }
+        } else if (subRegion && subRegion !== 'all') {
+            params.with_original_language = subRegion;
+        }
+
+        // Apply Genre mappings if category is defined and not 'all'
+        if (mapping && category.toLowerCase() !== 'all') {
+            const genreId = mediaType === 'movie' ? mapping.movieGenreId : mapping.tvGenreId;
+            if (genreId) {
+                params.with_genres = genreId;
+            }
+            if (mapping.keywordId) {
+                params.with_keywords = mapping.keywordId;
+            }
+        }
+
+        try {
+            const data = await callTMDB(`/discover/${mediaType}`, params);
+            return {
+                results: (data.results || []).map((r: any) => ({
+                    ...r,
+                    media_type: mediaType
+                })) as TMDBSearchResult[],
+                totalPages: data.total_pages || 1
+            };
+        } catch (e) {
+            console.error(`TMDB discover failed for ${mediaType}:`, e);
+            return { results: [], totalPages: 1 };
+        }
+    };
+
+    if (type === 'movie') {
+        return fetchEndpoint('movie', page);
+    } else if (type === 'tv') {
+        return fetchEndpoint('tv', page);
+    } else {
+        // type === 'all': fetch both movie and tv in parallel
+        const [movieRes, tvRes] = await Promise.all([
+            fetchEndpoint('movie', page),
+            fetchEndpoint('tv', page)
+        ]);
+
+        const combined: TMDBSearchResult[] = [];
+        const maxLen = Math.max(movieRes.results.length, tvRes.results.length);
+        for (let i = 0; i < maxLen; i++) {
+            if (movieRes.results[i]) combined.push(movieRes.results[i]);
+            if (tvRes.results[i]) combined.push(tvRes.results[i]);
+        }
+
+        return {
+            results: combined,
+            totalPages: Math.min(Math.max(movieRes.totalPages, tvRes.totalPages), 500)
+        };
+    }
+}
