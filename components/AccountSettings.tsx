@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronUp, CreditCard, Monitor, User as UserIcon, Plus, Calendar, Camera, Wifi, Settings, PlayCircle, Smartphone, Download, Send, Maximize, X, Trash2, Film } from 'lucide-react';
+import { ChevronDown, ChevronUp, CreditCard, Monitor, User as UserIcon, Plus, Calendar, Camera, Wifi, Settings, PlayCircle, Smartphone, Download, Send, Maximize, X, Trash2, Film, QrCode, ScanLine, Tv, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import PlanSelectionModal from './account/PlanSelectionModal';
 import PaymentMethodsModal from './account/PaymentMethodsModal';
@@ -190,6 +190,13 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                         <h1 className="text-xl md:text-2xl font-bold text-white">{userProfiles[0]?.name || 'User'}</h1>
                         <p className="text-sm text-gray-400 truncate max-w-[200px]">{currentUser.email}</p>
                     </div>
+                    <button
+                        onClick={() => navigate('/scan')}
+                        className="ml-auto flex items-center gap-2 px-3.5 py-2 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 transition-all font-bold text-xs shadow-lg shadow-cyan-500/10 active:scale-95"
+                    >
+                        <QrCode size={16} />
+                        <span>Scan</span>
+                    </button>
                 </div>
 
                 {/* Subscription Banner - Hotstar Gradient */}
@@ -280,26 +287,79 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                             <ChevronDown size={18} className="text-gray-500 -rotate-90" />
                         </button>
 
-                        {/* Scan to Login - Mobile Only Aesthetic */}
-                        <button 
-                            onClick={() => navigate('/scan')} 
-                            className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition group relative overflow-hidden"
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <div className="flex items-center gap-4 relative z-10">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 group-hover:scale-110 transition-transform">
-                                    <Smartphone size={18} />
+                    </div>
+
+                    {/* Scan & Connect / TV Login Section (Mobile First) */}
+                    <div className="bg-gradient-to-br from-[#121927] via-[#0d121f] to-[#150f26] rounded-2xl overflow-hidden border border-cyan-500/30 shadow-xl shadow-cyan-950/30 relative">
+                        {/* Glowing ambient background element */}
+                        <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-cyan-500/10 via-blue-500/5 to-transparent rounded-full blur-2xl pointer-events-none" />
+
+                        {/* Section Header */}
+                        <div className="px-5 py-3.5 border-b border-white/10 flex items-center justify-between relative z-10">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-6 h-6 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center">
+                                    <QrCode size={14} className="text-cyan-400" />
                                 </div>
-                                <div className="text-left">
-                                    <div className="font-bold text-cyan-400">Scan QR Code</div>
-                                    <div className="text-xs text-gray-500">Login to TV or Web instantly</div>
+                                <span className="text-xs font-black text-cyan-300 uppercase tracking-wider">Scan & Connect</span>
+                            </div>
+                            <span className="bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-[10px] font-black px-2.5 py-0.5 rounded-full flex items-center gap-1.5 shadow-sm">
+                                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                                TV & WEB LOGIN
+                            </span>
+                        </div>
+
+                        {/* Main Interactive Scan Card */}
+                        <div className="p-5 relative z-10">
+                            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+                                <div className="flex items-start gap-4">
+                                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/25 flex-shrink-0 border border-white/15">
+                                        <ScanLine size={28} className="text-white" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-base md:text-lg text-white flex items-center gap-2">
+                                            Scan QR Code to Login
+                                        </h3>
+                                        <p className="text-xs text-gray-300 mt-1 max-w-lg leading-relaxed">
+                                            Easily sign in to <strong className="text-cyan-300 font-semibold">Smart TV, Android TV, Fire TV</strong>, or Web browser by scanning the QR code with your mobile camera. No password needed!
+                                        </p>
+                                        <div className="flex flex-wrap gap-2 mt-3.5">
+                                            <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg bg-white/5 text-gray-300 border border-white/10">
+                                                <Tv size={12} className="text-cyan-400" /> Smart TV
+                                            </span>
+                                            <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg bg-white/5 text-gray-300 border border-white/10">
+                                                <Monitor size={12} className="text-blue-400" /> Web Browser
+                                            </span>
+                                            <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg bg-white/5 text-gray-300 border border-white/10">
+                                                <Sparkles size={12} className="text-purple-400" /> Instant Sign-in
+                                            </span>
+                                        </div>
+                                    </div>
                                 </div>
+
+                                <button
+                                    onClick={() => navigate('/scan')}
+                                    className="w-full md:w-auto px-6 py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 active:scale-95 text-white rounded-xl font-bold text-sm shadow-xl shadow-cyan-500/25 transition-all flex items-center justify-center gap-2.5 flex-shrink-0 cursor-pointer"
+                                >
+                                    <QrCode size={18} />
+                                    <span>Open Camera Scanner</span>
+                                    <ArrowRight size={16} />
+                                </button>
                             </div>
-                            <div className="flex items-center gap-2 relative z-10">
-                                <span className="bg-cyan-500/20 text-cyan-400 text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse">MOBILE ONLY</span>
-                                <ChevronDown size={18} className="text-gray-500 -rotate-90" />
+
+                            {/* Secondary Quick Action: Enter 6-digit Code */}
+                            <div className="mt-4 pt-3.5 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-gray-400">
+                                <span className="flex items-center gap-1.5">
+                                    <Smartphone size={14} className="text-gray-400" />
+                                    Camera unavailable or low light?
+                                </span>
+                                <button
+                                    onClick={() => navigate('/scan?mode=manual')}
+                                    className="text-cyan-400 hover:text-cyan-300 font-bold hover:underline flex items-center gap-1 transition-colors w-fit"
+                                >
+                                    Enter 6-digit code manually <ArrowRight size={12} />
+                                </button>
                             </div>
-                        </button>
+                        </div>
                     </div>
 
                     {/* Preferences Section */}
@@ -351,6 +411,27 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                             <div className={`w-12 h-7 rounded-full relative transition-colors ${currentUser.autoFullscreen ? 'bg-cyan-500' : 'bg-gray-700'}`}>
                                 <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-all ${currentUser.autoFullscreen ? 'left-6' : 'left-1'}`} />
                             </div>
+                        </button>
+
+                        <button
+                            onClick={() => navigate('/adblocker')}
+                            className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition border-t border-white/5 group text-left cursor-pointer"
+                        >
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-md shadow-cyan-500/20 group-hover:scale-105 transition-transform">
+                                    <ShieldCheck size={18} />
+                                </div>
+                                <div className="text-left">
+                                    <div className="font-medium flex items-center gap-2 text-white">
+                                        Adblockers & Mobile DNS
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                                            AD-FREE
+                                        </span>
+                                    </div>
+                                    <div className="text-xs text-gray-500">Suggested adblockers for PC & private DNS for smartphones</div>
+                                </div>
+                            </div>
+                            <ChevronDown size={18} className="text-gray-500 -rotate-90 group-hover:translate-x-1 transition-transform" />
                         </button>
                     </div>
                 </div>

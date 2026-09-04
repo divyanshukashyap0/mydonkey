@@ -13,6 +13,7 @@ import MobileNav from './components/MobileNav';
 import Footer from './components/Footer';
 import InfoPage from './components/InfoPage';
 import MobileScannerPage from './components/MobileScannerPage';
+import AdblockerGuidePage from './components/AdblockerGuidePage';
 
 import AccountSettings from './components/AccountSettings';
 import AdminLayout from './components/admin/AdminLayout';
@@ -26,7 +27,7 @@ import { buildEmbedUrl, parseEmbedContentType } from './utils/embedUrl';
 import Pagination from './components/Pagination';
 import { Content } from './types';
 import { StoreProvider } from './context/StoreContext';
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, Link } from 'react-router-dom';
 
 const MainLayout = () => {
     const { content, rawContent, currentUser, currentProfile, isLoading, isAuthenticated, sections, pages, settings, incrementViews, addToWatchHistory } = useStore();
@@ -361,6 +362,12 @@ const MainLayout = () => {
             return;
         }
 
+        if (page === 'adblocker' || page === 'adblockers' || page === 'Adblocker' || page === 'Adblockers') {
+            navigate('/adblocker');
+            window.scrollTo(0, 0);
+            return;
+        }
+
         // Check for dynamic page
         const existingPage = pages.find(p => p.id === page);
         if (existingPage) {
@@ -559,7 +566,7 @@ const MainLayout = () => {
                                             <span className="text-brand-red font-semibold">Enjoy All content is available in its real language voice.</span>
                                         </p>
                                         <p className="text-gray-300 text-sm md:text-base leading-relaxed">
-                                            we suggest to use adblocker for smooth experience and to enjoy content with better quality.  cause we use links of internet which contains ads.
+                                            we suggest to use <Link to="/adblocker" className="text-brand-red underline hover:text-brand-red/80">Adblockers & Mobile DNS</Link> for smooth experience and to enjoy content with better quality.  cause we use links of internet which contains ads.
                                         </p>
                                     </div>
                                 </div>
@@ -898,6 +905,8 @@ const AppRoutes = () => {
         <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/scan" element={<MobileScannerPage />} />
+            <Route path="/adblocker" element={<AdblockerGuidePage />} />
+            <Route path="/adblockers" element={<Navigate to="/adblocker" replace />} />
             <Route
                 path="/admin/*"
                 element={

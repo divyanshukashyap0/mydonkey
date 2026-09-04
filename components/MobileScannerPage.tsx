@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -10,10 +10,44 @@ const MobileScannerPage = () => {
     const { currentUser, isAuthenticated } = useStore();
     const navigate = useNavigate();
     const location = useLocation();
+    const manualInputRef = useRef<HTMLInputElement>(null);
     const [scannedSession, setScannedSession] = useState<string | null>(null);
     const [status, setStatus] = useState<'scanning' | 'confirming' | 'success' | 'error'>('scanning');
     const [errorMessage, setErrorMessage] = useState('');
     const [loading, setLoading] = useState(false);
+
+    // Detect if accessed from a PC / desktop browser
+    const isPC = useMemo(() => {
+        if (typeof window === 'undefined') return false;
+        const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent);
+        return !isMobileUA || (!('ontouchstart' in window) && window.innerWidth >= 1024);
+    }, []);
+
+    // If opened on PC, automatically navigate back to previous page
+    useEffect(() => {
+        if (isPC) {
+            console.log("Scanner page opened on PC. Redirecting back to previous page...");
+            const hasHistory = (window.history.state && typeof window.history.state.idx === 'number' && window.history.state.idx > 0) || (window.history.length > 1 && !!document.referrer);
+            if (hasHistory) {
+                navigate(-1);
+            } else {
+                navigate('/', { replace: true });
+            }
+
+            const fallbackTimer = setTimeout(() => {
+                if (window.location.pathname === '/scan') {
+                    navigate('/', { replace: true });
+                }
+            }, 300);
+
+            return () => clearTimeout(fallbackTimer);
+        }
+    }, [isPC, navigate]);
+
+    // Don't render scanner on PC to prevent webcam/permission activation
+    if (isPC) {
+        return null;
+    }
 
     useEffect(() => {
         console.log("Scanner Page Info:", {
@@ -30,6 +64,11 @@ const MobileScannerPage = () => {
             console.log("🎯 Session ID detected in URL, switching to confirmation:", urlSessionId);
             setScannedSession(urlSessionId);
             setStatus('confirming');
+        } else if (params.get('mode') === 'manual') {
+            setTimeout(() => {
+                manualInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                manualInputRef.current?.focus();
+            }, 300);
         }
     }, [currentUser, isAuthenticated, location]);
 
@@ -139,7 +178,7 @@ const MobileScannerPage = () => {
     return (
         <div className="min-h-screen bg-black text-white flex flex-col">
             <div className="p-4 flex items-center border-b border-white/10 bg-black/50 sticky top-0 z-10">
-                <button onClick={() => navigate('/')} className="p-2 -ml-2 text-gray-400 hover:text-white">
+                <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-gray-400 hover:text-white transition-colors" aria-label="Go back">
                     <ArrowLeft size={24} />
                 </button>
                 <h1 className="text-xl font-bold ml-2">Scan to Login</h1>
@@ -172,11 +211,12 @@ const MobileScannerPage = () => {
                             <p className="text-sm text-gray-500 mb-4 text-center">Camera not working? Enter the ID manually:</p>
                             <div className="flex gap-2">
                                 <input 
+                                    ref={manualInputRef}
                                     type="text" 
                                     inputMode="numeric"
                                     pattern="[0-9]*"
                                     placeholder="Enter 6-digit ID" 
-                                    className="flex-1 bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-lg font-mono tracking-[0.2em] text-center"
+                                    className="flex-1 bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-lg font-mono tracking-[0.2em] text-center focus:border-cyan-400 focus:outline-none transition-colors"
                                     maxLength={6}
                                     onChange={(e) => {
                                         if (e.target.value.length === 6) {
