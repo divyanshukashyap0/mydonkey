@@ -151,6 +151,49 @@ function isEnglishContent(title, overview, genres, tags, cast) {
     return true; // Default to English / Global
 }
 
+// Helper to ensure video:publication_date complies with Google Video Sitemap specifications:
+// 1. Must be >= 1970-01-01 (Google rejects pre-1970 negative epoch timestamps as 'Invalid date')
+// 2. Must not be in the future (cannot exceed today)
+// 3. Must be in valid W3C YYYY-MM-DD format
+function formatVideoPubDate(releaseDateStr, fallbackDate) {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const fallback = (fallbackDate && fallbackDate.length >= 10 && !isNaN(Date.parse(fallbackDate))) 
+        ? fallbackDate.substring(0, 10) 
+        : todayStr;
+
+    if (!releaseDateStr || typeof releaseDateStr !== 'string') {
+        return fallback;
+    }
+
+    const trimmed = releaseDateStr.trim();
+    const match = trimmed.match(/^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?/);
+    if (!match) {
+        return fallback;
+    }
+
+    const year = parseInt(match[1], 10);
+    const month = match[2] || '01';
+    const day = match[3] || '01';
+
+    // Must be between 1970 and current year
+    const currentYear = new Date().getFullYear();
+    if (year < 1970 || year > currentYear) {
+        return fallback;
+    }
+
+    const formatted = `${year}-${month}-${day}`;
+    if (isNaN(Date.parse(formatted))) {
+        return fallback;
+    }
+
+    // Ensure it does not exceed today
+    if (formatted > todayStr) {
+        return todayStr;
+    }
+
+    return formatted;
+}
+
 async function generateSitemap() {
     console.log(`🚀 Starting SEO & Keyword-Enriched Sitemap Generation`);
     console.log(`Target Base URL: ${BASE_URL}`);
@@ -487,13 +530,12 @@ async function generateSitemap() {
 
                 // Add Google Video Sitemap
                 if (videoThumbnailUrl) {
+                    const videoPubDate = formatVideoPubDate(releaseDate, lastMod);
                     xml += '    <video:video>\n';
                     xml += `      <video:thumbnail_loc>${videoThumbnailUrl}</video:thumbnail_loc>\n`;
                     xml += `      <video:title>${escapeXml(videoTitle)}</video:title>\n`;
                     xml += `      <video:description>${escapeXml(seoDescription)}</video:description>\n`;
-                    if (releaseDate) {
-                        xml += `      <video:publication_date>${escapeXml(releaseDate)}</video:publication_date>\n`;
-                    }
+                    xml += `      <video:publication_date>${escapeXml(videoPubDate)}</video:publication_date>\n`;
                     if (youtubeId) {
                         xml += `      <video:player_loc allow_embed="yes" autoplay="ap=1">${escapeXml(`https://www.youtube.com/embed/${youtubeId}`)}</video:player_loc>\n`;
                     } else if (videoUrl && videoUrl.startsWith('http')) {
@@ -546,6 +588,7 @@ async function generateSitemap() {
                             xml += '    <priority>0.70</priority>\n';
 
                             if (epThumb) {
+                                const epPubDate = formatVideoPubDate(releaseDate, lastMod);
                                 xml += '    <image:image>\n';
                                 xml += `      <image:loc>${epThumb}</image:loc>\n`;
                                 xml += `      <image:title>${escapeXml(`Watch ${epTitle} Free Online - My Donkey`)}</image:title>\n`;
@@ -556,6 +599,7 @@ async function generateSitemap() {
                                 xml += `      <video:thumbnail_loc>${epThumb}</video:thumbnail_loc>\n`;
                                 xml += `      <video:title>${escapeXml(`Watch ${epTitle} Online Free | My Donkey`)}</video:title>\n`;
                                 xml += `      <video:description>${escapeXml(`Stream ${epTitle} free on My Donkey. Watch full TV episodes and web series online in HD. ${epOverview}`)}</video:description>\n`;
+                                xml += `      <video:publication_date>${escapeXml(epPubDate)}</video:publication_date>\n`;
                                 if (epYoutubeId) {
                                     xml += `      <video:player_loc allow_embed="yes">${escapeXml(`https://www.youtube.com/embed/${epYoutubeId}`)}</video:player_loc>\n`;
                                 }
