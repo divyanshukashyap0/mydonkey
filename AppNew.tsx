@@ -8,7 +8,6 @@ import HeroSkeleton from './components/HeroSkeleton';
 import ContentRail from './components/ContentRail';
 import ContentDetails from './components/ContentDetails';
 import VideoPlayer from './components/VideoPlayer';
-import { MoviVideo } from './components/MoviVideo';
 import LoginPage from './components/LoginPage';
 import MobileNav from './components/MobileNav';
 import Footer from './components/Footer';
@@ -23,6 +22,7 @@ import ScrollToTop from './components/ScrollToTop';
 import ProfileSelection from './components/ProfileSelection';
 import FontLoader from './components/FontLoader';
 import Loader from './components/Loader';
+import { buildEmbedUrl } from './utils/embedUrl';
 import Pagination from './components/Pagination';
 import { Content } from './types';
 import { StoreProvider } from './context/StoreContext';
@@ -143,17 +143,23 @@ const MainLayout = () => {
                     }
 
                     if (item) {
+                        const embedBaseHost = (settings?.embedProxyBaseUrl || 'https://proxy.garageband.rocks').replace(/^https?:\/\//, '').replace(/\/+$/, '');
+
                         // Check if item has RapidStream movie/TV source with IMDb ID (open in same tab)
-                        const imdbId = item.imdbId || 
+                        const imdbId = item.imdbId ||
                             (typeof item.id === 'string' && item.id.startsWith('imdb_') ? item.id.replace('imdb_', '') : null) ||
                             (item.videoUrl ? item.videoUrl.match(/(tt\d+)/i)?.[1] : null) ||
                             (typeof item.id === 'string' && /^tt\d+$/i.test(item.id.trim()) ? item.id.trim() : null);
 
-                        if (imdbId) {
+                        const isEmbed = (item.videoUrl && (item.videoUrl.includes('proxy.garageband.rocks') || (embedBaseHost && item.videoUrl.includes(embedBaseHost)) || item.videoUrl.includes('/embed/'))) || !!imdbId;
+
+                        if (isEmbed && imdbId) {
+                            const existingType = item.videoUrl ? parseEmbedContentType(item.videoUrl) : null;
+                            const streamUrl = buildEmbedUrl(imdbId, existingType || item.type || 'movie', settings);
                             incrementViews(item.id).catch(err => console.error("Error incrementing views:", err));
                             addToWatchHistory(item).catch(err => console.error("Error saving watch history:", err));
                             setTimeout(() => {
-                                window.location.href = `https://proxy.garageband.rocks/embed/movie/${imdbId}`;
+                                window.location.href = streamUrl;
                             }, 100);
                             return;
                         }
@@ -221,7 +227,7 @@ const MainLayout = () => {
 
         // Trending logic
         const trendingContent = content.filter(c => c.featured || (c.vote_average && c.vote_average > 7.5));
-        
+
         // Content added by users (has addedBy field)
         const addedByUsers = content.filter(c => c.addedBy !== undefined);
 
@@ -245,7 +251,7 @@ const MainLayout = () => {
                 return c ? { ...c, progress: h.progress || 15 } : null;
             }).filter(Boolean) as (Content & { progress?: number })[];
         }
-        
+
         // Supplement from local storage
         try {
             const raw = localStorage.getItem('my_donkey_watch_history');
@@ -260,21 +266,21 @@ const MainLayout = () => {
                     }
                 });
             }
-        } catch (e) {}
+        } catch (e) { }
 
         return items;
     }, [currentUser?.continueWatching, content]);
- 
+
     // State for random heroes (refreshes on tab change)
     const [randomHeroes, setRandomHeroes] = useState<{ home: any; movie: any; tv: any }>({
         home: null,
         movie: null,
         tv: null
     });
- 
+
     useEffect(() => {
         if (!content || content.length === 0) return;
- 
+
         if (activeTab === 'home') {
             const candidates = trending.length > 0 ? trending : content;
             setRandomHeroes(prev => ({ ...prev, home: candidates[Math.floor(Math.random() * candidates.length)] }));
@@ -299,17 +305,23 @@ const MainLayout = () => {
             return;
         }
 
+        const embedBaseHost = (settings?.embedProxyBaseUrl || 'https://proxy.garageband.rocks').replace(/^https?:\/\//, '').replace(/\/+$/, '');
+
         // Check if item has RapidStream / IMDb content ID (open in same tab)
-        const imdbId = item.imdbId || 
+        const imdbId = item.imdbId ||
             (typeof item.id === 'string' && item.id.startsWith('imdb_') ? item.id.replace('imdb_', '') : null) ||
             (item.videoUrl ? item.videoUrl.match(/(tt\d+)/i)?.[1] : null) ||
             (typeof item.id === 'string' && /^tt\d+$/i.test(item.id.trim()) ? item.id.trim() : null);
 
-        if (imdbId) {
+        const isEmbed = (item.videoUrl && (item.videoUrl.includes('proxy.garageband.rocks') || (embedBaseHost && item.videoUrl.includes(embedBaseHost)) || item.videoUrl.includes('/embed/'))) || !!imdbId;
+
+        if (isEmbed && imdbId) {
+            const existingType = item.videoUrl ? parseEmbedContentType(item.videoUrl) : null;
+            const streamUrl = buildEmbedUrl(imdbId, existingType || item.type || 'movie', settings);
             incrementViews(item.id).catch(err => console.error("Error incrementing views:", err));
             addToWatchHistory(item).catch(err => console.error("Error saving watch history:", err));
             setTimeout(() => {
-                window.location.href = `https://proxy.garageband.rocks/embed/movie/${imdbId}`;
+                window.location.href = streamUrl;
             }, 100);
             return;
         }
@@ -544,7 +556,10 @@ const MainLayout = () => {
                                             Authentic Sound Experience
                                         </h3>
                                         <p className="text-gray-300 text-sm md:text-base leading-relaxed">
-                                            Enjoy every story with its original performance. <span className="text-brand-red font-semibold">All content is available in its real language voice.</span>
+                                            <span className="text-brand-red font-semibold">Enjoy All content is available in its real language voice.</span>
+                                        </p>
+                                        <p className="text-gray-300 text-sm md:text-base leading-relaxed">
+                                            we suggest to use adblocker for smooth experience and to enjoy content with better quality.  cause we use links of internet which contains ads.
                                         </p>
                                     </div>
                                 </div>
@@ -555,9 +570,9 @@ const MainLayout = () => {
                         {/* Continue Watching Rail (Watch History) */}
                         {continueWatchingItems.length > 0 && (
                             <div className="pt-8">
-                                <ContentRail 
-                                    title="Continue Watching" 
-                                    items={continueWatchingItems} 
+                                <ContentRail
+                                    title="Continue Watching"
+                                    items={continueWatchingItems}
                                     onDetails={handleDetails}
                                     onPlay={handlePlay}
                                 />
@@ -566,9 +581,9 @@ const MainLayout = () => {
 
                         {userAddedContent.length > 0 && (
                             <div className="pt-8">
-                                <ContentRail 
-                                    title="Recently Added by Users" 
-                                    items={userAddedContent} 
+                                <ContentRail
+                                    title="Recently Added by Users"
+                                    items={userAddedContent}
                                     onDetails={handleDetails}
                                     onPlay={handlePlay}
                                 />
@@ -702,11 +717,12 @@ const MainLayout = () => {
                 <div className="min-h-screen pt-24 px-4 md:px-12 pb-12 relative overflow-hidden">
                     {/* Background Video */}
                     <div className="absolute inset-0 z-0">
-                        <MoviVideo
+                        <video
                             src="/Anime.mp4"
                             autoPlay
                             loop
                             muted
+                            playsInline
                             className="w-full h-full object-cover"
                         />
                         <div className="absolute inset-0 bg-black/60" />
@@ -721,22 +737,22 @@ const MainLayout = () => {
                             <>
                                 <div className="pt-8 pr-4 md:pr-12">
                                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-4">
-                                    {visibleAnime.map(item => (
-                                        <div key={item.id} onClick={() => handleDetails(item)} className="group cursor-pointer relative aspect-[2/3] overflow-hidden rounded-xl border border-white/10 hover:border-brand-red/50 transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(229,9,20,0.4)]">
-                                            <img
-                                                src={item.poster_path_mobile || item.poster_path}
-                                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                                loading="lazy"
-                                                alt={item.title}
-                                            />
-                                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
-                                                <div>
-                                                    <h3 className="font-bold text-white leading-tight mb-1">{item.title}</h3>
-                                                    <div className="text-[10px] text-brand-red font-black uppercase">{item.genres?.[0]}</div>
+                                        {visibleAnime.map(item => (
+                                            <div key={item.id} onClick={() => handleDetails(item)} className="group cursor-pointer relative aspect-[2/3] overflow-hidden rounded-xl border border-white/10 hover:border-brand-red/50 transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(229,9,20,0.4)]">
+                                                <img
+                                                    src={item.poster_path_mobile || item.poster_path}
+                                                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                                    loading="lazy"
+                                                    alt={item.title}
+                                                />
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
+                                                    <div>
+                                                        <h3 className="font-bold text-white leading-tight mb-1">{item.title}</h3>
+                                                        <div className="text-[10px] text-brand-red font-black uppercase">{item.genres?.[0]}</div>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        ))}
                                     </div>
                                 </div>
                                 {totalPages > 1 && (

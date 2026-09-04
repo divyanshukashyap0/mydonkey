@@ -47,7 +47,7 @@ const SongsPlayer: React.FC<SongsPlayerProps> = ({ song, onNext, onShuffle, hasN
             onClick={() => setIframeReady(true)}
           >
             <img
-              src={song.thumbnail}
+              src={song.thumbnail || (song.videoId ? `https://i.ytimg.com/vi/${song.videoId}/hqdefault.jpg` : undefined)}
               alt={song.title}
               className="absolute inset-0 w-full h-full object-cover opacity-60"
               loading="lazy"

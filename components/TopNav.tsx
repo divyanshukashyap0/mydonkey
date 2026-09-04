@@ -185,7 +185,7 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                                             <div className="py-2 border-b border-white/10">
                                                 {userProfiles.filter(p => p.id !== currentProfile?.id).map(profile => (
                                                     <button key={profile.id} onClick={() => switchProfile(profile.id)} className="w-full flex items-center gap-3 px-4 py-2 text-sm hover:bg-white/10 transition opacity-80 hover:opacity-100">
-                                                        <img src={profile.avatarUrl} className="w-6 h-6 rounded object-cover" />
+                                                        <img src={profile.avatarUrl || "/Mydonkey%20user.jpg"} className="w-6 h-6 rounded object-cover" />
                                                         <span className="text-gray-300">{profile.name}</span>
                                                     </button>
                                                 ))}

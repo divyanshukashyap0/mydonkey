@@ -215,7 +215,7 @@ const ProfileSelection = () => {
           >
             <div className="relative">
               <div className={`w-24 h-24 md:w-32 md:h-32 rounded overflow-hidden border-2 transition-all duration-300 ${mode === 'manage' ? 'opacity-50' : 'border-transparent group-hover:border-white group-hover:scale-105'}`}>
-                <img src={profile.avatarUrl} alt={profile.name} className="w-full h-full object-cover" />
+                <img src={profile.avatarUrl || "/Mydonkey%20user.jpg"} alt={profile.name} className="w-full h-full object-cover" />
               </div>
               {mode === 'manage' && (
                 <div className="absolute inset-0 flex items-center justify-center">

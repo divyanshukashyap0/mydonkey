@@ -6,6 +6,7 @@ import { useStore } from '../context/StoreContext';
 import { collection, query, where, getDocs, addDoc, doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { searchTMDBMulti, fetchTMDBDetails, tmdbPosterUrl, tmdbBackdropUrl, mapTMDBGenres, extractTMDBTrailer } from '../services/tmdbService';
+import { buildEmbedUrl } from '../utils/embedUrl';
 import ContentRail from './ContentRail';
 import Pagination from './Pagination';
 
@@ -126,7 +127,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
             // 2. Set stream source URL with IMDb ID
             const imdbId = detail.external_ids?.imdb_id || (detail as any).imdb_id || '';
             const isMovie = !detail.name;
-            let videoUrl = (isMovie && imdbId) ? `https://proxy.garageband.rocks/embed/movie/${imdbId}` : '';
+            let videoUrl = imdbId ? buildEmbedUrl(imdbId, isMovie ? 'movie' : 'tv', settings) : '';
 
             // 3. Construct base Content object from fresh metadata
             const addedByInfo = currentUser ? {

@@ -124,7 +124,7 @@ const RequestContent = () => {
                                     </p>
                                     {matches.map(match => (
                                         <div key={match.id} className="flex items-center gap-3 bg-white/5 p-2 rounded-lg border border-green-500/30 hover:bg-white/10 transition">
-                                            <img src={match.poster_path} className="w-10 h-14 object-cover rounded bg-gray-800" alt={match.title} />
+                                            <img src={match.poster_path || undefined} className="w-10 h-14 object-cover rounded bg-gray-800" alt={match.title} />
                                             <div className="flex-1 min-w-0">
                                                 <h4 className="font-bold text-sm text-white line-clamp-1">{match.title}</h4>
                                                 <div className="flex items-center gap-2 text-[10px] text-gray-400">

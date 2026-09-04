@@ -398,7 +398,7 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                             <div key={profile.id} className="group text-center cursor-pointer relative" onClick={() => setEditingProfile(profile)}>
                                 <div className="relative mb-2">
                                     <img
-                                        src={profile.avatarUrl}
+                                        src={profile.avatarUrl || "/Mydonkey%20user.jpg"}
                                         className="w-14 h-14 md:w-16 md:h-16 mx-auto rounded-lg object-cover ring-2 ring-transparent group-hover:ring-cyan-500 transition"
                                     />
                                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition rounded-lg">

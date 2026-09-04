@@ -126,11 +126,13 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                     {/* Full Height Background Image */}
                     <div className="absolute inset-0 z-0 h-[50vh]">
                         {/* Prefer Poster for mobile aspect ratio if available, else Backdrop */}
-                        <img
-                            src={content.poster_path}
-                            className="w-full h-full object-cover"
-                            alt={content.title}
-                        />
+                        {(content.poster_path || content.backdrop_path) ? (
+                            <img
+                                src={content.poster_path || content.backdrop_path}
+                                className="w-full h-full object-cover"
+                                alt={content.title}
+                            />
+                        ) : null}
                         {/* Stronger Gradient for readability */}
                         <div className="absolute inset-0 bg-gradient-to-t from-[#181818] via-[#181818]/80 to-transparent" />
                     </div>
@@ -277,11 +279,13 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                 {/* --- Desktop: Existing Layout --- */}
                 <div className="hidden md:flex flex-col h-full bg-[#181818] overflow-y-auto no-scrollbar">
                     <div className="relative h-[400px] md:h-[500px] flex-shrink-0">
-                        <img
-                            src={content.backdrop_path}
-                            className="w-full h-full object-cover"
-                            alt={content.title}
-                        />
+                        {(content.backdrop_path || content.poster_path) ? (
+                            <img
+                                src={content.backdrop_path || content.poster_path}
+                                className="w-full h-full object-cover"
+                                alt={content.title}
+                            />
+                        ) : null}
                         <div className="absolute inset-0 bg-gradient-to-t from-[#181818] via-[#181818]/20 to-transparent" />
 
                         <div className="absolute bottom-0 left-0 w-full p-8 md:p-12">

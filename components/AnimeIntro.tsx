@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { MoviVideo } from './MoviVideo';
 
 interface AnimeIntroProps {
     onComplete: () => void;
@@ -29,11 +28,12 @@ const AnimeIntro: React.FC<AnimeIntroProps> = ({ onComplete, mode = 'enter' }) =
 
             {/* Background Video */}
             <div className="absolute inset-0 z-0">
-                <MoviVideo
+                <video
                     src="/Anime.mp4"
                     autoPlay
                     loop
                     muted
+                    playsInline
                     className="w-full h-full object-cover opacity-80 pointer-events-none"
                 />
                 <div className="absolute inset-0 bg-black/40" />

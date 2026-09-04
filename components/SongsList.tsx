@@ -56,12 +56,14 @@ const SongsList: React.FC<SongsListProps> = ({ songs, activeSongId, onSelect, lo
             {/* Thumbnail */}
             <div className="w-20 aspect-video flex-shrink-0 rounded-lg overflow-hidden relative bg-black/40">
               <img
-                src={song.thumbnail}
+                src={song.thumbnail || (song.videoId ? `https://i.ytimg.com/vi/${song.videoId}/hqdefault.jpg` : undefined)}
                 alt={song.title}
                 loading="lazy"
                 className="w-full h-full object-cover"
                 onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).src = `https://i.ytimg.com/vi/${song.videoId}/hqdefault.jpg`;
+                  if (song.videoId) {
+                    (e.currentTarget as HTMLImageElement).src = `https://i.ytimg.com/vi/${song.videoId}/hqdefault.jpg`;
+                  }
                 }}
               />
               <div className={`absolute inset-0 flex items-center justify-center transition-opacity bg-black/50 ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>

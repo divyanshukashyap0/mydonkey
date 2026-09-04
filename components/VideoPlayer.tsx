@@ -8,6 +8,7 @@ import ContentLoader from './ContentLoader';
 import { useStore } from '../context/StoreContext';
 import { logUserActivity, incrementWatchTime } from '../utils/activityLogger';
 import { MoviVideo } from './MoviVideo';
+import { buildEmbedUrl, parseEmbedContentType } from '../utils/embedUrl';
 
 interface VideoPlayerProps {
     content: Content;
@@ -70,10 +71,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const currentSeason = isTV ? content.seasons![currentSeasonIdx] : null;
     const currentEpisode = (isTV && currentSeason) ? currentSeason.episodes[currentEpisodeIdx] : null;
 
+    const embedBaseHost = useMemo(() => {
+        return (settings?.embedProxyBaseUrl || 'https://proxy.garageband.rocks').replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    }, [settings?.embedProxyBaseUrl]);
+
     // --- Video Source Logic ---
     const getDriveId = (url: string) => {
         if (!url) return '';
-        if (url.includes('youtube.com') || url.includes('youtu.be') || url.includes('proxy.garageband.rocks') || url.includes('imdb.com')) return '';
+        if (url.includes('youtube.com') || url.includes('youtu.be') || url.includes('proxy.garageband.rocks') || (embedBaseHost && url.includes(embedBaseHost)) || url.includes('imdb.com')) return '';
         const driveUrlMatch = url.match(/\/file\/d\/([-\w]{25,})/);
         if (driveUrlMatch) return driveUrlMatch[1];
         const rawIdMatch = url.match(/^[-\w]{25,}$/);
@@ -125,14 +130,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         if (content.videoUrl) {
             directVideoUrl = content.videoUrl;
         } else if (currentEpisode) {
-            directVideoUrl = currentEpisode.videoUrl || null;
+            directVideoUrl = currentEpisode.videoUrl || (extractedImdbId ? buildEmbedUrl(extractedImdbId, 'tv', settings, currentSeason?.seasonNumber, currentEpisode.episodeNumber) : null);
         } else if (extractedImdbId) {
-            directVideoUrl = `https://proxy.garageband.rocks/embed/movie/${extractedImdbId}`;
+            directVideoUrl = buildEmbedUrl(extractedImdbId, 'tv', settings);
         }
     } else if (overrideUrl) {
         directVideoUrl = overrideUrl;
     } else if (extractedImdbId && !finalDriveId && !finalYoutubeId) {
-        directVideoUrl = `https://proxy.garageband.rocks/embed/movie/${extractedImdbId}`;
+        directVideoUrl = buildEmbedUrl(extractedImdbId, 'movie', settings);
     } else {
         directVideoUrl = null;
     }
@@ -161,6 +166,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     }, [directVideoUrl]);
     const isEmbedPlayer = directVideoUrl ? (
         directVideoUrl.includes('proxy.garageband.rocks') ||
+        (embedBaseHost && directVideoUrl.includes(embedBaseHost)) ||
         directVideoUrl.includes('imdb.com') ||
         /tt\d+/.test(directVideoUrl)
     ) : false;
@@ -937,10 +943,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     const isSports = content.genres?.includes('Sports') || content.tags?.includes('Sports');
 
-    // --- Movie Player Source Link Transformer ---
+    // --- Movie / TV Player Source Link Transformer ---
     const getFinalVideoUrl = (url: string) => {
         if (!url) return '';
         const trimmed = url.trim();
+
+        const fallbackType = isTV ? 'tv' : 'movie';
 
         // Extract IMDb ID (e.g., tt1234567, /title/tt1234567/, /embed/movie/tt1234567)
         const imdbMatch = trimmed.match(/(tt\d+)/);
@@ -948,14 +956,18 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         // Check if it's an IMDb-related URL or raw IMDb ID
         if (trimmed.includes('imdb.com') || /^tt\d+$/.test(trimmed)) {
             if (imdbMatch) {
-                return `https://proxy.garageband.rocks/embed/movie/${imdbMatch[1]}`;
+                return buildEmbedUrl(imdbMatch[1], fallbackType, settings);
             }
         }
 
-        // If it is a proxy.garageband.rocks URL
-        if (trimmed.includes('proxy.garageband.rocks')) {
+        // If it is a proxy.garageband.rocks URL or matches configured embed host
+        if (trimmed.includes('proxy.garageband.rocks') || (embedBaseHost && trimmed.includes(embedBaseHost))) {
+            const existingType = parseEmbedContentType(trimmed);
             if (imdbMatch) {
-                return `https://proxy.garageband.rocks/embed/movie/${imdbMatch[1]}`;
+                const typeToUse = existingType || fallbackType;
+                const seasonEpMatch = trimmed.match(new RegExp(`${imdbMatch[1]}(\\/\\d+\\/\\d+)`));
+                const extraPath = seasonEpMatch ? seasonEpMatch[1] : '';
+                return `${buildEmbedUrl(imdbMatch[1], typeToUse, settings)}${extraPath}`;
             }
             return trimmed.startsWith('http') ? trimmed : `https://${trimmed}`;
         }
@@ -963,18 +975,18 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         return url;
     };
 
-    const finalUrl = useMemo(() => getFinalVideoUrl(directVideoUrl || ''), [directVideoUrl]);
+    const finalUrl = useMemo(() => getFinalVideoUrl(directVideoUrl || ''), [directVideoUrl, isTV, settings, embedBaseHost]);
 
     // Auto-redirect to RapidStream in same tab if this is a proxy.garageband.rocks source
     useEffect(() => {
-        if (finalUrl && finalUrl.includes('proxy.garageband.rocks')) {
+        if (finalUrl && (finalUrl.includes('proxy.garageband.rocks') || (embedBaseHost && finalUrl.includes(embedBaseHost)))) {
             addToWatchHistory(content).catch(e => console.error("Error saving watch history:", e));
             const timer = setTimeout(() => {
                 window.location.href = finalUrl;
             }, 200);
             return () => clearTimeout(timer);
         }
-    }, [finalUrl, content, addToWatchHistory]);
+    }, [finalUrl, content, addToWatchHistory, embedBaseHost]);
 
     // Final Main Render
     return (
@@ -1005,7 +1017,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                     onError={(err) => setPlaybackError(err.message || 'Movi player playback error')}
                                 />
                             ) : finalUrl ? (
-                                finalUrl.includes('proxy.garageband.rocks') ? (
+                                (finalUrl.includes('proxy.garageband.rocks') || (embedBaseHost && finalUrl.includes(embedBaseHost))) ? (
                                     <div className="w-full h-full flex flex-col items-center justify-center bg-black text-white p-6 z-[30] relative select-none">
                                         <div className="w-14 h-14 border-4 border-brand-red border-t-transparent rounded-full animate-spin mb-6"></div>
                                         <h2 className="text-2xl font-bold mb-2">Opening RapidStream...</h2>

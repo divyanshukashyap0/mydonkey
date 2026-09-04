@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../../../context/StoreContext';
-import { Save, AlertTriangle, Globe, Shield, Mail, Monitor, CheckCircle, Bell, Smartphone } from 'lucide-react';
+import { Save, AlertTriangle, Globe, Shield, Mail, Monitor, CheckCircle, Bell, Smartphone, Film, Tv, Link2, RefreshCw } from 'lucide-react';
 import { SiteSettings } from '../../../types';
+import { doc, writeBatch } from 'firebase/firestore';
+import { db } from '../../../firebase';
+import { buildEmbedUrl, parseEmbedContentType } from '../../../utils/embedUrl';
 
 const SettingsManager = () => {
     const { settings, updateSettings, content } = useStore();
@@ -23,6 +26,9 @@ const SettingsManager = () => {
         setSaveStatus('idle');
     };
 
+    const [isUpdatingBatch, setIsUpdatingBatch] = useState(false);
+    const [batchProgress, setBatchProgress] = useState('');
+
     const handleSave = async () => {
         setSaveStatus('saving');
         try {
@@ -33,6 +39,64 @@ const SettingsManager = () => {
         } catch (e) {
             alert("Failed to save settings");
             setSaveStatus('idle');
+        }
+    };
+
+    const handleUpdateAllContentUrls = async () => {
+        const newBase = (formData.embedProxyBaseUrl || 'https://proxy.garageband.rocks').trim().replace(/\/+$/, '');
+        const itemsToUpdate = content.filter(c => c.imdbId || (c.videoUrl && (c.videoUrl.includes('/embed/') || c.videoUrl.includes('proxy.garageband.rocks'))));
+        
+        if (itemsToUpdate.length === 0) {
+            alert("No content items found with IMDb ID or embed stream URLs to update.");
+            return;
+        }
+
+        if (!confirm(`Update stream URLs for all ${itemsToUpdate.length} content items to use the global website URL "${newBase}"?\n\nMovies will use: /embed/${formData.embedMovieType || 'movie'}/\nTV Series will use: /embed/${formData.embedTvType || 'tv'}/`)) {
+            return;
+        }
+
+        setIsUpdatingBatch(true);
+        setBatchProgress(`Updating 0 / ${itemsToUpdate.length}...`);
+
+        try {
+            let updatedCount = 0;
+            // Process in batches of 50
+            for (let i = 0; i < itemsToUpdate.length; i += 50) {
+                const chunk = itemsToUpdate.slice(i, i + 50);
+                const batch = writeBatch(db);
+
+                for (const item of chunk) {
+                    const imdbId = item.imdbId || (item.videoUrl ? item.videoUrl.match(/(tt\d+)/)?.[1] : null);
+                    if (imdbId) {
+                        const existingType = item.videoUrl ? parseEmbedContentType(item.videoUrl) : null;
+                        const effectiveType = existingType || (item.type === 'tv' ? (formData.embedTvType || 'tv') : (formData.embedMovieType || 'movie'));
+                        const newUrl = buildEmbedUrl(imdbId, effectiveType, formData);
+                        
+                        batch.update(doc(db, 'content', item.id), {
+                            videoUrl: newUrl,
+                            updatedAt: new Date().toISOString()
+                        });
+                        updatedCount++;
+                    }
+                }
+
+                await batch.commit();
+                setBatchProgress(`Updated ${Math.min(i + 50, itemsToUpdate.length)} / ${itemsToUpdate.length}...`);
+            }
+
+            // Also save the settings and bump contentVersion
+            await updateSettings({
+                ...formData,
+                contentVersion: (settings.contentVersion || 0) + 1
+            });
+
+            alert(`Success! Updated stream URLs for ${updatedCount} content items to use ${newBase}.`);
+        } catch (e: any) {
+            console.error("Batch update failed:", e);
+            alert("Failed to update all items: " + e.message);
+        } finally {
+            setIsUpdatingBatch(false);
+            setBatchProgress('');
         }
     };
 
@@ -84,6 +148,20 @@ const SettingsManager = () => {
                                 onChange={(e) => handleChange({ siteName: e.target.value })}
                                 className="w-full bg-black/50 border border-white/10 rounded-lg p-3 outline-none focus:border-brand-red transition font-bold text-lg"
                             />
+                        </div>
+
+                        <div>
+                            <label className="text-xs text-gray-500 uppercase font-bold block mb-2">Public Website URL (Domain)</label>
+                            <div className="relative">
+                                <Globe className="absolute left-3 top-3.5 text-gray-500" size={16} />
+                                <input
+                                    type="url"
+                                    value={formData.siteUrl || ''}
+                                    onChange={(e) => handleChange({ siteUrl: e.target.value })}
+                                    placeholder="https://www.mydonkey.in"
+                                    className="w-full bg-black/50 border border-white/10 rounded-lg p-3 pl-10 outline-none focus:border-brand-red transition font-mono text-sm"
+                                />
+                            </div>
                         </div>
 
                         <div>
@@ -173,7 +251,11 @@ const SettingsManager = () => {
                             <label className="text-xs text-gray-500 uppercase font-bold block mb-4">Homepage Hero Content</label>
                             {heroContent ? (
                                 <div className="flex items-start gap-4 bg-white/5 p-4 rounded-xl border border-white/10">
-                                    <img src={heroContent.poster_path} className="w-16 h-24 object-cover rounded-lg shadow-lg" alt="" />
+                                    {heroContent.poster_path ? (
+                                        <img src={heroContent.poster_path} className="w-16 h-24 object-cover rounded-lg shadow-lg" alt="" />
+                                    ) : (
+                                        <div className="w-16 h-24 bg-white/10 rounded-lg flex items-center justify-center text-[10px] text-gray-500">No Image</div>
+                                    )}
                                     <div className="flex-1">
                                         <div className="font-bold text-lg mb-1">{heroContent.title}</div>
                                         <div className="text-xs text-gray-400 mb-3">{heroContent.overview.substring(0, 100)}...</div>
@@ -237,6 +319,88 @@ const SettingsManager = () => {
                                         <p className="text-[10px] text-gray-500 mt-2">Recommended: 2.5 seconds. Allows users to read the dynamic connection phrases.</p>
                                     </div>
                                 )}
+                            </div>
+                        </div>
+
+                        <div className="pt-6 border-t border-white/10">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Link2 size={18} className="text-brand-red" />
+                                <h3 className="text-sm font-bold uppercase tracking-wider text-white">Stream Embed Proxy Settings</h3>
+                            </div>
+                            <p className="text-xs text-gray-400 mb-4">
+                                Configure the embed proxy server and URL content types used for playing movies and TV series (e.g. RapidStream / IMDb player).
+                            </p>
+
+                            <div className="space-y-4 bg-black/40 p-5 rounded-xl border border-white/5">
+                                <div>
+                                    <label className="text-xs text-gray-300 uppercase font-bold block mb-1.5 flex items-center justify-between">
+                                        <span>Global Content Streaming Website URL</span>
+                                        <span className="text-[10px] text-brand-red font-semibold lowercase">Controls all video embed URLs</span>
+                                    </label>
+                                    <input
+                                        type="url"
+                                        value={formData.embedProxyBaseUrl ?? 'https://proxy.garageband.rocks'}
+                                        onChange={(e) => handleChange({ embedProxyBaseUrl: e.target.value })}
+                                        className="w-full bg-black/60 border border-white/10 rounded-lg p-3 text-sm font-mono text-white outline-none focus:border-brand-red transition"
+                                        placeholder="https://proxy.garageband.rocks"
+                                    />
+                                    <p className="text-[10px] text-gray-500 mt-1">Default: https://proxy.garageband.rocks — Changing this updates the stream website for all content.</p>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                                    <div className="bg-white/5 p-4 rounded-lg border border-white/5">
+                                        <div className="flex items-center gap-2 mb-2 text-white font-bold text-xs">
+                                            <Film size={14} className="text-blue-400" /> Movie Content Type Path
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={formData.embedMovieType ?? 'movie'}
+                                            onChange={(e) => handleChange({ embedMovieType: e.target.value })}
+                                            className="w-full bg-black/60 border border-white/10 rounded p-2 text-sm font-mono text-white outline-none focus:border-blue-500 transition mb-2"
+                                            placeholder="movie"
+                                        />
+                                        <div className="text-[11px] text-gray-400 font-mono break-all bg-black/40 p-2 rounded border border-white/5">
+                                            <span className="text-gray-500">Preview: </span>
+                                            {(formData.embedProxyBaseUrl || 'https://proxy.garageband.rocks').replace(/\/+$/, '')}/embed/<span className="text-blue-400 font-bold">{formData.embedMovieType || 'movie'}</span>/tt1375666
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white/5 p-4 rounded-lg border border-white/5">
+                                        <div className="flex items-center gap-2 mb-2 text-white font-bold text-xs">
+                                            <Tv size={14} className="text-purple-400" /> TV Series Content Type Path
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={formData.embedTvType ?? 'tv'}
+                                            onChange={(e) => handleChange({ embedTvType: e.target.value })}
+                                            className="w-full bg-black/60 border border-white/10 rounded p-2 text-sm font-mono text-white outline-none focus:border-purple-500 transition mb-2"
+                                            placeholder="tv"
+                                        />
+                                        <div className="text-[11px] text-gray-400 font-mono break-all bg-black/40 p-2 rounded border border-white/5">
+                                            <span className="text-gray-500">Preview: </span>
+                                            {(formData.embedProxyBaseUrl || 'https://proxy.garageband.rocks').replace(/\/+$/, '')}/embed/<span className="text-purple-400 font-bold">{formData.embedTvType || 'tv'}</span>/tt0903747
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Batch Update Button */}
+                                <div className="pt-4 border-t border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div>
+                                        <div className="text-xs font-bold text-white">Sync All Existing Content in Database</div>
+                                        <div className="text-[10px] text-gray-400">
+                                            Rewrite all existing movies and TV show stream URLs in the database to use this global website URL and content types.
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handleUpdateAllContentUrls}
+                                        disabled={isUpdatingBatch}
+                                        className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition disabled:opacity-50 whitespace-nowrap"
+                                    >
+                                        <RefreshCw size={14} className={isUpdatingBatch ? 'animate-spin' : ''} />
+                                        {isUpdatingBatch ? (batchProgress || 'Updating...') : 'Apply to All Content'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>

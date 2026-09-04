@@ -4,9 +4,10 @@ import { Search, Play, AlertCircle, Film, Loader2 } from 'lucide-react';
 import { findByIMDbId, tmdbPosterUrl, tmdbBackdropUrl, mapTMDBGenres, TMDBDetail } from '../services/tmdbService';
 import { Content } from '../types';
 import { useStore } from '../context/StoreContext';
+import { buildEmbedUrl } from '../utils/embedUrl';
 
 const IMDbStreamPage: React.FC = () => {
-    const { addToWatchHistory } = useStore();
+    const { addToWatchHistory, settings } = useStore();
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
@@ -48,6 +49,7 @@ const IMDbStreamPage: React.FC = () => {
         const { detail, rawId } = result;
 
         const isTv = !!detail.name;
+        const streamUrl = buildEmbedUrl(rawId, isTv ? 'tv' : 'movie', settings);
         
         // Construct the mock Content object
         const mockItem: Content = {
@@ -55,7 +57,7 @@ const IMDbStreamPage: React.FC = () => {
             title: detail.title || detail.name || 'IMDb Stream',
             type: isTv ? 'tv' : 'movie',
             imdbId: rawId,
-            videoUrl: `https://proxy.garageband.rocks/embed/movie/${rawId}`,
+            videoUrl: streamUrl,
             poster_path: detail.poster_path ? tmdbPosterUrl(detail.poster_path) : '',
             backdrop_path: detail.backdrop_path ? tmdbBackdropUrl(detail.backdrop_path) : '',
             overview: detail.overview || '',
@@ -69,7 +71,7 @@ const IMDbStreamPage: React.FC = () => {
 
         addToWatchHistory(mockItem).catch(e => console.error("Error saving watch history:", e));
         setTimeout(() => {
-            window.location.href = `https://proxy.garageband.rocks/embed/movie/${rawId}`;
+            window.location.href = streamUrl;
         }, 100);
     };
 

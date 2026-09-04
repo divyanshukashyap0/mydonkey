@@ -39,7 +39,7 @@ const SparksFeed: React.FC<SparksFeedProps> = ({ items }) => {
                {/* Visual Content (Poster as Placeholder for vertical video) */}
                <div className="h-full w-full md:w-[450px] relative overflow-hidden">
                   <img
-                     src={item.poster_path}
+                     src={item.poster_path || undefined}
                      alt={item.title}
                      className="h-full w-full object-cover"
                   />

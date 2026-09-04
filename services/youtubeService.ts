@@ -143,6 +143,13 @@ export async function fetchMovieSongs(
     return callYouTubeDirectly(movieName, type, key);
   }
 
+  if (Array.isArray(data.results)) {
+    data.results = data.results.map((r) => ({
+      ...r,
+      thumbnail: r.thumbnail || (r.videoId ? `https://i.ytimg.com/vi/${r.videoId}/hqdefault.jpg` : ''),
+    }));
+  }
+
   sessionCache.set(key, data);
   return data;
 }

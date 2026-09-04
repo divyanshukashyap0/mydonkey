@@ -135,18 +135,22 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, onDetails, onPlay }) => {
             {/* Background Layer: Image (Always visible initially, fades out when video playing) */}
             <div className={`absolute inset-0 transition-opacity duration-1000 z-10 ${videoPlaying ? 'opacity-0' : 'opacity-100'}`}>
                 {/* Mobile: Poster (Smartphone Image) */}
-                <img
-                    src={item.poster_path_mobile || item.poster_path}
-                    className="w-full h-full object-cover md:hidden"
-                    alt="Hero Poster"
-                />
+                {(item.poster_path_mobile || item.poster_path) ? (
+                    <img
+                        src={item.poster_path_mobile || item.poster_path}
+                        className="w-full h-full object-cover md:hidden"
+                        alt="Hero Poster"
+                    />
+                ) : null}
 
                 {/* Desktop: Backdrop (Desktop Image) - Full Screen */}
-                <img
-                    src={item.backdrop_path}
-                    className="w-full h-full object-cover hidden md:block"
-                    alt="Hero Backdrop"
-                />
+                {(item.backdrop_path || item.poster_path) ? (
+                    <img
+                        src={item.backdrop_path || item.poster_path}
+                        className="w-full h-full object-cover hidden md:block"
+                        alt="Hero Backdrop"
+                    />
+                ) : null}
                 <div className="absolute inset-0 bg-gradient-to-t from-cinema-black via-cinema-black/20 to-transparent md:bg-gradient-to-r md:from-black md:via-black/40 md:to-transparent" />
             </div>
 

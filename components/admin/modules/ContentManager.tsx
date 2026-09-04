@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { Plus, Edit, Trash2, Youtube, HardDrive, Star, Check, X, Bell, ChevronDown, ChevronRight, Play, Lock, Search, Filter, MoreVertical, Archive, Sparkles, Loader2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Youtube, HardDrive, Star, Check, X, Bell, ChevronDown, ChevronRight, Play, Lock, Search, Filter, MoreVertical, Archive, Sparkles, Loader2, Film, Tv, Link2 } from 'lucide-react';
 import { useStore } from '../../../context/StoreContext';
 import { Content, Season, Episode } from '../../../types';
 import { doc, setDoc, deleteDoc, updateDoc, collection, addDoc, deleteField, writeBatch, getDocs } from 'firebase/firestore';
@@ -10,6 +10,7 @@ import {
     TMDBSearchResult, fetchTMDBSeason, tmdbStillUrl, extractTMDBTrailer,
     fetchTMDBEpisode, extractTMDBEpisodeVideo
 } from '../../../services/tmdbService';
+import { buildEmbedUrl, parseEmbedContentType, switchEmbedContentType } from '../../../utils/embedUrl';
 
 const MOVIE_GENRES = ["Action", "Adventure", "Comedy", "Drama", "Horror", "Sci-Fi", "Thriller", "Romance", "Documentary", "Animation"];
 const TV_GENRES = ["Drama", "Comedy", "Reality", "Action", "Sci-Fi", "Documentary", "Kids", "Mystery"];
@@ -424,11 +425,15 @@ const ContentManager = () => {
                     const year = releaseDate ? parseInt(releaseDate.split('-')[0]) : 0;
                     const trailerId = extractTMDBTrailer(detail) || item.youtubeId || '';
 
-                    // Ensure movie source uses proxy.garageband.rocks when IMDb ID is present
-                    if (item.type === 'movie' && (imdbId || item.imdbId) && (!videoUrl || videoUrl.includes('imdb.com'))) {
+                    const imdbId = detail.external_ids?.imdb_id || (detail as any).imdb_id || item.imdbId || '';
+                    let videoUrl = item.videoUrl || '';
+
+                    // Ensure movie / TV source uses configured embed proxy when IMDb ID is present
+                    const effectiveType = (item.type === 'tv' ? 'tv' : 'movie') as 'movie' | 'tv';
+                    if ((imdbId || item.imdbId) && (!videoUrl || videoUrl.includes('imdb.com'))) {
                         const match = videoUrl ? videoUrl.match(/(tt\d+)/) : null;
                         const idToUse = match ? match[1] : (imdbId || item.imdbId);
-                        videoUrl = idToUse ? `https://proxy.garageband.rocks/embed/movie/${idToUse}` : videoUrl;
+                        videoUrl = idToUse ? buildEmbedUrl(idToUse, effectiveType, settings) : videoUrl;
                     }
 
                     const updates: any = {
@@ -803,12 +808,109 @@ const ContentManager = () => {
                         )}
 
                         <div>
-                            <label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2 mt-4">Player Video URL (Optional)</label>
-                            <div className="text-[10px] text-gray-400 mb-1">Overrides the primary source for playback. Useful for direct MP4/HLS or tokenized R2 video links.</div>
-                            <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none font-mono text-sm"
+                            <div className="flex items-center justify-between mt-4 mb-1">
+                                <label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2">
+                                    <Link2 size={13} className="text-brand-red" /> Player Video URL (Optional)
+                                </label>
+                                {formData.imdbId && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const newUrl = buildEmbedUrl(formData.imdbId!, formData.type || 'movie', settings);
+                                            setFormData({ ...formData, videoUrl: newUrl });
+                                        }}
+                                        className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 transition"
+                                        title="Auto-fill with proxy embed URL"
+                                    >
+                                        <Sparkles size={12} /> Generate Embed URL
+                                    </button>
+                                )}
+                            </div>
+                            <div className="text-[10px] text-gray-400 mb-2">
+                                Overrides the primary source for playback. Direct MP4/HLS, or proxy embed URL (e.g. proxy.garageband.rocks).
+                            </div>
+                            <input
+                                className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none font-mono text-sm focus:border-brand-red transition"
                                 value={formData.videoUrl || ''}
                                 onChange={e => setFormData({ ...formData, videoUrl: extractVideoUrl(e.target.value) })}
-                                placeholder="https://pub-xxx.r2.dev/video.mkv?token=xxx" />
+                                placeholder="https://proxy.garageband.rocks/embed/movie/tt1234567"
+                            />
+
+                            {/* Embed Proxy Content Type Quick Switcher */}
+                            <div className="mt-2.5 p-2.5 bg-white/5 rounded-lg border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <div className="text-[11px] text-gray-400 flex items-center gap-1.5 font-medium">
+                                    <span>Embed Content Type:</span>
+                                    {(() => {
+                                        const currentDetected = parseEmbedContentType(formData.videoUrl || '');
+                                        return currentDetected ? (
+                                            <span className="font-mono text-brand-red bg-red-950/40 border border-red-800/40 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                                                /embed/{currentDetected}/
+                                            </span>
+                                        ) : (
+                                            <span className="text-gray-500 text-[10px]">None</span>
+                                        );
+                                    })()}
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const movieType = settings.embedMovieType || 'movie';
+                                            if (formData.videoUrl) {
+                                                setFormData({ ...formData, videoUrl: switchEmbedContentType(formData.videoUrl, movieType, settings) });
+                                            } else if (formData.imdbId) {
+                                                setFormData({ ...formData, videoUrl: buildEmbedUrl(formData.imdbId, 'movie', settings) });
+                                            }
+                                        }}
+                                        className={`px-2 py-1 rounded text-[11px] font-semibold flex items-center gap-1 transition ${
+                                            parseEmbedContentType(formData.videoUrl || '') === (settings.embedMovieType || 'movie')
+                                                ? 'bg-blue-600 text-white shadow'
+                                                : 'bg-black/50 hover:bg-white/10 text-gray-300 border border-white/10'
+                                        }`}
+                                        title="Switch URL to Movie (/embed/movie/)"
+                                    >
+                                        <Film size={12} /> Movie
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const tvType = settings.embedTvType || 'tv';
+                                            if (formData.videoUrl) {
+                                                setFormData({ ...formData, videoUrl: switchEmbedContentType(formData.videoUrl, tvType, settings) });
+                                            } else if (formData.imdbId) {
+                                                setFormData({ ...formData, videoUrl: buildEmbedUrl(formData.imdbId, 'tv', settings) });
+                                            }
+                                        }}
+                                        className={`px-2 py-1 rounded text-[11px] font-semibold flex items-center gap-1 transition ${
+                                            parseEmbedContentType(formData.videoUrl || '') === (settings.embedTvType || 'tv')
+                                                ? 'bg-purple-600 text-white shadow'
+                                                : 'bg-black/50 hover:bg-white/10 text-gray-300 border border-white/10'
+                                        }`}
+                                        title="Switch URL to TV (/embed/tv/)"
+                                    >
+                                        <Tv size={12} /> TV Series
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const customType = prompt("Enter embed content type (e.g. series, movie, tv, anime):", parseEmbedContentType(formData.videoUrl || '') || 'series');
+                                            if (customType && customType.trim()) {
+                                                if (formData.videoUrl) {
+                                                    setFormData({ ...formData, videoUrl: switchEmbedContentType(formData.videoUrl, customType.trim(), settings) });
+                                                } else if (formData.imdbId) {
+                                                    setFormData({ ...formData, videoUrl: buildEmbedUrl(formData.imdbId, customType.trim(), settings) });
+                                                }
+                                            }
+                                        }}
+                                        className="px-2 py-1 rounded text-[11px] font-semibold bg-black/50 hover:bg-white/10 text-gray-400 border border-white/10 transition"
+                                        title="Enter custom embed content type path"
+                                    >
+                                        Custom...
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
                         {/* Video Preview */}
@@ -1279,11 +1381,17 @@ const ContentManager = () => {
                     >
                         {/* Thumbnail */}
                         <div className="aspect-[2/3] relative">
-                            <img
-                                src={item.poster_path}
-                                alt={item.title}
-                                className="w-full h-full object-cover"
-                            />
+                            {item.poster_path ? (
+                                <img
+                                    src={item.poster_path}
+                                    alt={item.title}
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <div className="w-full h-full bg-zinc-800 flex items-center justify-center text-xs text-gray-500">
+                                    No Image
+                                </div>
+                            )}
 
                             {/* Selection Checkbox Overlay */}
                             <div className={`absolute top-2 right-2 z-20 transition-all ${selectedItems.length > 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>

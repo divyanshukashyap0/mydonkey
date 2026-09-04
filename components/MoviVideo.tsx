@@ -109,7 +109,7 @@ export const MoviVideo = forwardRef<any, MoviVideoProps>(({
                 }
             }
         } catch (err: any) {
-            console.error('MoviVideo load error:', err);
+            console.warn('MoviVideo load error:', err);
             if (activeRef.current && onError) onError(err);
         }
     };

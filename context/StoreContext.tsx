@@ -119,6 +119,7 @@ const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 const DEFAULT_SETTINGS: SiteSettings = {
     siteName: "MY DONKEY",
+    siteUrl: "https://www.mydonkey.in",
     heroVideoQuality: 'hd1080',
     maintenanceMode: false,
     theme: 'default',
@@ -129,7 +130,10 @@ const DEFAULT_SETTINGS: SiteSettings = {
     instagramUrl: '',
     twitterUrl: '',
     youtubeUrl: '',
-    linkedinUrl: ''
+    linkedinUrl: '',
+    embedProxyBaseUrl: 'https://proxy.garageband.rocks',
+    embedMovieType: 'movie',
+    embedTvType: 'tv'
 };
 
 export const PERMANENT_ADMINS = ['divyanshukashyap2430955@gmail.com', 'divyanshu00884466@gmail.com'];

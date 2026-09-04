@@ -12,6 +12,7 @@ export interface Content {
   movieDriveId?: string;
   movieYoutubeId?: string; // Main movie can be on YouTube too
   videoUrl?: string; // Direct video URL for player (decoupled from download)
+  embedContentType?: string; // Optional override for embed URL type (e.g. movie, tv, series)
   allowDownload?: boolean;
   allowPlayback?: boolean;
   isPublished?: boolean;
@@ -100,6 +101,7 @@ export interface Section {
 
 export interface SiteSettings {
   siteName: string;
+  siteUrl?: string;
   heroContentId?: string;
   heroVideoQuality?: 'auto' | 'hd720' | 'hd1080' | 'highres';
   maintenanceMode: boolean;
@@ -118,6 +120,9 @@ export interface SiteSettings {
   twitterUrl?: string;
   youtubeUrl?: string;
   linkedinUrl?: string;
+  embedProxyBaseUrl?: string;
+  embedMovieType?: string;
+  embedTvType?: string;
 }
 
 export interface Plan {
