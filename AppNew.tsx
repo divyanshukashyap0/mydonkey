@@ -88,6 +88,10 @@ const MainLayout = () => {
 
     const [viewingContent, setViewingContent] = useState<Content | null>(null);
     const [playingContent, setPlayingContent] = useState<Content | null>(null);
+    const viewingContentRef = useRef<Content | null>(null);
+    viewingContentRef.current = viewingContent;
+    const playingContentRef = useRef<Content | null>(null);
+    playingContentRef.current = playingContent;
     const [showUnlockModal, setShowUnlockModal] = useState(false);
     const [showGenreModal, setShowGenreModal] = useState(false);
 
@@ -144,7 +148,7 @@ const MainLayout = () => {
                 document.documentElement.style.overflow = '';
             }
         };
-    }, [playingContent, location.pathname]);
+    }, [!!playingContent, location.pathname]);
 
     // Deep Link Handler (e.g. /browse/content_123 or /watch/content_123)
     useEffect(() => {
@@ -164,8 +168,18 @@ const MainLayout = () => {
                             return;
                         }
                         if (isCancelled || !window.location.pathname.startsWith('/browse/')) return;
-                        setViewingContent(item);
+                        if (viewingContentRef.current?.id !== item.id) {
+                            setViewingContent(item);
+                        }
                     } else if (contentId.startsWith('tmdb_')) {
+                        const currentViewing = viewingContentRef.current;
+                        const isAlreadyViewing = currentViewing && (
+                            currentViewing.id === contentId ||
+                            `tmdb_${currentViewing.tmdbId}` === contentId
+                        );
+                        if (isAlreadyViewing) {
+                            return;
+                        }
                         const rawId = parseInt(contentId.replace('tmdb_', ''));
                         if (!isNaN(rawId)) {
                             const hintType = (stateItem?.type as 'movie' | 'tv') || (location.search.includes('type=tv') ? 'tv' : undefined);
@@ -232,7 +246,7 @@ const MainLayout = () => {
             }
         } else {
             // URL cleared, ensure modal closes
-            if (viewingContent) {
+            if (viewingContentRef.current) {
                 setViewingContent(null);
             }
         }
@@ -305,7 +319,7 @@ const MainLayout = () => {
                             navigate('/exclusive', { replace: true });
                             return;
                         }
-                        if (!playingContent || playingContent.id !== playableItem.id || playingContent.playMode !== mode) {
+                        if (!playingContentRef.current || playingContentRef.current.id !== playableItem.id || playingContentRef.current.playMode !== mode) {
                             if (isCancelled || !window.location.pathname.startsWith('/watch/')) return;
                             setPlayingContent({ ...playableItem, playMode: mode });
                             // Increment views when main movie starts
@@ -314,6 +328,17 @@ const MainLayout = () => {
                             }
                         }
                     } else if (contentId && (contentId.startsWith('tmdb_') || /^\d+$/.test(contentId) || /^tt\d+$/i.test(contentId))) {
+                        const currentPlaying = playingContentRef.current;
+                        const isAlreadyPlaying = currentPlaying && (
+                            currentPlaying.id === contentId ||
+                            `tmdb_${currentPlaying.tmdbId}` === contentId ||
+                            String(currentPlaying.tmdbId) === contentId
+                        ) && currentPlaying.playMode === mode;
+
+                        if (isAlreadyPlaying) {
+                            return;
+                        }
+
                         // Dynamically resolve TMDB or IMDb ID on /watch/:id deep link
                         const isImdb = /^tt\d+$/i.test(contentId);
                         const fetchResolved = async () => {
@@ -399,7 +424,7 @@ const MainLayout = () => {
                 }
             }
         } else {
-            if (playingContent) {
+            if (playingContentRef.current) {
                 setPlayingContent(null);
             }
         }
@@ -407,7 +432,7 @@ const MainLayout = () => {
         return () => {
             isCancelled = true;
         };
-    }, [location.pathname, location.search, content, rawContent, navigate, viewingContent, playingContent, isLoading, isAuthenticated, currentProfile]);
+    }, [location.pathname, location.search, rawContent, isLoading, isAuthenticated, currentProfile]);
 
     // Synchronously clean up player and modals when navigating away from their routes or on browser back/forward
     useEffect(() => {
@@ -450,7 +475,7 @@ const MainLayout = () => {
                 });
             }
         }
-    }, [playingContent, location.pathname, navigate]);
+    }, [playingContent?.id, playingContent?.playMode, location.pathname, navigate]);
 
     // Redirect legacy /home and /features to main website link /
     useEffect(() => {

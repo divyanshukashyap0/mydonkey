@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, X, Loader2 } from 'lucide-react';
 import { Content, Section } from '../types';
 import { useStore } from '../context/StoreContext';
-import { collection, query, where, getDocs, addDoc, doc, setDoc } from 'firebase/firestore';
+import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { searchTMDBMulti, fetchTMDBDetails, tmdbPosterUrl, tmdbBackdropUrl, mapTMDBGenres, extractTMDBTrailer } from '../services/tmdbService';
 import { buildEmbedUrl } from '../utils/embedUrl';
@@ -17,7 +17,7 @@ interface SearchPageProps {
 const ITEMS_PER_PAGE = 24;
 
 const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
-    const { content, sections, currentProfile, unlockContent, settings, currentUser, publishCatalog } = useStore();
+    const { content, sections, currentProfile, unlockContent, settings, currentUser } = useStore();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const initialQuery = searchParams.get('q') || '';
@@ -26,7 +26,6 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
     const [matchingSections, setMatchingSections] = useState<Section[]>([]);
     const [currentPage, setCurrentPage] = useState(1);
     const [isSearching, setIsSearching] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
 
     // Sync state if URL query param changes
     useEffect(() => {
@@ -94,17 +93,29 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                     console.warn("TMDB Search failed, using local results only", e);
                 }
 
-                // 5. Map TMDB results
-                const mappedTMDB: Partial<Content>[] = tmdbResults.map(r => ({
-                    id: `tmdb_${r.id}`, // temporary ID
-                    tmdbId: r.id,
-                    title: r.title || r.name || '',
-                    type: r.media_type === 'tv' ? 'tv' : 'movie',
-                    poster_path: r.poster_path ? tmdbPosterUrl(r.poster_path) : '',
-                    release_date: r.release_date || r.first_air_date || '',
-                    vote_average: r.vote_average || 0,
-                    overview: r.overview
-                }));
+                // 5. Map TMDB results with rich metadata ready for immediate details display
+                const mappedTMDB: Partial<Content>[] = tmdbResults.map(r => {
+                    const releaseDate = r.release_date || r.first_air_date || '';
+                    const year = releaseDate ? parseInt(releaseDate.split('-')[0]) : 0;
+                    const effectiveType: 'movie' | 'tv' = r.media_type === 'tv' ? 'tv' : 'movie';
+                    return {
+                        id: `tmdb_${r.id}`,
+                        tmdbId: r.id,
+                        title: r.title || r.name || '',
+                        type: effectiveType,
+                        poster_path: r.poster_path ? tmdbPosterUrl(r.poster_path) : '',
+                        backdrop_path: r.backdrop_path ? tmdbBackdropUrl(r.backdrop_path) : '',
+                        release_date: releaseDate,
+                        year: year,
+                        vote_average: r.vote_average || 0,
+                        rating: r.vote_average || 0,
+                        overview: r.overview || '',
+                        description: r.overview || '',
+                        genres: mapTMDBGenres(r.genre_ids || []),
+                        allowPlayback: true,
+                        isPublished: true
+                    };
+                });
 
                 // 6. Merge and Deduplicate Results
                 // Combine local matches and TMDB matches
@@ -125,123 +136,113 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                 setIsSearching(false);
             }
 
-        }, 500); // 500ms delay to prevent excessive API calls
+        }, 300); // 300ms delay for snappy, responsive search
 
         return () => clearTimeout(timer);
     }, [searchQuery, sections, settings, unlockContent, content]);
 
-    // Handle clicking a search result
-    const handleResultClick = async (item: Partial<Content>) => {
+    // Handle clicking a search result - Opens INSTANTLY, enriches asynchronously
+    const handleResultClick = (item: Partial<Content>) => {
+        // 1. If already full Content in local library, open immediately
+        const localMatch = content?.find(c => (item.tmdbId && c.tmdbId === item.tmdbId) || (item.id && c.id === item.id));
+        if (localMatch) {
+            onDetails(localMatch);
+            return;
+        }
+
         if (!item.tmdbId) {
-            // It's a local section item (already full Content)
+            // Local section item
             onDetails(item as Content);
             return;
         }
 
-        setIsSaving(true);
-        try {
-            // 1. Fetch full TMDB details (includes external_ids for IMDb ID)
-            const detail = await fetchTMDBDetails(item.tmdbId, item.type as 'movie' | 'tv');
+        const immediateType: 'movie' | 'tv' = (item.type as 'movie' | 'tv') || 'movie';
+        const streamId = String(item.tmdbId);
+        const immediateContent: Content = {
+            id: (item.id && !item.id.startsWith('tmdb_')) ? item.id : `tmdb_${item.tmdbId}`,
+            tmdbId: item.tmdbId,
+            title: item.title || 'Untitled',
+            type: immediateType,
+            poster_path: item.poster_path || '',
+            backdrop_path: item.backdrop_path || '',
+            release_date: item.release_date || '',
+            year: item.year || (item.release_date ? parseInt(item.release_date.split('-')[0]) : 0),
+            vote_average: item.vote_average || 0,
+            rating: item.vote_average || 0,
+            overview: item.overview || '',
+            description: item.overview || '',
+            genres: item.genres || [],
+            videoUrl: buildEmbedUrl(streamId, immediateType, settings),
+            allowPlayback: true,
+            isPublished: true,
+        };
 
-            // 2. Set stream source URL with IMDb ID
-            const imdbId = detail.external_ids?.imdb_id || (detail as any).imdb_id || '';
-            const isMovie = !detail.name;
-            let videoUrl = imdbId ? buildEmbedUrl(imdbId, isMovie ? 'movie' : 'tv', settings) : '';
+        // OPEN DETAILS MODAL IMMEDIATELY (0ms wait time for user)
+        onDetails(immediateContent);
 
-            // 3. Construct base Content object from fresh metadata
-            const addedByInfo = currentUser ? {
-                userId: currentUser.uid,
-                name: currentProfile?.name || currentUser.name || 'User',
-                email: currentUser.email || '',
-                addedAt: new Date().toISOString()
-            } : null;
+        // Background enrichment: fetch full TMDB metadata (cast, trailer, IMDb ID for higher stream quality)
+        (async () => {
+            try {
+                const detail = await fetchTMDBDetails(item.tmdbId!, immediateType);
+                if (!detail) return;
 
-            // Extract Year safely
-            const releaseDate = detail.release_date || detail.first_air_date || '';
-            const year = releaseDate ? parseInt(releaseDate.split('-')[0]) : 0;
+                const imdbId = detail.external_ids?.imdb_id || (detail as any).imdb_id || '';
+                const trailerKey = extractTMDBTrailer(detail);
+                const resolvedType: 'movie' | 'tv' = (detail.name || detail.media_type === 'tv' || immediateType === 'tv') ? 'tv' : 'movie';
+                const effectiveStreamId = imdbId || String(detail.id);
+                const releaseDate = detail.release_date || detail.first_air_date || immediateContent.release_date;
+                const finalYear = releaseDate ? parseInt(releaseDate.split('-')[0]) : immediateContent.year;
 
-            const newMetadata: Omit<Content, 'id'> = {
-                tmdbId: detail.id,
-                imdbId: imdbId || '',
-                title: detail.title || detail.name || '',
-                type: detail.title ? 'movie' : 'tv',
-                videoUrl: videoUrl,
-                youtubeId: extractTMDBTrailer(detail) || '', // Trailer key
-                poster_path: detail.poster_path ? tmdbPosterUrl(detail.poster_path) : '',
-                backdrop_path: detail.backdrop_path ? tmdbBackdropUrl(detail.backdrop_path) : '',
-                overview: detail.overview || '',
-                genres: mapTMDBGenres(detail.genres?.map((g: any) => g.id) || []),
-                cast: detail.credits?.cast?.slice(0, 10).map((c: any) => c.name) || [], // Top 10 cast
-                release_date: releaseDate,
-                year: year,
-                vote_average: detail.vote_average || 0,
-                allowPlayback: true,
-                isPublished: true,
-                createdAt: new Date().toISOString(),
-                ...(addedByInfo && { addedBy: addedByInfo })
-            };
-
-            // 4. Check if it already exists in Firebase to handle "No Duplicates" and "Replace All"
-            const q = query(collection(db, 'content'), where('tmdbId', '==', item.tmdbId));
-            const querySnapshot = await getDocs(q);
-            
-            let savedContent: Content;
-
-            if (!querySnapshot.empty) {
-                // ALREADY EXISTS
-                const existingDoc = querySnapshot.docs[0];
-                const existingData = existingDoc.data() as Content;
-                
-                // Only admins can update existing metadata to prevent permission errors
-                if (currentUser?.role === 'admin') {
-                    const updatedData = {
-                        ...existingData,
-                        ...newMetadata,
-                        // Preserve state fields
-                        featured: existingData.featured || false,
-                        isOriginal: existingData.isOriginal || false,
-                        views: existingData.views || 0,
-                        likes: existingData.likes || 0,
-                        createdAt: existingData.createdAt || newMetadata.createdAt,
-                        updatedAt: new Date().toISOString()
-                    };
-                    await setDoc(doc(db, 'content', existingDoc.id), updatedData);
-                    savedContent = { id: existingDoc.id, ...updatedData } as Content;
-                    await publishCatalog();
-                } else {
-                    // Non-admins just use the existing content
-                    savedContent = { id: existingDoc.id, ...existingData } as Content;
-                }
-            } else {
-                // ADD NEW (Allowed by rules for everyone currently)
-                const docRef = await addDoc(collection(db, 'content'), newMetadata);
-                savedContent = { id: docRef.id, ...newMetadata } as Content;
-                await publishCatalog();
-            }
-
-            // 5. Log to content_contributions for tracking
-            if (addedByInfo) {
-                addDoc(collection(db, 'content_contributions'), {
-                    contentId: savedContent.id,
+                const enrichedContent: Content = {
+                    ...immediateContent,
+                    id: `tmdb_${detail.id}`,
                     tmdbId: detail.id,
-                    imdbId: imdbId || '',
-                    title: savedContent.title,
-                    poster_path: savedContent.poster_path,
-                    type: savedContent.type,
-                    addedBy: addedByInfo,
-                    addedAt: new Date().toISOString()
-                }).catch(e => console.error('Contribution log failed:', e));
+                    imdbId: imdbId || undefined,
+                    title: detail.title || detail.name || immediateContent.title,
+                    type: resolvedType,
+                    videoUrl: buildEmbedUrl(effectiveStreamId, resolvedType, settings),
+                    youtubeId: trailerKey || undefined,
+                    trailerUrl: trailerKey ? `https://www.youtube.com/watch?v=${trailerKey}` : undefined,
+                    poster_path: detail.poster_path ? tmdbPosterUrl(detail.poster_path) : immediateContent.poster_path,
+                    backdrop_path: detail.backdrop_path ? tmdbBackdropUrl(detail.backdrop_path) : immediateContent.backdrop_path,
+                    overview: detail.overview || immediateContent.overview,
+                    description: detail.overview || immediateContent.description,
+                    genres: mapTMDBGenres(detail.genres?.map((g: any) => g.id) || []),
+                    cast: detail.credits?.cast?.slice(0, 10).map((c: any) => c.name) || [],
+                    year: finalYear,
+                    release_date: releaseDate,
+                    vote_average: detail.vote_average || immediateContent.vote_average,
+                    rating: detail.vote_average || immediateContent.rating,
+                    totalSeasons: detail.number_of_seasons,
+                    totalEpisodes: detail.number_of_episodes,
+                };
+
+                // Seamlessly update details view with enriched metadata
+                onDetails(enrichedContent);
+
+                // Background logging of contribution (without blocking UI or re-publishing full catalog)
+                if (currentUser) {
+                    const addedByInfo = {
+                        userId: currentUser.uid,
+                        name: currentProfile?.name || currentUser.name || 'User',
+                        email: currentUser.email || '',
+                        addedAt: new Date().toISOString()
+                    };
+                    addDoc(collection(db, 'content_contributions'), {
+                        contentId: enrichedContent.id,
+                        tmdbId: detail.id,
+                        imdbId: imdbId || '',
+                        title: enrichedContent.title,
+                        poster_path: enrichedContent.poster_path,
+                        type: enrichedContent.type,
+                        addedBy: addedByInfo,
+                        addedAt: new Date().toISOString()
+                    }).catch(() => {});
+                }
+            } catch (err) {
+                console.warn("Background TMDB metadata enrichment error:", err);
             }
-
-            // 6. Call onDetails to open the player/details view
-            onDetails(savedContent);
-
-        } catch (error) {
-            console.error("Error processing selection:", error);
-            alert("Failed to load title details. Please try again.");
-        } finally {
-            setIsSaving(false);
-        }
+        })();
     };
 
     // Helper to resolve items for a section
@@ -275,17 +276,6 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
 
     return (
         <div className="pt-24 px-4 md:px-12 pb-12 min-h-screen relative">
-
-            {/* Loading Overlay when Saving to DB */}
-            {isSaving && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm">
-                    <div className="flex flex-col items-center">
-                        <Loader2 className="h-12 w-12 text-brand-red animate-spin mb-4" />
-                        <p className="text-white font-bold text-lg">Loading Title...</p>
-                    </div>
-                </div>
-            )}
-
             <div className="max-w-6xl mx-auto">
                 <div className="relative mb-12">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">

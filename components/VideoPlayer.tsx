@@ -1058,12 +1058,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         };
     }, [content?.title]);
 
-    // Record watch history for stream sources without redirecting away
+    // Record watch history for stream sources without redirecting away (guarded to once per content ID)
+    const hasRecordedWatchHistoryRef = useRef<string | null>(null);
     useEffect(() => {
-        if (finalUrl) {
+        if (finalUrl && content?.id && hasRecordedWatchHistoryRef.current !== content.id) {
+            hasRecordedWatchHistoryRef.current = content.id;
             addToWatchHistory(content).catch(e => console.error("Error saving watch history:", e));
         }
-    }, [finalUrl, content, addToWatchHistory]);
+    }, [finalUrl, content?.id]);
 
     // Final Main Render
     return (
