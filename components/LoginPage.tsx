@@ -1,13 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowRight, QrCode, Mail } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 // import { AppleLogo } from './AppleLogo';
 import { useStore } from '../context/StoreContext';
 import QRLogin from './QRLogin';
 
 const LoginPage = () => {
-    const { login, signup, loginWithGoogle, loginWithApple, loginAsGuest } = useStore();
+    const { login, signup, loginWithGoogle, loginWithApple, loginAsGuest, isAuthenticated, currentUser, isLoading } = useStore();
     const navigate = useNavigate();
+
+    // If user is already logged in, redirect back to home page
+    const isAlreadyLoggedIn = !isLoading && isAuthenticated && currentUser && !currentUser.isGuest;
+
+    useEffect(() => {
+        if (isAlreadyLoggedIn) {
+            const params = new URLSearchParams(window.location.search);
+            const redirect = params.get('redirect') || '/';
+            navigate(redirect, { replace: true });
+        }
+    }, [isAlreadyLoggedIn, navigate]);
+
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [step, setStep] = useState<'email' | 'password'>('email');
@@ -17,6 +29,10 @@ const LoginPage = () => {
     
     // Check if device is a smartphone
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+    if (isAlreadyLoggedIn) {
+        return <Navigate to="/" replace />;
+    }
 
     const handleContinue = async (e: React.FormEvent) => {
         e.preventDefault();

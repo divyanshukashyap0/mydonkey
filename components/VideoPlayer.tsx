@@ -241,11 +241,17 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         const handleBlur = () => {
             if (document.activeElement?.tagName === 'IFRAME') {
                 setHasStartedPlaying(true);
+                if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+                controlsTimeoutRef.current = setTimeout(() => {
+                    if (!isHoveringHeaderRef.current && !showStats && !showAudioSubMenu && !showQualityMenu && !showEpisodesMenu) {
+                        setShowControls(false);
+                    }
+                }, 3000);
             }
         };
         window.addEventListener('blur', handleBlur);
         return () => window.removeEventListener('blur', handleBlur);
-    }, []);
+    }, [showStats, showAudioSubMenu, showQualityMenu, showEpisodesMenu]);
 
 
 
@@ -316,6 +322,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const progressRef = useRef(initialProgress);
     const playerContainerRef = useRef<HTMLDivElement>(null);
+    const isHoveringHeaderRef = useRef(false);
 
     // Dynamic Audio Options
     const [audioTracks, setDynamicAudioTracks] = useState<any[]>([]);
@@ -677,30 +684,43 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     }, [content.id, duration, isDriveVideo, isTrailer]);
 
 
-    // Controls Visibility Timer
-    // Only mouse-move resets the timer (desktop). Taps are handled by handleTap below.
-    useEffect(() => {
-        const onMouseMove = () => {
-            setShowControls(true);
-            if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-            controlsTimeoutRef.current = setTimeout(() => {
-                if (!showStats && !showAudioSubMenu && !showQualityMenu && playing) setShowControls(false);
-            }, 3000);
-        };
-
-        window.addEventListener('mousemove', onMouseMove);
-
-        // Start an initial 4-second timer: controls are visible on mount then auto-hide
+    // Controls & Movie Card Visibility Timer (Hides after 3 seconds of inactivity)
+    const resetInactivityTimer = useCallback(() => {
+        if (isHoveringHeaderRef.current) return;
+        setShowControls(true);
         if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
         controlsTimeoutRef.current = setTimeout(() => {
-            if (!showStats && !showAudioSubMenu && !showQualityMenu && playing) setShowControls(false);
-        }, 4000);
+            if (!isHoveringHeaderRef.current && !showStats && !showAudioSubMenu && !showQualityMenu && !showEpisodesMenu) {
+                setShowControls(false);
+            }
+        }, 3000);
+    }, [showStats, showAudioSubMenu, showQualityMenu, showEpisodesMenu]);
+
+    useEffect(() => {
+        const handleUserActivity = () => {
+            if (!isHoveringHeaderRef.current) {
+                resetInactivityTimer();
+            }
+        };
+
+        window.addEventListener('mousemove', handleUserActivity);
+        window.addEventListener('pointermove', handleUserActivity);
+        window.addEventListener('mousedown', handleUserActivity);
+        window.addEventListener('touchstart', handleUserActivity);
+        window.addEventListener('keydown', handleUserActivity);
+
+        // Initial 5-second timer on mount: card shows then hides after 5s of inactivity
+        resetInactivityTimer();
 
         return () => {
-            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mousemove', handleUserActivity);
+            window.removeEventListener('pointermove', handleUserActivity);
+            window.removeEventListener('mousedown', handleUserActivity);
+            window.removeEventListener('touchstart', handleUserActivity);
+            window.removeEventListener('keydown', handleUserActivity);
             if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
         };
-    }, [showStats, showAudioSubMenu, showQualityMenu, playing]);
+    }, [resetInactivityTimer]);
 
     // Keyboard Shortcuts
     useEffect(() => {
@@ -798,12 +818,31 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     // Fullscreen Event Listener
     useEffect(() => {
         const handleFullscreenChange = () => {
-            const isFull = !!(document.fullscreenElement ||
+            const fsElement = document.fullscreenElement ||
                 (document as any).webkitFullscreenElement ||
                 (document as any).mozFullScreenElement ||
-                (document as any).msFullscreenElement);
+                (document as any).msFullscreenElement;
+            const isFull = !!fsElement;
             setIsFullscreen(isFull);
             if (isFull) setShowControls(false);
+
+            // If an inner child (such as the embed iframe, video, or canvas) entered fullscreen,
+            // promote our playerContainerRef to fullscreen so the watermark logo remains visible on top!
+            if (fsElement && playerContainerRef.current && fsElement !== playerContainerRef.current) {
+                if (playerContainerRef.current.contains(fsElement)) {
+                    try {
+                        const requestFS = playerContainerRef.current.requestFullscreen ||
+                            (playerContainerRef.current as any).webkitRequestFullscreen ||
+                            (playerContainerRef.current as any).mozRequestFullScreen ||
+                            (playerContainerRef.current as any).msRequestFullscreen;
+                        if (requestFS) {
+                            requestFS.call(playerContainerRef.current).catch(() => {});
+                        }
+                    } catch (e) {
+                        // ignore
+                    }
+                }
+            }
         };
 
         document.addEventListener('fullscreenchange', handleFullscreenChange);
@@ -826,9 +865,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const startHideTimer = useCallback(() => {
         if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
         controlsTimeoutRef.current = setTimeout(() => {
-            setShowControls(false);
+            if (!isHoveringHeaderRef.current && !showStats && !showAudioSubMenu && !showQualityMenu && !showEpisodesMenu) {
+                setShowControls(false);
+            }
         }, 3000);
-    }, []);
+    }, [showStats, showAudioSubMenu, showQualityMenu, showEpisodesMenu]);
 
     const handleTap = (e: React.MouseEvent) => {
         const now = Date.now();
@@ -974,16 +1015,23 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     const finalUrl = useMemo(() => getFinalVideoUrl(directVideoUrl || ''), [directVideoUrl, isTV, settings, embedBaseHost]);
 
-    // Auto-redirect to RapidStream in same tab if this is a proxy.garageband.rocks source
+    // Dynamically update document title to movie/show name during playback
     useEffect(() => {
-        if (finalUrl && (finalUrl.includes('proxy.garageband.rocks') || (embedBaseHost && finalUrl.includes(embedBaseHost)))) {
-            addToWatchHistory(content).catch(e => console.error("Error saving watch history:", e));
-            const timer = setTimeout(() => {
-                window.location.href = finalUrl;
-            }, 200);
-            return () => clearTimeout(timer);
+        const prevTitle = document.title;
+        if (content?.title) {
+            document.title = `${content.title} | My Donkey`;
         }
-    }, [finalUrl, content, addToWatchHistory, embedBaseHost]);
+        return () => {
+            document.title = prevTitle;
+        };
+    }, [content?.title]);
+
+    // Record watch history for stream sources without redirecting away
+    useEffect(() => {
+        if (finalUrl) {
+            addToWatchHistory(content).catch(e => console.error("Error saving watch history:", e));
+        }
+    }, [finalUrl, content, addToWatchHistory]);
 
     // Final Main Render
     return (
@@ -1014,34 +1062,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                     onError={(err) => setPlaybackError(err.message || 'Movi player playback error')}
                                 />
                             ) : finalUrl ? (
-                                (finalUrl.includes('proxy.garageband.rocks') || (embedBaseHost && finalUrl.includes(embedBaseHost))) ? (
-                                    <div className="w-full h-full flex flex-col items-center justify-center bg-black text-white p-6 z-[30] relative select-none">
-                                        <div className="w-14 h-14 border-4 border-brand-red border-t-transparent rounded-full animate-spin mb-6"></div>
-                                        <h2 className="text-2xl font-bold mb-2">Opening RapidStream...</h2>
-                                        <p className="text-gray-400 text-sm mb-6 text-center max-w-md">
-                                            Redirecting you to RapidStream in this tab. If the player does not open automatically, click below:
-                                        </p>
-                                        <a 
-                                            href={finalUrl}
-                                            onClick={() => addToWatchHistory(content)}
-                                            className="bg-brand-red hover:bg-red-700 text-white font-bold py-3 px-8 rounded-full transition shadow-lg flex items-center gap-2"
-                                        >
-                                            <Play size={20} className="fill-current" />
-                                            Open RapidStream
-                                        </a>
-                                    </div>
-                                ) : (
-                                    <iframe 
-                                        className="w-full h-full relative z-[30]"
-                                        src={finalUrl}
-                                        allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-                                        allowFullScreen
-                                        frameBorder="0"
-                                        scrolling="no"
-                                        title={content.title}
-                                        onLoad={handleIframeLoad}
-                                    />
-                                )
+                                <iframe 
+                                    className="w-full h-full relative z-[30] border-0"
+                                    src={finalUrl}
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                                    allowFullScreen
+                                    scrolling="no"
+                                    referrerPolicy="origin"
+                                    title={content.title}
+                                    onLoad={handleIframeLoad}
+                                />
                             ) : null}
                         </div>
                     )}
@@ -1111,7 +1141,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             {isMobile && isPortrait ? (
                 <>
                     {/* Top bar */}
-                    <div className="absolute top-0 left-0 right-0 flex items-center gap-3 px-3 py-3 z-10 bg-[#0f0f0f]/80 backdrop-blur-md">
+                    <div className={`absolute top-0 left-0 right-0 flex items-center gap-3 px-3 py-3 z-10 bg-[#0f0f0f]/80 backdrop-blur-md transition-opacity duration-300 ${showControls ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
                         <button onClick={onClose} className="text-white p-1.5 rounded-full hover:bg-white/10 transition active:scale-90">
                             <ArrowLeft size={22} />
                         </button>
@@ -1212,17 +1242,37 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
             {/* Header - Side Middle Floating Pill Style (Landscape/Desktop only) */}
             {!isPortrait && (
-                <div className={`absolute top-1/2 left-2 md:left-6 -translate-y-1/2 transition-opacity duration-300 pointer-events-none z-[120] ${showControls ? 'opacity-100' : 'opacity-0'}`}>
-                    <div className="bg-black/40 backdrop-blur-xl border border-white/10 inline-flex items-center gap-2 md:gap-3 px-2 py-2 md:px-3 md:py-2.5 rounded-2xl pointer-events-auto hover:bg-black/60 transition-all shadow-2xl ring-1 ring-white/5 group/header">
-                        <button onClick={onClose} className="text-white hover:text-brand-red transition-all p-2 md:p-3 rounded-xl bg-white/5 hover:bg-white/10 active:scale-90">
-                            <ArrowLeft size={18} className="md:w-5 md:h-5 transition-transform group-hover/header:-translate-x-1" />
+                <div 
+                    onMouseEnter={() => {
+                        isHoveringHeaderRef.current = true;
+                        if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+                        setShowControls(true);
+                    }}
+                    onMouseLeave={() => {
+                        isHoveringHeaderRef.current = false;
+                        resetInactivityTimer();
+                    }}
+                    className={`absolute top-1/2 left-2 md:left-6 -translate-y-1/2 transition-all duration-500 z-[120] ${
+                        showControls 
+                            ? 'opacity-50 hover:opacity-100 pointer-events-auto translate-x-0' 
+                            : 'opacity-0 pointer-events-none -translate-x-6'
+                    }`}
+                >
+                    <div className="bg-black/50 backdrop-blur-xl border border-white/15 inline-flex items-center gap-2 md:gap-3 px-2 py-2 md:px-3 md:py-2.5 rounded-2xl pointer-events-auto hover:bg-black/80 transition-all shadow-2xl ring-1 ring-white/10 group/header">
+                        <button
+                            onClick={onClose}
+                            className="text-white hover:text-brand-red transition-all p-2 md:p-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-90 flex items-center justify-center cursor-pointer"
+                            title="Go Back to Previous Page"
+                            aria-label="Previous page"
+                        >
+                            <ArrowLeft size={20} className="md:w-5 md:h-5 transition-transform group-hover/header:-translate-x-1" />
                         </button>
-                        <div className="h-6 w-px bg-white/10"></div>
+                        <div className="h-6 w-px bg-white/15"></div>
                         <button
                             onClick={(e) => { e.stopPropagation(); setShowEpisodesMenu(!showEpisodesMenu); }}
-                            className="text-left pr-2 md:pr-4 group/title"
+                            className="text-left pr-2 md:pr-4 group/title cursor-pointer"
                         >
-                            <div className="text-white font-bold text-[10px] md:text-sm leading-tight tracking-tight line-clamp-1 max-w-[100px] md:max-w-[180px] group-hover/title:text-brand-red transition-colors">
+                            <div className="text-white font-bold text-xs md:text-sm leading-tight tracking-tight line-clamp-1 max-w-[120px] md:max-w-[200px] group-hover/title:text-brand-red transition-colors">
                                 {content.title}
                             </div>
                             {isTV && currentEpisode && (
@@ -1232,6 +1282,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                     </span>
                                 </div>
                             )}
+                        </button>
+                        <div className="h-6 w-px bg-white/15"></div>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
+                            className="text-white hover:text-brand-red transition-all p-2 rounded-xl bg-white/10 hover:bg-white/20 active:scale-90 flex items-center justify-center cursor-pointer"
+                            title={isFullscreen ? "Exit Fullscreen (Esc)" : "Full Screen (F)"}
+                            aria-label="Toggle Fullscreen"
+                        >
+                            {isFullscreen ? <Minimize size={18} className="md:w-5 md:h-5" /> : <Maximize size={18} className="md:w-5 md:h-5" />}
                         </button>
                     </div>
                 </div>
@@ -1576,6 +1635,25 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     </div>
                 </div>
             )}
+
+            {/* Unclickable Low-Opacity Corner Watermark Logo (Always visible in normal, embedded, and fullscreen modes) */}
+            <div 
+                className={`video-watermark absolute z-[999] pointer-events-none select-none transition-all duration-300 drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] ${
+                    isFullscreen 
+                        ? 'top-6 right-6 md:top-8 md:right-10 opacity-35' 
+                        : (isMobile && isPortrait 
+                            ? 'top-16 right-4 opacity-30' 
+                            : 'top-4 right-4 md:top-6 md:right-8 opacity-30')
+                }`}
+                aria-hidden="true"
+            >
+                <img
+                    src="/favicon.png"
+                    alt=""
+                    className={`${isFullscreen ? 'w-10 h-10 md:w-14 md:h-14' : 'w-7 h-7 md:w-10 md:h-10'} object-contain pointer-events-none select-none`}
+                    draggable={false}
+                />
+            </div>
         </div>
     );
 };

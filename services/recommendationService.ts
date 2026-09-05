@@ -57,28 +57,72 @@ export function normalizeGenre(genre: string): string {
 /**
  * Regional & Language Recognition Helpers for Indian & Hindi Cinema
  */
-export const INDIAN_LANG_CODES = ['hi', 'te', 'ta', 'ml', 'kn', 'pa', 'bn', 'mr', 'gu', 'ur', 'or', 'as'];
-export const INDIAN_LANG_NAMES = ['hindi', 'telugu', 'tamil', 'malayalam', 'kannada', 'punjabi', 'bengali', 'marathi', 'gujarati', 'urdu', 'odia', 'assamese'];
+export const INDIAN_LANG_CODES = ['hi', 'te', 'ta', 'ml', 'kn', 'pa', 'bn', 'mr', 'gu', 'ur', 'or', 'as', 'bho', 'sa'];
+export const INDIAN_LANG_NAMES = ['hindi', 'telugu', 'tamil', 'malayalam', 'kannada', 'punjabi', 'bengali', 'marathi', 'gujarati', 'urdu', 'odia', 'assamese', 'bhojpuri'];
 export const INDIAN_TAGS = ['bollywood', 'tollywood', 'kollywood', 'mollywood', 'sandalwood', 'pollywood', 'desi', 'indian', 'south indian', 'hindi'];
 
-export function isIndianContent(item: Content): boolean {
+export const MARVEL_TITLE_REGEX = /\b(marvel|avengers|iron man|spider-?man|thor|captain america|guardians of the galaxy|black panther|doctor strange|ant-?man|deadpool|wolverine|x-?men|fantastic four|hulk|black widow|shang-?chi|eternals|blade|daredevil|punisher|ghost rider|moon knight|loki|wandavision|hawkeye|she-?hulk|secret invasion|agatha|what if|thanos|venom|morbius|madame web|kraven|thunderbolts)\b/i;
+
+export const NOTABLE_INDIAN_CAST = [
+    'shah rukh khan', 'salman khan', 'aamir khan', 'amitabh bachchan', 'akshay kumar', 'hrithik roshan',
+    'deepika padukone', 'priyanka chopra', 'ranbir kapoor', 'ranveer singh', 'alia bhatt', 'ajay devgn',
+    'kareena kapoor', 'katrina kaif', 'prabhas', 'allu arjun', 'ram charan', 'jr ntr', 'rajinikanth',
+    'kamal haasan', 'vijay', 'ajith kumar', 'suriya', 'dhanush', 'fahadh faasil', 'mohanlal', 'mammootty',
+    'yash', 'rishab shetty', 'nawazuddin siddiqui', 'pankaj tripathi', 'manoj bajpayee', 'ayushmann khurrana',
+    'rajkummar rao', 'vicky kaushal', 'shahid kapoor', 'varun dhawan', 'siddharth malhotra', 'kartik aaryan',
+    'diljit dosanjh', 'anushka sharma', 'shraddha kapoor', 'kriti sanon', 'kiara advani', 'taapsee pannu',
+    'samantha ruth prabhu', 'nayanthara', 'rashmika mandanna', 'pooja hegde', 'tamannaah bhatia', 'kajal aggarwal',
+    'trisha krishnan', 'sai pallavi', 'anupam kher', 'naseeruddin shah', 'paresh rawal', 'boman irani',
+    'bobby deol', 'sunny deol', 'suniel shetty', 'sanjay dutt', 'anil kapoor', 'jackie shroff', 'govinda',
+    'mithun chakraborty', 'dharmendra', 'jeetendra', 'dev anand', 'rajesh khanna', 'dilip kumar', 'devgn'
+];
+
+export function isIndianContent(item: Content | any): boolean {
     if (!item) return false;
-    const country = (item.country || '').toLowerCase().trim();
+    const country = ((item as any).country || (item as any).origin_country || '').toString().toLowerCase().trim();
     if (country === 'india' || country === 'in' || country.includes('india')) return true;
 
-    const lang = ((item as any).language || (item as any).original_language || '').toLowerCase().trim();
+    const lang = ((item as any).language || (item as any).original_language || (item as any).lang || '').toString().toLowerCase().trim();
     if (INDIAN_LANG_CODES.includes(lang) || INDIAN_LANG_NAMES.some(l => lang.includes(l))) return true;
 
-    const tags = ((item.tags || []) as string[]).map(t => t.toLowerCase().trim());
-    if (tags.some(t => INDIAN_TAGS.some(tag => t.includes(tag)))) return true;
+    const tags = Array.isArray(item.tags) ? item.tags.map((t: any) => String(t).toLowerCase().trim()) : [];
+    if (tags.some((t: string) => INDIAN_TAGS.some(tag => t.includes(tag)))) return true;
 
-    const genres = (item.genres || []).map(g => g.toLowerCase().trim());
-    if (genres.some(g => g.includes('bollywood') || g.includes('desi') || g.includes('indian'))) return true;
+    const genres = Array.isArray(item.genres) ? item.genres.map((g: any) => String(g).toLowerCase().trim()) : [];
+    if (genres.some((g: string) => g.includes('bollywood') || g.includes('desi') || g.includes('indian'))) return true;
+
+    const cast = Array.isArray(item.cast) ? item.cast.map((c: any) => String(c).toLowerCase().trim()) : [];
+    if (cast.some((c: string) => NOTABLE_INDIAN_CAST.some(nic => c.includes(nic)))) return true;
+
+    const title = (item.title || item.name || '').toLowerCase();
+    if (/\b(ishq|pyaar|kahani|desh|bharat|hindustan|dastaar|satluj|pushpa|vikram|vedha|kareen|pritam|sharma|singh|kumar|patel|khan)\b/i.test(title)) {
+        return true;
+    }
 
     return false;
 }
 
-export function isHindiContent(item: Content): boolean {
+export function isMarvelContent(item: Content | any): boolean {
+    if (!item) return false;
+    const title = (item.title || item.name || '').toLowerCase();
+    if (MARVEL_TITLE_REGEX.test(title)) return true;
+
+    const tags = Array.isArray(item.tags) ? item.tags.map((t: any) => String(t).toLowerCase().trim()) : [];
+    if (tags.some((t: string) => t.includes('marvel') || t === 'mcu')) return true;
+
+    const overview = (item.overview || (item as any).description || '').toLowerCase();
+    if (overview.includes('marvel cinematic universe') || overview.includes('marvel studios') || overview.includes('marvel comics') || overview.includes('mcu')) {
+        return true;
+    }
+
+    return false;
+}
+
+export function isIndianOrMarvelContent(item: Content | any): boolean {
+    return isIndianContent(item) || isMarvelContent(item);
+}
+
+export function isHindiContent(item: Content | any): boolean {
     if (!item) return false;
     const lang = ((item as any).language || (item as any).original_language || '').toLowerCase().trim();
     if (lang === 'hi' || lang.includes('hindi')) return true;

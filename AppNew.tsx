@@ -32,10 +32,12 @@ import {
     getPersonalizedRecommendations,
     getBecauseYouWatchedSection,
     getTopPicksForGenre,
-    normalizeGenre
+    normalizeGenre,
+    isIndianOrMarvelContent
 } from './services/recommendationService';
 import {
     fetchTMDBDetails,
+    findByIMDbId,
     tmdbPosterUrl,
     tmdbBackdropUrl,
     mapTMDBGenres,
@@ -242,23 +244,24 @@ const MainLayout = () => {
                     if (item) {
                         const embedBaseHost = (settings?.embedProxyBaseUrl || 'https://proxy.garageband.rocks').replace(/^https?:\/\//, '').replace(/\/+$/, '');
 
-                        // Check if item has RapidStream movie/TV source with IMDb ID (open in same tab)
                         const imdbId = item.imdbId ||
                             (typeof item.id === 'string' && item.id.startsWith('imdb_') ? item.id.replace('imdb_', '') : null) ||
                             (item.videoUrl ? item.videoUrl.match(/(tt\d+)/i)?.[1] : null) ||
                             (typeof item.id === 'string' && /^tt\d+$/i.test(item.id.trim()) ? item.id.trim() : null);
 
-                        const isEmbed = (item.videoUrl && (item.videoUrl.includes('proxy.garageband.rocks') || (embedBaseHost && item.videoUrl.includes(embedBaseHost)) || item.videoUrl.includes('/embed/'))) || !!imdbId;
+                        const tmdbNumId = item.tmdbId || (typeof item.id === 'string' && item.id.startsWith('tmdb_') ? item.id.replace('tmdb_', '') : null);
 
-                        if (isEmbed && imdbId) {
+                        const isEmbed = (item.videoUrl && (item.videoUrl.includes('proxy.garageband.rocks') || (embedBaseHost && item.videoUrl.includes(embedBaseHost)) || item.videoUrl.includes('/embed/'))) || !!imdbId || !!tmdbNumId;
+
+                        const effectiveStreamId = imdbId || tmdbNumId;
+
+                        let playableItem = { ...item };
+                        if (isEmbed && (effectiveStreamId || item.videoUrl)) {
                             const existingType = item.videoUrl ? parseEmbedContentType(item.videoUrl) : null;
-                            const streamUrl = buildEmbedUrl(imdbId, existingType || item.type || 'movie', settings);
-                            incrementViews(item.id).catch(() => {});
-                            addToWatchHistory(item).catch(() => {});
-                            setTimeout(() => {
-                                window.location.href = streamUrl;
-                            }, 100);
-                            return;
+                            const streamUrl = effectiveStreamId ? buildEmbedUrl(effectiveStreamId, existingType || item.type || 'movie', settings) : item.videoUrl;
+                            if (streamUrl) {
+                                playableItem.videoUrl = streamUrl;
+                            }
                         }
 
                         // Authenticate if required (trailers don't need auth, movies do)
@@ -268,17 +271,83 @@ const MainLayout = () => {
                         }
 
                         // Check for Exclusive Content
-                        if (mode === 'movie' && item.isExclusive && !currentProfile?.unlockedContent?.includes('global_unlock')) {
+                        if (mode === 'movie' && playableItem.isExclusive && !currentProfile?.unlockedContent?.includes('global_unlock')) {
                             navigate('/exclusive', { replace: true });
                             return;
                         }
-                        if (!playingContent || playingContent.id !== item.id || playingContent.playMode !== mode) {
-                            setPlayingContent({ ...item, playMode: mode });
+                        if (!playingContent || playingContent.id !== playableItem.id || playingContent.playMode !== mode) {
+                            setPlayingContent({ ...playableItem, playMode: mode });
                             // Increment views when main movie starts
                             if (mode === 'movie') {
-                                incrementViews(item.id).catch(() => {});
+                                incrementViews(playableItem.id).catch(() => {});
                             }
                         }
+                    } else if (contentId && (contentId.startsWith('tmdb_') || /^\d+$/.test(contentId) || /^tt\d+$/i.test(contentId))) {
+                        // Dynamically resolve TMDB or IMDb ID on /watch/:id deep link
+                        const isImdb = /^tt\d+$/i.test(contentId);
+                        const fetchResolved = async () => {
+                            let detail: any = null;
+                            let resolvedType: 'movie' | 'tv' = 'movie';
+                            let rawTmdbId = 0;
+                            let imdbId = '';
+                            if (isImdb) {
+                                imdbId = contentId;
+                                detail = await findByIMDbId(contentId);
+                                if (detail) {
+                                    rawTmdbId = detail.id;
+                                    resolvedType = detail.title ? 'movie' : 'tv';
+                                }
+                            } else {
+                                rawTmdbId = parseInt(contentId.replace('tmdb_', ''), 10);
+                                try {
+                                    detail = await fetchTMDBDetails(rawTmdbId, 'movie');
+                                } catch (_) {
+                                    if (!detail) { try { detail = await fetchTMDBDetails(rawTmdbId, 'tv'); resolvedType = 'tv'; } catch (_) { } }
+                                }
+                                if (detail) {
+                                    imdbId = detail.external_ids?.imdb_id || (detail as any).imdb_id || '';
+                                    resolvedType = (detail.name || detail.media_type === 'tv' || resolvedType === 'tv') ? 'tv' : 'movie';
+                                }
+                            }
+                            if (!detail) throw new Error(`Content ID ${contentId} not found`);
+
+                            const trailerUrl = extractTMDBTrailer(detail);
+                            const streamId = imdbId || (rawTmdbId ? String(rawTmdbId) : '');
+
+                            const resolved: Content = {
+                                id: `tmdb_${detail.id}`,
+                                title: detail.title || detail.name || 'Untitled',
+                                type: resolvedType,
+                                imdbId: imdbId || undefined,
+                                genres: mapTMDBGenres(detail.genres?.map((g: any) => g.id) || []),
+                                poster_path: detail.poster_path ? tmdbPosterUrl(detail.poster_path) : '',
+                                backdrop_path: detail.backdrop_path ? tmdbBackdropUrl(detail.backdrop_path) : '',
+                                overview: detail.overview || '',
+                                year: (detail.release_date || detail.first_air_date) ? parseInt((detail.release_date || detail.first_air_date)!.split('-')[0]) : new Date().getFullYear(),
+                                rating: detail.vote_average || 0,
+                                vote_average: detail.vote_average || 0,
+                                trailerUrl: trailerUrl ? `https://www.youtube.com/watch?v=${trailerUrl}` : undefined,
+                                youtubeId: trailerUrl || '',
+                                videoUrl: buildEmbedUrl(streamId, resolvedType, settings),
+                                tmdbId: detail.id,
+                                totalSeasons: detail.number_of_seasons,
+                                totalEpisodes: detail.number_of_episodes,
+                                allowPlayback: true,
+                                isPublished: true,
+                                createdAt: new Date().toISOString()
+                            };
+                            setPlayingContent({ ...resolved, playMode: mode });
+                            if (mode === 'movie') {
+                                incrementViews(resolved.id).catch(() => {});
+                            }
+                        };
+                        fetchResolved().catch(() => {
+                            if (!playingContent) {
+                                const from = (location.state as any)?.from || lastNonModalUrlRef.current;
+                                navigate(from || '/', { replace: true });
+                            }
+                        });
+                        return;
                     } else {
                         // Optional: Handle episodes correctly if deep linking directly to episode ID
                         // For now, if ID not in main content list, redirect
@@ -290,8 +359,10 @@ const MainLayout = () => {
                         return;
                     }
                 } else {
-                    const from = (location.state as any)?.from || lastNonModalUrlRef.current;
-                    navigate(from || '/', { replace: true });
+                    if (!playingContent) {
+                        const from = (location.state as any)?.from || lastNonModalUrlRef.current;
+                        navigate(from || '/', { replace: true });
+                    }
                 }
             }
         } else {
@@ -301,6 +372,23 @@ const MainLayout = () => {
         }
 
     }, [location.pathname, location.search, content, rawContent, navigate, viewingContent, playingContent, isLoading, isAuthenticated, currentProfile]);
+
+    // Ensure URL is explicitly /watch/:id whenever content is playing (never stays on localhost:3000)
+    useEffect(() => {
+        if (playingContent) {
+            const targetWatchPath = `/watch/${playingContent.id}`;
+            if (!location.pathname.startsWith(targetWatchPath)) {
+                navigate(`${targetWatchPath}?mode=${playingContent.playMode || 'movie'}`, {
+                    replace: true,
+                    state: {
+                        item: playingContent,
+                        from: lastNonModalUrlRef.current,
+                        fromTab: lastActiveTabRef.current
+                    }
+                });
+            }
+        }
+    }, [playingContent, location.pathname, navigate]);
 
     // Redirect legacy /home and /features to main website link /
     useEffect(() => {
@@ -410,16 +498,22 @@ const MainLayout = () => {
         return [];
     }, [currentProfile?.favoriteGenres, currentUser?.favoriteGenres]);
 
-    // Personalized Recommendations for Home Tab
+    // Home Page Suggestions Scope: ONLY Indian movies, Indian TV shows, and Marvel movies
+    const homeFilteredContent = useMemo(() => {
+        if (!content) return [];
+        return content.filter(isIndianOrMarvelContent);
+    }, [content]);
+
+    // Personalized Recommendations for Home Tab (Exclusively Indian & Marvel)
     const homePersonalized = useMemo(() => {
         return getPersonalizedRecommendations({
-            allContent: content,
+            allContent: homeFilteredContent,
             watchHistory: combinedWatchHistory,
             favoriteGenres: userFavoriteGenres,
             currentProfile,
             limit: 20
         });
-    }, [content, combinedWatchHistory, userFavoriteGenres, currentProfile]);
+    }, [homeFilteredContent, combinedWatchHistory, userFavoriteGenres, currentProfile]);
 
     // Personalized Recommendations for Movies Tab
     const moviePersonalized = useMemo(() => {
@@ -445,29 +539,29 @@ const MainLayout = () => {
         });
     }, [content, combinedWatchHistory, userFavoriteGenres, currentProfile]);
 
-    // "Because You Watched [Title]" Section
+    // "Because You Watched [Title]" Section (Exclusively Indian & Marvel on Home Tab)
     const becauseYouWatched = useMemo(() => {
         return getBecauseYouWatchedSection({
             watchHistory: combinedWatchHistory,
-            allContent: content,
+            allContent: homeFilteredContent,
             limit: 15
         });
-    }, [combinedWatchHistory, content]);
+    }, [combinedWatchHistory, homeFilteredContent]);
 
-    // Curated Rails for User's Explicit Favorite Genres
+    // Curated Rails for User's Explicit Favorite Genres (Exclusively Indian & Marvel on Home Tab)
     const favoriteGenreRails = useMemo(() => {
         if (!userFavoriteGenres || userFavoriteGenres.length === 0) return [];
         const watchedIds = new Set(combinedWatchHistory.map(w => w.movieId));
         return userFavoriteGenres.slice(0, 2).map(genre => {
             const items = getTopPicksForGenre({
                 genre,
-                allContent: content,
+                allContent: homeFilteredContent,
                 watchedIds,
                 limit: 15
             });
             return { genre, items };
         }).filter(r => r.items.length > 0);
-    }, [userFavoriteGenres, combinedWatchHistory, content]);
+    }, [userFavoriteGenres, combinedWatchHistory, homeFilteredContent]);
 
     // State for random heroes (refreshes on tab change)
     const [randomHeroes, setRandomHeroes] = useState<{ movie: any; tv: any }>({
@@ -534,10 +628,13 @@ const MainLayout = () => {
         const fromTab = (location.state as any)?.fromTab || activeTab;
 
         if (mode === 'trailer') {
-            setPlayingContent({ ...item, playMode: 'trailer' });
-            navigate(`/watch/${item.id}?mode=trailer`, {
+            const targetId = item.id || (item.tmdbId ? `tmdb_${item.tmdbId}` : (item.imdbId ? `imdb_${item.imdbId}` : 'trailer'));
+            const fullItem = { ...item, id: targetId, playMode: 'trailer' as const };
+            setViewingContent(null);
+            setPlayingContent(fullItem);
+            navigate(`/watch/${targetId}?mode=trailer`, {
                 state: {
-                    item,
+                    item: fullItem,
                     from: fromUrl,
                     fromTab: fromTab
                 }
@@ -559,24 +656,20 @@ const MainLayout = () => {
 
         const effectiveStreamId = imdbId || tmdbNumId;
 
+        let playableItem = { ...item };
         if (isEmbed && (effectiveStreamId || item.videoUrl)) {
             const existingType = item.videoUrl ? parseEmbedContentType(item.videoUrl) : null;
             const streamUrl = effectiveStreamId ? buildEmbedUrl(effectiveStreamId, existingType || item.type || 'movie', settings) : item.videoUrl;
             if (streamUrl) {
-                incrementViews(item.id).catch(() => {});
-                addToWatchHistory(item).catch(() => {});
-                setTimeout(() => {
-                    window.location.href = streamUrl;
-                }, 100);
-                return;
+                playableItem.videoUrl = streamUrl;
             }
         }
 
         // ── Guard: block internal player if no playable source exists ──────────
         const hasAnyPlayableSource = !!(
-            item.videoUrl ||
-            item.movieDriveId ||
-            item.movieYoutubeId ||
+            playableItem.videoUrl ||
+            playableItem.movieDriveId ||
+            playableItem.movieYoutubeId ||
             imdbId ||
             tmdbNumId
         );
@@ -610,10 +703,13 @@ const MainLayout = () => {
         // ── End guard ──────────────────────────────────────────────────────────
 
         if (isAuthenticated && currentUser) {
-            setPlayingContent({ ...item, playMode: 'movie' });
-            navigate(`/watch/${item.id}?mode=movie`, {
+            const targetId = playableItem.id || (playableItem.tmdbId ? `tmdb_${playableItem.tmdbId}` : (playableItem.imdbId ? `imdb_${playableItem.imdbId}` : 'player'));
+            const fullItem = { ...playableItem, id: targetId, playMode: 'movie' as const };
+            setViewingContent(null);
+            setPlayingContent(fullItem);
+            navigate(`/watch/${targetId}?mode=movie`, {
                 state: {
-                    item,
+                    item: fullItem,
                     from: fromUrl,
                     fromTab: fromTab
                 }
@@ -635,32 +731,31 @@ const MainLayout = () => {
                 fromTab: fromTab
             }
         });
-        window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
     };
 
     const handleCloseDetails = () => {
         setViewingContent(null);
         const from = (location.state as any)?.from || lastNonModalUrlRef.current;
-        if (from) {
-            navigate(from);
-        } else if (window.history.state && window.history.state.idx > 0) {
+        if (window.history.state && window.history.state.idx > 0) {
             navigate(-1);
+        } else if (from) {
+            navigate(from, { replace: true });
         } else {
             const path = activeTab === 'home' ? '/' : `/${activeTab}`;
-            navigate(path);
+            navigate(path, { replace: true });
         }
     };
 
     const handleClosePlayer = () => {
         setPlayingContent(null);
         const from = (location.state as any)?.from || lastNonModalUrlRef.current;
-        if (from) {
-            navigate(from);
-        } else if (window.history.state && window.history.state.idx > 0) {
+        if (window.history.state && window.history.state.idx > 0) {
             navigate(-1);
+        } else if (from) {
+            navigate(from, { replace: true });
         } else {
             const path = activeTab === 'home' ? '/' : `/${activeTab}`;
-            navigate(path);
+            navigate(path, { replace: true });
         }
     };
 
@@ -671,8 +766,11 @@ const MainLayout = () => {
         }
         // Navigate to the target URL (Home uses main website link '/')
         const targetPath = tabId === 'home' ? '/' : `/${tabId}`;
-        navigate(targetPath);
-        window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+        if (location.pathname === targetPath) {
+            window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+        } else {
+            navigate(targetPath);
+        }
     };
 
     const handleNavigate = (page: string) => {
@@ -681,14 +779,12 @@ const MainLayout = () => {
                 navigate('/login');
             } else {
                 navigate('/account');
-                window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
             }
             return;
         }
 
         if (page === 'adblocker' || page === 'adblockers' || page === 'Adblocker' || page === 'Adblockers') {
             navigate('/adblocker');
-            window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
             return;
         }
 
@@ -696,7 +792,6 @@ const MainLayout = () => {
         const existingPage = pages.find(p => p.id === page);
         if (existingPage) {
             navigate(`/${page}`);
-            window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
             return;
         }
 
@@ -711,7 +806,6 @@ const MainLayout = () => {
             if (page === 'Categories' || page === 'Category') target = 'categories';
 
             navigate(`/${target}`);
-            window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
             return;
         }
 
@@ -728,9 +822,6 @@ const MainLayout = () => {
         if (prevActiveTabRef.current !== activeTab) {
             prevActiveTabRef.current = activeTab;
             setCurrentPage(1); // Reset on actual tab change
-            if (!isModalRoute) {
-                window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
-            }
         }
     }, [activeTab, animeCategory, isModalRoute]);
 
@@ -740,6 +831,8 @@ const MainLayout = () => {
 
     // Helper to render sections for a given scope
     const renderSections = (scope: 'home' | 'tv' | 'movie') => {
+        const scopeContent = scope === 'home' ? homeFilteredContent : (scope === 'movie' ? movies : (scope === 'tv' ? tvShows : content));
+
         const scopeSections = sections
             .filter(s => s.enabled && s.scopes?.includes(scope))
             .sort((a, b) => a.order - b.order);
@@ -754,20 +847,20 @@ const MainLayout = () => {
                         ? moviePersonalized.recommendations
                         : (scope === 'tv' ? tvPersonalized.recommendations : homePersonalized.recommendations);
                 } else if (section.type === 'trending') {
-                    autoItems = content.filter(c => c.featured || (c.vote_average && c.vote_average > 7.5)).slice(0, 20);
+                    autoItems = scopeContent.filter(c => c.featured || (c.vote_average && c.vote_average > 7.5)).slice(0, 20);
                 } else if (section.type === 'genre' && section.genreFilter) {
-                    autoItems = content.filter(c => c.genres?.includes(section.genreFilter!)).slice(0, 20);
+                    autoItems = scopeContent.filter(c => c.genres?.includes(section.genreFilter!)).slice(0, 20);
                 } else if (section.type === 'originals') {
-                    autoItems = content.filter(c => c.isOriginal).slice(0, 20);
+                    autoItems = scopeContent.filter(c => c.isOriginal).slice(0, 20);
                 } else if (section.type === 'new_movies') {
-                    autoItems = content.filter(c => c.type === 'movie').slice(0, 20);
+                    autoItems = scopeContent.filter(c => c.type === 'movie').slice(0, 20);
                 } else if (section.type === 'new_tv') {
-                    autoItems = content.filter(c => c.type === 'tv').slice(0, 20);
+                    autoItems = scopeContent.filter(c => c.type === 'tv').slice(0, 20);
                 } else if (section.type === 'tag' && section.tagFilter) {
-                    autoItems = content.filter(c => c.tags?.includes(section.tagFilter!) || c.genres?.includes(section.tagFilter!)).slice(0, 20);
+                    autoItems = scopeContent.filter(c => c.tags?.includes(section.tagFilter!) || c.genres?.includes(section.tagFilter!)).slice(0, 20);
                 } else if (section.type === 'my_list') {
                     if (currentProfile?.myList) {
-                        autoItems = content.filter(c => currentProfile.myList.includes(c.id));
+                        autoItems = scopeContent.filter(c => currentProfile.myList.includes(c.id));
                     }
                 }
 
@@ -780,7 +873,10 @@ const MainLayout = () => {
                 }
 
                 // Manual items
-                const manualItems = (section.contentIds || []).map(id => content.find(c => c.id === id)).filter(Boolean) as Content[];
+                let manualItems = (section.contentIds || []).map(id => content.find(c => c.id === id)).filter(Boolean) as Content[];
+                if (scope === 'home') {
+                    manualItems = manualItems.filter(isIndianOrMarvelContent);
+                }
 
                 // Merge: Manual first, then Auto. Deduplicate.
                 const items = [...manualItems, ...autoItems].filter((item, index, self) =>
@@ -803,7 +899,7 @@ const MainLayout = () => {
         }
 
         // --- Automatic Fallback Sections ---
-        const filteredContent = scope === 'movie' ? movies : (scope === 'tv' ? tvShows : content);
+        const filteredContent = scope === 'home' ? homeFilteredContent : (scope === 'movie' ? movies : (scope === 'tv' ? tvShows : content));
 
         if (filteredContent.length === 0) return null;
 
@@ -869,15 +965,19 @@ const MainLayout = () => {
         }
 
         if (activeTab === 'home') {
-            // Fallback single item while TMDB carousel loads
-            const fallbackHero = (settings?.heroContentId && content.find(c => c.id === settings.heroContentId))
-                || (trending.length > 0 ? trending[0] : (content.length > 0 ? content[0] : null));
+            // Home Hero items filtered strictly to Indian movies, Indian TV shows, and Marvel movies
+            const homeHeroItems = heroItems.filter(isIndianOrMarvelContent);
+            const fallbackHero = (settings?.heroContentId && content.find(c => c.id === settings.heroContentId && isIndianOrMarvelContent(c)))
+                || (homeHeroItems.length > 0 ? homeHeroItems[0] : (homeFilteredContent.length > 0 ? homeFilteredContent[0] : null));
+
+            const homeContinueWatching = continueWatchingItems.filter(isIndianOrMarvelContent);
+            const homeUserAdded = userAddedContent.filter(isIndianOrMarvelContent);
 
             return (
                 <>
-                    {heroItems.length > 0 ? (
+                    {homeHeroItems.length > 0 ? (
                         <HeroBanner
-                            items={heroItems}
+                            items={homeHeroItems}
                             onPlay={(item) => handlePlay(item, 'movie')}
                             onDetails={handleDetails}
                         />
@@ -924,10 +1024,10 @@ const MainLayout = () => {
                         )}
 
                         {/* Continue Watching Rail (Watch History) */}
-                        {continueWatchingItems.length > 0 && (
+                        {homeContinueWatching.length > 0 && (
                             <ContentRail
                                 title="Continue Watching"
-                                items={continueWatchingItems}
+                                items={homeContinueWatching}
                                 onDetails={handleDetails}
                                 onPlay={handlePlay}
                             />
@@ -944,7 +1044,7 @@ const MainLayout = () => {
                                 subtitle={
                                     userFavoriteGenres.length > 0
                                         ? `Curated from your watch history & ${userFavoriteGenres.length} favourite ${userFavoriteGenres.length === 1 ? 'genre' : 'genres'}`
-                                        : (continueWatchingItems.length > 0
+                                        : (homeContinueWatching.length > 0
                                             ? 'Curated from your recent watch history'
                                             : 'Tailored suggestions based on trending and top-rated titles')
                                 }
@@ -985,10 +1085,10 @@ const MainLayout = () => {
                             />
                         ))}
 
-                        {userAddedContent.length > 0 && (
+                        {homeUserAdded.length > 0 && (
                             <ContentRail
                                 title="Recently Added by Users"
-                                items={userAddedContent}
+                                items={homeUserAdded}
                                 onDetails={handleDetails}
                                 onPlay={handlePlay}
                             />
@@ -1274,6 +1374,11 @@ const MainLayout = () => {
             return <AccountSettings setActiveTab={handleTabChange} />;
         }
 
+        // If currently playing content or viewing browse modal, do NOT redirect URL!
+        if (isModalRoute) {
+            return null;
+        }
+
         return <Navigate to="/" replace />;
     };
 
@@ -1345,9 +1450,22 @@ const AppRoutes = () => {
     const { currentUser, isLoading, isAuthenticated } = useStore();
     const navigate = useNavigate();
 
+    const isAlreadyLoggedIn = !isLoading && isAuthenticated && currentUser && !currentUser.isGuest;
+
     return (
         <Routes>
-            <Route path="/login" element={<LoginPage />} />
+            <Route
+                path="/login"
+                element={
+                    isLoading ? (
+                        <Loader />
+                    ) : isAlreadyLoggedIn ? (
+                        <Navigate to="/" replace />
+                    ) : (
+                        <LoginPage />
+                    )
+                }
+            />
             <Route path="/scan" element={<MobileScannerPage />} />
             <Route path="/adblocker" element={<AdblockerGuidePage />} />
             <Route path="/adblockers" element={<Navigate to="/adblocker" replace />} />

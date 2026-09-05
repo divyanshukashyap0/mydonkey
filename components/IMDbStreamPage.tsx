@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Play, AlertCircle, Film, Loader2 } from 'lucide-react';
-import { findByIMDbId, tmdbPosterUrl, tmdbBackdropUrl, mapTMDBGenres, TMDBDetail } from '../services/tmdbService';
+import { findByIMDbId, fetchTMDBDetails, tmdbPosterUrl, tmdbBackdropUrl, mapTMDBGenres, TMDBDetail } from '../services/tmdbService';
 import { Content } from '../types';
 import { useStore } from '../context/StoreContext';
 import { buildEmbedUrl } from '../utils/embedUrl';
@@ -11,7 +11,7 @@ const IMDbStreamPage: React.FC = () => {
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
-    const [result, setResult] = useState<{ detail: TMDBDetail, rawId: string } | null>(null);
+    const [result, setResult] = useState<{ detail: TMDBDetail, rawId: string, customUrl?: string } | null>(null);
     const navigate = useNavigate();
 
     const handleSearch = async (e: React.FormEvent) => {
@@ -24,19 +24,55 @@ const IMDbStreamPage: React.FC = () => {
         setResult(null);
 
         try {
-            // Extract ttXXXXXXX from URL or input
-            const match = query.match(/(tt\d+)/);
-            if (!match) {
-                throw new Error("Invalid IMDb ID or URL. Please provide a link containing 'tt' followed by numbers.");
+            // Case 1: External embed link (e.g., https://proxy.garageband.rocks/embed/movie/597089)
+            const embedMatch = query.match(/(?:embed|v)\/(movie|tv)\/(\d+)/i);
+            if (embedMatch) {
+                const type = embedMatch[1].toLowerCase() as 'movie' | 'tv';
+                const id = Number(embedMatch[2]);
+                const detail = await fetchTMDBDetails(id, type);
+                if (!detail) throw new Error(`Could not find details for ${type} ID ${id}`);
+                setResult({ detail, rawId: String(id), customUrl: query });
+                return;
             }
-            const imdbId = match[1];
 
-            const detail = await findByIMDbId(imdbId);
-            if (!detail) {
-                throw new Error("Could not find a movie or TV show matching this IMDb ID on TMDB.");
+            // Case 2: IMDb ID or URL (e.g., tt0371746 or https://www.imdb.com/title/tt0371746/)
+            const imdbMatch = query.match(/(tt\d+)/i);
+            if (imdbMatch) {
+                const imdbId = imdbMatch[1].toLowerCase();
+                const detail = await findByIMDbId(imdbId);
+                if (!detail) {
+                    throw new Error("Could not find a movie or TV show matching this IMDb ID on TMDB.");
+                }
+                setResult({ detail, rawId: imdbId });
+                return;
             }
 
-            setResult({ detail, rawId: imdbId });
+            // Case 3: TMDB ID or tmdb_XXXX prefix
+            const tmdbMatch = query.match(/^(?:tmdb[_-])?(\d+)$/i);
+            if (tmdbMatch) {
+                const id = Number(tmdbMatch[1]);
+                try {
+                    const detail = await fetchTMDBDetails(id, 'movie');
+                    if (detail && (detail.title || detail.id)) {
+                        setResult({ detail, rawId: String(id) });
+                        return;
+                    }
+                } catch {
+                    // Try TV
+                }
+
+                try {
+                    const detail = await fetchTMDBDetails(id, 'tv');
+                    if (detail && (detail.name || detail.id)) {
+                        setResult({ detail, rawId: String(id) });
+                        return;
+                    }
+                } catch {
+                    // fall through
+                }
+            }
+
+            throw new Error("Invalid link or ID. Please enter an IMDb URL/ID (e.g. tt0371746), TMDB ID, or streaming embed URL.");
         } catch (err: any) {
             setError(err.message || "An error occurred while searching.");
         } finally {
@@ -46,17 +82,18 @@ const IMDbStreamPage: React.FC = () => {
 
     const handleWatchNow = () => {
         if (!result) return;
-        const { detail, rawId } = result;
+        const { detail, rawId, customUrl } = result;
 
         const isTv = !!detail.name;
-        const streamUrl = buildEmbedUrl(rawId, isTv ? 'tv' : 'movie', settings);
+        const streamUrl = customUrl || buildEmbedUrl(rawId, isTv ? 'tv' : 'movie', settings);
         
         // Construct the mock Content object
         const mockItem: Content = {
-            id: `imdb_${rawId}`,
-            title: detail.title || detail.name || 'IMDb Stream',
+            id: rawId.startsWith('tt') ? `imdb_${rawId}` : `tmdb_${detail.id}`,
+            title: detail.title || detail.name || 'Stream',
             type: isTv ? 'tv' : 'movie',
-            imdbId: rawId,
+            imdbId: detail.imdb_id || (rawId.startsWith('tt') ? rawId : undefined),
+            tmdbId: detail.id,
             videoUrl: streamUrl,
             poster_path: detail.poster_path ? tmdbPosterUrl(detail.poster_path) : '',
             backdrop_path: detail.backdrop_path ? tmdbBackdropUrl(detail.backdrop_path) : '',
@@ -70,9 +107,11 @@ const IMDbStreamPage: React.FC = () => {
         };
 
         addToWatchHistory(mockItem).catch(e => console.error("Error saving watch history:", e));
-        setTimeout(() => {
-            window.location.href = streamUrl;
-        }, 100);
+        
+        // Play directly on-site inside our embedded player
+        navigate(`/watch/${mockItem.id}?mode=${mockItem.type}`, {
+            state: { item: mockItem, from: '/imdb-stream' }
+        });
     };
 
     return (
@@ -82,10 +121,10 @@ const IMDbStreamPage: React.FC = () => {
             
             <div className="relative z-10 max-w-4xl mx-auto flex flex-col items-center">
                 <h1 className="text-4xl md:text-5xl font-black mb-4 text-center tracking-tight">
-                    Watch Any <span className="text-brand-red">IMDb</span> Title
+                    Watch Any <span className="text-brand-red">Title or Link</span>
                 </h1>
                 <p className="text-gray-400 text-center mb-10 max-w-xl text-lg">
-                    Paste an IMDb URL or ID to instantly stream your favorite movie or TV show in high quality.
+                    Paste an IMDb URL, TMDB ID, or streaming embed link to play directly inside our custom player.
                 </p>
 
                 {/* Search Bar */}
@@ -94,7 +133,7 @@ const IMDbStreamPage: React.FC = () => {
                         <Search className="absolute left-6 text-gray-400" size={24} />
                         <input
                             type="text"
-                            placeholder="e.g. https://www.imdb.com/title/tt0371746/"
+                            placeholder="IMDb link (tt...), TMDB ID, or stream link..."
                             className="w-full bg-transparent text-white text-lg px-16 py-4 outline-none placeholder:text-gray-600"
                             value={inputValue}
                             onChange={(e) => setInputValue(e.target.value)}

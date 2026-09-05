@@ -363,9 +363,8 @@ export const TMDB_CATEGORY_MAPPING: Record<string, { movieGenreId?: number; tvGe
 export const INDIAN_LANGUAGES = ['hi', 'ta', 'te', 'ml', 'kn', 'pa', 'bn', 'mr', 'gu'];
 
 // ── Curated Hero Carousel ─────────────────────────────────────────────────────
-// Company IDs: Marvel=420,7505  DC=429,9993,128064
+// Company IDs: Marvel=420,7505
 const MARVEL_COMPANY_IDS = '420,7505';
-const DC_COMPANY_IDS = '429,9993,128064';
 const MIN_HERO_RATING = 7.5;
 const MIN_VOTE_COUNT = 100;
 
@@ -404,11 +403,29 @@ async function fetchIndianMovies(language: string, page = 1): Promise<TMDBSearch
     }
 }
 
+async function fetchIndianTVShows(language: string, page = 1): Promise<TMDBSearchResult[]> {
+    try {
+        const data = await callTMDB('/discover/tv', {
+            sort_by: 'vote_average.desc',
+            'vote_average.gte': MIN_HERO_RATING,
+            'vote_count.gte': 20,
+            with_origin_country: 'IN',
+            with_original_language: language,
+            language: 'en-US',
+            page,
+        });
+        return ((data.results || []) as any[]).map(r => ({ ...r, media_type: 'tv' }));
+    } catch (e) {
+        console.error('fetchIndianTVShows error', e);
+        return [];
+    }
+}
+
 /**
  * Fetches a curated list of hero banner items:
- * - Indian cinema (top-rated IN origin, honoring preferredLanguage if provided)
- * - Marvel Cinematic content
- * - DC Cinematic content
+ * - Indian movies (top-rated IN origin, honoring preferredLanguage if provided)
+ * - Indian TV shows / web series (top-rated IN origin)
+ * - Marvel Cinematic content (Marvel Studios / Entertainment)
  * All items have vote_average >= 7.5.
  * Results are shuffled with preferred-language content surfaced first.
  */
@@ -420,14 +437,16 @@ export async function fetchCuratedHeroContent(preferredLanguage?: string): Promi
 
     const [
         marvelItems,
-        dcItems,
-        indianPreferred,
+        indianMovies,
         indianHindi,
+        indianTvShows,
+        indianTvHindi,
     ] = await Promise.all([
         fetchUniverseMovies(MARVEL_COMPANY_IDS, rndPage()),
-        fetchUniverseMovies(DC_COMPANY_IDS, rndPage()),
         fetchIndianMovies(preferredLang, rndPage()),
         preferredLang !== 'hi' ? fetchIndianMovies('hi', rndPage()) : Promise.resolve([] as TMDBSearchResult[]),
+        fetchIndianTVShows(preferredLang, rndPage()),
+        preferredLang !== 'hi' ? fetchIndianTVShows('hi', rndPage()) : Promise.resolve([] as TMDBSearchResult[]),
     ]);
 
     // Full Fisher-Yates shuffle
@@ -447,9 +466,11 @@ export async function fetchCuratedHeroContent(preferredLanguage?: string): Promi
 
     // Shuffle each group independently so order is never predictable
     const ordered = [
-        ...dedup(shuffle(indianPreferred)),
+        ...dedup(shuffle(indianMovies)),
+        ...dedup(shuffle(indianTvShows)),
         ...dedup(shuffle(indianHindi)),
-        ...dedup(shuffle([...marvelItems, ...dcItems])),
+        ...dedup(shuffle(indianTvHindi)),
+        ...dedup(shuffle(marvelItems)),
     ];
 
     // Final full shuffle of the merged list for maximum variety

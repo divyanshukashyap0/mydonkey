@@ -492,4 +492,25 @@ h6 {
 @keyframes bounce-bar {
   0%, 100% { transform: scaleY(0.4); }
   50%       { transform: scaleY(1);   }
+}
+
+/* --- Fullscreen Video Player & Watermark Support --- */
+#video-player-root:fullscreen,
+#video-player-root:-webkit-full-screen,
+#video-player-root:-moz-full-screen,
+#video-player-root:-ms-fullscreen {
+  width: 100vw !important;
+  height: 100vh !important;
+  background-color: #000000 !important;
+  overflow: hidden !important;
+}
+
+#video-player-root:fullscreen .video-watermark,
+#video-player-root:-webkit-full-screen .video-watermark,
+#video-player-root:-moz-full-screen .video-watermark,
+#video-player-root:-ms-fullscreen .video-watermark {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 0.35 !important;
+  z-index: 99999 !important;
 }

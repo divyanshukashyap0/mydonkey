@@ -49,7 +49,6 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
 
     const handleNavClick = (id: string) => {
         setTab(id);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
         setMobileMenuOpen(false);
     };
 

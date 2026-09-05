@@ -43,6 +43,32 @@ export const MOCK_PLANS: UserPlan[] = [
 
 export const MOCK_CONTENT: (ContentItem & { rank?: number })[] = [
   {
+    id: 'tmdb_597089',
+    title: 'Article 15',
+    overview: 'In the rural heartland of India, an upright city-bred police officer embarks on a crusade against violent social discrimination and caste atrocities.',
+    poster_path: 'https://image.tmdb.org/t/p/w500/hx0J2j51B5dGekBq2mZ82jN5T4T.jpg',
+    backdrop_path: 'https://image.tmdb.org/t/p/w1280/1st4iR7q26B2pEmsPZz5q0V7u3s.jpg',
+    type: ContentType.MOVIE,
+    rating: 'U/A 16+',
+    year: 2019,
+    duration: '2h 10m',
+    tags: ['Crime', 'Drama', 'Thriller'],
+    genres: ['Crime', 'Drama', 'Thriller'],
+    country: 'India',
+    language: 'hi',
+    origin_country: ['IN'],
+    original_language: 'hi',
+    tmdbId: 597089,
+    imdbId: 'tt10324144',
+    videoUrl: 'https://proxy.garageband.rocks/embed/movie/597089',
+    vote_average: 7.8,
+    release_date: '2019-06-28',
+    cast: ['Ayushmann Khurrana', 'Nassar', 'Manoj Pahwa', 'Kumud Mishra'],
+    isPublished: true,
+    allowPlayback: true,
+    createdAt: new Date().toISOString()
+  },
+  {
     id: '1',
     title: 'Echoes of Mumbai',
     overview: 'A gritty underworld drama set in the heart of the city.',

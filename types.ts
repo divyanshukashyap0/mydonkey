@@ -44,6 +44,10 @@ export interface Content {
   creators?: string[]; // Multiple creators/showrunners for TV
   reviews?: { userId: string; rating: number; comment: string; date: string }[];
   downloadLinks?: DownloadLink[];
+  country?: string;
+  language?: string;
+  origin_country?: string[] | string;
+  original_language?: string;
   addedBy?: { userId: string; name: string; email: string; addedAt: string }; // User attribution
 }
 
