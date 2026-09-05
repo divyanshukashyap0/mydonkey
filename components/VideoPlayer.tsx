@@ -222,6 +222,27 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         };
     }, [isMobile]);
 
+    // Lock document & window scroll during video playback so no scrollbar appears on the side
+    useEffect(() => {
+        const originalBodyOverflow = document.body.style.overflow;
+        const originalHtmlOverflow = document.documentElement.style.overflow;
+
+        document.body.classList.add('video-player-active');
+        document.documentElement.classList.add('video-player-active');
+        document.body.style.overflow = 'hidden';
+        document.documentElement.style.overflow = 'hidden';
+
+        return () => {
+            if (document.fullscreenElement && document.exitFullscreen) {
+                document.exitFullscreen().catch(() => {});
+            }
+            document.body.classList.remove('video-player-active');
+            document.documentElement.classList.remove('video-player-active');
+            document.body.style.overflow = originalBodyOverflow;
+            document.documentElement.style.overflow = originalHtmlOverflow;
+        };
+    }, []);
+
     // Data Usage Warning
     useEffect(() => {
         if (!currentUser?.lowDataMode && !isDriveVideo) {
@@ -858,6 +879,17 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         };
     }, []);
 
+    // Escape Key Listener to exit player
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && !document.fullscreenElement) {
+                onClose();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onClose]);
+
     // Gesture State
     const lastTapRef = useRef<{ time: number, x: number } | null>(null);
     const [rippleSides, setRippleSides] = useState<('left' | 'right')[]>([]);
@@ -1038,7 +1070,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         <div
             id="video-player-root"
             ref={playerContainerRef}
-            className={`fixed inset-0 z-[100] bg-black flex flex-col font-sans select-none ${isMobile && isPortrait ? 'overflow-y-auto' : 'justify-center items-center overflow-hidden'} ${!showControls && !(isMobile && isPortrait) ? 'cursor-none' : ''}`}
+            className={`fixed inset-0 z-[100] bg-black flex flex-col font-sans select-none no-scrollbar ${isMobile && isPortrait ? 'overflow-y-auto' : 'justify-center items-center overflow-hidden'} ${!showControls && !(isMobile && isPortrait) ? 'cursor-none' : ''}`}
         >
             {/* 1. STABLE VIDEO CONTAINER (Root level, never unmounts) */}
             <div className={`${isMobile && isPortrait ? 'relative w-full aspect-video' : 'absolute inset-0 z-0'} bg-black overflow-hidden`}>
@@ -1142,7 +1174,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 <>
                     {/* Top bar */}
                     <div className={`absolute top-0 left-0 right-0 flex items-center gap-3 px-3 py-3 z-10 bg-[#0f0f0f]/80 backdrop-blur-md transition-opacity duration-300 ${showControls ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
-                        <button onClick={onClose} className="text-white p-1.5 rounded-full hover:bg-white/10 transition active:scale-90">
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onClose();
+                            }}
+                            className="text-white p-1.5 rounded-full hover:bg-white/10 transition active:scale-90 cursor-pointer"
+                            title="Go Back to Previous Page"
+                            aria-label="Previous page"
+                        >
                             <ArrowLeft size={22} />
                         </button>
                         <span className="text-white font-bold text-sm flex-1 truncate">{content.title}</span>
@@ -1214,8 +1254,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                     <RefreshCw size={18} /> RETRY
                                 </button>
                                 <button
-                                    onClick={onClose}
-                                    className="bg-white/5 border border-white/10 text-white px-8 py-3 rounded-xl font-bold hover:bg-white/10 transition-all"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onClose();
+                                    }}
+                                    className="bg-white/5 border border-white/10 text-white px-8 py-3 rounded-xl font-bold hover:bg-white/10 transition-all cursor-pointer"
                                 >
                                     GO BACK
                                 </button>
@@ -1260,7 +1303,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 >
                     <div className="bg-black/50 backdrop-blur-xl border border-white/15 inline-flex items-center gap-2 md:gap-3 px-2 py-2 md:px-3 md:py-2.5 rounded-2xl pointer-events-auto hover:bg-black/80 transition-all shadow-2xl ring-1 ring-white/10 group/header">
                         <button
-                            onClick={onClose}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onClose();
+                            }}
                             className="text-white hover:text-brand-red transition-all p-2 md:p-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-90 flex items-center justify-center cursor-pointer"
                             title="Go Back to Previous Page"
                             aria-label="Previous page"

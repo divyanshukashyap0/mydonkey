@@ -121,8 +121,35 @@ const MainLayout = () => {
         }
     }, [location.pathname, currentUser]);
 
+    // Lock document scroll when watching video to eliminate browser sidebar scrollbar
+    useEffect(() => {
+        const isWatchRoute = location.pathname.startsWith('/watch/');
+        if (playingContent && isWatchRoute) {
+            document.body.classList.add('video-player-active');
+            document.documentElement.classList.add('video-player-active');
+            document.body.style.overflow = 'hidden';
+            document.documentElement.style.overflow = 'hidden';
+        } else {
+            document.body.classList.remove('video-player-active');
+            document.documentElement.classList.remove('video-player-active');
+            document.body.style.overflow = '';
+            document.documentElement.style.overflow = '';
+        }
+
+        return () => {
+            if (!playingContent || !location.pathname.startsWith('/watch/')) {
+                document.body.classList.remove('video-player-active');
+                document.documentElement.classList.remove('video-player-active');
+                document.body.style.overflow = '';
+                document.documentElement.style.overflow = '';
+            }
+        };
+    }, [playingContent, location.pathname]);
+
     // Deep Link Handler (e.g. /browse/content_123 or /watch/content_123)
     useEffect(() => {
+        let isCancelled = false;
+
         if (location.pathname.startsWith('/browse/')) {
             const contentId = location.pathname.split('/')[2];
             const stateItem = (location.state as any)?.item;
@@ -136,6 +163,7 @@ const MainLayout = () => {
                             navigate('/exclusive', { replace: true });
                             return;
                         }
+                        if (isCancelled || !window.location.pathname.startsWith('/browse/')) return;
                         setViewingContent(item);
                     } else if (contentId.startsWith('tmdb_')) {
                         const rawId = parseInt(contentId.replace('tmdb_', ''));
@@ -180,10 +208,12 @@ const MainLayout = () => {
                                     allowPlayback: true,
                                     isPublished: true
                                 };
+                                if (isCancelled || !window.location.pathname.startsWith('/browse/')) return;
                                 setViewingContent(resolved);
                             };
 
                             fetchResolved().catch(() => {
+                                if (isCancelled || !window.location.pathname.startsWith('/browse/')) return;
                                 const from = (location.state as any)?.from || lastNonModalUrlRef.current;
                                 navigate(from || '/', { replace: true });
                             });
@@ -276,6 +306,7 @@ const MainLayout = () => {
                             return;
                         }
                         if (!playingContent || playingContent.id !== playableItem.id || playingContent.playMode !== mode) {
+                            if (isCancelled || !window.location.pathname.startsWith('/watch/')) return;
                             setPlayingContent({ ...playableItem, playMode: mode });
                             // Increment views when main movie starts
                             if (mode === 'movie') {
@@ -336,12 +367,14 @@ const MainLayout = () => {
                                 isPublished: true,
                                 createdAt: new Date().toISOString()
                             };
+                            if (isCancelled || !window.location.pathname.startsWith('/watch/')) return;
                             setPlayingContent({ ...resolved, playMode: mode });
                             if (mode === 'movie') {
                                 incrementViews(resolved.id).catch(() => {});
                             }
                         };
                         fetchResolved().catch(() => {
+                            if (isCancelled || !window.location.pathname.startsWith('/watch/')) return;
                             if (!playingContent) {
                                 const from = (location.state as any)?.from || lastNonModalUrlRef.current;
                                 navigate(from || '/', { replace: true });
@@ -371,11 +404,40 @@ const MainLayout = () => {
             }
         }
 
+        return () => {
+            isCancelled = true;
+        };
     }, [location.pathname, location.search, content, rawContent, navigate, viewingContent, playingContent, isLoading, isAuthenticated, currentProfile]);
+
+    // Synchronously clean up player and modals when navigating away from their routes or on browser back/forward
+    useEffect(() => {
+        const handleRouteExit = () => {
+            if (!location.pathname.startsWith('/watch/')) {
+                setPlayingContent(null);
+                if (document.fullscreenElement && document.exitFullscreen) {
+                    document.exitFullscreen().catch(() => {});
+                }
+                document.body.classList.remove('video-player-active');
+                document.documentElement.classList.remove('video-player-active');
+                document.body.style.overflow = '';
+                document.documentElement.style.overflow = '';
+            }
+            if (!location.pathname.startsWith('/browse/')) {
+                setViewingContent(null);
+            }
+        };
+
+        window.addEventListener('popstate', handleRouteExit);
+        handleRouteExit();
+
+        return () => {
+            window.removeEventListener('popstate', handleRouteExit);
+        };
+    }, [location.pathname]);
 
     // Ensure URL is explicitly /watch/:id whenever content is playing (never stays on localhost:3000)
     useEffect(() => {
-        if (playingContent) {
+        if (playingContent && location.pathname.startsWith('/watch/')) {
             const targetWatchPath = `/watch/${playingContent.id}`;
             if (!location.pathname.startsWith(targetWatchPath)) {
                 navigate(`${targetWatchPath}?mode=${playingContent.playMode || 'movie'}`, {
@@ -630,9 +692,11 @@ const MainLayout = () => {
         if (mode === 'trailer') {
             const targetId = item.id || (item.tmdbId ? `tmdb_${item.tmdbId}` : (item.imdbId ? `imdb_${item.imdbId}` : 'trailer'));
             const fullItem = { ...item, id: targetId, playMode: 'trailer' as const };
+            const isFromBrowse = location.pathname.startsWith('/browse/');
             setViewingContent(null);
             setPlayingContent(fullItem);
             navigate(`/watch/${targetId}?mode=trailer`, {
+                replace: isFromBrowse,
                 state: {
                     item: fullItem,
                     from: fromUrl,
@@ -705,9 +769,11 @@ const MainLayout = () => {
         if (isAuthenticated && currentUser) {
             const targetId = playableItem.id || (playableItem.tmdbId ? `tmdb_${playableItem.tmdbId}` : (playableItem.imdbId ? `imdb_${playableItem.imdbId}` : 'player'));
             const fullItem = { ...playableItem, id: targetId, playMode: 'movie' as const };
+            const isFromBrowse = location.pathname.startsWith('/browse/');
             setViewingContent(null);
             setPlayingContent(fullItem);
             navigate(`/watch/${targetId}?mode=movie`, {
+                replace: isFromBrowse,
                 state: {
                     item: fullItem,
                     from: fromUrl,
@@ -735,27 +801,44 @@ const MainLayout = () => {
 
     const handleCloseDetails = () => {
         setViewingContent(null);
-        const from = (location.state as any)?.from || lastNonModalUrlRef.current;
+        let destination = (location.state as any)?.from || lastNonModalUrlRef.current;
+        if (!destination || destination.startsWith('/browse') || destination.startsWith('/watch')) {
+            destination = lastNonModalUrlRef.current;
+        }
+        if (!destination || destination.startsWith('/browse') || destination.startsWith('/watch')) {
+            const tab = lastActiveTabRef.current || activeTab;
+            destination = (!tab || tab === 'home') ? '/' : `/${tab}`;
+        }
         if (window.history.state && window.history.state.idx > 0) {
             navigate(-1);
-        } else if (from) {
-            navigate(from, { replace: true });
         } else {
-            const path = activeTab === 'home' ? '/' : `/${activeTab}`;
-            navigate(path, { replace: true });
+            navigate(destination, { replace: true });
         }
     };
 
     const handleClosePlayer = () => {
+        if (document.fullscreenElement && document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+        }
+        document.body.classList.remove('video-player-active');
+        document.documentElement.classList.remove('video-player-active');
+        document.body.style.overflow = '';
+        document.documentElement.style.overflow = '';
         setPlayingContent(null);
-        const from = (location.state as any)?.from || lastNonModalUrlRef.current;
+        setViewingContent(null);
+
+        let destination = (location.state as any)?.from || lastNonModalUrlRef.current;
+        if (!destination || destination.startsWith('/watch') || destination.startsWith('/browse')) {
+            destination = lastNonModalUrlRef.current;
+        }
+        if (!destination || destination.startsWith('/watch') || destination.startsWith('/browse')) {
+            const tab = lastActiveTabRef.current || activeTab;
+            destination = (!tab || tab === 'home') ? '/' : `/${tab}`;
+        }
         if (window.history.state && window.history.state.idx > 0) {
             navigate(-1);
-        } else if (from) {
-            navigate(from, { replace: true });
         } else {
-            const path = activeTab === 'home' ? '/' : `/${activeTab}`;
-            navigate(path, { replace: true });
+            navigate(destination, { replace: true });
         }
     };
 
@@ -1416,7 +1499,7 @@ const MainLayout = () => {
 
 
 
-            {viewingContent && (
+            {viewingContent && location.pathname.startsWith('/browse/') && (
                 <ContentDetails
                     content={viewingContent}
                     onClose={handleCloseDetails}
@@ -1425,7 +1508,7 @@ const MainLayout = () => {
                 />
             )}
 
-            {playingContent && (
+            {playingContent && location.pathname.startsWith('/watch/') && (
                 <VideoPlayer
                     content={playingContent}
                     onClose={handleClosePlayer}

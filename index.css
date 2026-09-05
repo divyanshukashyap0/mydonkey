@@ -513,4 +513,29 @@ h6 {
   visibility: visible !important;
   opacity: 0.35 !important;
   z-index: 99999 !important;
-}
+}
+
+/* --- Video Player Active Scroll Lock (removes sidebar/window scrollbar) --- */
+html.video-player-active,
+body.video-player-active {
+  overflow: hidden !important;
+  height: 100% !important;
+  max-height: 100vh !important;
+  overscroll-behavior: none !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+body.video-player-active #root {
+  height: 100% !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
+}
+
+body.video-player-active::-webkit-scrollbar,
+html.video-player-active::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
