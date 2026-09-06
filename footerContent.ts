@@ -52,7 +52,7 @@ export const footerContent: Record<string, InfoPageData> = {
             },
             {
                 heading: 'Deploy',
-                content: 'Send your manifesto and proof of work to careers@mydonkey.com. Impress us.'
+                content: 'Submit your portfolio and proof of work through our Support Desk. Impress us.'
             }
         ]
     },
@@ -67,7 +67,7 @@ export const footerContent: Record<string, InfoPageData> = {
             },
             {
                 heading: 'Contact IR',
-                content: 'Serious inquiries only. ir@mydonkey.com.'
+                content: 'Serious inquiries only. Submit an inquiry through our Support Desk.'
             }
         ]
     },
@@ -86,7 +86,7 @@ export const footerContent: Record<string, InfoPageData> = {
             },
             {
                 heading: 'Contact',
-                content: 'For exclusives, leaks, and interviews, hit up our war room at press@mydonkey.com.'
+                content: 'For exclusives, leaks, and interviews, hit up our war room via the Support Desk.'
             }
         ]
     },
@@ -114,11 +114,11 @@ export const footerContent: Record<string, InfoPageData> = {
         sections: [
             {
                 heading: 'Support Line',
-                content: 'Technical snafu? Account limbo? support@mydonkey.com. We respond faster than light.'
+                content: 'Technical snafu? Account limbo? Submit a ticket via our Support Desk. We respond faster than light.'
             },
             {
                 heading: 'Alliances',
-                content: 'Partnerships and licensing: business@mydonkey.com. Let\'s make money together.'
+                content: 'Partnerships and licensing: Submit a proposal via our Support Desk. Let\'s create something great.'
             },
             {
                 heading: 'HQ',
@@ -147,7 +147,7 @@ export const footerContent: Record<string, InfoPageData> = {
             },
             {
                 heading: 'Direct Line',
-                content: 'Still stuck? Our elite support squad is on standby 24/7. Email support@mydonkey.com and we will sort you out.'
+                content: 'Still stuck? Our elite support squad is on standby 24/7. Submit a ticket via our Support Desk and we will sort you out.'
             }
         ]
     },
@@ -218,7 +218,7 @@ export const footerContent: Record<string, InfoPageData> = {
             },
             {
                 heading: 'Comms',
-                content: 'Phone: +91 22 1234 5678\nEmail: corporate@mydonkey.com'
+                content: 'Support: Available 24/7 via the online Support Desk.'
             }
         ]
     },

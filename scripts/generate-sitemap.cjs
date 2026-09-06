@@ -221,6 +221,8 @@ async function generateSitemap() {
             { path: '/sound-enhancements', priority: '0.80', changefreq: 'weekly', title: 'Sound Enhancements & Audio Booster Guide | My Donkey' },
             { path: '/my-list',    priority: '0.75', changefreq: 'weekly',  title: 'My Watchlist — Save and Watch Free Movies Online' },
             { path: '/about',      priority: '0.70', changefreq: 'monthly', title: 'About My Donkey — Free Online Movie & Series Streaming Platform' },
+            { path: '/support',    priority: '0.85', changefreq: 'weekly',  title: 'Help & Support Hub — Guides, Tools & FAQs | My Donkey' },
+            { path: '/community-chat', priority: '0.85', changefreq: 'daily', title: 'Community Help Chat & Q&A Discussion Forum | My Donkey' },
             { path: '/help',       priority: '0.70', changefreq: 'monthly', title: 'Help & FAQ Center | My Donkey Streaming' },
             { path: '/contact',    priority: '0.70', changefreq: 'monthly', title: 'Contact Us | My Donkey' },
             { path: '/careers',    priority: '0.65', changefreq: 'monthly', title: 'Careers at My Donkey' },

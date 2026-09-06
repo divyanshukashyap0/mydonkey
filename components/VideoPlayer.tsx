@@ -858,15 +858,106 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         return () => clearInterval(heartbeat);
     }, [playing, currentUser?.uid, currentUser?.isGuest]);
 
+    // Comprehensive Mute & Volume Synchronizer (Native, HLS, YouTube, Google Drive, and Iframe Embeds)
     useEffect(() => {
-        if (isDriveVideo || isHls) return;
-        if (!playerRef.current?.setVolume) return;
-        if (isMuted) playerRef.current.mute();
-        else {
-            playerRef.current.unMute();
-            playerRef.current.setVolume(volume);
+        // 1. Synchronize Web Audio SoundBooster pipeline
+        soundBooster.setMuted(isMuted);
+
+        // 2. Direct MoviVideo / HLS player element
+        if (videoRef.current) {
+            try {
+                videoRef.current.muted = isMuted;
+                const effectiveVol = isMuted ? 0 : (volume / 100) * boostLevel;
+                videoRef.current.volume = effectiveVol;
+                if (videoRef.current.setBoost) {
+                    videoRef.current.setBoost(boostLevel);
+                }
+            } catch {}
         }
-    }, [volume, isMuted, isDriveVideo]);
+
+        // 3. YouTube Player API
+        if (playerRef.current) {
+            try {
+                if (isMuted) {
+                    playerRef.current.mute?.();
+                } else {
+                    playerRef.current.unMute?.();
+                    playerRef.current.setVolume?.(volume);
+                }
+            } catch {}
+        }
+
+        // 4. Synchronize all HTMLMediaElements in document
+        try {
+            document.querySelectorAll<HTMLMediaElement>('video, audio').forEach((el) => {
+                el.muted = isMuted;
+                if (isMuted) {
+                    el.volume = 0;
+                } else {
+                    el.volume = Math.min(1, Math.max(0, volume / 100));
+                }
+            });
+        } catch {}
+
+        // 5. Broadcast postMessage mute/unmute to all iframes (DrivePlayer, proxy.garageband.rocks, external embeds)
+        try {
+            const iframes = document.querySelectorAll<HTMLIFrameElement>('iframe');
+            iframes.forEach((iframe) => {
+                const win = iframe.contentWindow;
+                if (!win) return;
+
+                // YouTube & Google Drive style command
+                const ytCmd = {
+                    event: 'command',
+                    func: isMuted ? 'mute' : 'unMute',
+                    args: []
+                };
+                win.postMessage(ytCmd, '*');
+                win.postMessage(JSON.stringify(ytCmd), '*');
+
+                const ytVolCmd = {
+                    event: 'command',
+                    func: 'setVolume',
+                    args: [isMuted ? 0 : volume]
+                };
+                win.postMessage(ytVolCmd, '*');
+                win.postMessage(JSON.stringify(ytVolCmd), '*');
+
+                // HTML5 / Video.js / Plyr / JW Player style commands
+                const standardCommands = [
+                    { type: isMuted ? 'mute' : 'unmute' },
+                    { action: isMuted ? 'mute' : 'unmute' },
+                    { method: isMuted ? 'mute' : 'unmute' },
+                    { command: isMuted ? 'mute' : 'unmute' },
+                    { event: isMuted ? 'mute' : 'unmute' },
+                    { api: isMuted ? 'mute' : 'unmute' },
+                    { type: 'volumechange', volume: isMuted ? 0 : (volume / 100) },
+                    { action: 'setVolume', value: isMuted ? 0 : (volume / 100) },
+                    { command: 'setVolume', args: [isMuted ? 0 : (volume / 100)] }
+                ];
+
+                standardCommands.forEach((cmd) => {
+                    try {
+                        win.postMessage(cmd, '*');
+                        win.postMessage(JSON.stringify(cmd), '*');
+                    } catch {}
+                });
+
+                // Safe cross-origin / same-origin DOM access attempt
+                try {
+                    const innerDoc = iframe.contentDocument || iframe.contentWindow?.document;
+                    if (innerDoc) {
+                        innerDoc.querySelectorAll<HTMLMediaElement>('video, audio').forEach((media) => {
+                            media.muted = isMuted;
+                            media.volume = isMuted ? 0 : Math.min(1, volume / 100);
+                        });
+                    }
+                } catch {}
+            });
+        } catch (e) {
+            console.warn('Error broadcasting mute state:', e);
+        }
+    }, [volume, isMuted, boostLevel]);
 
     // Progress Loop
     useEffect(() => {
@@ -1552,12 +1643,23 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                         {content.overview && <p className="text-gray-300 text-sm leading-relaxed line-clamp-4">{content.overview}</p>}
 
                         <div className="flex items-center gap-4 pt-1">
-                            <button onClick={() => setIsMuted(!isMuted)} className="flex items-center gap-2 text-gray-300 text-xs bg-white/10 px-3 py-2 rounded-full">
-                                {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
-                                {isMuted ? 'Unmute' : 'Muted off'}
+                            <button
+                                onClick={() => {
+                                    const next = !isMuted;
+                                    setIsMuted(next);
+                                    showOsd(next ? 'Muted' : 'Unmuted', undefined, next ? 'mute' : 'volume');
+                                }}
+                                className="flex items-center gap-2 text-gray-300 hover:text-white text-xs bg-white/10 hover:bg-white/15 px-3.5 py-2 rounded-full transition cursor-pointer active:scale-95 shadow-sm"
+                                title={isMuted ? 'Unmute audio' : 'Mute audio'}
+                            >
+                                {isMuted ? <VolumeX size={14} className="text-red-500" /> : <Volume2 size={14} />}
+                                <span>{isMuted ? 'Unmute' : 'Mute'}</span>
                             </button>
-                            <button onClick={toggleFullscreen} className="flex items-center gap-2 text-gray-300 text-xs bg-white/10 px-3 py-2 rounded-full">
-                                <Maximize size={14} /> Fullscreen
+                            <button
+                                onClick={toggleFullscreen}
+                                className="flex items-center gap-2 text-gray-300 hover:text-white text-xs bg-white/10 hover:bg-white/15 px-3.5 py-2 rounded-full transition cursor-pointer active:scale-95 shadow-sm"
+                            >
+                                <Maximize size={14} /> <span>Fullscreen</span>
                             </button>
                         </div>
                     </div>

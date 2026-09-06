@@ -427,7 +427,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     // Check for Anonymous Guest
                     if (firebaseUser.isAnonymous) {
                         const guestUid = firebaseUser.uid;
-                        const guestEmail = `guest-${guestUid.substring(0, 6)}@mydonkey.in`;
+                        const guestEmail = `guest-${guestUid.substring(0, 6)}@guest.local`;
 
                         // Guest logic flows into main logic below
                     }
@@ -436,7 +436,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     // This ensures that even if DB fetch is slow/times out, we show ProfileSelection (loading) instead of Login
 
                     const isGuest = firebaseUser.isAnonymous;
-                    const userEmail = isGuest ? `guest-${firebaseUser.uid.substring(0, 6)}@mydonkey.in` : (firebaseUser.email || '');
+                    const userEmail = isGuest ? `guest-${firebaseUser.uid.substring(0, 6)}@guest.local` : (firebaseUser.email || '');
 
                     // Check for Permanent Admin
                     const isPermanentAdmin = PERMANENT_ADMINS.includes(userEmail);

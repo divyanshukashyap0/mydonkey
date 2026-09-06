@@ -223,11 +223,25 @@ const MobileScannerPage = () => {
 
     return (
         <div className="min-h-screen bg-black text-white flex flex-col">
-            <div className="p-4 flex items-center border-b border-white/10 bg-black/50 sticky top-0 z-10 backdrop-blur-md">
-                <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-gray-400 hover:text-white transition-colors" aria-label="Go back">
-                    <ArrowLeft size={24} />
-                </button>
-                <h1 className="text-xl font-bold ml-2">Scan to Login</h1>
+            <div className="p-4 flex items-center justify-between border-b border-white/10 bg-black/50 sticky top-0 z-10 backdrop-blur-md">
+                <div className="flex items-center gap-3">
+                    <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-gray-400 hover:text-white transition-colors" aria-label="Go back">
+                        <ArrowLeft size={24} />
+                    </button>
+                    <h1 className="text-xl font-bold ml-1">Scan to Login</h1>
+                </div>
+                <div
+                    onClick={() => navigate('/')}
+                    className="cursor-pointer transition-transform hover:scale-105 active:scale-95"
+                    title="Return to Home"
+                >
+                    <img
+                        src="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.png'; }}
+                        className="h-7 sm:h-8 w-auto object-contain drop-shadow"
+                        alt="My Donkey"
+                    />
+                </div>
             </div>
 
             <div className="flex-1 flex flex-col items-center justify-center p-6">

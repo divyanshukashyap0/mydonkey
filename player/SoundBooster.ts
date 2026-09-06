@@ -24,6 +24,7 @@ export class SoundBooster {
     private testSourceNode: AudioBufferSourceNode | null = null;
     private testGainNode: GainNode | null = null;
     private isTestPlaying: boolean = false;
+    private isMuted: boolean = false;
 
     private constructor() {
         // Lazy initialize AudioContext on user interaction
@@ -248,6 +249,55 @@ export class SoundBooster {
     }
 
     /**
+     * Set global mute state on booster nodes and attached media elements.
+     */
+    public setMuted(muted: boolean): void {
+        this.isMuted = muted;
+        const ctx = this.audioCtx;
+        const targetGain = muted ? 0 : this.boostFactor;
+
+        for (const el of this.activeElements) {
+            try {
+                el.muted = muted;
+            } catch {}
+            const state = this.attachedElements.get(el);
+            if (state && state.gainNode && ctx) {
+                try {
+                    state.gainNode.gain.setTargetAtTime(targetGain, ctx.currentTime, 0.02);
+                } catch {
+                    state.gainNode.gain.value = targetGain;
+                }
+            }
+        }
+
+        for (const player of this.activeMoviPlayers) {
+            try {
+                player.setMuted?.(muted);
+                if (player?.audioRenderer?.gainNode?.gain) {
+                    const pCtx = player.audioRenderer.audioContext;
+                    if (pCtx) {
+                        player.audioRenderer.gainNode.gain.setTargetAtTime(targetGain, pCtx.currentTime, 0.02);
+                    } else {
+                        player.audioRenderer.gainNode.gain.value = targetGain;
+                    }
+                }
+            } catch {}
+        }
+
+        if (this.testGainNode && ctx) {
+            try {
+                this.testGainNode.gain.setTargetAtTime(targetGain, ctx.currentTime, 0.02);
+            } catch {
+                this.testGainNode.gain.value = targetGain;
+            }
+        }
+    }
+
+    public getMuted(): boolean {
+        return this.isMuted;
+    }
+
+    /**
      * Scan document for all media elements and attach them.
      */
     public scanAndAttach(): void {
@@ -260,11 +310,12 @@ export class SoundBooster {
         const ctx = this.audioCtx;
         if (!ctx || !state.gainNode) return;
 
+        const targetGain = this.isMuted ? 0 : this.boostFactor;
         try {
             // Smooth ramp to prevent clicks/pops
-            state.gainNode.gain.setTargetAtTime(this.boostFactor, ctx.currentTime, 0.05);
+            state.gainNode.gain.setTargetAtTime(targetGain, ctx.currentTime, 0.05);
         } catch {
-            state.gainNode.gain.value = this.boostFactor;
+            state.gainNode.gain.value = targetGain;
         }
     }
 
@@ -272,12 +323,12 @@ export class SoundBooster {
         try {
             if (typeof player?.setVolume === 'function') {
                 // MoviPlayer supports up to 2.0 (200%) in its internal volume API
-                player.setVolume(this.boostFactor);
+                player.setVolume(this.isMuted ? 0 : this.boostFactor);
             }
             if (player?.audioRenderer?.gainNode?.gain) {
                 const ctx = player.audioRenderer.audioContext;
                 const currentTime = ctx ? ctx.currentTime : 0;
-                const targetGain = this.boostFactor;
+                const targetGain = this.isMuted ? 0 : this.boostFactor;
                 if (ctx) {
                     player.audioRenderer.gainNode.gain.setTargetAtTime(targetGain, currentTime, 0.05);
                 } else {

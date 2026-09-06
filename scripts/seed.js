@@ -303,7 +303,7 @@ const SETTINGS = {
     heroContentId: 'content_1',
     heroVideoQuality: "hd1080",
     maintenanceMode: false,
-    contactEmail: "support@mydonkeyott.com"
+    contactEmail: ""
 };
 
 // --- Seeding Logic ---
@@ -340,7 +340,7 @@ async function runSeed() {
         // 5. Seed Admin User
         const adminUser = {
             uid: 'admin_test_uid',
-            email: 'admin@mydonkey.in',
+            email: 'admin@example.com',
             role: 'admin',
             plan: 'Premium',
             subscriptionStatus: 'active',

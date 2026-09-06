@@ -23,6 +23,7 @@ import {
     Flame,
     Radio
 } from 'lucide-react';
+import HelpPageHeader from './HelpPageHeader';
 import { soundBooster } from '../player/SoundBooster';
 
 interface BoosterTool {
@@ -186,26 +187,23 @@ const SoundEnhancementsPage: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-[#0d0d0d] text-white pt-20 pb-24 px-4 sm:px-6 lg:px-8 font-sans selection:bg-brand-red selection:text-white">
-            <div className="max-w-5xl mx-auto">
+        <div className="min-h-screen bg-[#0d0d0d] text-white font-sans selection:bg-brand-red selection:text-white">
+            <HelpPageHeader
+                breadcrumbs={[
+                    { label: 'Support', path: '/support' },
+                    { label: 'Sound Enhancements', active: true }
+                ]}
+                backTo="/support"
+                backLabel="Back to Support"
+                rightBadge={
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold">
+                        <Volume2 size={13} />
+                        <span>Audio Booster Lab</span>
+                    </span>
+                }
+            />
 
-                {/* Back Button & Breadcrumbs */}
-                <div className="flex items-center gap-3 mb-8 text-sm">
-                    <button
-                        onClick={() => navigate(-1)}
-                        className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition flex items-center gap-1.5 border border-white/5"
-                    >
-                        <ArrowLeft size={16} />
-                        <span className="font-medium text-xs">Back</span>
-                    </button>
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <span className="cursor-pointer hover:text-gray-300" onClick={() => navigate('/')}>Home</span>
-                        <span>/</span>
-                        <span>Support</span>
-                        <span>/</span>
-                        <span className="text-amber-400 font-semibold">Sound Enhancements</span>
-                    </div>
-                </div>
+            <div className="max-w-5xl mx-auto pt-6 sm:pt-8 pb-24 px-4 sm:px-6 lg:px-8">
 
                 {/* Hero Header */}
                 <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-amber-500/10 via-red-500/5 to-black border border-white/10 p-6 sm:p-10 mb-10 shadow-2xl">

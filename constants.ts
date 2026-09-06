@@ -592,7 +592,7 @@ export const FOOTER_PAGE_CONTENT: Record<string, InfoPageData> = {
     sections: [
       {
         heading: 'Media Inquiries',
-        content: 'For press related questions, please contact press@mydonkey.in'
+        content: 'For press related questions, please submit an inquiry via our Support Desk.'
       },
       {
         heading: 'Recent News',
@@ -650,7 +650,7 @@ export const FOOTER_PAGE_CONTENT: Record<string, InfoPageData> = {
       },
       {
         heading: 'Contact Support',
-        content: 'Our team is available 24/7. Call us at 1-800-DONKEY-HELP or email support@mydonkey.in'
+        content: 'Our team is available 24/7. Submit a ticket through our online Support Desk for instant assistance.'
       }
     ]
   },

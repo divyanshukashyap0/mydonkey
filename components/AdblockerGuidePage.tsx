@@ -19,6 +19,7 @@ import {
     ChevronRight,
     Flame
 } from 'lucide-react';
+import HelpPageHeader from './HelpPageHeader';
 
 interface AdblockerTool {
     name: string;
@@ -221,30 +222,21 @@ const AdblockerGuidePage: React.FC = () => {
                 <div className="absolute bottom-20 -left-40 w-[500px] h-[500px] bg-cyan-600/10 rounded-full blur-3xl" />
             </div>
 
-            {/* Sticky Navigation Header */}
-            <header className="sticky top-0 z-50 bg-[#0a0a0f]/80 backdrop-blur-xl border-b border-white/10 px-4 md:px-8 py-4">
-                <div className="max-w-6xl mx-auto flex items-center justify-between">
-                    <button
-                        onClick={() => navigate(-1)}
-                        className="flex items-center gap-2 text-gray-300 hover:text-white px-3.5 py-1.5 rounded-xl hover:bg-white/5 transition-all text-sm font-semibold group cursor-pointer"
-                    >
-                        <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-                        <span>Back</span>
-                    </button>
-
-                    <div className="flex items-center gap-2 bg-white/5 px-3.5 py-1.5 rounded-full border border-white/10">
-                        <ShieldCheck size={16} className="text-cyan-400" />
-                        <span className="text-xs font-bold text-gray-200">Ad-Free Streaming Setup</span>
-                    </div>
-
-                    <button
-                        onClick={() => navigate('/')}
-                        className="text-xs font-bold text-gray-400 hover:text-white transition-colors"
-                    >
-                        Home
-                    </button>
-                </div>
-            </header>
+            {/* Sticky Navigation Header with Website Corner Logo */}
+            <HelpPageHeader
+                breadcrumbs={[
+                    { label: 'Support', path: '/support' },
+                    { label: 'Ad-Free Streaming Setup', active: true }
+                ]}
+                backTo="/support"
+                backLabel="Back to Support"
+                rightBadge={
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 text-xs font-semibold">
+                        <ShieldCheck size={13} />
+                        <span>Adblocker Setup</span>
+                    </span>
+                }
+            />
 
             <main className="relative z-10 max-w-6xl mx-auto px-4 md:px-8 pt-10 pb-24">
                 {/* Hero Header */}

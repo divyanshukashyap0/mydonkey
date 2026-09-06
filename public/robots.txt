@@ -13,6 +13,8 @@ Allow: /adblocker
 Allow: /sound-enhancements
 Allow: /about
 Allow: /help
+Allow: /support
+Allow: /community-chat
 Allow: /contact
 Allow: /careers
 Allow: /press

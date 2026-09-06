@@ -18,9 +18,13 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
     {
       title: 'Support',
       links: [
-        ...pages.filter(p => p.category === 'Support').map(p => ({ label: p.title, action: p.id })),
-        { label: 'Suggested Adblockers', action: 'adblocker' },
+        { label: 'Help & Support Hub', action: 'support' },
+        { label: 'Community Help Chat', action: 'community-chat' },
+        { label: 'Supported Devices', action: 'devices' },
+        { label: 'Contact Support Desk', action: 'contact' },
         { label: 'Sound Enhancements', action: 'sound-enhancements' },
+        { label: 'Suggested Adblockers', action: 'adblocker' },
+        ...pages.filter(p => p.category === 'Support' && !['Supported Devices', 'Contact Us', 'Help Center'].includes(p.title)).map(p => ({ label: p.title, action: p.id })),
         { label: 'User Manual', action: '/MyDonkey.pdf' }
       ]
     },

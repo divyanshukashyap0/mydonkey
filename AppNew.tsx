@@ -15,6 +15,10 @@ import InfoPage from './components/InfoPage';
 import MobileScannerPage from './components/MobileScannerPage';
 import AdblockerGuidePage from './components/AdblockerGuidePage';
 import SoundEnhancementsPage from './components/SoundEnhancementsPage';
+import SupportHubPage from './components/SupportHubPage';
+import DevicesGuidePage from './components/DevicesGuidePage';
+import ContactDeskPage from './components/ContactDeskPage';
+import CommunityHelpChatPage from './components/CommunityHelpChatPage';
 
 import AccountSettings from './components/AccountSettings';
 import AdminLayout from './components/admin/AdminLayout';
@@ -947,6 +951,26 @@ const MainLayout = () => {
             return;
         }
 
+        if (page === 'support' || page === 'help' || page === 'help-center' || page === 'Support') {
+            navigate('/support');
+            return;
+        }
+
+        if (page === 'devices' || page === 'supported-devices' || page === 'Devices' || page === 'Supported Devices') {
+            navigate('/devices');
+            return;
+        }
+
+        if (page === 'contact' || page === 'contact-us' || page === 'Contact' || page === 'Contact Us') {
+            navigate('/contact');
+            return;
+        }
+
+        if (page === 'community-chat' || page === 'help-chat' || page === 'community-help' || page === 'chat-help' || page === 'Community Help Chat') {
+            navigate('/community-chat');
+            return;
+        }
+
         // Check for dynamic page
         const existingPage = pages.find(p => p.id === page);
         if (existingPage) {
@@ -1655,7 +1679,7 @@ const MainLayout = () => {
         }
 
         if (activeTab === 'account') {
-            if (!isAuthenticated) return <Navigate to="/home" />;
+            if (!isAuthenticated) return <Navigate to="/login" state={{ from: '/account' }} replace />;
             return <AccountSettings setActiveTab={handleTabChange} />;
         }
 
@@ -1793,6 +1817,17 @@ const AppRoutes = () => {
             <Route path="/adblockers" element={<Navigate to="/adblocker" replace />} />
             <Route path="/sound-enhancements" element={<SoundEnhancementsPage />} />
             <Route path="/sound-enhancement" element={<Navigate to="/sound-enhancements" replace />} />
+            <Route path="/support" element={<SupportHubPage />} />
+            <Route path="/help" element={<Navigate to="/support" replace />} />
+            <Route path="/help-center" element={<Navigate to="/support" replace />} />
+            <Route path="/devices" element={<DevicesGuidePage />} />
+            <Route path="/supported-devices" element={<Navigate to="/devices" replace />} />
+            <Route path="/contact" element={<ContactDeskPage />} />
+            <Route path="/contact-us" element={<Navigate to="/contact" replace />} />
+            <Route path="/community-chat" element={<CommunityHelpChatPage />} />
+            <Route path="/help-chat" element={<Navigate to="/community-chat" replace />} />
+            <Route path="/community-help" element={<Navigate to="/community-chat" replace />} />
+            <Route path="/chat-help" element={<Navigate to="/community-chat" replace />} />
             <Route
                 path="/admin/*"
                 element={

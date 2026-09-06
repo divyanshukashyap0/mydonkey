@@ -312,7 +312,7 @@ const GlobalSettingsModal: React.FC<GlobalSettingsModalProps> = ({ isOpen, onClo
                                             value={formData.contactEmail || ''}
                                             onChange={(e) => handleChange({ contactEmail: e.target.value })}
                                             className="w-full bg-black/60 border border-white/10 rounded-xl p-3 pl-10 text-white text-sm outline-none focus:border-brand-red transition"
-                                            placeholder="support@mydonkey.in"
+                                            placeholder="contact@yourdomain.com"
                                         />
                                     </div>
                                 </div>
