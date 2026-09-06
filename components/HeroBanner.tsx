@@ -22,7 +22,8 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onDetails, onPlay 
     const [activeIdx, setActiveIdx] = useState(0);
     const [showVideo, setShowVideo] = useState(false);
     const [videoPlaying, setVideoPlaying] = useState(false);
-    const [isMuted, setIsMuted] = useState(true);
+    // Permanent mute: background trailer must never play sound or music
+    const isMuted = true;
     const [isPaused, setIsPaused] = useState(false);
     const [touchStart, setTouchStart] = useState<number | null>(null);
     const playerRef = useRef<any>(null);
@@ -47,7 +48,6 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onDetails, onPlay 
     const resetVideoState = () => {
         setShowVideo(false);
         setVideoPlaying(false);
-        setIsMuted(true);
         destroyPlayer();
     };
 
@@ -55,7 +55,6 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onDetails, onPlay 
         const target = (idx + slides.length) % slides.length;
         setShowVideo(false);
         setVideoPlaying(false);
-        setIsMuted(true);
         destroyPlayer();
         setActiveIdx(target);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -91,19 +90,50 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onDetails, onPlay 
         return () => clearTimeout(failsafe);
     }, [showVideo, videoPlaying, currentItem?.youtubeId, slides.length, isPaused]);
 
+    // Helper to check if video player is currently active on the page
+    const isVideoPlayerActive = () => {
+        return typeof document !== 'undefined' && (
+            document.body.classList.contains('video-player-active') ||
+            window.location.pathname.startsWith('/watch/')
+        );
+    };
+
+    // Listen for VideoPlayer mounting or navigation to /watch/ to immediately stop background trailer
+    useEffect(() => {
+        const handlePlayerState = () => {
+            if (isVideoPlayerActive()) {
+                resetVideoState();
+            }
+        };
+
+        handlePlayerState();
+        const observer = new MutationObserver(handlePlayerState);
+        observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+        window.addEventListener('popstate', handlePlayerState);
+
+        return () => {
+            observer.disconnect();
+            window.removeEventListener('popstate', handlePlayerState);
+        };
+    }, []);
+
     // ── Trailer autoplay ──────────────────────────────────────────────────
 
     useEffect(() => {
         if (!currentItem) return;
         resetVideoState();
-        if (!shouldAutoplay) return;
-        const timer = setTimeout(() => { setShowVideo(true); }, 3000);
+        if (!shouldAutoplay || isVideoPlayerActive()) return;
+        const timer = setTimeout(() => {
+            if (!isVideoPlayerActive()) {
+                setShowVideo(true);
+            }
+        }, 3000);
         return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeIdx, shouldAutoplay]);
 
     useEffect(() => {
-        if (!showVideo || !currentItem?.youtubeId) return;
+        if (!showVideo || !currentItem?.youtubeId || isVideoPlayerActive()) return;
 
         const initPlayer = () => {
             if (window.YT && window.YT.Player) {
@@ -120,8 +150,21 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onDetails, onPlay 
                         iv_load_policy: 3, disablekb: 1, fs: 0, enablejsapi: 1,
                     },
                     events: {
-                        onReady: (e: any) => { e.target.mute(); e.target.playVideo(); },
+                        onReady: (e: any) => {
+                            // Enforce permanent mute
+                            try {
+                                e.target.mute();
+                                e.target.setVolume(0);
+                            } catch (_) { }
+                            e.target.playVideo();
+                        },
                         onStateChange: (e: any) => {
+                            // Keep permanently muted even if external commands try to unmute
+                            try {
+                                e.target.mute();
+                                e.target.setVolume(0);
+                            } catch (_) { }
+
                             // YT.PlayerState.PLAYING = 1
                             if (e.data === 1) {
                                 setVideoPlaying(true);
@@ -173,10 +216,10 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onDetails, onPlay 
     // ── Mute toggle ────────────────────────────────────────────────────────
 
     const handleMuteToggle = () => {
-        const next = !isMuted;
-        setIsMuted(next);
+        // Enforce permanent mute
         if (playerRef.current?.mute) {
-            next ? playerRef.current.mute() : playerRef.current.unMute();
+            playerRef.current.mute();
+            playerRef.current.setVolume?.(0);
         }
     };
 
@@ -354,14 +397,14 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onDetails, onPlay 
                 </div>
             )}
 
-            {/* ── Mute toggle ───────────────────────────────────────────── */}
+            {/* ── Mute indicator (Permanently muted) ─────────────────────── */}
             {videoPlaying && (
-                <button
-                    onClick={handleMuteToggle}
-                    className="absolute bottom-24 right-6 md:bottom-12 md:right-12 z-40 bg-black/40 border border-white/20 p-2.5 md:p-3 rounded-full text-white hover:bg-white/10 transition animate-in fade-in"
+                <div
+                    className="absolute bottom-24 right-6 md:bottom-12 md:right-12 z-40 bg-black/40 border border-white/20 p-2.5 md:p-3 rounded-full text-white/70 pointer-events-none animate-in fade-in"
+                    title="Muted background trailer"
                 >
-                    {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-                </button>
+                    <VolumeX size={18} />
+                </div>
             )}
 
             {/* ── CSS keyframe for progress bar ─────────────────────────── */}

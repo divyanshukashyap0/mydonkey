@@ -189,22 +189,22 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const isNativeVideo = useMemo(() => {
         if (!directVideoUrl) return false;
         const urlWithoutQuery = directVideoUrl.split('?')[0].toLowerCase();
-        
+
         // Standard video extensions
-        const hasExtension = ['.mp4', '.webm', '.mkv', '.ogg', '.mov', '.avi', '.ts', '.flv'].some(ext => 
+        const hasExtension = ['.mp4', '.webm', '.mkv', '.ogg', '.mov', '.avi', '.ts', '.flv'].some(ext =>
             urlWithoutQuery.endsWith(ext)
         );
         if (hasExtension) return true;
 
         // Check if extension is present in the path
-        const hasExtensionAnywhere = ['.mp4', '.webm', '.mkv', '.ogg', '.mov', '.avi', '.ts', '.flv'].some(ext => 
+        const hasExtensionAnywhere = ['.mp4', '.webm', '.mkv', '.ogg', '.mov', '.avi', '.ts', '.flv'].some(ext =>
             urlWithoutQuery.includes(ext)
         );
         if (hasExtensionAnywhere) return true;
-        
+
         // Cloudflare R2 buckets (often host raw video files like MKV/MP4 without file extensions in the pathname)
         if (directVideoUrl.toLowerCase().includes('.r2.dev')) return true;
-        
+
         return false;
     }, [directVideoUrl]);
     const isEmbedPlayer = directVideoUrl ? (
@@ -276,9 +276,23 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         document.body.style.overflow = 'hidden';
         document.documentElement.style.overflow = 'hidden';
 
+        // Immediately pause and mute any background trailer (e.g. HeroBanner YouTube player)
+        try {
+            const heroIframes = document.querySelectorAll<HTMLIFrameElement>('#hero-player, iframe#hero-player, #hero-player iframe');
+            heroIframes.forEach((ifr) => {
+                if (ifr?.contentWindow) {
+                    ifr.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
+                    ifr.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'mute', args: [] }), '*');
+                    ifr.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [0] }), '*');
+                    ifr.contentWindow.postMessage({ event: 'command', func: 'pauseVideo', args: [] }, '*');
+                    ifr.contentWindow.postMessage({ event: 'command', func: 'mute', args: [] }, '*');
+                }
+            });
+        } catch (_) { }
+
         return () => {
             if (document.fullscreenElement && document.exitFullscreen) {
-                document.exitFullscreen().catch(() => {});
+                document.exitFullscreen().catch(() => { });
             }
             document.body.classList.remove('video-player-active');
             document.documentElement.classList.remove('video-player-active');
@@ -343,17 +357,17 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     try {
                         await (target as any).webkitRequestFullscreen();
                         entered = true;
-                    } catch (e) {}
+                    } catch (e) { }
                 } else if ((target as any)?.mozRequestFullScreen) {
                     try {
                         await (target as any).mozRequestFullScreen();
                         entered = true;
-                    } catch (e) {}
+                    } catch (e) { }
                 } else if ((target as any)?.msRequestFullscreen) {
                     try {
                         await (target as any).msRequestFullscreen();
                         entered = true;
-                    } catch (e) {}
+                    } catch (e) { }
                 }
 
                 if (!entered && document.documentElement.requestFullscreen) {
@@ -372,7 +386,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                         try {
                             videoEl.webkitEnterFullscreen();
                             entered = true;
-                        } catch (e) {}
+                        } catch (e) { }
                     }
                 }
 
@@ -461,7 +475,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
         try {
             pill.setPointerCapture(e.pointerId);
-        } catch (_) {}
+        } catch (_) { }
     };
 
     const handlePillPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -500,7 +514,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         if (pill) {
             try {
                 pill.releasePointerCapture(e.pointerId);
-            } catch (_) {}
+            } catch (_) { }
         }
     };
 
@@ -656,14 +670,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         }
         try {
             localStorage.setItem('mydonkey_sound_boost_level', String(boostLevel));
-        } catch {}
+        } catch { }
     }, [boostLevel]);
 
     useEffect(() => {
         soundBooster.setDialogueClarity(dialogueClarity);
         try {
             localStorage.setItem('mydonkey_dialogue_boost', String(dialogueClarity));
-        } catch {}
+        } catch { }
     }, [dialogueClarity]);
 
     useEffect(() => {
@@ -693,7 +707,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     useEffect(() => {
         // HLS initialization is now handled internally by MoviVideo
-        return () => {};
+        return () => { };
     }, [isHls, directVideoUrl]);
 
     // Handle loaded metadata and dynamic track extraction
@@ -703,7 +717,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             finishLoading();
             const dur = videoRef.current.duration || e?.target?.duration || 0;
             setDuration(dur);
-            
+
             // Query dynamic tracks from Movi player
             if (videoRef.current.getSubtitleTracks) {
                 const subs = videoRef.current.getSubtitleTracks();
@@ -728,7 +742,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     });
                 }
             }
-            
+
             if (playing) {
                 videoRef.current.play().catch(console.error);
             }
@@ -872,7 +886,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 if (videoRef.current.setBoost) {
                     videoRef.current.setBoost(boostLevel);
                 }
-            } catch {}
+            } catch { }
         }
 
         // 3. YouTube Player API
@@ -884,79 +898,102 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     playerRef.current.unMute?.();
                     playerRef.current.setVolume?.(volume);
                 }
-            } catch {}
+            } catch { }
         }
 
-        // 4. Synchronize all HTMLMediaElements in document
+        // 4. Synchronize all HTMLMediaElements in this video player container
         try {
-            document.querySelectorAll<HTMLMediaElement>('video, audio').forEach((el) => {
-                el.muted = isMuted;
-                if (isMuted) {
-                    el.volume = 0;
-                } else {
-                    el.volume = Math.min(1, Math.max(0, volume / 100));
-                }
-            });
-        } catch {}
-
-        // 5. Broadcast postMessage mute/unmute to all iframes (DrivePlayer, proxy.garageband.rocks, external embeds)
-        try {
-            const iframes = document.querySelectorAll<HTMLIFrameElement>('iframe');
-            iframes.forEach((iframe) => {
-                const win = iframe.contentWindow;
-                if (!win) return;
-
-                // YouTube & Google Drive style command
-                const ytCmd = {
-                    event: 'command',
-                    func: isMuted ? 'mute' : 'unMute',
-                    args: []
-                };
-                win.postMessage(ytCmd, '*');
-                win.postMessage(JSON.stringify(ytCmd), '*');
-
-                const ytVolCmd = {
-                    event: 'command',
-                    func: 'setVolume',
-                    args: [isMuted ? 0 : volume]
-                };
-                win.postMessage(ytVolCmd, '*');
-                win.postMessage(JSON.stringify(ytVolCmd), '*');
-
-                // HTML5 / Video.js / Plyr / JW Player style commands
-                const standardCommands = [
-                    { type: isMuted ? 'mute' : 'unmute' },
-                    { action: isMuted ? 'mute' : 'unmute' },
-                    { method: isMuted ? 'mute' : 'unmute' },
-                    { command: isMuted ? 'mute' : 'unmute' },
-                    { event: isMuted ? 'mute' : 'unmute' },
-                    { api: isMuted ? 'mute' : 'unmute' },
-                    { type: 'volumechange', volume: isMuted ? 0 : (volume / 100) },
-                    { action: 'setVolume', value: isMuted ? 0 : (volume / 100) },
-                    { command: 'setVolume', args: [isMuted ? 0 : (volume / 100)] }
-                ];
-
-                standardCommands.forEach((cmd) => {
-                    try {
-                        win.postMessage(cmd, '*');
-                        win.postMessage(JSON.stringify(cmd), '*');
-                    } catch {}
-                });
-
-                // Safe cross-origin / same-origin DOM access attempt
-                try {
-                    const innerDoc = iframe.contentDocument || iframe.contentWindow?.document;
-                    if (innerDoc) {
-                        innerDoc.querySelectorAll<HTMLMediaElement>('video, audio').forEach((media) => {
-                            media.muted = isMuted;
-                            media.volume = isMuted ? 0 : Math.min(1, volume / 100);
-                        });
+            const container = playerContainerRef.current;
+            if (container) {
+                container.querySelectorAll<HTMLMediaElement>('video, audio').forEach((el) => {
+                    el.muted = isMuted;
+                    if (isMuted) {
+                        el.volume = 0;
+                    } else {
+                        el.volume = Math.min(1, Math.max(0, volume / 100));
                     }
-                } catch {}
-            });
+                });
+            }
+        } catch { }
+
+        // 5. Broadcast postMessage mute/unmute ONLY to iframes inside this video player container
+        try {
+            const container = playerContainerRef.current;
+            if (container) {
+                const iframes = container.querySelectorAll<HTMLIFrameElement>('iframe');
+                iframes.forEach((iframe) => {
+                    // Strictly exclude any background hero-player
+                    if (iframe.id === 'hero-player' || iframe.closest('#hero-player')) return;
+
+                    const win = iframe.contentWindow;
+                    if (!win) return;
+
+                    // YouTube & Google Drive style command
+                    const ytCmd = {
+                        event: 'command',
+                        func: isMuted ? 'mute' : 'unMute',
+                        args: []
+                    };
+                    win.postMessage(ytCmd, '*');
+                    win.postMessage(JSON.stringify(ytCmd), '*');
+
+                    const ytVolCmd = {
+                        event: 'command',
+                        func: 'setVolume',
+                        args: [isMuted ? 0 : volume]
+                    };
+                    win.postMessage(ytVolCmd, '*');
+                    win.postMessage(JSON.stringify(ytVolCmd), '*');
+
+                    // HTML5 / Video.js / Plyr / JW Player style commands
+                    const standardCommands = [
+                        { type: isMuted ? 'mute' : 'unmute' },
+                        { action: isMuted ? 'mute' : 'unmute' },
+                        { method: isMuted ? 'mute' : 'unmute' },
+                        { command: isMuted ? 'mute' : 'unmute' },
+                        { event: isMuted ? 'mute' : 'unmute' },
+                        { api: isMuted ? 'mute' : 'unmute' },
+                        { type: 'volumechange', volume: isMuted ? 0 : (volume / 100) },
+                        { action: 'setVolume', value: isMuted ? 0 : (volume / 100) },
+                        { command: 'setVolume', args: [isMuted ? 0 : (volume / 100)] }
+                    ];
+
+                    standardCommands.forEach((cmd) => {
+                        try {
+                            win.postMessage(cmd, '*');
+                            win.postMessage(JSON.stringify(cmd), '*');
+                        } catch { }
+                    });
+
+                    // Safe cross-origin / same-origin DOM access attempt
+                    try {
+                        const innerDoc = iframe.contentDocument || iframe.contentWindow?.document;
+                        if (innerDoc) {
+                            innerDoc.querySelectorAll<HTMLMediaElement>('video, audio').forEach((media) => {
+                                media.muted = isMuted;
+                                media.volume = isMuted ? 0 : Math.min(1, volume / 100);
+                            });
+                        }
+                    } catch { }
+                });
+            }
         } catch (e) {
             console.warn('Error broadcasting mute state:', e);
         }
+
+        // 6. Guarantee any background hero trailer is permanently muted & paused
+        try {
+            const bgHeroIframes = document.querySelectorAll<HTMLIFrameElement>('#hero-player, iframe#hero-player, #hero-player iframe');
+            bgHeroIframes.forEach((ifr) => {
+                if (ifr?.contentWindow) {
+                    ifr.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
+                    ifr.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'mute', args: [] }), '*');
+                    ifr.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [0] }), '*');
+                    ifr.contentWindow.postMessage({ event: 'command', func: 'pauseVideo', args: [] }, '*');
+                    ifr.contentWindow.postMessage({ event: 'command', func: 'mute', args: [] }, '*');
+                }
+            });
+        } catch { }
     }, [volume, isMuted, boostLevel]);
 
     // Progress Loop
@@ -998,7 +1035,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     // Only update if missing or different (and valid)
                     if (mins > 0 && content.duration !== durationStr) {
                         updateContentDuration(content.id, durationStr)
-                            .catch(() => {});
+                            .catch(() => { });
                         hasUpdatedDuration.current = true; // Block future updates
                     }
                 }
@@ -1041,7 +1078,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     lastWatchedAt: new Date().toISOString()
                 });
                 localStorage.setItem('my_donkey_watch_history', JSON.stringify(filtered.slice(0, 30)));
-            } catch (_) {}
+            } catch (_) { }
         }
     }, [currentTime, content.id, duration, isDriveVideo, isHls, isTrailer]);
 
@@ -1109,7 +1146,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     if (document.activeElement?.tagName === 'IFRAME') {
                         window.focus();
                     }
-                } catch (_) {}
+                } catch (_) { }
             }
         }, 3000);
     }, [showStats, showAudioSubMenu, showQualityMenu, showEpisodesMenu]);
@@ -1274,7 +1311,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                             (playerContainerRef.current as any).mozRequestFullScreen ||
                             (playerContainerRef.current as any).msRequestFullscreen;
                         if (requestFS) {
-                            requestFS.call(playerContainerRef.current).catch(() => {});
+                            requestFS.call(playerContainerRef.current).catch(() => { });
                         }
                     } catch (e) {
                         // ignore
@@ -1534,7 +1571,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                     onError={(err) => setPlaybackError(err.message || 'Movi player playback error')}
                                 />
                             ) : finalUrl ? (
-                                <iframe 
+                                <iframe
                                     className="w-full h-full relative z-[30] border-0"
                                     src={finalUrl}
                                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
@@ -1681,7 +1718,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                         <div className="absolute top-24 left-1/2 -translate-x-1/2 z-[130] animate-in slide-in-from-top-4 fade-in duration-300">
                             <div className="bg-yellow-500/10 backdrop-blur-md border border-yellow-500/20 text-yellow-200 px-6 py-3 rounded-full flex items-center gap-3 shadow-lg max-w-sm text-center">
                                 <Wifi size={20} className="text-yellow-400 shrink-0" />
-                                <span className="text-sm font-medium">Available in it's original Sound & all languages subtitles Available</span>
+                                <span className="text-sm font-medium">original Sound</span>
                             </div>
                         </div>
                     )}
@@ -1770,17 +1807,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     isHoveringHeaderRef.current = false;
                     resetInactivityTimer();
                 }}
-                className={`fixed z-[300] select-none touch-none cursor-grab active:cursor-grabbing transition-opacity duration-300 ${
-                    showControls
+                className={`fixed z-[300] select-none touch-none cursor-grab active:cursor-grabbing transition-opacity duration-300 ${showControls
                         ? 'opacity-50 hover:opacity-100 pointer-events-auto'
                         : 'opacity-0 pointer-events-none'
-                } ${
-                    pillPosition
+                    } ${pillPosition
                         ? ''
                         : isMobile && isPortrait
-                        ? 'top-3 left-3'
-                        : 'top-1/2 left-2 md:left-6 -translate-y-1/2'
-                }`}
+                            ? 'top-3 left-3'
+                            : 'top-1/2 left-2 md:left-6 -translate-y-1/2'
+                    }`}
                 title="Drag to reposition anywhere, double-click to reset"
             >
                 <div className="bg-black/60 backdrop-blur-xl border border-white/20 inline-flex items-center gap-2 md:gap-3 px-2 py-2 md:px-3 md:py-2.5 rounded-2xl pointer-events-auto hover:bg-black/85 transition-all shadow-2xl ring-1 ring-white/10 group/header">
@@ -1923,7 +1958,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                     <button onClick={(e) => { e.stopPropagation(); setPlaying(!playing); }} className="text-gray-300 hover:text-white p-1.5 md:p-2 rounded-full hover:bg-white/10 transition" title={playing ? "Pause" : "Play"}>
                                         {playing ? <Pause size={18} className="md:w-[22px] md:h-[22px] fill-current" /> : <Play size={18} className="md:w-[22px] md:h-[22px] fill-current ml-0.5" />}
                                     </button>
-                                    
+
                                     {/* Volume & Hover Slider */}
                                     <div className="flex items-center group/vol">
                                         <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); showOsd(isMuted ? 'Unmuted' : 'Muted', undefined, isMuted ? 'volume' : 'mute'); }} className="text-gray-300 hover:text-white p-1.5 md:p-2 rounded-full hover:bg-white/10 transition" title={isMuted ? "Unmute" : "Mute"}>
@@ -1952,11 +1987,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                             e.stopPropagation();
                                             cycleBoost();
                                         }}
-                                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wider transition-all duration-300 ${
-                                            boostLevel > 1.0
+                                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wider transition-all duration-300 ${boostLevel > 1.0
                                                 ? 'bg-gradient-to-r from-red-600/30 to-amber-500/30 border border-amber-500/50 text-amber-300 shadow-[0_0_16px_rgba(245,158,11,0.35)]'
                                                 : 'text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10'
-                                        }`}
+                                            }`}
                                         title="Sound Booster: Click to cycle presets (100% → 150% → 200% → 300% → 400%). Hotkey: B"
                                     >
                                         <Zap size={13} className={boostLevel > 1.0 ? 'text-amber-400 fill-amber-400 animate-pulse' : 'text-gray-400'} />
@@ -2027,7 +2061,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                                                 </span>
                                                             </div>
                                                             <p className="text-[11px] text-gray-300 leading-snug">
-                                                                This title is streamed via an external embed ({embedBaseHost || 'proxy.garageband.rocks'}). 
+                                                                This title is streamed via an external embed ({embedBaseHost || 'proxy.garageband.rocks'}).
                                                                 Browser security (Same-Origin Policy) isolates external iframe audio from web pages.
                                                             </p>
                                                             <a
@@ -2058,11 +2092,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                                                     onClick={() => {
                                                                         soundBooster.toggleTestSound((active) => setIsTestingAudio(active));
                                                                     }}
-                                                                    className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl font-bold text-xs transition border ${
-                                                                        isTestingAudio 
-                                                                            ? 'bg-amber-400 text-black border-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.5)]' 
+                                                                    className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl font-bold text-xs transition border ${isTestingAudio
+                                                                            ? 'bg-amber-400 text-black border-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.5)]'
                                                                             : 'bg-white/10 hover:bg-white/15 text-amber-100 border-amber-500/30'
-                                                                    }`}
+                                                                        }`}
                                                                 >
                                                                     <Volume2 size={14} />
                                                                     <span>{isTestingAudio ? 'Stop 400% Demo Chime' : '🎧 Play 400% Demo Chime'}</span>
@@ -2104,11 +2137,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                                                     <Zap size={14} className={boostLevel > 1.0 ? 'text-amber-400 fill-amber-400' : 'text-gray-400'} />
                                                                     <span className="text-xs font-bold text-white tracking-wide">SOUND BOOSTER</span>
                                                                 </div>
-                                                                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
-                                                                    boostLevel > 1.0
+                                                                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${boostLevel > 1.0
                                                                         ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
                                                                         : 'bg-white/5 text-gray-400 border-white/10'
-                                                                }`}>
+                                                                    }`}>
                                                                     {boostLevel > 1.0 ? `${Math.round(boostLevel * 100)}% (${boostLevel}x)` : '100% (NORMAL)'}
                                                                 </span>
                                                             </div>
@@ -2121,11 +2153,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                                                         <button
                                                                             key={lvl}
                                                                             onClick={() => setBoostPreset(lvl)}
-                                                                            className={`py-1.5 px-1 rounded-lg text-[10px] font-bold text-center transition-all ${
-                                                                                isActive
+                                                                            className={`py-1.5 px-1 rounded-lg text-[10px] font-bold text-center transition-all ${isActive
                                                                                     ? 'bg-brand-red text-white shadow-md shadow-brand-red/30 ring-1 ring-white/20'
                                                                                     : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
-                                                                            }`}
+                                                                                }`}
                                                                         >
                                                                             {Math.round(lvl * 100)}%
                                                                         </button>
@@ -2204,11 +2235,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                                                     onClick={() => {
                                                                         soundBooster.toggleTestSound((active) => setIsTestingAudio(active));
                                                                     }}
-                                                                    className={`w-full flex items-center justify-center gap-2 py-1.5 px-2 rounded-lg font-bold text-[11px] transition border ${
-                                                                        isTestingAudio 
-                                                                            ? 'bg-amber-400 text-black border-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.5)]' 
+                                                                    className={`w-full flex items-center justify-center gap-2 py-1.5 px-2 rounded-lg font-bold text-[11px] transition border ${isTestingAudio
+                                                                            ? 'bg-amber-400 text-black border-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.5)]'
                                                                             : 'bg-white/5 hover:bg-white/10 text-gray-300 border-white/10'
-                                                                    }`}
+                                                                        }`}
                                                                 >
                                                                     <Volume2 size={13} />
                                                                     <span>{isTestingAudio ? 'Stop Demo Chime' : '🎧 Test 400% Audio Chime'}</span>
@@ -2397,14 +2427,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             )}
 
             {/* Unclickable Low-Opacity Corner Watermark Logo (Always visible in normal, embedded, and fullscreen modes) */}
-            <div 
-                className={`video-watermark absolute z-[999] pointer-events-none select-none transition-all duration-300 drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] ${
-                    isFullscreen 
-                        ? 'top-6 right-6 md:top-8 md:right-10 opacity-35' 
-                        : (isMobile && isPortrait 
-                            ? 'top-16 right-4 opacity-30' 
+            <div
+                className={`video-watermark absolute z-[999] pointer-events-none select-none transition-all duration-300 drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] ${isFullscreen
+                        ? 'top-6 right-6 md:top-8 md:right-10 opacity-35'
+                        : (isMobile && isPortrait
+                            ? 'top-16 right-4 opacity-30'
                             : 'top-4 right-4 md:top-6 md:right-8 opacity-30')
-                }`}
+                    }`}
                 aria-hidden="true"
             >
                 <img
