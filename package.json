@@ -8,6 +8,7 @@
     "build": "vite build",
     "seed": "node scripts/seed.js",
     "sitemap": "node scripts/generate-sitemap.cjs",
+    "indexnow": "node scripts/indexnow.cjs",
     "google-index": "node scripts/google-bulk-index.cjs",
     "preview": "vite preview"
   },
