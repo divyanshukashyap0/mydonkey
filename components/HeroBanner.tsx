@@ -255,7 +255,7 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onDetails, onPlay 
             {/* ── Content overlay ───────────────────────────────────────── */}
             <div className="absolute bottom-0 left-0 right-0 z-40 px-6 md:px-12 lg:px-16 pb-6 md:pb-12 pointer-events-none">
                 <div className="max-w-4xl flex items-end justify-between">
-                    <div className="max-w-2xl space-y-4 pointer-events-auto">
+                    <div className={`max-w-2xl space-y-4 pointer-events-auto transition-opacity duration-700 ${videoPlaying ? 'opacity-50 group-hover:opacity-100' : 'opacity-100'}`}>
                         {isOriginal && (
                             <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left duration-700">
                                 <img src="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png" className="h-5 w-auto object-contain" alt="Logo" />
