@@ -1792,6 +1792,66 @@ const MainLayout = () => {
     );
 };
 
+const SitemapHandler = () => {
+    const [xmlContent, setXmlContent] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        fetch('/sitemap.xml', { cache: 'reload', headers: { Accept: 'application/xml, text/xml' } })
+            .then(res => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.text();
+            })
+            .then(text => {
+                if (text.startsWith('<?xml') || text.includes('<urlset')) {
+                    setXmlContent(text);
+                } else {
+                    throw new Error('Received non-XML response');
+                }
+            })
+            .catch(err => {
+                setError(err.message);
+            });
+    }, []);
+
+    if (error) {
+        return (
+            <div className="p-6 bg-[#0a0a0a] text-red-400 font-mono text-sm min-h-screen">
+                Failed to load sitemap: {error}
+            </div>
+        );
+    }
+
+    if (!xmlContent) {
+        return <Loader />;
+    }
+
+    return (
+        <pre className="m-0 p-4 bg-white text-black font-mono text-xs whitespace-pre-wrap break-all min-h-screen">
+            {xmlContent}
+        </pre>
+    );
+};
+
+const RobotsHandler = () => {
+    const [content, setContent] = useState<string | null>(null);
+
+    useEffect(() => {
+        fetch('/robots.txt', { cache: 'reload' })
+            .then(res => res.text())
+            .then(text => setContent(text))
+            .catch(() => setContent('User-agent: *\nAllow: /\nSitemap: https://www.mydonkey.in/sitemap.xml'));
+    }, []);
+
+    if (!content) return <Loader />;
+
+    return (
+        <pre className="m-0 p-4 bg-white text-black font-mono text-sm whitespace-pre-wrap min-h-screen">
+            {content}
+        </pre>
+    );
+};
+
 const AppRoutes = () => {
     const { currentUser, isLoading, isAuthenticated } = useStore();
     const navigate = useNavigate();
@@ -1800,6 +1860,8 @@ const AppRoutes = () => {
 
     return (
         <Routes>
+            <Route path="/sitemap.xml" element={<SitemapHandler />} />
+            <Route path="/robots.txt" element={<RobotsHandler />} />
             <Route
                 path="/login"
                 element={

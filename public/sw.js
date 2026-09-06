@@ -55,7 +55,9 @@ self.addEventListener('fetch', (event) => {
         url.hostname.includes('firebaseio.com') || 
         url.hostname.includes('themoviedb.org') ||
         url.hostname.includes('firebasedatabase.app') ||
-        url.pathname.startsWith('/api/')) {
+        url.pathname.startsWith('/api/') ||
+        url.pathname === '/sitemap.xml' ||
+        url.pathname === '/robots.txt') {
         return;
     }
 

@@ -94,6 +94,7 @@ export default defineConfig(({ mode }) => {
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
         workbox: {
           maximumFileSizeToCacheInBytes: 15 * 1024 * 1024, // 15 MiB
+          navigateFallbackDenylist: [/^\/api/, /^\/sitemap\.xml$/, /^\/robots\.txt$/, /\.[a-zA-Z0-9]+$/],
         },
         manifest: {
           name: 'My Donkey OTT',

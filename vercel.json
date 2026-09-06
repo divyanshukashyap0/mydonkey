@@ -16,7 +16,7 @@
             "destination": "/api/content-seo?id=:id&type=$1"
         },
         {
-            "source": "/(.*)",
+            "source": "/((?!api/|sitemap\\.xml|robots\\.txt).*)",
             "destination": "/index.html"
         }
     ]
