@@ -5,6 +5,7 @@ import { MoviSubtitles } from './Subtitles';
 import { MoviAudio } from './Audio';
 import { MoviBuffer } from './Buffer';
 import { MoviPlayback } from './Playback';
+import { soundBooster } from '../SoundBooster';
 
 export interface MoviEngineConfig {
     decoder?: 'auto' | 'software';
@@ -55,6 +56,10 @@ export class MoviEngine {
         }
 
         await this.player.load(source);
+        soundBooster.attachMoviPlayer(this.player);
+        if ((this.player as any)?.streamWrapper?.videoElement) {
+            soundBooster.attachMediaElement((this.player as any).streamWrapper.videoElement);
+        }
     }
 
     public play(): Promise<void> {
@@ -80,6 +85,11 @@ export class MoviEngine {
 
     public setVolume(volume: number): void {
         if (this.audio) this.audio.setVolume(volume);
+    }
+
+    public setBoost(boost: number): void {
+        if (this.audio) this.audio.setBoost(boost);
+        else soundBooster.setBoost(boost);
     }
 
     public mute(): void {
@@ -131,6 +141,7 @@ export class MoviEngine {
 
     public destroy(): void {
         if (this.player) {
+            soundBooster.detachMoviPlayer(this.player);
             this.player.destroy();
             this.player = null;
         }

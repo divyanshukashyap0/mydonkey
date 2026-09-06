@@ -20,6 +20,7 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
       links: [
         ...pages.filter(p => p.category === 'Support').map(p => ({ label: p.title, action: p.id })),
         { label: 'Suggested Adblockers', action: 'adblocker' },
+        { label: 'Sound Enhancements', action: 'sound-enhancements' },
         { label: 'User Manual', action: '/MyDonkey.pdf' }
       ]
     },

@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { MoviEngine } from '../player/MoviEngine';
+import { soundBooster } from '../player/SoundBooster';
 
 export interface MoviVideoProps {
     src?: string;
@@ -37,6 +38,7 @@ export const MoviVideo = forwardRef<any, MoviVideoProps>(({
     const activeRef = useRef<boolean>(true);
 
     const volumeRef = useRef<number>(1.0);
+    const boostRef = useRef<number>(1.0);
     const mutedRef = useRef<boolean>(muted);
     const loopRef = useRef<boolean>(loop);
 
@@ -104,6 +106,9 @@ export const MoviVideo = forwardRef<any, MoviVideoProps>(({
             if (activeRef.current && engineRef.current) {
                 engineRef.current.setVolume(volumeRef.current);
                 engineRef.current.player?.setMuted(mutedRef.current);
+                if (boostRef.current > 1.0) {
+                    engineRef.current.setBoost(boostRef.current);
+                }
                 if (autoPlay) {
                     await engineRef.current.play().catch(console.error);
                 }
@@ -219,6 +224,20 @@ export const MoviVideo = forwardRef<any, MoviVideoProps>(({
         },
         getActiveSubtitleTrack: () => {
             return engineRef.current && engineRef.current.decoder ? engineRef.current.decoder.getActiveSubtitleTrack() : null;
+        },
+        setBoost: (factor: number) => {
+            boostRef.current = factor;
+            if (engineRef.current) {
+                engineRef.current.setBoost(factor);
+            } else {
+                soundBooster.setBoost(factor);
+            }
+        },
+        getBoost: () => {
+            return boostRef.current;
+        },
+        getMediaElement: () => {
+            return (engineRef.current?.player as any)?.streamWrapper?.videoElement || null;
         }
     }));
 

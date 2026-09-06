@@ -4,7 +4,7 @@
         xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
   <url>
     <loc>https://www.mydonkey.in/</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.00</priority>
     <image:image>
@@ -15,7 +15,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/home</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.00</priority>
     <image:image>
@@ -26,7 +26,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/movies</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.95</priority>
     <image:image>
@@ -37,7 +37,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/tv</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.95</priority>
     <image:image>
@@ -48,7 +48,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/anime</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.95</priority>
     <image:image>
@@ -59,7 +59,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.90</priority>
     <image:image>
@@ -70,7 +70,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.90</priority>
     <image:image>
@@ -81,7 +81,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/exclusive</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -92,7 +92,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/adblocker</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.80</priority>
     <image:image>
@@ -102,8 +102,19 @@
     </image:image>
   </url>
   <url>
+    <loc>https://www.mydonkey.in/sound-enhancements</loc>
+    <lastmod>2026-09-06</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Sound Enhancements &amp; Audio Booster Guide | My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Watch free movies, TV shows, anime, and marvel movies online in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
     <loc>https://www.mydonkey.in/my-list</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.75</priority>
     <image:image>
@@ -114,7 +125,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/about</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.70</priority>
     <image:image>
@@ -125,7 +136,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/help</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.70</priority>
     <image:image>
@@ -136,7 +147,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/contact</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.70</priority>
     <image:image>
@@ -147,7 +158,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/careers</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <image:image>
@@ -158,7 +169,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/press</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <image:image>
@@ -169,7 +180,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/blog</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.65</priority>
     <image:image>
@@ -180,7 +191,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/investors</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.60</priority>
     <image:image>
@@ -191,7 +202,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/devices</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <image:image>
@@ -202,7 +213,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/terms</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.50</priority>
     <image:image>
@@ -213,7 +224,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/login</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.60</priority>
     <image:image>
@@ -224,7 +235,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?genre=Action</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -235,7 +246,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?genre=Adventure</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -246,7 +257,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?genre=Animation</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -257,7 +268,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?genre=Biography</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -268,7 +279,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?genre=Comedy</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -279,7 +290,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?genre=Crime</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -290,7 +301,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?genre=Documentary</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -301,7 +312,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?genre=Drama</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -312,7 +323,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?genre=Family</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -323,7 +334,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?genre=Fantasy</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -334,7 +345,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?genre=History</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -345,7 +356,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?genre=Horror</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -356,7 +367,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?genre=Mystery</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -367,7 +378,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?genre=Romance</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -378,7 +389,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?genre=Sci-Fi</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -389,7 +400,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?genre=Sport</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -400,7 +411,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?genre=Thriller</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -411,7 +422,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?genre=War</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -422,7 +433,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?region=global&amp;subRegion=en</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -433,7 +444,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?region=indian&amp;subRegion=hi</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -444,7 +455,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?region=indian&amp;subRegion=te</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -455,7 +466,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?region=indian&amp;subRegion=ta</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -466,7 +477,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?region=indian&amp;subRegion=ml</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -477,7 +488,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?region=indian&amp;subRegion=kn</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -488,7 +499,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?region=indian&amp;subRegion=pa</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -499,7 +510,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?region=indian&amp;subRegion=bn</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -510,7 +521,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?region=indian&amp;subRegion=mr</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -521,7 +532,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?region=global&amp;subRegion=ko</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -532,7 +543,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?region=global&amp;subRegion=ja</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -543,7 +554,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?region=global&amp;subRegion=es</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -554,7 +565,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories?region=global&amp;subRegion=fr</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.88</priority>
     <image:image>
@@ -565,7 +576,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=donkey</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -576,7 +587,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=my</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -587,7 +598,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=my%20donkey</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -598,7 +609,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=my%20donkey%20movies</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -609,7 +620,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=movies</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -620,7 +631,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=tv%20shows</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -631,7 +642,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=anime</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -642,7 +653,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=marvel%20movies</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -653,7 +664,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=english%20movies</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -664,7 +675,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=watch%20free%20movies</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -675,7 +686,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=online%20free%20movies</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -686,7 +697,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=free%20movies</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -697,7 +708,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=free%20movies%20online</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -708,7 +719,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=hindi%20movies</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -719,7 +730,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=bollywood%20movies</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -730,7 +741,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=hollywood%20movies</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -741,7 +752,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=web%20series</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -752,7 +763,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=action%20movies</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -763,7 +774,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=comedy%20movies</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -774,7 +785,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=horror%20movies</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -785,7 +796,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=romantic%20movies</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -796,7 +807,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=sci%20fi%20movies</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -807,7 +818,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=thriller%20movies</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -818,7 +829,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=south%20indian%20movies</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -829,7 +840,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=avengers%20movies</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -840,7 +851,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=dc%20movies</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -851,7 +862,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=watch%20anime%20online%20free</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -862,7 +873,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=watch%20series%20online</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -873,7 +884,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=hd%20movies%20online</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -884,7 +895,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=latest%20movies%202026</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -895,7 +906,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=free%20streaming%20movies</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -906,7 +917,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/search?q=korean%20drama</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -1677,12 +1688,6 @@
       <video:tag>demi moore</video:tag>
       <video:tag>andy garcia</video:tag>
     </video:video>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/browse/1KhxgyFWg24awfwqVZ2h</loc>
-    <lastmod>2026-09-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
   </url>
   <url>
     <loc>https://www.mydonkey.in/browse/1MgrTdh7Fkmvg2o79Ya9</loc>
@@ -8566,7 +8571,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/browse/EmOlX6RkVMcSlqEuJXKh</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-05</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -16599,7 +16604,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/browse/VDhfqSQHQ4dzGEC6e2A9</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -17502,7 +17507,7 @@
       <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/p1Xk8xNHHP1HJx2yGZuREp8Etab.jpg</video:thumbnail_loc>
       <video:title>Watch The Love Hypothesis (2026) Online Free | My Donkey</video:title>
       <video:description>Stream The Love Hypothesis (2026) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Olive Smith, a biology PhD candidate, and Dr. Adam Carlsen, a hotshot professor and well-known tyrant, enter into a fake relationship, seeing each of their carefully calculated theories on love get thrown into chaos.</video:description>
-      <video:publication_date>2026-09-04</video:publication_date>
+      <video:publication_date>2026-09-06</video:publication_date>
       <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/xwdamnfS6IM</video:player_loc>
       <video:category>Romance Movies</video:category>
       <video:family_friendly>yes</video:family_friendly>
@@ -18412,7 +18417,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/browse/Y7dW2caXllqYZ9Dw1zD3</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-05</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -19307,7 +19312,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/browse/a54dAOAEumdQnKROqXT3</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-05</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -19941,7 +19946,7 @@
       <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/ieAytQ8YcWEZGQpbBy7vHVddwd.jpg</video:thumbnail_loc>
       <video:title>Watch The Angry Birds Movie 3 (2026) Online Free | My Donkey</video:title>
       <video:description>Stream The Angry Birds Movie 3 (2026) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Red faces his greatest challenge yet… surviving fatherhood while saving the world.</video:description>
-      <video:publication_date>2026-09-04</video:publication_date>
+      <video:publication_date>2026-09-06</video:publication_date>
       <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/a9DB_aUMzME</video:player_loc>
       <video:category>Anime</video:category>
       <video:family_friendly>yes</video:family_friendly>
@@ -20505,7 +20510,7 @@
       <video:thumbnail_loc>https://wallpaperaccess.com/full/22193958.jpg</video:thumbnail_loc>
       <video:title>Watch Avengers : Doomsday (2026) Online Free | My Donkey</video:title>
       <video:description>Stream Avengers : Doomsday (2026) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Avengers: Doomsday is an upcoming Marvel Cinematic Universe film set for release on December 18, 2026, directed by the Russo Brothers.</video:description>
-      <video:publication_date>2026-09-04</video:publication_date>
+      <video:publication_date>2026-09-06</video:publication_date>
       <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/1clWprLC5Ak</video:player_loc>
       <video:category>Action Movies</video:category>
       <video:family_friendly>yes</video:family_friendly>
@@ -24634,6 +24639,50 @@
       <video:tag>amol parashar</video:tag>
       <video:tag>anandeshwar dwivedi</video:tag>
       <video:tag>akash makhija</video:tag>
+    </video:video>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/browse/iGiROeTj3zQmDP132tNJ</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://image.tmdb.org/t/p/w500/kiU9L3YUi8IWmsZw8V1YHiwYtqE.jpg</image:loc>
+      <image:title>Watch A Mosquito in the Ear (2026) Free Online - My Donkey Movies</image:title>
+      <image:caption>Stream A Mosquito in the Ear in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://image.tmdb.org/t/p/w1280/bkUkx4PIDkeIFqrTESS7rnBKDaD.jpg</image:loc>
+      <image:title>A Mosquito in the Ear HD Wallpaper &amp; Backdrop - My Donkey</image:title>
+      <image:caption>High definition backdrop for A Mosquito in the Ear on My Donkey streaming platform.</image:caption>
+    </image:image>
+    <video:video>
+      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/bkUkx4PIDkeIFqrTESS7rnBKDaD.jpg</video:thumbnail_loc>
+      <video:title>Watch A Mosquito in the Ear (2026) Online Free | My Donkey</video:title>
+      <video:description>Stream A Mosquito in the Ear (2026) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Andrew and Daniela travel to Goa, India, to meet their newly adopted 4-year-old daughter, Sarvari, and bring her back to the US. However, their world begins to crumble when Sarvari refuses to leave the orphanage that she calls home behind. The couple’s attempts to welcome their child into her new family and travel back with her prove to be a chaotic challenge that not only tests their patience but also profoundly reshapes their ideas of family, parenthood, and their relationship as a couple.</video:description>
+      <video:publication_date>2026-06-11</video:publication_date>
+      <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/7eMht2v1vzE</video:player_loc>
+      <video:category>Drama Movies</video:category>
+      <video:family_friendly>yes</video:family_friendly>
+      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
+      <video:platform relationship="allow">web mobile tv</video:platform>
+      <video:tag>donkey</video:tag>
+      <video:tag>my donkey</video:tag>
+      <video:tag>watch free movies</video:tag>
+      <video:tag>online free movies</video:tag>
+      <video:tag>free movies</video:tag>
+      <video:tag>hd streaming</video:tag>
+      <video:tag>movies</video:tag>
+      <video:tag>full movie online</video:tag>
+      <video:tag>english movies</video:tag>
+      <video:tag>hollywood movies</video:tag>
+      <video:tag>a mosquito in the ear</video:tag>
+      <video:tag>watch a mosquito in the ear</video:tag>
+      <video:tag>drama</video:tag>
+      <video:tag>drama movies</video:tag>
+      <video:tag>jake lacy</video:tag>
+      <video:tag>nazanin boniadi</video:tag>
+      <video:tag>ruhi pal</video:tag>
     </video:video>
   </url>
   <url>
@@ -30192,6 +30241,52 @@
     </video:video>
   </url>
   <url>
+    <loc>https://www.mydonkey.in/browse/rcX7adIQzYSNeOawdz9A</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://image.tmdb.org/t/p/w500/puyn1J1NOTG7P2dYxpOIl1583yf.jpg</image:loc>
+      <image:title>Watch Article 15 (2019) Free Online - My Donkey Movies</image:title>
+      <image:caption>Stream Article 15 in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://image.tmdb.org/t/p/w1280/wN5e6gMVBTEihohzFkuGyZGbDOw.jpg</image:loc>
+      <image:title>Article 15 HD Wallpaper &amp; Backdrop - My Donkey</image:title>
+      <image:caption>High definition backdrop for Article 15 on My Donkey streaming platform.</image:caption>
+    </image:image>
+    <video:video>
+      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/wN5e6gMVBTEihohzFkuGyZGbDOw.jpg</video:thumbnail_loc>
+      <video:title>Watch Article 15 (2019) Online Free | My Donkey</video:title>
+      <video:description>Stream Article 15 (2019) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. A young IPS officer’s new posting in rural India has him confronting caste disparities and uncomfortable truths in the face of a gruesome crime. When three girls go missing in the fictional village of Lalgaon, two of them are found dead and there is no trace of the third one. Where is she and who is responsible for this heinous act?</video:description>
+      <video:publication_date>2019-05-28</video:publication_date>
+      <video:player_loc allow_embed="yes">https://proxy.garageband.rocks/embed/movie/tt10324144</video:player_loc>
+      <video:category>Drama Movies</video:category>
+      <video:family_friendly>yes</video:family_friendly>
+      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
+      <video:platform relationship="allow">web mobile tv</video:platform>
+      <video:tag>donkey</video:tag>
+      <video:tag>my donkey</video:tag>
+      <video:tag>watch free movies</video:tag>
+      <video:tag>online free movies</video:tag>
+      <video:tag>free movies</video:tag>
+      <video:tag>hd streaming</video:tag>
+      <video:tag>movies</video:tag>
+      <video:tag>full movie online</video:tag>
+      <video:tag>english movies</video:tag>
+      <video:tag>hollywood movies</video:tag>
+      <video:tag>article 15</video:tag>
+      <video:tag>watch article 15</video:tag>
+      <video:tag>drama</video:tag>
+      <video:tag>drama movies</video:tag>
+      <video:tag>thriller</video:tag>
+      <video:tag>thriller movies</video:tag>
+      <video:tag>ayushmann khurrana</video:tag>
+      <video:tag>isha talwar</video:tag>
+      <video:tag>sayani gupta</video:tag>
+    </video:video>
+  </url>
+  <url>
     <loc>https://www.mydonkey.in/browse/reU850zHxPfP0qjVs8zl</loc>
     <lastmod>2026-07-07</lastmod>
     <changefreq>weekly</changefreq>
@@ -31170,6 +31265,54 @@
       <video:tag>maaya uchida</video:tag>
       <video:tag>shouta aoi</video:tag>
       <video:tag>miho okasaki</video:tag>
+    </video:video>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/browse/tmdb_597089</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://image.tmdb.org/t/p/w500/puyn1J1NOTG7P2dYxpOIl1583yf.jpg</image:loc>
+      <image:title>Watch Article 15 (2019) Free Online - My Donkey Movies</image:title>
+      <image:caption>Stream Article 15 in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://image.tmdb.org/t/p/w1280/wN5e6gMVBTEihohzFkuGyZGbDOw.jpg</image:loc>
+      <image:title>Article 15 HD Wallpaper &amp; Backdrop - My Donkey</image:title>
+      <image:caption>High definition backdrop for Article 15 on My Donkey streaming platform.</image:caption>
+    </image:image>
+    <video:video>
+      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/wN5e6gMVBTEihohzFkuGyZGbDOw.jpg</video:thumbnail_loc>
+      <video:title>Watch Article 15 (2019) Online Free | My Donkey</video:title>
+      <video:description>Stream Article 15 (2019) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. A young IPS officer’s new posting in rural India has him confronting caste disparities and uncomfortable truths in the face of a gruesome crime. When three girls go missing in the fictional village of Lalgaon, two of them are found dead and there is no trace of the third one. Where is she and who is responsible for this heinous act?</video:description>
+      <video:publication_date>2019-05-28</video:publication_date>
+      <video:player_loc allow_embed="yes">https://proxy.garageband.rocks/embed/movie/597089</video:player_loc>
+      <video:category>Crime Movies</video:category>
+      <video:family_friendly>yes</video:family_friendly>
+      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
+      <video:platform relationship="allow">web mobile tv</video:platform>
+      <video:tag>donkey</video:tag>
+      <video:tag>my donkey</video:tag>
+      <video:tag>watch free movies</video:tag>
+      <video:tag>online free movies</video:tag>
+      <video:tag>free movies</video:tag>
+      <video:tag>hd streaming</video:tag>
+      <video:tag>movies</video:tag>
+      <video:tag>full movie online</video:tag>
+      <video:tag>english movies</video:tag>
+      <video:tag>hollywood movies</video:tag>
+      <video:tag>article 15</video:tag>
+      <video:tag>watch article 15</video:tag>
+      <video:tag>crime</video:tag>
+      <video:tag>crime movies</video:tag>
+      <video:tag>drama</video:tag>
+      <video:tag>drama movies</video:tag>
+      <video:tag>thriller</video:tag>
+      <video:tag>thriller movies</video:tag>
+      <video:tag>ayushmann khurrana</video:tag>
+      <video:tag>isha talwar</video:tag>
+      <video:tag>sayani gupta</video:tag>
     </video:video>
   </url>
   <url>

@@ -14,6 +14,7 @@ import Footer from './components/Footer';
 import InfoPage from './components/InfoPage';
 import MobileScannerPage from './components/MobileScannerPage';
 import AdblockerGuidePage from './components/AdblockerGuidePage';
+import SoundEnhancementsPage from './components/SoundEnhancementsPage';
 
 import AccountSettings from './components/AccountSettings';
 import AdminLayout from './components/admin/AdminLayout';
@@ -941,6 +942,11 @@ const MainLayout = () => {
             return;
         }
 
+        if (page === 'sound-enhancements' || page === 'sound-enhancement' || page === 'sound' || page === 'sound-booster') {
+            navigate('/sound-enhancements');
+            return;
+        }
+
         // Check for dynamic page
         const existingPage = pages.find(p => p.id === page);
         if (existingPage) {
@@ -1785,6 +1791,8 @@ const AppRoutes = () => {
             <Route path="/scan" element={<MobileScannerPage />} />
             <Route path="/adblocker" element={<AdblockerGuidePage />} />
             <Route path="/adblockers" element={<Navigate to="/adblocker" replace />} />
+            <Route path="/sound-enhancements" element={<SoundEnhancementsPage />} />
+            <Route path="/sound-enhancement" element={<Navigate to="/sound-enhancements" replace />} />
             <Route
                 path="/admin/*"
                 element={

@@ -1,7 +1,10 @@
 import { MoviPlayer } from 'movi-player/player';
+import { soundBooster } from '../SoundBooster';
 
 export class MoviAudio {
-    constructor(private player: MoviPlayer) {}
+    constructor(private player: MoviPlayer) {
+        soundBooster.attachMoviPlayer(this.player);
+    }
 
     public getAudioTracks() {
         return this.player.trackManager.getAudioTracks();
@@ -13,6 +16,11 @@ export class MoviAudio {
 
     public setVolume(volume: number): void {
         this.player.setVolume(volume);
+    }
+
+    public setBoost(boost: number): void {
+        soundBooster.setBoost(boost);
+        soundBooster.attachMoviPlayer(this.player);
     }
 
     public getVolume(): number {

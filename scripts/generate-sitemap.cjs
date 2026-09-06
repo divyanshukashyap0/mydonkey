@@ -218,6 +218,7 @@ async function generateSitemap() {
             { path: '/search',     priority: '0.90', changefreq: 'daily',   title: 'Search Free Movies, TV Shows, Anime & Marvel Movies | My Donkey' },
             { path: '/exclusive',  priority: '0.85', changefreq: 'weekly',  title: 'My Donkey Originals & Exclusive Movies' },
             { path: '/adblocker',  priority: '0.80', changefreq: 'weekly',  title: 'Adblocker & Mobile DNS Setup Guide | My Donkey' },
+            { path: '/sound-enhancements', priority: '0.80', changefreq: 'weekly', title: 'Sound Enhancements & Audio Booster Guide | My Donkey' },
             { path: '/my-list',    priority: '0.75', changefreq: 'weekly',  title: 'My Watchlist — Save and Watch Free Movies Online' },
             { path: '/about',      priority: '0.70', changefreq: 'monthly', title: 'About My Donkey — Free Online Movie & Series Streaming Platform' },
             { path: '/help',       priority: '0.70', changefreq: 'monthly', title: 'Help & FAQ Center | My Donkey Streaming' },

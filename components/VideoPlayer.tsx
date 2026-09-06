@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Hls from 'hls.js';
-import { Play, Pause, Volume2, VolumeX, Maximize, Settings, SkipForward, ArrowLeft, RotateCcw, RotateCw, Subtitles, Layers, BarChart2, Minimize, Headphones, Check, MessageSquare, Wifi, ExternalLink, Scan, Scaling, AlertCircle, RefreshCw } from 'lucide-react';
+import { Play, Pause, Volume2, Volume1, VolumeX, Maximize, Settings, SkipForward, ArrowLeft, RotateCcw, RotateCw, Subtitles, Layers, BarChart2, Minimize, Headphones, Check, MessageSquare, Wifi, ExternalLink, Scan, Scaling, AlertCircle, RefreshCw, Zap, Sliders, Sparkles, ShieldCheck } from 'lucide-react';
 import { Content } from '../types';
 import StatsPanel from './StatsPanel';
 import DrivePlayer from './DrivePlayer';
@@ -9,6 +9,7 @@ import { useStore } from '../context/StoreContext';
 import { logUserActivity, incrementWatchTime } from '../utils/activityLogger';
 import { MoviVideo } from './MoviVideo';
 import { buildEmbedUrl, parseEmbedContentType } from '../utils/embedUrl';
+import { soundBooster } from '../player/SoundBooster';
 
 interface VideoPlayerProps {
     content: Content;
@@ -53,9 +54,44 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [isPlayerReady, setIsPlayerReady] = useState(false);
     const [isBuffering, setIsBuffering] = useState(false);
-    const [initialLoad, setInitialLoad] = useState(true); // New state to track first play
-    const [loaderStartTime] = useState(Date.now()); // Track when loader appeared
-    const [isBoosted, setIsBoosted] = useState(false);
+    const [initialLoad, setInitialLoad] = useState(true);
+    const [loaderStartTime] = useState(Date.now());
+    const [boostLevel, setBoostLevel] = useState<number>(() => {
+        try {
+            const saved = localStorage.getItem('mydonkey_sound_boost_level');
+            return saved ? parseFloat(saved) : 1.0;
+        } catch {
+            return 1.0;
+        }
+    });
+    const [dialogueClarity, setDialogueClarity] = useState<boolean>(() => {
+        try {
+            return localStorage.getItem('mydonkey_dialogue_boost') === 'true';
+        } catch {
+            return false;
+        }
+    });
+    const [limiterEnabled, setLimiterEnabled] = useState<boolean>(true);
+    const isBoosted = boostLevel > 1.0;
+    const [isTestingAudio, setIsTestingAudio] = useState(false);
+
+    useEffect(() => {
+        return () => {
+            soundBooster.stopTestSound();
+        };
+    }, []);
+
+    // On-Screen Display (OSD / HUD)
+    const [osdNotice, setOsdNotice] = useState<{ text: string; subtext?: string; icon?: 'zap' | 'volume' | 'mute' } | null>(null);
+    const osdTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const showOsd = useCallback((text: string, subtext?: string, icon?: 'zap' | 'volume' | 'mute') => {
+        if (osdTimeoutRef.current) clearTimeout(osdTimeoutRef.current);
+        setOsdNotice({ text, subtext, icon });
+        osdTimeoutRef.current = setTimeout(() => {
+            setOsdNotice(null);
+        }, 1800);
+    }, []);
     const [showDataWarning, setShowDataWarning] = useState(false);
     const [isZoomed, setIsZoomed] = useState(false); // Zoom/Fill State
     const [playbackError, setPlaybackError] = useState<string | null>(null);
@@ -187,6 +223,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const youtubeVideoId = finalYoutubeId;
     const driveIdToUse = finalDriveId;
     const isDriveVideo = useDrive && !useDirect;
+    const isExternalStream = isDirectIframeEmbed || isDriveVideo || (!directVideoUrl && !!youtubeVideoId);
     // --- End Video Source Logic ---
 
     const isMobile = useMemo(() => {
@@ -580,14 +617,58 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         setShowQualityMenu(false);
     };
 
-    const toggleBoost = () => {
-        const newBoost = !isBoosted;
-        setIsBoosted(newBoost);
-        if (newBoost) {
-            setVolume(100);
-            if (playerRef.current) playerRef.current.setVolume(100);
+    const BOOST_PRESETS = [1.0, 1.5, 2.0, 3.0, 4.0];
+
+    const cycleBoost = useCallback(() => {
+        if (isExternalStream) {
+            showOsd('External Embed Stream', 'Browser security blocks websites from modifying external iframe audio.', 'zap');
+            return;
         }
-    };
+        const levels = [1.0, 1.5, 2.0, 3.0, 4.0];
+        const nextIndex = (levels.findIndex(l => Math.abs(l - boostLevel) < 0.05) + 1) % levels.length;
+        const nextBoost = levels[nextIndex];
+        setBoostLevel(nextBoost);
+        if (nextBoost > 1.0) {
+            showOsd(`SOUND BOOST: ${Math.round(nextBoost * 100)}%`, `${nextBoost}x Maximum Audio`, 'zap');
+        } else {
+            showOsd('SOUND BOOST: OFF', 'Standard 100% Volume', 'volume');
+        }
+    }, [isExternalStream, boostLevel, showOsd]);
+
+    const setBoostPreset = useCallback((factor: number) => {
+        if (isExternalStream) {
+            showOsd('External Embed Stream', 'Browser security blocks websites from modifying external iframe audio.', 'zap');
+            return;
+        }
+        setBoostLevel(factor);
+        if (factor > 1.0) {
+            showOsd(`SOUND BOOST: ${Math.round(factor * 100)}%`, `${factor}x Browser Audio`, 'zap');
+        } else {
+            showOsd('SOUND BOOST: OFF', 'Standard 100% Volume', 'volume');
+        }
+    }, [isExternalStream, showOsd]);
+
+    // Sound Booster Sync
+    useEffect(() => {
+        soundBooster.setBoost(boostLevel);
+        if (videoRef.current?.setBoost) {
+            videoRef.current.setBoost(boostLevel);
+        }
+        try {
+            localStorage.setItem('mydonkey_sound_boost_level', String(boostLevel));
+        } catch {}
+    }, [boostLevel]);
+
+    useEffect(() => {
+        soundBooster.setDialogueClarity(dialogueClarity);
+        try {
+            localStorage.setItem('mydonkey_dialogue_boost', String(dialogueClarity));
+        } catch {}
+    }, [dialogueClarity]);
+
+    useEffect(() => {
+        soundBooster.setLimiter(limiterEnabled);
+    }, [limiterEnabled]);
 
     const triggerRipple = useCallback((side: 'left' | 'right') => {
         setRippleSides(prev => [...prev, side]);
@@ -696,9 +777,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     // Sync Vol/Mute for HLS/Native
     useEffect(() => {
         if (!(isHls || isNativeVideo) || !videoRef.current) return;
-        videoRef.current.volume = isMuted ? 0 : volume / 100;
+        const effectiveVol = isMuted ? 0 : (volume / 100) * boostLevel;
+        videoRef.current.volume = effectiveVol;
         videoRef.current.muted = isMuted;
-    }, [volume, isMuted, isHls, isNativeVideo]);
+        if (videoRef.current.setBoost) {
+            videoRef.current.setBoost(boostLevel);
+        }
+        soundBooster.setBoost(boostLevel);
+        soundBooster.scanAndAttach();
+    }, [volume, isMuted, isHls, isNativeVideo, boostLevel]);
 
     // Initialize YouTube Player
     useEffect(() => {
@@ -990,13 +1077,25 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     handleSkip(10);
                     triggerRipple('right');
                     break;
+                case 'KeyB':
+                    e.preventDefault();
+                    cycleBoost();
+                    break;
                 case 'ArrowUp':
                     e.preventDefault();
-                    setVolume(prev => Math.min(100, prev + 5));
+                    setVolume(prev => {
+                        const next = Math.min(100, prev + 5);
+                        showOsd(`Volume: ${next}%`, boostLevel > 1.0 ? `Sound Boost: ${Math.round(boostLevel * 100)}%` : undefined, 'volume');
+                        return next;
+                    });
                     break;
                 case 'ArrowDown':
                     e.preventDefault();
-                    setVolume(prev => Math.max(0, prev - 5));
+                    setVolume(prev => {
+                        const next = Math.max(0, prev - 5);
+                        showOsd(`Volume: ${next}%`, undefined, 'volume');
+                        return next;
+                    });
                     break;
                 case 'KeyF':
                     e.preventDefault();
@@ -1004,7 +1103,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     break;
                 case 'KeyM':
                     e.preventDefault();
-                    setIsMuted(prev => !prev);
+                    setIsMuted(prev => {
+                        const next = !prev;
+                        showOsd(next ? 'Muted' : 'Unmuted', undefined, next ? 'mute' : 'volume');
+                        return next;
+                    });
                     break;
                 case 'Escape':
                     if (document.fullscreenElement) {
@@ -1018,7 +1121,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [handleSkip, triggerRipple, toggleFullscreen, onClose]);
+    }, [handleSkip, triggerRipple, toggleFullscreen, onClose, cycleBoost, boostLevel, showOsd]);
 
 
     // Resume Logic: Watch for currentUser to populate if it wasn't ready initially
@@ -1303,6 +1406,21 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             onClick={resetInactivityTimer}
             className={`fixed inset-0 z-[100] bg-black flex flex-col font-sans select-none no-scrollbar ${isMobile && isPortrait ? 'overflow-y-auto' : 'justify-center items-center overflow-hidden'} ${!showControls && !(isMobile && isPortrait) ? 'cursor-none' : ''}`}
         >
+            {/* On-Screen Display (OSD / HUD) for Volume / Boost Feedback */}
+            {osdNotice && (
+                <div className="absolute top-14 md:top-16 left-1/2 -translate-x-1/2 z-[250] pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+                    <div className="flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-black/85 backdrop-blur-2xl border border-white/20 text-white shadow-[0_8px_32px_rgba(0,0,0,0.8)] ring-1 ring-white/10">
+                        {osdNotice.icon === 'zap' && <Zap size={20} className="text-amber-400 fill-amber-400 animate-pulse" />}
+                        {osdNotice.icon === 'mute' && <VolumeX size={20} className="text-red-500" />}
+                        {(!osdNotice.icon || osdNotice.icon === 'volume') && <Volume2 size={20} className="text-white" />}
+                        <div className="flex flex-col text-left">
+                            <span className="text-sm font-bold tracking-wide leading-tight">{osdNotice.text}</span>
+                            {osdNotice.subtext && <span className="text-[11px] text-amber-300 font-medium tracking-normal">{osdNotice.subtext}</span>}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* 1. STABLE VIDEO CONTAINER (Root level, never unmounts) */}
             <div className={`${isMobile && isPortrait ? 'relative w-full aspect-video' : 'absolute inset-0 z-0'} bg-black overflow-hidden`}>
                 <div className={`w-full h-full relative transition-transform duration-500 ease-in-out ${isZoomed ? 'scale-[1.35]' : 'scale-100'}`}>
@@ -1698,13 +1816,49 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                             {/* Lower Controls Row */}
                             <div className="flex justify-between items-center">
 
-                                {/* LEFT: Play/Pause and Volume Controls */}
-                                <div className="flex flex-1 items-center gap-1 md:gap-2">
+                                {/* LEFT: Play/Pause, Volume Slider, and Sound Booster */}
+                                <div className="flex flex-1 items-center gap-1 md:gap-3">
                                     <button onClick={(e) => { e.stopPropagation(); setPlaying(!playing); }} className="text-gray-300 hover:text-white p-1.5 md:p-2 rounded-full hover:bg-white/10 transition" title={playing ? "Pause" : "Play"}>
                                         {playing ? <Pause size={18} className="md:w-[22px] md:h-[22px] fill-current" /> : <Play size={18} className="md:w-[22px] md:h-[22px] fill-current ml-0.5" />}
                                     </button>
-                                    <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} className="text-gray-300 hover:text-white p-1.5 md:p-2 rounded-full hover:bg-white/10 transition" title={isMuted ? "Unmute" : "Mute"}>
-                                        {isMuted ? <VolumeX size={18} className="md:w-[22px] md:h-[22px]" /> : <Volume2 size={18} className="md:w-[22px] md:h-[22px]" />}
+                                    
+                                    {/* Volume & Hover Slider */}
+                                    <div className="flex items-center group/vol">
+                                        <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); showOsd(isMuted ? 'Unmuted' : 'Muted', undefined, isMuted ? 'volume' : 'mute'); }} className="text-gray-300 hover:text-white p-1.5 md:p-2 rounded-full hover:bg-white/10 transition" title={isMuted ? "Unmute" : "Mute"}>
+                                            {isMuted ? <VolumeX size={18} className="md:w-[22px] md:h-[22px] text-red-500" /> : volume > 50 ? <Volume2 size={18} className="md:w-[22px] md:h-[22px]" /> : <Volume1 size={18} className="md:w-[22px] md:h-[22px]" />}
+                                        </button>
+                                        <div className="w-0 group-hover/vol:w-20 md:group-hover/vol:w-24 overflow-hidden transition-all duration-300 flex items-center pr-2">
+                                            <input
+                                                type="range"
+                                                min="0"
+                                                max="100"
+                                                value={isMuted ? 0 : volume}
+                                                onChange={(e) => {
+                                                    const val = Number(e.target.value);
+                                                    setVolume(val);
+                                                    if (isMuted) setIsMuted(false);
+                                                }}
+                                                className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-brand-red focus:outline-none"
+                                                title={`Volume: ${volume}%`}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Quick Sound Booster Button */}
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            cycleBoost();
+                                        }}
+                                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wider transition-all duration-300 ${
+                                            boostLevel > 1.0
+                                                ? 'bg-gradient-to-r from-red-600/30 to-amber-500/30 border border-amber-500/50 text-amber-300 shadow-[0_0_16px_rgba(245,158,11,0.35)]'
+                                                : 'text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10'
+                                        }`}
+                                        title="Sound Booster: Click to cycle presets (100% → 150% → 200% → 300% → 400%). Hotkey: B"
+                                    >
+                                        <Zap size={13} className={boostLevel > 1.0 ? 'text-amber-400 fill-amber-400 animate-pulse' : 'text-gray-400'} />
+                                        <span>{boostLevel > 1.0 ? `${Math.round(boostLevel * 100)}%` : 'BOOST'}</span>
                                     </button>
                                 </div>
 
@@ -1758,21 +1912,224 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                                         <Headphones size={12} /> Audio
                                                     </h3>
 
-                                                    {/* Booster */}
-                                                    <div className="mb-4 px-1">
-                                                        <button
-                                                            onClick={toggleBoost}
-                                                            className={`w-full text-left p-3 rounded-xl border text-xs font-bold flex flex-col gap-2 transition-all ${isBoosted ? 'bg-brand-red/10 border-brand-red text-brand-red shadow-[0_0_15px_rgba(229,9,20,0.15)]' : 'border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'}`}
-                                                        >
-                                                            <div className="flex items-center justify-between w-full">
-                                                                <span className="tracking-wide">VOLUME BOOST</span>
-                                                                <div className={`w-2 h-2 rounded-full ${isBoosted ? 'bg-brand-red animate-pulse' : 'bg-gray-700'}`} />
+                                                    {/* Sound Booster / External Embed Notice */}
+                                                    {isExternalStream ? (
+                                                        <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-b from-amber-500/15 to-amber-500/5 border border-amber-500/30 flex flex-col gap-2.5">
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex items-center gap-1.5 text-amber-300 font-bold text-xs">
+                                                                    <AlertCircle size={15} />
+                                                                    <span>EXTERNAL STREAM</span>
+                                                                </div>
+                                                                <span className="text-[10px] uppercase font-bold text-amber-300 px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/30">
+                                                                    Iframe Player
+                                                                </span>
                                                             </div>
-                                                            <div className="w-full h-1 bg-gray-700 rounded-full overflow-hidden">
-                                                                <div className={`h-full transition-all duration-300 ${isBoosted ? 'w-full bg-brand-red' : 'w-0'}`} />
+                                                            <p className="text-[11px] text-gray-300 leading-snug">
+                                                                This title is streamed via an external embed ({embedBaseHost || 'proxy.garageband.rocks'}). 
+                                                                Browser security (Same-Origin Policy) isolates external iframe audio from web pages.
+                                                            </p>
+                                                            <a
+                                                                href="https://chromewebstore.google.com/detail/sound-booster-that-works/gnidjfdekbljleajoeamecfijnhbgndl"
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                className="flex items-center justify-between p-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 text-xs font-bold transition group"
+                                                            >
+                                                                <div className="flex flex-col">
+                                                                    <span>Sound Booster Extension</span>
+                                                                    <span className="text-[10px] text-amber-300/80 font-normal">Boosts all tab audio up to 600%</span>
+                                                                </div>
+                                                                <ExternalLink size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                                                            </a>
+
+                                                            {/* Interactive 400% Booster Preview */}
+                                                            <div className="pt-2 border-t border-amber-500/20 flex flex-col gap-2">
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="text-[10px] text-amber-200/90 font-bold uppercase tracking-wider">Test 400% Web Audio Engine</span>
+                                                                    {isTestingAudio && (
+                                                                        <span className="text-[9px] bg-amber-400 text-black px-1.5 py-0.5 rounded font-extrabold animate-pulse">
+                                                                            TESTING
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        soundBooster.toggleTestSound((active) => setIsTestingAudio(active));
+                                                                    }}
+                                                                    className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl font-bold text-xs transition border ${
+                                                                        isTestingAudio 
+                                                                            ? 'bg-amber-400 text-black border-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.5)]' 
+                                                                            : 'bg-white/10 hover:bg-white/15 text-amber-100 border-amber-500/30'
+                                                                    }`}
+                                                                >
+                                                                    <Volume2 size={14} />
+                                                                    <span>{isTestingAudio ? 'Stop 400% Demo Chime' : '🎧 Play 400% Demo Chime'}</span>
+                                                                </button>
+                                                                {isTestingAudio && (
+                                                                    <div className="p-2.5 rounded-xl bg-black/50 border border-amber-500/40 flex flex-col gap-1.5 animate-in fade-in duration-150">
+                                                                        <div className="flex justify-between text-[11px] text-amber-300 font-bold">
+                                                                            <span>Demo Volume:</span>
+                                                                            <span>{Math.round(boostLevel * 100)}% ({boostLevel}x)</span>
+                                                                        </div>
+                                                                        <input
+                                                                            type="range"
+                                                                            min="1.0"
+                                                                            max="4.0"
+                                                                            step="0.1"
+                                                                            value={boostLevel}
+                                                                            onChange={(e) => {
+                                                                                const val = parseFloat(e.target.value);
+                                                                                setBoostLevel(val);
+                                                                            }}
+                                                                            className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                                                                        />
+                                                                        <div className="flex justify-between text-[9px] text-gray-400">
+                                                                            <span>100% (Normal)</span>
+                                                                            <span>200% (2x)</span>
+                                                                            <span>400% (4x MAX)</span>
+                                                                        </div>
+                                                                        <p className="text-[10px] text-amber-200/90 text-center font-medium mt-0.5">
+                                                                            Drag slider to hear sound amplify up to 400% in real-time!
+                                                                        </p>
+                                                                    </div>
+                                                                )}
                                                             </div>
-                                                        </button>
-                                                    </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="mb-4 p-3 rounded-2xl bg-white/[0.04] border border-white/10 flex flex-col gap-3">
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <Zap size={14} className={boostLevel > 1.0 ? 'text-amber-400 fill-amber-400' : 'text-gray-400'} />
+                                                                    <span className="text-xs font-bold text-white tracking-wide">SOUND BOOSTER</span>
+                                                                </div>
+                                                                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+                                                                    boostLevel > 1.0
+                                                                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
+                                                                        : 'bg-white/5 text-gray-400 border-white/10'
+                                                                }`}>
+                                                                    {boostLevel > 1.0 ? `${Math.round(boostLevel * 100)}% (${boostLevel}x)` : '100% (NORMAL)'}
+                                                                </span>
+                                                            </div>
+
+                                                            {/* Presets */}
+                                                            <div className="grid grid-cols-5 gap-1">
+                                                                {BOOST_PRESETS.map((lvl) => {
+                                                                    const isActive = Math.abs(lvl - boostLevel) < 0.05;
+                                                                    return (
+                                                                        <button
+                                                                            key={lvl}
+                                                                            onClick={() => setBoostPreset(lvl)}
+                                                                            className={`py-1.5 px-1 rounded-lg text-[10px] font-bold text-center transition-all ${
+                                                                                isActive
+                                                                                    ? 'bg-brand-red text-white shadow-md shadow-brand-red/30 ring-1 ring-white/20'
+                                                                                    : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
+                                                                            }`}
+                                                                        >
+                                                                            {Math.round(lvl * 100)}%
+                                                                        </button>
+                                                                    );
+                                                                })}
+                                                            </div>
+
+                                                            {/* Fine slider */}
+                                                            <div className="flex flex-col gap-1">
+                                                                <div className="flex justify-between text-[10px] text-gray-400 font-medium">
+                                                                    <span>100%</span>
+                                                                    <span className="text-amber-400 font-bold">{Math.round(boostLevel * 100)}%</span>
+                                                                    <span>400%</span>
+                                                                </div>
+                                                                <input
+                                                                    type="range"
+                                                                    min="1.0"
+                                                                    max="4.0"
+                                                                    step="0.1"
+                                                                    value={boostLevel}
+                                                                    onChange={(e) => {
+                                                                        const val = parseFloat(e.target.value);
+                                                                        setBoostLevel(val);
+                                                                    }}
+                                                                    className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-brand-red focus:outline-none"
+                                                                />
+                                                            </div>
+
+                                                            {/* Extra Audio Processing Toggles */}
+                                                            <div className="pt-2 border-t border-white/5 flex flex-col gap-1.5">
+                                                                {/* Dialogue Clarity */}
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const next = !dialogueClarity;
+                                                                        setDialogueClarity(next);
+                                                                        showOsd(next ? 'Dialogue Clarity: ON' : 'Dialogue Clarity: OFF', 'Vocal frequency enhancer', 'zap');
+                                                                    }}
+                                                                    className="flex items-center justify-between text-left p-1.5 rounded-lg hover:bg-white/5 transition"
+                                                                >
+                                                                    <div className="flex items-center gap-2">
+                                                                        <Sparkles size={13} className={dialogueClarity ? 'text-amber-400' : 'text-gray-500'} />
+                                                                        <div className="flex flex-col">
+                                                                            <span className="text-[11px] font-semibold text-gray-200">Dialogue Clarity</span>
+                                                                            <span className="text-[9px] text-gray-500">Boosts voice frequencies for crisp speech</span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className={`w-8 h-4 rounded-full transition-colors relative flex items-center px-0.5 ${dialogueClarity ? 'bg-brand-red' : 'bg-white/10'}`}>
+                                                                        <div className={`w-3 h-3 rounded-full bg-white transition-transform ${dialogueClarity ? 'translate-x-4' : 'translate-x-0'}`} />
+                                                                    </div>
+                                                                </button>
+
+                                                                {/* Anti-Clipping Limiter */}
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const next = !limiterEnabled;
+                                                                        setLimiterEnabled(next);
+                                                                        showOsd(next ? 'Anti-Clipping: ON' : 'Anti-Clipping: OFF', 'Dynamic distortion protection', 'zap');
+                                                                    }}
+                                                                    className="flex items-center justify-between text-left p-1.5 rounded-lg hover:bg-white/5 transition"
+                                                                >
+                                                                    <div className="flex items-center gap-2">
+                                                                        <ShieldCheck size={13} className={limiterEnabled ? 'text-emerald-400' : 'text-gray-500'} />
+                                                                        <div className="flex flex-col">
+                                                                            <span className="text-[11px] font-semibold text-gray-200">Anti-Clipping Limiter</span>
+                                                                            <span className="text-[9px] text-gray-500">Compresses peaks to prevent distortion</span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className={`w-8 h-4 rounded-full transition-colors relative flex items-center px-0.5 ${limiterEnabled ? 'bg-emerald-600' : 'bg-white/10'}`}>
+                                                                        <div className={`w-3 h-3 rounded-full bg-white transition-transform ${limiterEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+                                                                    </div>
+                                                                </button>
+
+                                                                {/* Test Chime Button */}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        soundBooster.toggleTestSound((active) => setIsTestingAudio(active));
+                                                                    }}
+                                                                    className={`w-full flex items-center justify-center gap-2 py-1.5 px-2 rounded-lg font-bold text-[11px] transition border ${
+                                                                        isTestingAudio 
+                                                                            ? 'bg-amber-400 text-black border-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.5)]' 
+                                                                            : 'bg-white/5 hover:bg-white/10 text-gray-300 border-white/10'
+                                                                    }`}
+                                                                >
+                                                                    <Volume2 size={13} />
+                                                                    <span>{isTestingAudio ? 'Stop Demo Chime' : '🎧 Test 400% Audio Chime'}</span>
+                                                                </button>
+                                                            </div>
+
+                                                            {/* Dynamic visualizer bars when boosted */}
+                                                            {boostLevel > 1.0 && (
+                                                                <div className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-black/40 border border-amber-500/20 text-[10px] text-amber-300/90 font-medium">
+                                                                    <span className="flex items-center gap-1.5">
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                                                                        Amplification Active
+                                                                    </span>
+                                                                    <div className="flex items-end gap-0.5 h-3">
+                                                                        <div className="w-0.5 bg-amber-400 rounded-full h-2 animate-pulse" />
+                                                                        <div className="w-0.5 bg-amber-400 rounded-full h-3 animate-pulse" />
+                                                                        <div className="w-0.5 bg-amber-400 rounded-full h-1.5 animate-pulse" />
+                                                                        <div className="w-0.5 bg-amber-400 rounded-full h-2.5 animate-pulse" />
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
 
                                                     <div className="space-y-1">
                                                         {AUDIO_OPTIONS.map(audi => (
@@ -1782,24 +2139,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                                                 {selectedAudio.id === audi.id && <Check size={14} className="text-brand-red" />}
                                                             </button>
                                                         ))}
-                                                    </div>
-
-                                                    {/* Extension Link */}
-                                                    <div className="mt-6 pt-4 border-t border-white/5 px-1">
-                                                        <a
-                                                            href="https://chromewebstore.google.com/detail/sound-booster-that-works/gnidjfdekbljleajoeamecfijnhbgndl"
-                                                            target="_blank"
-                                                            rel="noreferrer"
-                                                            className="flex flex-col gap-1 p-3 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 hover:text-blue-300 transition-all group"
-                                                        >
-                                                            <div className="flex items-center justify-between">
-                                                                <span className="text-xs font-bold uppercase tracking-wider">Need More Volume?</span>
-                                                                <ExternalLink size={14} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                                                            </div>
-                                                            <span className="text-[10px] text-gray-400 group-hover:text-gray-300 leading-tight">
-                                                                Get the "Sound Booster" Chrome Extension for up to 600% louder audio.
-                                                            </span>
-                                                        </a>
                                                     </div>
                                                 </div>
                                             </div>

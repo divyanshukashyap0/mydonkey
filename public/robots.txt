@@ -10,6 +10,7 @@ Allow: /search*
 Allow: /exclusive
 Allow: /my-list
 Allow: /adblocker
+Allow: /sound-enhancements
 Allow: /about
 Allow: /help
 Allow: /contact

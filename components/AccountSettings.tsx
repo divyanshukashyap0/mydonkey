@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronUp, ChevronRight, Monitor, User as UserIcon, Plus, Calendar, Camera, Wifi, Settings, PlayCircle, Smartphone, Download, Send, Maximize, X, Trash2, Film, QrCode, ScanLine, Tv, Sparkles, ArrowRight, ShieldCheck, History, SlidersHorizontal, Globe } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronRight, Monitor, User as UserIcon, Plus, Calendar, Camera, Wifi, Settings, PlayCircle, Smartphone, Download, Send, Maximize, X, Trash2, Film, QrCode, ScanLine, Tv, Sparkles, ArrowRight, ShieldCheck, History, SlidersHorizontal, Globe, Volume2 } from 'lucide-react';
 import { useStore, PERMANENT_ADMINS } from '../context/StoreContext';
 import DeviceManagementModal from './account/DeviceManagementModal';
 import MyContributions from './account/MyContributions';
@@ -478,6 +478,27 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                                         </span>
                                     </div>
                                     <div className="text-xs text-gray-500">Suggested adblockers for PC & private DNS for smartphones</div>
+                                </div>
+                            </div>
+                            <ChevronDown size={18} className="text-gray-500 -rotate-90 group-hover:translate-x-1 transition-transform" />
+                        </button>
+
+                        <button
+                            onClick={() => navigate('/sound-enhancements')}
+                            className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition border-t border-white/5 group text-left cursor-pointer"
+                        >
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-black shadow-md shadow-amber-500/20 group-hover:scale-105 transition-transform">
+                                    <Volume2 size={18} />
+                                </div>
+                                <div className="text-left">
+                                    <div className="font-medium flex items-center gap-2 text-white">
+                                        Sound Enhancements & Booster
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                            AUDIO LAB
+                                        </span>
+                                    </div>
+                                    <div className="text-xs text-gray-500">400% Web Audio studio, dialogue clarity EQ, & OS guide</div>
                                 </div>
                             </div>
                             <ChevronDown size={18} className="text-gray-500 -rotate-90 group-hover:translate-x-1 transition-transform" />
