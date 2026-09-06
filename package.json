@@ -8,6 +8,7 @@
     "build": "vite build",
     "seed": "node scripts/seed.js",
     "sitemap": "node scripts/generate-sitemap.cjs",
+    "google-index": "node scripts/google-bulk-index.cjs",
     "preview": "vite preview"
   },
   "dependencies": {

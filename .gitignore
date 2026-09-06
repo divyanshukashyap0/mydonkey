@@ -46,3 +46,7 @@ tv_10_data.json
 test-*.mjs
 test-*.ts
 check_encoding.cjs
+service_account.json
+google-key*.json
+scripts/.indexed-urls.json
+
