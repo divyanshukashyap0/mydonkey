@@ -107,6 +107,7 @@ export interface SiteSettings {
   siteName: string;
   siteUrl?: string;
   heroContentId?: string;
+  heroContentIds?: string[];
   heroVideoQuality?: 'auto' | 'hd720' | 'hd1080' | 'highres';
   maintenanceMode: boolean;
   contactEmail?: string;

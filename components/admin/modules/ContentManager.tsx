@@ -380,11 +380,16 @@ const ContentManager = () => {
     };
 
     const toggleHero = async (id: string) => {
-        if (settings.heroContentId === id) {
-            await updateSettings({ heroContentId: deleteField() as any });
-        } else {
-            await updateSettings({ heroContentId: id });
-        }
+        const currentList = settings.heroContentIds || (settings.heroContentId ? [settings.heroContentId] : []);
+        const isCurrentlyHero = currentList.includes(id);
+        const updatedList = isCurrentlyHero
+            ? currentList.filter(item => item !== id)
+            : [...currentList, id];
+
+        await updateSettings({
+            heroContentIds: updatedList,
+            heroContentId: updatedList[0] || (deleteField() as any)
+        });
     };
 
     const handleSyncAll = async () => {
@@ -1417,7 +1422,7 @@ const ContentManager = () => {
 
                             {/* Status Badges */}
                             <div className="absolute top-2 left-2 flex flex-col gap-1">
-                                {settings.heroContentId === item.id && (
+                                {((settings.heroContentIds && settings.heroContentIds.includes(item.id)) || settings.heroContentId === item.id) && (
                                     <span className="px-2 py-0.5 rounded bg-amber-500 text-black text-[10px] font-black uppercase shadow-lg">
                                         ⭐ HERO
                                     </span>
@@ -1441,10 +1446,14 @@ const ContentManager = () => {
                                 </button>
                                 <button
                                     onClick={(e) => { e.stopPropagation(); toggleHero(item.id); }}
-                                    className={`p-2 rounded-full bg-black/60 backdrop-blur-md text-white border border-white/20 hover:scale-110 transition ${settings.heroContentId === item.id ? 'text-amber-400 border-amber-400' : ''}`}
-                                    title="Set as Hero"
+                                    className={`p-2 rounded-full bg-black/60 backdrop-blur-md text-white border border-white/20 hover:scale-110 transition ${
+                                        ((settings.heroContentIds && settings.heroContentIds.includes(item.id)) || settings.heroContentId === item.id)
+                                            ? 'text-amber-400 border-amber-400'
+                                            : ''
+                                    }`}
+                                    title={((settings.heroContentIds && settings.heroContentIds.includes(item.id)) || settings.heroContentId === item.id) ? "Remove from Hero Banner" : "Feature in Hero Banner"}
                                 >
-                                    <Star size={16} fill={settings.heroContentId === item.id ? "currentColor" : "none"} />
+                                    <Star size={16} fill={((settings.heroContentIds && settings.heroContentIds.includes(item.id)) || settings.heroContentId === item.id) ? "currentColor" : "none"} />
                                 </button>
                             </div>
                         </div>

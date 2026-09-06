@@ -17,7 +17,14 @@ import {
     Monitor,
     Share2,
     Lock,
-    Eye
+    Eye,
+    ChevronUp,
+    ChevronDown,
+    Trash2,
+    Plus,
+    Search,
+    Star,
+    Check
 } from 'lucide-react';
 import { SiteSettings } from '../../types';
 import { doc, writeBatch } from 'firebase/firestore';
@@ -39,6 +46,60 @@ const GlobalSettingsModal: React.FC<GlobalSettingsModalProps> = ({ isOpen, onClo
 
     const [isUpdatingBatch, setIsUpdatingBatch] = useState(false);
     const [batchProgress, setBatchProgress] = useState('');
+    const [heroSearchQuery, setHeroSearchQuery] = useState('');
+
+    const selectedHeroIds = formData.heroContentIds && formData.heroContentIds.length > 0
+        ? formData.heroContentIds
+        : (formData.heroContentId ? [formData.heroContentId] : []);
+
+    const selectedHeroItems = selectedHeroIds
+        .map(id => content.find(c => c.id === id || String(c.tmdbId) === String(id)))
+        .filter(Boolean) as (typeof content[0])[];
+
+    const heroSearchResults = heroSearchQuery.trim().length > 1
+        ? content.filter(c =>
+            c.title?.toLowerCase().includes(heroSearchQuery.toLowerCase().trim()) ||
+            c.genres?.some(g => g.toLowerCase().includes(heroSearchQuery.toLowerCase().trim()))
+        ).slice(0, 6)
+        : [];
+
+    const handleAddHeroItem = (id: string) => {
+        if (selectedHeroIds.includes(id)) return;
+        const next = [...selectedHeroIds, id];
+        handleChange({
+            heroContentIds: next,
+            heroContentId: next[0] || ''
+        });
+        setHeroSearchQuery('');
+    };
+
+    const handleRemoveHeroItem = (id: string) => {
+        const next = selectedHeroIds.filter(item => item !== id);
+        handleChange({
+            heroContentIds: next,
+            heroContentId: next[0] || ''
+        });
+    };
+
+    const handleMoveHeroItem = (index: number, direction: 'up' | 'down') => {
+        const targetIndex = direction === 'up' ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= selectedHeroIds.length) return;
+        const next = [...selectedHeroIds];
+        const temp = next[index];
+        next[index] = next[targetIndex];
+        next[targetIndex] = temp;
+        handleChange({
+            heroContentIds: next,
+            heroContentId: next[0] || ''
+        });
+    };
+
+    const handleClearHeroItems = () => {
+        handleChange({
+            heroContentIds: [],
+            heroContentId: ''
+        });
+    };
 
     useEffect(() => {
         if (isOpen) {
@@ -411,6 +472,195 @@ const GlobalSettingsModal: React.FC<GlobalSettingsModalProps> = ({ isOpen, onClo
                     {/* TAB 3: Media & Hero */}
                     {activeTab === 'media' && (
                         <div className="space-y-6 animate-in fade-in duration-150">
+                            {/* Hero Carousel Selection */}
+                            <div className="bg-white/5 border border-white/10 rounded-xl p-5 space-y-4">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-white/10">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                            <Star size={18} fill="currentColor" />
+                                        </div>
+                                        <div>
+                                            <div className="font-bold text-white text-sm">Main Screen Hero Carousel</div>
+                                            <div className="text-xs text-gray-400">
+                                                Select and arrange which blockbusters appear in the top hero banner carousel on the homepage.
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {selectedHeroItems.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={handleClearHeroItems}
+                                            className="text-xs text-gray-400 hover:text-red-400 font-semibold transition flex items-center gap-1 self-start sm:self-auto"
+                                        >
+                                            <Trash2 size={13} />
+                                            <span>Reset to Auto</span>
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Currently Selected Hero Items */}
+                                <div className="space-y-2">
+                                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+                                        <span>Featured Carousel Titles ({selectedHeroItems.length})</span>
+                                        {selectedHeroItems.length === 0 && (
+                                            <span className="text-[11px] text-amber-400 font-normal lowercase">
+                                                (auto-showing top-rated blockbusters)
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {selectedHeroItems.length === 0 ? (
+                                        <div className="p-4 rounded-lg bg-black/40 border border-dashed border-white/10 text-center text-xs text-gray-400">
+                                            No custom hero titles selected. The homepage will automatically showcase top-rated titles with verified YouTube trailers. Use the search bar below to pin specific titles!
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                                            {selectedHeroItems.map((item, index) => (
+                                                <div
+                                                    key={item.id}
+                                                    className="flex items-center gap-3 p-2.5 rounded-lg bg-black/60 border border-white/10 hover:border-white/20 transition"
+                                                >
+                                                    <span className="text-xs font-mono font-bold text-amber-400 w-5 text-center">
+                                                        #{index + 1}
+                                                    </span>
+                                                    <img
+                                                        src={item.poster_path || item.backdrop_path || '/logo.png'}
+                                                        alt={item.title}
+                                                        className="w-10 h-14 object-cover rounded bg-zinc-900 flex-shrink-0"
+                                                        onError={(e) => {
+                                                            const t = e.currentTarget;
+                                                            if (!t.src.endsWith('/logo.png')) t.src = '/logo.png';
+                                                        }}
+                                                    />
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-sm font-bold text-white truncate">
+                                                            {item.title}
+                                                        </div>
+                                                        <div className="flex items-center gap-2 text-[11px] text-gray-400 mt-0.5">
+                                                            <span>{item.year || item.release_date?.split('-')[0] || 'HD'}</span>
+                                                            <span className="uppercase text-[10px] px-1.5 py-0.2 bg-white/10 rounded font-semibold text-gray-300">
+                                                                {item.type || 'MOVIE'}
+                                                            </span>
+                                                            {item.youtubeId ? (
+                                                                <span className="text-[10px] text-green-400 flex items-center gap-0.5">
+                                                                    🎬 Trailer
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-[10px] text-yellow-500/80">
+                                                                    ⚠️ No trailer
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <button
+                                                            type="button"
+                                                            disabled={index === 0}
+                                                            onClick={() => handleMoveHeroItem(index, 'up')}
+                                                            className={`p-1.5 rounded hover:bg-white/10 text-gray-400 hover:text-white transition ${
+                                                                index === 0 ? 'opacity-30 cursor-not-allowed' : ''
+                                                            }`}
+                                                            title="Move Up"
+                                                        >
+                                                            <ChevronUp size={14} />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            disabled={index === selectedHeroItems.length - 1}
+                                                            onClick={() => handleMoveHeroItem(index, 'down')}
+                                                            className={`p-1.5 rounded hover:bg-white/10 text-gray-400 hover:text-white transition ${
+                                                                index === selectedHeroItems.length - 1 ? 'opacity-30 cursor-not-allowed' : ''
+                                                            }`}
+                                                            title="Move Down"
+                                                        >
+                                                            <ChevronDown size={14} />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveHeroItem(item.id)}
+                                                            className="p-1.5 rounded hover:bg-red-500/20 text-gray-400 hover:text-red-400 transition ml-1"
+                                                            title="Remove from Hero"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Search to Add Title */}
+                                <div className="pt-2 border-t border-white/10">
+                                    <label className="text-xs text-gray-300 font-bold block mb-2">
+                                        Add Content to Hero Carousel
+                                    </label>
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-3 text-gray-500" size={16} />
+                                        <input
+                                            type="text"
+                                            value={heroSearchQuery}
+                                            onChange={(e) => setHeroSearchQuery(e.target.value)}
+                                            placeholder="Type movie or series title to feature..."
+                                            className="w-full bg-black/60 border border-white/10 rounded-xl p-2.5 pl-10 text-sm text-white outline-none focus:border-brand-red transition placeholder:text-gray-600"
+                                        />
+                                        {heroSearchQuery && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setHeroSearchQuery('')}
+                                                className="absolute right-3 top-3 text-gray-500 hover:text-white text-xs"
+                                            >
+                                                <X size={14} />
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Search Results Dropdown */}
+                                    {heroSearchResults.length > 0 && (
+                                        <div className="mt-2 bg-zinc-900/95 border border-white/15 rounded-xl overflow-hidden shadow-2xl divide-y divide-white/5 max-h-56 overflow-y-auto">
+                                            {heroSearchResults.map(item => {
+                                                const isAlreadySelected = selectedHeroIds.includes(item.id);
+                                                return (
+                                                    <div
+                                                        key={item.id}
+                                                        className="flex items-center justify-between gap-3 p-2.5 hover:bg-white/5 transition"
+                                                    >
+                                                        <div className="flex items-center gap-2.5 min-w-0">
+                                                            <img
+                                                                src={item.poster_path || item.backdrop_path || '/logo.png'}
+                                                                alt=""
+                                                                className="w-8 h-11 object-cover rounded bg-black flex-shrink-0"
+                                                            />
+                                                            <div className="min-w-0">
+                                                                <div className="text-xs font-bold text-white truncate">
+                                                                    {item.title}
+                                                                </div>
+                                                                <div className="text-[10px] text-gray-400">
+                                                                    {item.year || item.release_date?.split('-')[0]} • {item.genres?.slice(0, 2).join(', ')}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        {isAlreadySelected ? (
+                                                            <span className="text-[11px] font-semibold text-green-400 px-2 py-1 rounded bg-green-500/10 border border-green-500/20 flex items-center gap-1 flex-shrink-0">
+                                                                <Check size={12} /> In Hero
+                                                            </span>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleAddHeroItem(item.id)}
+                                                                className="text-xs font-bold px-3 py-1 rounded-lg bg-brand-red hover:bg-red-700 text-white transition flex items-center gap-1 shadow-sm flex-shrink-0"
+                                                            >
+                                                                <Plus size={13} /> Add
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
                             {/* Content Loader Overlay */}
                             <div className="bg-white/5 border border-white/10 rounded-xl p-5 space-y-4">
                                 <div className="flex items-center justify-between">

@@ -1180,6 +1180,26 @@ const MainLayout = () => {
         }
 
         if (activeTab === 'home') {
+            // Check if admin has explicitly selected hero contents for the main screen
+            const configuredHeroIds = (settings.heroContentIds && settings.heroContentIds.length > 0)
+                ? settings.heroContentIds
+                : (settings.heroContentId ? [settings.heroContentId] : []);
+
+            const configuredHeroItems: Content[] = [];
+            const seenHeroIds = new Set<string>();
+
+            if (configuredHeroIds.length > 0) {
+                for (const hid of configuredHeroIds) {
+                    const match = content.find(c => c.id === hid || String(c.tmdbId) === String(hid))
+                        || rawContent?.find(c => c.id === hid || String(c.tmdbId) === String(hid))
+                        || FALLBACK_CATALOG.find(c => c.id === hid || String(c.tmdbId) === String(hid));
+                    if (match && !seenHeroIds.has(match.id)) {
+                        seenHeroIds.add(match.id);
+                        configuredHeroItems.push(match);
+                    }
+                }
+            }
+
             // Strictly TOP-RATED content with verified YouTube TRAILERS (rating >= 7.5, sorted highest first)
             const catalogWithTrailers = content
                 .filter(c => isIndianOrMarvelContent(c))
@@ -1194,31 +1214,33 @@ const MainLayout = () => {
                 .filter(c => Boolean(c.youtubeId && c.youtubeId.trim() !== ''))
                 .filter(c => (c.vote_average || 0) >= 7.5);
 
-            // Deduplicate, prioritizing highest rated
-            const seenHeroIds = new Set<string>();
-            const heroCandidates: Content[] = [];
+            // Deduplicate automatic candidates
+            const autoCandidates: Content[] = [];
             for (const item of [...catalogWithTrailers, ...dynamicWithTrailers]) {
                 if (!seenHeroIds.has(item.id)) {
                     seenHeroIds.add(item.id);
-                    heroCandidates.push(item);
+                    autoCandidates.push(item);
                 }
             }
 
             // Fallback if needed to any content with trailers
-            if (heroCandidates.length === 0) {
+            if (autoCandidates.length === 0 && configuredHeroItems.length === 0) {
                 content
                     .filter(c => Boolean(c.youtubeId && c.youtubeId.trim() !== ''))
                     .filter(c => Boolean(c.backdrop_path || c.poster_path))
                     .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0))
                     .slice(0, 5)
-                    .forEach(c => heroCandidates.push(c));
+                    .forEach(c => autoCandidates.push(c));
             }
 
-            // Always sort hero items by rating descending (highest rated first: 8.6, 8.5, 8.4...)
-            heroCandidates.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
+            // Always sort automatic hero items by rating descending (highest rated first)
+            autoCandidates.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
 
-            // Strictly take up to 10 top-rated items with verified trailers
-            const effectiveHeroItems = heroCandidates.filter(c => Boolean(c.youtubeId && c.youtubeId.trim() !== '')).slice(0, 10);
+            // Admin-selected hero contents come first, followed by top-rated candidates
+            const heroCandidates: Content[] = [...configuredHeroItems, ...autoCandidates];
+
+            // Strictly take up to 10 items
+            const effectiveHeroItems = heroCandidates.slice(0, 10);
             const fallbackHero = effectiveHeroItems[0] || null;
 
             const homeContinueWatching = continueWatchingItems.filter(isIndianOrMarvelContent);

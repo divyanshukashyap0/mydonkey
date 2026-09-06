@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../../../context/StoreContext';
-import { Save, AlertTriangle, Globe, Shield, Monitor, CheckCircle, Smartphone, Film, Tv, Link2, RefreshCw, Mail } from 'lucide-react';
-import { SiteSettings } from '../../../types';
+import { Save, AlertTriangle, Globe, Shield, Monitor, CheckCircle, Smartphone, Film, Tv, Link2, RefreshCw, Mail, Star, Trash2 } from 'lucide-react';
+import { SiteSettings, Content } from '../../../types';
 import { doc, writeBatch } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { buildEmbedUrl, parseEmbedContentType } from '../../../utils/embedUrl';
@@ -100,7 +100,21 @@ const SettingsManager = () => {
         }
     };
 
-    const heroContent = content.find(c => c.id === formData.heroContentId);
+    const selectedHeroIds = formData.heroContentIds && formData.heroContentIds.length > 0
+        ? formData.heroContentIds
+        : (formData.heroContentId ? [formData.heroContentId] : []);
+
+    const selectedHeroItems = selectedHeroIds
+        .map(id => content.find(c => c.id === id || String(c.tmdbId) === String(id)))
+        .filter(Boolean) as Content[];
+
+    const handleRemoveHeroItem = (id: string) => {
+        const next = selectedHeroIds.filter(item => item !== id);
+        handleChange({
+            heroContentIds: next,
+            heroContentId: next[0] || ''
+        });
+    };
 
     return (
         <div className="space-y-6 animate-in fade-in pb-20 max-w-5xl">
@@ -248,31 +262,67 @@ const SettingsManager = () => {
                 {activeTab === 'media' && (
                     <div className="max-w-2xl space-y-8 animate-in slide-in-from-left-4 duration-300">
                         <div>
-                            <label className="text-xs text-gray-500 uppercase font-bold block mb-4">Homepage Hero Content</label>
-                            {heroContent ? (
-                                <div className="flex items-start gap-4 bg-white/5 p-4 rounded-xl border border-white/10">
-                                    <img 
-                                        src={heroContent.poster_path || '/logo.png'} 
-                                        className={`w-16 h-24 ${heroContent.poster_path ? 'object-cover' : 'object-contain p-2 bg-white/10'} rounded-lg shadow-lg`} 
-                                        alt="" 
-                                        onError={(e) => {
-                                            const t = e.currentTarget;
-                                            if (!t.src.endsWith('/logo.png')) {
-                                                t.src = '/logo.png';
-                                                t.className = "w-16 h-24 object-contain p-2 bg-white/10 rounded-lg shadow-lg";
-                                            }
-                                        }}
-                                    />
-                                    <div className="flex-1">
-                                        <div className="font-bold text-lg mb-1">{heroContent.title}</div>
-                                        <div className="text-xs text-gray-400 mb-3">{heroContent.overview.substring(0, 100)}...</div>
-                                        <div className="text-[10px] text-gray-500 uppercase font-mono">ID: {heroContent.id}</div>
-                                    </div>
-                                    <button onClick={() => alert("Go to Content Library to change selection.")} className="text-xs text-blue-400 hover:text-white font-bold">Change</button>
+                            <div className="flex items-center justify-between mb-4">
+                                <label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2">
+                                    <Star size={14} className="text-amber-400" fill="currentColor" />
+                                    Homepage Hero Carousel ({selectedHeroItems.length} Selected)
+                                </label>
+                                {selectedHeroItems.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleChange({ heroContentIds: [], heroContentId: '' })}
+                                        className="text-xs text-gray-500 hover:text-red-400 font-semibold transition flex items-center gap-1"
+                                    >
+                                        <Trash2 size={12} /> Clear All
+                                    </button>
+                                )}
+                            </div>
+
+                            {selectedHeroItems.length > 0 ? (
+                                <div className="space-y-3">
+                                    {selectedHeroItems.map((item, index) => (
+                                        <div key={item.id} className="flex items-center gap-4 bg-white/5 p-3 rounded-xl border border-white/10 hover:border-white/20 transition">
+                                            <span className="text-xs font-mono font-bold text-amber-400 w-6 text-center">
+                                                #{index + 1}
+                                            </span>
+                                            <img 
+                                                src={item.poster_path || item.backdrop_path || '/logo.png'} 
+                                                className={`w-12 h-16 ${item.poster_path ? 'object-cover' : 'object-contain p-2 bg-white/10'} rounded-lg shadow-lg flex-shrink-0`} 
+                                                alt="" 
+                                                onError={(e) => {
+                                                    const t = e.currentTarget;
+                                                    if (!t.src.endsWith('/logo.png')) {
+                                                        t.src = '/logo.png';
+                                                        t.className = "w-12 h-16 object-contain p-2 bg-white/10 rounded-lg shadow-lg flex-shrink-0";
+                                                    }
+                                                }}
+                                            />
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-bold text-sm text-white truncate">{item.title}</div>
+                                                <div className="text-xs text-gray-400 mt-0.5">{item.year || item.release_date?.split('-')[0]} • {item.type?.toUpperCase()}</div>
+                                                <div className="text-[10px] text-gray-500 font-mono mt-0.5">ID: {item.id}</div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemoveHeroItem(item.id)}
+                                                className="p-2 rounded hover:bg-red-500/20 text-gray-400 hover:text-red-400 transition"
+                                                title="Remove from Hero"
+                                            >
+                                                <Trash2 size={15} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <p className="text-[11px] text-gray-500 mt-2">
+                                        💡 Tip: You can also toggle the ⭐ Star icon on any movie or show in the <span className="text-white font-semibold">Content Library</span> or customize from <span className="text-white font-semibold">Account Settings</span>.
+                                    </p>
                                 </div>
                             ) : (
-                                <div className="p-6 border border-dashed border-white/10 rounded-xl text-center text-gray-500">
-                                    No content selected as Hero. Go to <span className="font-bold text-white">Content Library</span> to set one.
+                                <div className="p-6 border border-dashed border-white/10 rounded-xl text-center text-gray-500 space-y-2">
+                                    <div className="font-bold text-white text-sm">Automatic Top-Rated Dynamic Mode</div>
+                                    <div className="text-xs">No specific titles selected. Homepage will automatically display top-rated blockbusters with verified trailers.</div>
+                                    <div className="text-xs text-gray-400">
+                                        Go to <span className="font-bold text-white">Content Library</span> and click the ⭐ Star on any title, or use <span className="font-bold text-white">Account Settings</span> to feature custom titles.
+                                    </div>
                                 </div>
                             )}
                         </div>

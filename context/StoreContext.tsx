@@ -133,6 +133,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
     siteName: "MY DONKEY",
     siteUrl: "https://www.mydonkey.in",
     heroVideoQuality: 'hd1080',
+    heroContentIds: [],
     maintenanceMode: false,
     theme: 'default',
     websiteFont: 'Inter',
