@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronUp, ChevronRight, CreditCard, Monitor, User as UserIcon, Plus, Calendar, Camera, Wifi, Settings, PlayCircle, Smartphone, Download, Send, Maximize, X, Trash2, Film, QrCode, ScanLine, Tv, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
-import { useStore } from '../context/StoreContext';
-import PlanSelectionModal from './account/PlanSelectionModal';
-import PaymentMethodsModal from './account/PaymentMethodsModal';
-import BillingHistoryModal from './account/BillingHistoryModal';
+import { ChevronDown, ChevronUp, ChevronRight, Monitor, User as UserIcon, Plus, Calendar, Camera, Wifi, Settings, PlayCircle, Smartphone, Download, Send, Maximize, X, Trash2, Film, QrCode, ScanLine, Tv, Sparkles, ArrowRight, ShieldCheck, History, SlidersHorizontal, Globe } from 'lucide-react';
+import { useStore, PERMANENT_ADMINS } from '../context/StoreContext';
 import DeviceManagementModal from './account/DeviceManagementModal';
 import MyContributions from './account/MyContributions';
 import GenrePreferenceModal from './GenrePreferenceModal';
+import GlobalSettingsModal from './account/GlobalSettingsModal';
 import { normalizeGenre } from '../services/recommendationService';
 
 const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) => {
@@ -20,7 +18,6 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
         addProfile,
         updateProfile,
         deleteProfile,
-        plans,
         updateUserEmail,
         triggerPasswordReset,
         updateProfileAvatar,
@@ -33,14 +30,14 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
     } = useStore();
 
     const [expandedProfile, setExpandedProfile] = useState<string | null>(null);
-    const [showPlanModal, setShowPlanModal] = useState(false);
-    const [showPaymentModal, setShowPaymentModal] = useState(false);
-    const [showBillingModal, setShowBillingModal] = useState(false);
     const [showDeviceModal, setShowDeviceModal] = useState(false);
     const [showGenreModal, setShowGenreModal] = useState(false);
+    const [showGlobalSettings, setShowGlobalSettings] = useState(false);
     const [requestTitle, setRequestTitle] = useState('');
     const [isRequesting, setIsRequesting] = useState(false);
     const [showContributions, setShowContributions] = useState(false);
+
+    const isAdmin = currentUser?.role === 'admin' || Boolean(currentUser?.email && PERMANENT_ADMINS.includes(currentUser.email));
 
     const userFavoriteGenres = React.useMemo(() => {
         if (currentProfile?.favoriteGenres && currentProfile.favoriteGenres.length > 0) {
@@ -55,7 +52,7 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                 const parsed = JSON.parse(raw);
                 if (Array.isArray(parsed)) return parsed.map(normalizeGenre);
             }
-        } catch (e) {}
+        } catch (e) { }
         return [];
     }, [currentProfile?.favoriteGenres, currentUser?.favoriteGenres]);
 
@@ -64,8 +61,6 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
     const [isAddingProfile, setIsAddingProfile] = useState(false);
 
     if (!currentUser) return null;
-
-    const currentPlan = plans.find(p => p.name === currentUser.plan) || plans[0];
 
     const toggleProfile = (id: string) => {
         setExpandedProfile(expandedProfile === id ? null : id);
@@ -163,8 +158,8 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                             <span>Watch history is not saved</span>
                         </div>
                         <div className="flex items-center gap-3 text-sm text-gray-300">
-                            <CreditCard size={16} className="text-red-400" />
-                            <span>Cannot subscribe to plans</span>
+                            <UserIcon size={16} className="text-red-400" />
+                            <span>Profile customization is disabled</span>
                         </div>
                     </div>
 
@@ -220,23 +215,25 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                     </button>
                 </div>
 
-                {/* Subscription Banner - Hotstar Gradient */}
-                <div className="bg-gradient-to-r from-cyan-600 via-blue-600 to-purple-600 rounded-2xl p-5 md:p-6 mb-6 relative overflow-hidden">
+                {/* 100% Free Lifetime Access Banner */}
+                <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 rounded-2xl p-5 md:p-6 mb-6 relative overflow-hidden shadow-xl shadow-teal-950/40 border border-emerald-400/20">
                     <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxjaXJjbGUgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuMDUiIGN4PSIyMCIgY3k9IjIwIiByPSIyIi8+PC9nPjwvc3ZnPg==')] opacity-30" />
                     <div className="relative z-10 flex flex-wrap items-center justify-between gap-4">
                         <div>
                             <div className="flex items-center gap-2 mb-1">
-                                <span className="text-xs font-bold uppercase tracking-wider text-cyan-200">Current Plan</span>
-                                <span className="px-2 py-0.5 bg-white/20 rounded text-[10px] font-bold">{currentPlan?.quality}</span>
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-emerald-200 bg-black/30 px-2.5 py-0.5 rounded-full border border-emerald-300/30">
+                                    <Sparkles size={12} className="text-emerald-300" />
+                                    100% Free Platform
+                                </span>
+                                <span className="px-2 py-0.5 bg-white/20 rounded text-[10px] font-bold text-white">Full HD & 4K</span>
                             </div>
-                            <div className="text-2xl md:text-3xl font-black">{currentPlan?.name}</div>
+                            <div className="text-2xl md:text-3xl font-black text-white">Free Forever Membership</div>
+                            <p className="text-xs text-emerald-100/90 mt-1 max-w-md">Unlimited movies, series & anime at zero cost. No credit card or subscription needed.</p>
                         </div>
-                        <button
-                            onClick={() => setShowPlanModal(true)}
-                            className="px-6 py-2.5 bg-white text-gray-900 rounded-full font-bold text-sm hover:bg-gray-100 transition shadow-lg"
-                        >
-                            Upgrade
-                        </button>
+                        <div className="flex items-center gap-2 px-4 py-2 bg-white/15 backdrop-blur-md rounded-full border border-white/20 text-white text-xs font-bold shadow-md">
+                            <ShieldCheck size={16} className="text-emerald-300" />
+                            <span>Lifetime Free Access</span>
+                        </div>
                     </div>
                 </div>
 
@@ -262,7 +259,7 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                             <ChevronDown size={18} className="text-gray-500 -rotate-90" />
                         </button>
 
-                        <button onClick={handlePasswordReset} className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition">
+                        <button onClick={handlePasswordReset} className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition border-b border-white/5">
                             <div className="flex items-center gap-4">
                                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
                                     <Settings size={18} />
@@ -270,26 +267,6 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                                 <div className="text-left">
                                     <div className="font-medium">Password</div>
                                     <div className="text-xs text-gray-500">Reset your password</div>
-                                </div>
-                            </div>
-                            <ChevronDown size={18} className="text-gray-500 -rotate-90" />
-                        </button>
-                    </div>
-
-                    {/* Subscription Section */}
-                    <div className="bg-white/5 rounded-xl overflow-hidden">
-                        <div className="px-5 py-3 border-b border-white/5">
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Subscription</span>
-                        </div>
-
-                        <button onClick={() => setShowPaymentModal(true)} className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition border-b border-white/5">
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
-                                    <CreditCard size={18} />
-                                </div>
-                                <div className="text-left">
-                                    <div className="font-medium">Payment Methods</div>
-                                    <div className="text-xs text-gray-500">•••• 4242</div>
                                 </div>
                             </div>
                             <ChevronDown size={18} className="text-gray-500 -rotate-90" />
@@ -307,7 +284,6 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                             </div>
                             <ChevronDown size={18} className="text-gray-500 -rotate-90" />
                         </button>
-
                     </div>
 
                     {/* Scan & Connect / TV Login Section (Mobile First) */}
@@ -416,50 +392,75 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                             <ChevronRight size={18} className="text-gray-500 group-hover:text-white group-hover:translate-x-1 transition-transform" />
                         </button>
 
-                        <button onClick={toggleLowDataMode} className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition border-b border-white/5">
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center">
-                                    <Wifi size={18} />
-                                </div>
-                                <div className="text-left">
-                                    <div className="font-medium">Low Data Mode</div>
-                                    <div className="text-xs text-gray-500">Reduce quality to save data. <span className="text-red-400">High Quality uses up to 3GB/hr.</span></div>
-                                </div>
-                            </div>
-                            <div className={`w-12 h-7 rounded-full relative transition-colors ${currentUser.lowDataMode ? 'bg-cyan-500' : 'bg-gray-700'}`}>
-                                <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-all ${currentUser.lowDataMode ? 'left-6' : 'left-1'}`} />
-                            </div>
-                        </button>
 
-                        <button onClick={() => updateUser({ autoplayEnabled: !currentUser.autoplayEnabled })} className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition border-b border-white/5">
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center">
-                                    <PlayCircle size={18} />
-                                </div>
-                                <div className="text-left">
-                                    <div className="font-medium">Autoplay Videos</div>
-                                    <div className="text-xs text-gray-500">Auto-start trailers on home</div>
-                                </div>
-                            </div>
-                            <div className={`w-12 h-7 rounded-full relative transition-colors ${currentUser.autoplayEnabled ? 'bg-cyan-500' : 'bg-gray-700'}`}>
-                                <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-all ${currentUser.autoplayEnabled ? 'left-6' : 'left-1'}`} />
-                            </div>
-                        </button>
 
-                        <button onClick={() => updateUser({ autoFullscreen: !currentUser.autoFullscreen })} className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition">
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
-                                    <Maximize size={18} />
+
+
+                        {/* Search History Toggle & Clear */}
+                        <div className="border-t border-white/5">
+                            <div className="flex items-center justify-between px-5 py-4 hover:bg-white/5 transition">
+                                <div className="flex items-center gap-4 flex-1 pr-4">
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-md shadow-amber-500/20">
+                                        <History size={18} />
+                                    </div>
+                                    <div className="text-left flex-1 min-w-0">
+                                        <div className="font-medium flex items-center gap-2 text-white">
+                                            Search History
+                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${currentUser.searchHistoryEnabled !== false
+                                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                                : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                                                }`}>
+                                                {currentUser.searchHistoryEnabled !== false ? 'ENABLED' : 'PAUSED'}
+                                            </span>
+                                        </div>
+                                        <div className="text-xs text-gray-500">
+                                            {currentUser.searchHistoryEnabled !== false
+                                                ? 'Showing and saving recent searches in Search page'
+                                                : 'Search history paused (searches won’t be saved or shown)'}
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="text-left">
-                                    <div className="font-medium">Auto Fullscreen</div>
-                                    <div className="text-xs text-gray-500">Go fullscreen when video starts</div>
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={async (e) => {
+                                            e.stopPropagation();
+                                            const nextVal = currentUser.searchHistoryEnabled === false ? true : false;
+                                            localStorage.setItem('my_donkey_search_history_enabled', String(nextVal));
+                                            await updateUser({ searchHistoryEnabled: nextVal });
+                                        }}
+                                        className={`w-12 h-7 rounded-full relative transition-colors cursor-pointer ${currentUser.searchHistoryEnabled !== false ? 'bg-cyan-500' : 'bg-gray-700'
+                                            }`}
+                                        aria-label="Toggle Search History"
+                                    >
+                                        <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-all ${currentUser.searchHistoryEnabled !== false ? 'left-6' : 'left-1'
+                                            }`} />
+                                    </button>
                                 </div>
                             </div>
-                            <div className={`w-12 h-7 rounded-full relative transition-colors ${currentUser.autoFullscreen ? 'bg-cyan-500' : 'bg-gray-700'}`}>
-                                <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-all ${currentUser.autoFullscreen ? 'left-6' : 'left-1'}`} />
-                            </div>
-                        </button>
+
+                            {/* Clear History Action Button */}
+                            {((currentUser.searchHistory && currentUser.searchHistory.length > 0) || Boolean(localStorage.getItem('my_donkey_search_history'))) && (
+                                <div className="px-5 pb-3 pt-1 flex items-center justify-between border-t border-white/5 bg-black/20 text-xs">
+                                    <span className="text-gray-400">
+                                        {currentUser.searchHistory?.length || JSON.parse(localStorage.getItem('my_donkey_search_history') || '[]').length || 0} saved search{(currentUser.searchHistory?.length || 0) === 1 ? '' : 'es'}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            if (window.confirm("Clear all your search history?")) {
+                                                localStorage.removeItem('my_donkey_search_history');
+                                                await updateUser({ searchHistory: [] });
+                                            }
+                                        }}
+                                        className="text-red-400 hover:text-red-300 font-bold hover:underline flex items-center gap-1.5 transition-colors py-1 px-2 rounded hover:bg-red-500/10 cursor-pointer"
+                                    >
+                                        <Trash2 size={13} />
+                                        <span>Clear Search History</span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
 
                         <button
                             onClick={() => navigate('/adblocker')}
@@ -570,8 +571,40 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                     )}
                 </div>
 
-                {/* Content Request Section */}
+                {/* Administrator Controls (Only visible to Admins) */}
+                {isAdmin && (
+                    <div className="bg-gradient-to-br from-[#18111e] via-[#141021] to-black rounded-xl overflow-hidden border border-brand-red/30 shadow-lg shadow-brand-red/10">
+                        <div className="px-5 py-3 border-b border-white/5 flex items-center justify-between">
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Administrator Controls</span>
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-brand-red/20 text-brand-red border border-brand-red/30">
+                                ADMIN ONLY
+                            </span>
+                        </div>
 
+                        <button
+                            onClick={() => setShowGlobalSettings(true)}
+                            className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition group text-left cursor-pointer"
+                        >
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-red to-orange-600 flex items-center justify-center text-white shadow-md shadow-brand-red/25 group-hover:scale-105 transition-transform">
+                                    <SlidersHorizontal size={18} />
+                                </div>
+                                <div className="text-left">
+                                    <div className="font-bold flex items-center gap-2 text-white">
+                                        Global Website Settings
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-gray-300">
+                                            SYSTEM
+                                        </span>
+                                    </div>
+                                    <div className="text-xs text-gray-400">
+                                        Configure site-wide branding, stream URLs, maintenance mode & security
+                                    </div>
+                                </div>
+                            </div>
+                            <ChevronRight size={18} className="text-gray-500 group-hover:text-white group-hover:translate-x-1 transition-transform" />
+                        </button>
+                    </div>
+                )}
 
                 {/* Sign Out */}
                 <button
@@ -687,11 +720,9 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                 )
             }
             {/* Modals */}
-            {showPlanModal && <PlanSelectionModal onClose={() => setShowPlanModal(false)} />}
-            {showPaymentModal && <PaymentMethodsModal onClose={() => setShowPaymentModal(false)} />}
-            {showBillingModal && <BillingHistoryModal onClose={() => setShowBillingModal(false)} />}
             {showDeviceModal && <DeviceManagementModal onClose={() => setShowDeviceModal(false)} />}
             {showGenreModal && <GenrePreferenceModal isOpen={showGenreModal} onClose={() => setShowGenreModal(false)} />}
+            {showGlobalSettings && <GlobalSettingsModal isOpen={showGlobalSettings} onClose={() => setShowGlobalSettings(false)} />}
         </div >
     );
 };

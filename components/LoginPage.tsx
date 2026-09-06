@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, QrCode, Mail } from 'lucide-react';
+import { ArrowRight, QrCode, Mail, Loader2 } from 'lucide-react';
 import { useNavigate, Navigate } from 'react-router-dom';
 // import { AppleLogo } from './AppleLogo';
 import { useStore } from '../context/StoreContext';
@@ -26,6 +26,7 @@ const LoginPage = () => {
     const [isSignUp, setIsSignUp] = useState(false);
     const [error, setError] = useState('');
     const [loginMethod, setLoginMethod] = useState<'email' | 'qr'>('email');
+    const [isGoogleLoading, setIsGoogleLoading] = useState(false);
     
     // Check if device is a smartphone
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -171,19 +172,31 @@ const LoginPage = () => {
 
                     <div className="flex flex-col gap-4">
                         <button
+                            type="button"
+                            disabled={isGoogleLoading}
                             onClick={async () => {
                                 try {
+                                    setIsGoogleLoading(true);
+                                    setError('');
                                     await loginWithGoogle();
                                     const params = new URLSearchParams(window.location.search);
                                     const redirect = params.get('redirect') || '/';
                                     navigate(redirect, { replace: true });
                                 } catch (err: any) {
-                                    setError(err.message);
+                                    console.error("Google Sign-In Error:", err);
+                                    setError(err.message || 'Google Sign-In failed');
+                                } finally {
+                                    setIsGoogleLoading(false);
                                 }
                             }}
-                            className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/15 border border-white/10 rounded-lg py-3 transition text-sm font-medium w-full"
+                            className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/15 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 rounded-lg py-3 transition text-sm font-medium w-full cursor-pointer"
                         >
-                            <div className="w-4 h-4 bg-white rounded-full flex items-center justify-center text-black font-bold text-[10px]">G</div> Google
+                            {isGoogleLoading ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-white" />
+                            ) : (
+                                <div className="w-4 h-4 bg-white rounded-full flex items-center justify-center text-black font-bold text-[10px]">G</div>
+                            )}
+                            <span>{isGoogleLoading ? 'Connecting to Google...' : 'Google'}</span>
                         </button>
                     </div>
 

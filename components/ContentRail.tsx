@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { ChevronRight, ChevronLeft, PlayCircle, Plus, Check, Trash2 } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Play, Plus, Check, ThumbsUp, Trash2 } from 'lucide-react';
 import { Content } from '../types';
 import { useStore } from '../context/StoreContext';
 
@@ -12,6 +12,7 @@ interface ContentRailProps {
     isOriginal?: boolean;
     layout?: 'portrait' | 'landscape';
     showRanking?: boolean;
+    size?: 'standard' | 'mid';
     badge?: string;
     subtitle?: string;
     actionButton?: React.ReactNode;
@@ -26,12 +27,13 @@ const ContentRail: React.FC<ContentRailProps> = ({
     isOriginal = false,
     layout = 'portrait',
     showRanking = false,
+    size = 'standard',
     badge,
     subtitle,
     actionButton
 }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
-    const { currentProfile, toggleWatchlist, currentUser, deleteContent } = useStore();
+    const { currentProfile, toggleWatchlist, likedContent, toggleLike, currentUser, deleteContent } = useStore();
     const isAdmin = currentUser?.role === 'admin';
 
     const scroll = (direction: 'left' | 'right') => {
@@ -45,8 +47,8 @@ const ContentRail: React.FC<ContentRailProps> = ({
     if (!items || items.length === 0) return null;
 
     return (
-        <div className="relative group/rail py-2 md:py-3">
-            <div className="px-4 md:px-12 mb-2 md:mb-3 flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+        <div className={`relative group/rail ${size === 'mid' ? 'py-1 md:py-2' : 'py-2 md:py-3'}`}>
+            <div className={`${size === 'mid' ? 'px-0 mb-2' : 'px-4 md:px-12 mb-2 md:mb-3'} flex flex-col sm:flex-row sm:items-end justify-between gap-2`}>
                 <div>
                     {badge && (
                         <div className="mb-1.5 flex items-center">
@@ -55,9 +57,9 @@ const ContentRail: React.FC<ContentRailProps> = ({
                             </span>
                         </div>
                     )}
-                    <h2 className="text-xl md:text-2xl font-bold flex items-center gap-2 group/title cursor-pointer text-white">
+                    <h2 className={`${size === 'mid' ? 'text-lg md:text-xl' : 'text-xl md:text-2xl'} font-bold flex items-center gap-2 group/title cursor-pointer text-white`}>
                         {title}
-                        <ChevronRight size={20} className="text-brand-red opacity-0 group-hover/title:opacity-100 transition-opacity translate-y-0.5" />
+                        <ChevronRight size={size === 'mid' ? 16 : 20} className="text-brand-red opacity-0 group-hover/title:opacity-100 transition-opacity translate-y-0.5" />
                     </h2>
                     {subtitle && (
                         <p className="text-xs md:text-sm text-gray-400 mt-1 font-normal leading-relaxed">{subtitle}</p>
@@ -74,26 +76,33 @@ const ContentRail: React.FC<ContentRailProps> = ({
                 {/* Navigation Buttons */}
                 <button
                     onClick={() => scroll('left')}
-                    className="absolute left-0 top-0 bottom-0 w-12 bg-black/50 z-30 hidden md:flex items-center justify-center hover:bg-black/70 transition-colors"
+                    aria-label="Scroll left"
+                    className={`absolute left-2 md:left-3 top-1/2 -translate-y-1/2 ${
+                        size === 'mid' ? 'w-9 h-9 md:w-10 md:h-10' : 'w-10 h-10 md:w-11 md:h-11'
+                    } rounded-full bg-black/75 hover:bg-black/95 text-white/90 hover:text-white backdrop-blur-md border border-white/20 shadow-[0_4px_20px_rgba(0,0,0,0.6)] z-30 hidden md:flex items-center justify-center hover:scale-110 active:scale-95 transition-all opacity-85 hover:opacity-100 cursor-pointer`}
                 >
-                    <ChevronLeft size={40} />
+                    <ChevronLeft size={size === 'mid' ? 20 : 24} />
                 </button>
                 <button
                     onClick={() => scroll('right')}
-                    className="absolute right-0 top-0 bottom-0 w-12 bg-black/50 z-30 hidden md:flex items-center justify-center hover:bg-black/70 transition-colors"
+                    aria-label="Scroll right"
+                    className={`absolute right-2 md:right-3 top-1/2 -translate-y-1/2 ${
+                        size === 'mid' ? 'w-9 h-9 md:w-10 md:h-10' : 'w-10 h-10 md:w-11 md:h-11'
+                    } rounded-full bg-black/75 hover:bg-black/95 text-white/90 hover:text-white backdrop-blur-md border border-white/20 shadow-[0_4px_20px_rgba(0,0,0,0.6)] z-30 hidden md:flex items-center justify-center hover:scale-110 active:scale-95 transition-all opacity-85 hover:opacity-100 cursor-pointer`}
                 >
-                    <ChevronRight size={40} />
+                    <ChevronRight size={size === 'mid' ? 20 : 24} />
                 </button>
 
                 <div
                     ref={scrollRef}
-                    className={`flex overflow-x-auto px-4 md:px-12 no-scrollbar scroll-smooth py-2 md:py-3 ${showRanking ? 'gap-0 md:gap-0' : 'gap-3 md:gap-4'}`}
+                    className={`flex overflow-x-auto ${size === 'mid' ? 'px-0 gap-2.5 md:gap-3.5' : 'px-4 md:px-12 gap-3 md:gap-4'} no-scrollbar scroll-smooth py-1.5 md:py-2.5`}
                 >
                     {(!items || items.length === 0) ? (
                         <div className="text-gray-500 text-sm italic p-4">No content available.</div>
                     ) : (
                         items.map((item, idx) => {
-                            const isAdded = currentProfile?.myList.includes(item.id);
+                            const isAdded = currentProfile?.myList?.includes(item.id) ?? false;
+                            const isLiked = likedContent?.includes(item.id) ?? false;
                             // Ranking logic
                             const rank = idx + 1;
 
@@ -101,11 +110,17 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                 <div
                                     key={item.id}
                                     className={`flex-shrink-0 transition-all duration-300 hover:z-20 cursor-pointer select-none relative flex items-end ${
-                                        showRanking
-                                            ? 'w-56 xs:w-64 sm:w-80 md:w-[420px]'
-                                            : layout === 'landscape'
-                                            ? 'w-56 xs:w-64 sm:w-72 md:w-88 lg:w-96'
-                                            : 'w-36 xs:w-44 sm:w-52 md:w-60 lg:w-64 xl:w-72'
+                                        size === 'mid'
+                                            ? (showRanking
+                                                ? 'w-36 xs:w-40 sm:w-44 md:w-48'
+                                                : layout === 'landscape'
+                                                ? 'w-44 xs:w-48 sm:w-56 md:w-64'
+                                                : 'w-28 xs:w-32 sm:w-36 md:w-40 lg:w-44')
+                                            : (showRanking
+                                                ? 'w-56 xs:w-64 sm:w-80 md:w-[420px]'
+                                                : layout === 'landscape'
+                                                ? 'w-56 xs:w-64 sm:w-72 md:w-88 lg:w-96'
+                                                : 'w-36 xs:w-44 sm:w-52 md:w-60 lg:w-64 xl:w-72')
                                     }`}
                                     onClick={() => {
                                         if (navigator.vibrate) navigator.vibrate(10);
@@ -113,10 +128,10 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                     }}
                                 >
                                     {showRanking && (
-                                        <div className="flex-shrink-0 relative z-10 -mr-10 md:-mr-16 translate-y-6 md:translate-y-10 flex items-end pb-4">
+                                        <div className={`flex-shrink-0 relative z-10 ${size === 'mid' ? '-mr-5 md:-mr-7 translate-y-2 md:translate-y-4 pb-2' : '-mr-10 md:-mr-16 translate-y-6 md:translate-y-10 pb-4'} flex items-end`}>
                                             <svg
                                                 viewBox="0 0 140 150"
-                                                className="h-28 md:h-56 w-auto fill-black stroke-white stroke-[2px]"
+                                                className={`${size === 'mid' ? 'h-16 md:h-20' : 'h-28 md:h-56'} w-auto fill-black stroke-white stroke-[2px]`}
                                                 style={{ filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.5))' }}
                                             >
                                                 <text
@@ -135,15 +150,29 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                         </div>
                                     )}
  
-                                    <div className={`relative ${showRanking ? 'w-36 xs:w-44 sm:w-52 md:w-64' : 'flex-1'} ${layout === 'landscape' ? 'aspect-video' : 'aspect-[2/3]'} group/card rounded-xl overflow-hidden shadow-xl hover:scale-105 transition-transform duration-300 z-20`}>
+                                    <div className={`relative ${showRanking ? (size === 'mid' ? 'w-24 xs:w-28 sm:w-32 md:w-36' : 'w-36 xs:w-44 sm:w-52 md:w-64') : 'flex-1'} ${layout === 'landscape' ? 'aspect-video' : 'aspect-[2/3]'} group/card rounded-xl overflow-hidden shadow-xl hover:scale-105 transition-transform duration-300 z-20`}>
                                         {layout === 'landscape' ? (
                                             (item.backdrop_path || item.poster_path) ? (
                                                 <picture>
                                                     {item.backdrop_path_mobile && <source media="(max-width: 767px)" srcSet={item.backdrop_path_mobile} />}
-                                                    <img src={item.backdrop_path || item.poster_path} className="w-full h-full object-cover aspect-video" alt={item.title || ''} draggable={false} loading="lazy" decoding="async" />
+                                                    <img 
+                                                        src={item.backdrop_path || item.poster_path} 
+                                                        className="w-full h-full object-cover aspect-video" 
+                                                        alt={item.title || ''} 
+                                                        draggable={false} 
+                                                        loading="lazy" 
+                                                        decoding="async" 
+                                                        onError={(e) => {
+                                                            const t = e.currentTarget;
+                                                            if (!t.src.endsWith('/logo.png')) {
+                                                                t.src = '/logo.png';
+                                                                t.className = "w-full h-full object-contain p-4 bg-zinc-900 aspect-video";
+                                                            }
+                                                        }}
+                                                    />
                                                 </picture>
                                             ) : (
-                                                <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-xs text-gray-500 aspect-video">No Image</div>
+                                                <img src="/logo.png" className="w-full h-full object-contain p-4 bg-zinc-900 aspect-video" alt={item.title || ''} />
                                             )
                                         ) : (
                                             (item.poster_path_mobile || item.poster_path) ? (
@@ -154,17 +183,24 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                                     draggable={false}
                                                     loading="lazy"
                                                     decoding="async"
+                                                    onError={(e) => {
+                                                        const t = e.currentTarget;
+                                                        if (!t.src.endsWith('/logo.png')) {
+                                                            t.src = '/logo.png';
+                                                            t.className = "w-full h-full object-contain p-4 bg-zinc-900 aspect-[2/3]";
+                                                        }
+                                                    }}
                                                 />
                                             ) : (
-                                                <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-xs text-gray-500 aspect-[2/3]">No Poster</div>
+                                                <img src="/logo.png" className="w-full h-full object-contain p-4 bg-zinc-900 aspect-[2/3]" alt={item.title || ''} />
                                             )
                                         )}
 
                                         {/* Overlay on hover */}
                                         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent opacity-0 group-hover/card:opacity-100 transition-all duration-300 flex flex-col justify-end p-4 translate-y-4 group-hover/card:translate-y-0">
                                             <div className="flex items-center gap-2 mb-3">
-                                                <PlayCircle 
-                                                    size={32} 
+                                                {/* Play Button */}
+                                                <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         if (onPlay) {
@@ -173,23 +209,44 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                                             onDetails(item);
                                                         }
                                                     }}
-                                                    className="text-white fill-white hover:text-brand-red hover:fill-brand-red transition-colors cursor-pointer active:scale-95" 
-                                                />
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); toggleWatchlist(item.id); }}
-                                                    className="bg-gray-600/50 p-1.5 rounded-full border border-white/20 hover:border-white transition"
+                                                    className="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center hover:bg-neutral-200 transition-all cursor-pointer active:scale-95 shadow-md flex-shrink-0"
+                                                    title="Play"
                                                 >
-                                                    {isAdded ? <Check size={18} className="text-green-400" /> : <Plus size={18} />}
+                                                    <Play size={15} className="fill-black text-black ml-0.5" />
+                                                </button>
+
+                                                {/* Add to My List Button */}
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        toggleWatchlist(item.id);
+                                                    }}
+                                                    className="w-8 h-8 rounded-full bg-zinc-800/80 hover:bg-zinc-700/80 border border-white/30 hover:border-white text-white flex items-center justify-center transition-all cursor-pointer active:scale-95 shadow-md flex-shrink-0"
+                                                    title={isAdded ? "Remove from My List" : "Add to My List"}
+                                                >
+                                                    {isAdded ? <Check size={16} className="text-green-400" /> : <Plus size={16} className="text-white" />}
+                                                </button>
+
+                                                {/* Like Button */}
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        toggleLike(item.id);
+                                                    }}
+                                                    className={`w-8 h-8 rounded-full border flex items-center justify-center transition-all cursor-pointer active:scale-95 shadow-md flex-shrink-0 ${
+                                                        isLiked
+                                                            ? 'bg-white/25 border-white text-white'
+                                                            : 'bg-zinc-800/80 hover:bg-zinc-700/80 border-white/30 hover:border-white text-white'
+                                                    }`}
+                                                    title={isLiked ? "Liked" : "Like"}
+                                                >
+                                                    <ThumbsUp size={14} className={isLiked ? "fill-white text-white" : "text-white"} />
                                                 </button>
                                             </div>
                                             <div className="text-sm font-bold truncate">{item.title}</div>
                                             <div className="flex items-center gap-2 text-[10px] mt-1">
-                                                <span className="text-green-400 font-bold">
-                                                    {(item as any).matchPercentage
-                                                        ? `${(item as any).matchPercentage}% Match`
-                                                        : `${(item.vote_average ? item.vote_average * 10 : 85).toFixed(0)}% Match`}
-                                                </span>
                                                 <span className="border border-white/30 px-1 rounded">HD</span>
+                                                {item.year && <span className="text-gray-300 font-medium">{item.year}</span>}
                                                 {item.addedBy && (
                                                     <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.2 rounded font-medium truncate max-w-[80px]">
                                                         User Added

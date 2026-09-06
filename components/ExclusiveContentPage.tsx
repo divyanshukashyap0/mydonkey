@@ -165,9 +165,16 @@ const ExclusiveContentPage: React.FC<ExclusiveContentPageProps> = ({ onDetails }
                                     className="group cursor-pointer relative aspect-[2/3] overflow-hidden rounded-xl border border-white/10 hover:border-brand-red/50 transition-all duration-500 hover:scale-105 hover:shadow-[0_20px_40px_rgba(0,0,0,0.8)] shadow-2xl"
                                 >
                                     <img
-                                        src={item.poster_path_mobile || item.poster_path || undefined}
+                                        src={item.poster_path_mobile || item.poster_path || '/logo.png'}
                                         alt={item.title}
-                                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                                        className={`w-full h-full ${(item.poster_path_mobile || item.poster_path) ? 'object-cover' : 'object-contain p-4 bg-zinc-900'} transition-transform duration-700 group-hover:scale-110`}
+                                        onError={(e) => {
+                                            const t = e.currentTarget;
+                                            if (!t.src.endsWith('/logo.png')) {
+                                                t.src = '/logo.png';
+                                                t.className = "w-full h-full object-contain p-4 bg-zinc-900 transition-transform duration-700 group-hover:scale-110";
+                                            }
+                                        }}
                                     />
                                     
                                     {/* Overlay */}

@@ -2,6 +2,9 @@
 // Requires VITE_TMDB_API_KEY in your .env file
 // Get a free key at: https://www.themoviedb.org/settings/api
 
+import { Content, SiteSettings } from '../types';
+import { buildEmbedUrl } from '../utils/embedUrl';
+
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
 const API_KEY = import.meta.env.VITE_TMDB_API_KEY;
@@ -249,6 +252,23 @@ export function extractTMDBEpisodeVideo(detail: { videos?: { results: any[] } })
     // For episodes, Clips are most common
     const clip = items.find(v => (v.type === 'Clip' || v.type === 'Teaser' || v.type === 'Trailer' || v.type === 'Opening Credits' || v.type === 'Featurette') && v.site === 'YouTube');
     return clip?.key || items.find(v => v.site === 'YouTube')?.key;
+}
+
+/** Fetch the official YouTube trailer key for a TMDB item */
+export async function fetchTMDBTrailer(tmdbId: number, type: 'movie' | 'tv'): Promise<string | undefined> {
+    try {
+        const data = await callTMDB(`/${type}/${tmdbId}/videos`, { language: 'en-US' });
+        if (data && data.results && Array.isArray(data.results)) {
+            const trailer = data.results.find((v: any) => v.type === 'Trailer' && v.site === 'YouTube');
+            if (trailer) return trailer.key;
+            const teaser = data.results.find((v: any) => v.type === 'Teaser' && v.site === 'YouTube');
+            if (teaser) return teaser.key;
+            return data.results.find((v: any) => v.site === 'YouTube')?.key;
+        }
+    } catch {
+        // Fallback silently
+    }
+    return undefined;
 }
 
 // TMDB genre IDs → app genre names (shared subset)
@@ -579,5 +599,172 @@ export async function fetchTMDBDiscoverByCategory(options: {
             results: combined,
             totalPages: Math.min(Math.max(movieRes.totalPages, tvRes.totalPages), 500)
         };
+    }
+}
+
+/**
+ * Maps a TMDB result to our standard Content model with embed stream support
+ */
+export function mapTMDBResultToContent(r: TMDBSearchResult, settings?: Partial<SiteSettings>): Content {
+    const itemType = (r.media_type === 'tv' ? 'tv' : 'movie') as 'movie' | 'tv';
+    const date = r.release_date || r.first_air_date || '';
+    const year = date ? parseInt(date.split('-')[0]) : new Date().getFullYear();
+    const streamId = String(r.id);
+    return {
+        id: `tmdb_${r.id}`,
+        tmdbId: r.id,
+        title: r.title || r.name || 'Untitled',
+        type: itemType,
+        poster_path: r.poster_path ? tmdbPosterUrl(r.poster_path) : '',
+        backdrop_path: r.backdrop_path ? tmdbBackdropUrl(r.backdrop_path) : '',
+        release_date: date,
+        year,
+        vote_average: r.vote_average || 0,
+        overview: r.overview || '',
+        youtubeId: '',
+        genres: mapTMDBGenres(r.genre_ids || []),
+        videoUrl: buildEmbedUrl(streamId, itemType, settings),
+        allowPlayback: true,
+        isPublished: true,
+        createdAt: new Date().toISOString()
+    };
+}
+
+/**
+ * Fetches an endless discover page for infinite scrolling
+ */
+export async function fetchEndlessDiscoverPage(options: {
+    type: 'movie' | 'tv' | 'all';
+    page: number;
+    region?: 'all' | 'indian' | 'global';
+    sortBy?: 'popular' | 'rating' | 'newest';
+    settings?: Partial<SiteSettings>;
+}): Promise<Content[]> {
+    const { type, page, region = 'all', sortBy = 'popular', settings } = options;
+
+    if (region === 'all' && type !== 'all') {
+        // Interleave Indian titles and Global blockbusters across pages
+        const isIndianPage = (page % 2 === 1);
+        const effectivePage = Math.ceil(page / 2);
+        const { results } = await fetchTMDBDiscoverByCategory({
+            category: 'all',
+            type,
+            sortBy: sortBy as any,
+            page: effectivePage,
+            region: isIndianPage ? 'indian' : 'all'
+        });
+        return results
+            .filter(r => r.poster_path)
+            .map(r => mapTMDBResultToContent({ ...r, media_type: r.media_type || type }, settings));
+    }
+
+    const { results } = await fetchTMDBDiscoverByCategory({
+        category: 'all',
+        type,
+        sortBy: sortBy as any,
+        page,
+        region
+    });
+
+    return results
+        .filter(r => r.poster_path)
+        .map(r => mapTMDBResultToContent({ ...r, media_type: r.media_type || (type === 'all' ? (r.name ? 'tv' : 'movie') : type) }, settings));
+}
+
+export interface HomeCuratedRail {
+    id: string;
+    title: string;
+    badge?: string;
+    subtitle?: string;
+    items: Content[];
+}
+
+/**
+ * Fetches curated dynamic rails for endless exploration on the Home tab
+ */
+export async function fetchHomeCuratedRails(settings?: Partial<SiteSettings>): Promise<HomeCuratedRail[]> {
+    try {
+        const [
+            indianBlockbusters,
+            marvelCinematic,
+            actionHits,
+            topRatedSeries,
+            criticallyAcclaimed,
+            comedySpecials
+        ] = await Promise.allSettled([
+            fetchTMDBDiscoverByCategory({ category: 'all', type: 'movie', sortBy: 'popular', region: 'indian', page: 1 }),
+            fetchUniverseMovies(MARVEL_COMPANY_IDS, 1),
+            fetchTMDBDiscoverByCategory({ category: 'Action', type: 'movie', sortBy: 'popular', page: 1 }),
+            fetchTMDBDiscoverByCategory({ category: 'all', type: 'tv', sortBy: 'rating', page: 1 }),
+            fetchTMDBDiscoverByCategory({ category: 'all', type: 'movie', sortBy: 'rating', page: 1 }),
+            fetchTMDBDiscoverByCategory({ category: 'Comedy', type: 'movie', sortBy: 'popular', page: 1 })
+        ]);
+
+        const rails: HomeCuratedRail[] = [];
+
+        if (indianBlockbusters.status === 'fulfilled' && indianBlockbusters.value.results.length > 0) {
+            rails.push({
+                id: 'rail_indian_blockbusters',
+                title: 'Indian Blockbusters & Superstars',
+                badge: '🇮🇳 Pan-India Hits',
+                subtitle: 'Bollywood, Tollywood, Kollywood & Mollywood chart-toppers',
+                items: indianBlockbusters.value.results.filter(r => r.poster_path).map(r => mapTMDBResultToContent({ ...r, media_type: 'movie' }, settings))
+            });
+        }
+
+        if (marvelCinematic.status === 'fulfilled' && marvelCinematic.value.length > 0) {
+            rails.push({
+                id: 'rail_marvel_cinematic',
+                title: 'Marvel Cinematic Universe',
+                badge: '⚡ Marvel Studios',
+                subtitle: 'Avengers, superheroes and MCU blockbusters',
+                items: marvelCinematic.value.filter(r => r.poster_path).map(r => mapTMDBResultToContent({ ...r, media_type: 'movie' }, settings))
+            });
+        }
+
+        if (actionHits.status === 'fulfilled' && actionHits.value.results.length > 0) {
+            rails.push({
+                id: 'rail_action_hits',
+                title: 'High-Octane Action & Thrills',
+                badge: '💥 Explosive Action',
+                subtitle: 'Adrenaline rushes, epic combat & unforgettable stunts',
+                items: actionHits.value.results.filter(r => r.poster_path).map(r => mapTMDBResultToContent({ ...r, media_type: 'movie' }, settings))
+            });
+        }
+
+        if (topRatedSeries.status === 'fulfilled' && topRatedSeries.value.results.length > 0) {
+            rails.push({
+                id: 'rail_top_rated_series',
+                title: 'Binge-Worthy TV Series & Web Shows',
+                badge: '📺 Top Series',
+                subtitle: 'Gripping stories that keep you hooked season after season',
+                items: topRatedSeries.value.results.filter(r => r.poster_path).map(r => mapTMDBResultToContent({ ...r, media_type: 'tv' }, settings))
+            });
+        }
+
+        if (criticallyAcclaimed.status === 'fulfilled' && criticallyAcclaimed.value.results.length > 0) {
+            rails.push({
+                id: 'rail_critically_acclaimed',
+                title: 'Critically Acclaimed Masterpieces',
+                badge: '🏆 8.0+ Rated',
+                subtitle: 'Highest rated cinema praised by viewers worldwide',
+                items: criticallyAcclaimed.value.results.filter(r => r.poster_path).map(r => mapTMDBResultToContent({ ...r, media_type: 'movie' }, settings))
+            });
+        }
+
+        if (comedySpecials.status === 'fulfilled' && comedySpecials.value.results.length > 0) {
+            rails.push({
+                id: 'rail_comedy_specials',
+                title: 'Laugh-Out-Loud Comedy & Feel-Good Hits',
+                badge: '😂 Pure Entertainment',
+                subtitle: 'Heartfelt humor, comedies & crowd pleasers',
+                items: comedySpecials.value.results.filter(r => r.poster_path).map(r => mapTMDBResultToContent({ ...r, media_type: 'movie' }, settings))
+            });
+        }
+
+        return rails;
+    } catch (e) {
+        console.error('fetchHomeCuratedRails error:', e);
+        return [];
     }
 }

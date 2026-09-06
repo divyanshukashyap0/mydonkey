@@ -39,9 +39,16 @@ const SparksFeed: React.FC<SparksFeedProps> = ({ items }) => {
                {/* Visual Content (Poster as Placeholder for vertical video) */}
                <div className="h-full w-full md:w-[450px] relative overflow-hidden">
                   <img
-                     src={item.poster_path || undefined}
+                     src={item.poster_path || '/logo.png'}
                      alt={item.title}
-                     className="h-full w-full object-cover"
+                     className={`h-full w-full ${item.poster_path ? 'object-cover' : 'object-contain p-12 bg-black'}`}
+                     onError={(e) => {
+                        const t = e.currentTarget;
+                        if (!t.src.endsWith('/logo.png')) {
+                           t.src = '/logo.png';
+                           t.className = "h-full w-full object-contain p-12 bg-black";
+                        }
+                     }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/90" />
 
@@ -68,14 +75,15 @@ const SparksFeed: React.FC<SparksFeedProps> = ({ items }) => {
 
                      <button
                         onClick={async () => {
-                           const shareUrl = `${window.location.origin}/browse/${item.id}`;
-                           const text = `🎬 Watch "${item.title}" on My Donkey!\n\n🍿 Stream Free: ${shareUrl}`;
-                           if (navigator.share) {
-                              try { await navigator.share({ title: `${item.title} | My Donkey`, text, url: shareUrl }); } catch {}
-                           } else {
-                              await navigator.clipboard.writeText(text);
-                              alert('🎬 Link copied to clipboard! Paste it into your chat to share.');
-                           }
+                            const shareUrl = `${window.location.origin}/browse/${item.id}`;
+                            const text = `🎬 Watch "${item.title}" on My Donkey!\n\n🍿 Stream Free:`;
+                            const fullText = `${text} ${shareUrl}`;
+                            if (navigator.share) {
+                               try { await navigator.share({ title: `${item.title} | My Donkey`, text, url: shareUrl }); } catch {}
+                            } else {
+                               await navigator.clipboard.writeText(fullText);
+                               alert('🎬 Link copied to clipboard! Paste it into your chat to share.');
+                            }
                         }}
                         className="p-3.5 bg-gray-800/40 backdrop-blur-md border border-white/10 rounded-full cursor-pointer transition-colors active:scale-90"
                         title="Share"

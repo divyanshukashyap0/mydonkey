@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { Plus, Edit, Trash2, Youtube, HardDrive, Star, Check, X, Bell, ChevronDown, ChevronRight, Play, Lock, Search, Filter, MoreVertical, Archive, Sparkles, Loader2, Film, Tv, Link2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Youtube, HardDrive, Star, Check, X, ChevronDown, ChevronRight, Play, Lock, Search, Filter, MoreVertical, Archive, Sparkles, Loader2, Film, Tv, Link2, RefreshCcw } from 'lucide-react';
 import { useStore } from '../../../context/StoreContext';
 import { Content, Season, Episode } from '../../../types';
 import { doc, setDoc, deleteDoc, updateDoc, collection, addDoc, deleteField, writeBatch, getDocs } from 'firebase/firestore';
@@ -20,6 +20,7 @@ const ContentManager = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
     const [syncProgress, setSyncProgress] = useState(0);
+    const [isPublishing, setIsPublishing] = useState(false);
 
     // Filters & Search
     const [filterType, setFilterType] = useState<'ALL' | 'movie' | 'tv' | 'userAdded'>('ALL');
@@ -357,23 +358,7 @@ const ContentManager = () => {
             const dataToSave = JSON.parse(JSON.stringify(finalData));
             await setDoc(doc(db, 'content', id), dataToSave);
 
-            // Increment DB Version to trigger client reuse/fetch
-            await setDoc(doc(db, 'settings', 'global'), {
-                contentVersion: (settings.contentVersion || 0) + 1
-            }, { merge: true });
 
-            // Notification for new content
-            if (!formData.id && finalData.isPublished) {
-                await addDoc(collection(db, 'notifications'), {
-                    title: `New Arrival: ${finalData.title}`,
-                    message: `Watch ${finalData.title} now on My Donkey!`,
-                    image: finalData.poster_path,
-                    type: 'content',
-                    link: `/browse/${id}`,
-                    createdAt: now,
-                    read: false
-                });
-            }
 
             alert("Content saved successfully!");
             setIsEditing(false);
@@ -605,15 +590,18 @@ const ContentManager = () => {
                                 >
                                     {/* Poster thumbnail */}
                                     <div className="w-10 h-14 rounded overflow-hidden flex-shrink-0 bg-white/10">
-                                        {(result.poster_path) ? (
-                                            <img
-                                                src={`https://image.tmdb.org/t/p/w92${result.poster_path}`}
-                                                alt={result.title || result.name}
-                                                className="w-full h-full object-cover"
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-gray-600 text-[10px]">N/A</div>
-                                        )}
+                                        <img
+                                            src={result.poster_path ? `https://image.tmdb.org/t/p/w92${result.poster_path}` : '/logo.png'}
+                                            alt={result.title || result.name}
+                                            className={`w-full h-full ${result.poster_path ? 'object-cover' : 'object-contain p-1'}`}
+                                            onError={(e) => {
+                                                const t = e.currentTarget;
+                                                if (!t.src.endsWith('/logo.png')) {
+                                                    t.src = '/logo.png';
+                                                    t.className = "w-full h-full object-contain p-1";
+                                                }
+                                            }}
+                                        />
                                     </div>
 
                                     {/* Info */}
@@ -1296,11 +1284,30 @@ const ContentManager = () => {
                         <h2 className="text-2xl md:text-3xl font-black text-white">Content Library</h2>
                         <p className="text-gray-500 text-sm">{filteredContent.length} titles found</p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            onClick={async () => {
+                                setIsPublishing(true);
+                                try {
+                                    await publishCatalog();
+                                    alert("Global Catalog published successfully!");
+                                } catch (e: any) {
+                                    alert("Publish failed: " + e.message);
+                                } finally {
+                                    setIsPublishing(false);
+                                }
+                            }}
+                            disabled={isPublishing}
+                            className="bg-emerald-600 px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-700 transition disabled:opacity-50 shadow-lg shadow-emerald-900/20 text-white text-sm"
+                            title="Compile compact catalog into catalogs/global and update version"
+                        >
+                            {isPublishing ? <Loader2 size={18} className="animate-spin" /> : <RefreshCcw size={18} />}
+                            {isPublishing ? 'Publishing...' : 'Publish Catalog'}
+                        </button>
                         <button
                             onClick={handleSyncAll}
                             disabled={isSyncing}
-                            className="bg-amber-600 px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-amber-700 transition disabled:opacity-50 shadow-lg shadow-amber-900/20"
+                            className="bg-amber-600 px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-amber-700 transition disabled:opacity-50 shadow-lg shadow-amber-900/20 text-sm"
                         >
                             {isSyncing ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
                             {isSyncing ? `Syncing ${syncProgress}%` : 'Sync TMDB Data'}
@@ -1381,17 +1388,18 @@ const ContentManager = () => {
                     >
                         {/* Thumbnail */}
                         <div className="aspect-[2/3] relative">
-                            {item.poster_path ? (
-                                <img
-                                    src={item.poster_path}
-                                    alt={item.title}
-                                    className="w-full h-full object-cover"
-                                />
-                            ) : (
-                                <div className="w-full h-full bg-zinc-800 flex items-center justify-center text-xs text-gray-500">
-                                    No Image
-                                </div>
-                            )}
+                            <img
+                                src={item.poster_path || '/logo.png'}
+                                alt={item.title}
+                                className={`w-full h-full ${item.poster_path ? 'object-cover' : 'object-contain p-4 bg-zinc-800'}`}
+                                onError={(e) => {
+                                    const t = e.currentTarget;
+                                    if (!t.src.endsWith('/logo.png')) {
+                                        t.src = '/logo.png';
+                                        t.className = "w-full h-full object-contain p-4 bg-zinc-800";
+                                    }
+                                }}
+                            />
 
                             {/* Selection Checkbox Overlay */}
                             <div className={`absolute top-2 right-2 z-20 transition-all ${selectedItems.length > 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>

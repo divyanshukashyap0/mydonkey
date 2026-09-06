@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Calendar, Youtube, Bell, Play, HardDrive, X, AlertCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, Calendar, Youtube, Play, HardDrive, X, AlertCircle } from 'lucide-react';
 import { useStore } from '../../../context/StoreContext';
 import { Content } from '../../../types';
 import { doc, setDoc, deleteDoc, addDoc, collection } from 'firebase/firestore';
@@ -16,7 +16,58 @@ const ComingSoonManager = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState<Partial<Content>>({});
 
-    // ... (rest of the file remains same until return)
+    const extractYoutubeId = (url: string) => {
+        if (!url) return '';
+        const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+        return match ? match[1] : (url.length === 11 ? url : '');
+    };
+
+    const resetForm = () => {
+        setFormData({
+            type: 'movie',
+            genres: [],
+            isPublished: true,
+            comingSoon: true,
+            allowPlayback: true,
+            allowDownload: false,
+        });
+        setIsEditing(false);
+    };
+
+    const handleSave = async () => {
+        if (!formData.title || !formData.release_date) {
+            alert('Please provide at least a title and release date.');
+            return;
+        }
+        const cleanYtId = extractYoutubeId(formData.youtubeId || '');
+        const data: any = {
+            ...formData,
+            youtubeId: cleanYtId,
+            comingSoon: true,
+            isPublished: true,
+            updatedAt: new Date().toISOString(),
+        };
+        try {
+            if (formData.id) {
+                await setDoc(doc(db, 'content', formData.id), data, { merge: true });
+            } else {
+                data.createdAt = new Date().toISOString();
+                await addDoc(collection(db, 'content'), data);
+            }
+            resetForm();
+        } catch (err) {
+            console.error('Error saving coming soon title:', err);
+        }
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!window.confirm('Delete this upcoming title?')) return;
+        try {
+            await deleteDoc(doc(db, 'content', id));
+        } catch (err) {
+            console.error('Error deleting title:', err);
+        }
+    };
 
     if (isEditing) {
         return (
@@ -129,7 +180,6 @@ const ComingSoonManager = () => {
                             <th className="p-4">Content</th>
                             <th className="p-4">Release Date</th>
                             <th className="p-4">Trailer</th>
-                            <th className="p-4 text-center">Notification</th>
                             <th className="p-4 text-right">Actions</th>
                         </tr>
                     </thead>
@@ -139,7 +189,18 @@ const ComingSoonManager = () => {
                                 <td className="p-4">
                                     <div className="flex items-center gap-3">
                                         <div className="relative w-10 h-14 rounded overflow-hidden">
-                                            <img src={item.poster_path} className="w-full h-full object-cover" alt="" />
+                                            <img 
+                                                src={item.poster_path || '/logo.png'} 
+                                                className={`w-full h-full ${item.poster_path ? 'object-cover' : 'object-contain p-1'}`} 
+                                                alt="" 
+                                                onError={(e) => {
+                                                    const t = e.currentTarget;
+                                                    if (!t.src.endsWith('/logo.png')) {
+                                                        t.src = '/logo.png';
+                                                        t.className = "w-full h-full object-contain p-1";
+                                                    }
+                                                }}
+                                            />
                                             <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition" />
                                         </div>
                                         <div>
@@ -168,15 +229,6 @@ const ComingSoonManager = () => {
                                     ) : (
                                         <span className="text-red-500 text-xs flex items-center gap-1"><AlertCircle size={12} /> Missing</span>
                                     )}
-                                </td>
-                                <td className="p-4 text-center">
-                                    <button
-                                        onClick={() => sendNotificationNow(item)}
-                                        className="p-2 hover:bg-blue-500/20 text-gray-500 hover:text-blue-400 rounded-full transition"
-                                        title="Send Notification Now"
-                                    >
-                                        <Bell size={18} />
-                                    </button>
                                 </td>
                                 <td className="p-4 text-right">
                                     <div className="flex justify-end gap-2">

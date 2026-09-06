@@ -2,13 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Check, X, Trash2, Camera } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { Profile } from '../types';
-import { collection, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase';
 import Loader from './Loader';
 
 const ProfileSelection = () => {
-  const { currentUser, switchProfile, addProfile, deleteProfile, updateProfile } = useStore();
-  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const { currentUser, userProfiles, isLoading, switchProfile, addProfile, deleteProfile, updateProfile } = useStore();
+  const profiles = userProfiles;
+  const loading = isLoading && profiles.length === 0;
   const [mode, setMode] = useState<'select' | 'manage' | 'edit' | 'add'>('select');
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
 
@@ -16,7 +15,6 @@ const ProfileSelection = () => {
   const [name, setName] = useState('');
   const [isKids, setIsKids] = useState(false);
   const [selectedAvatar, setSelectedAvatar] = useState('');
-  const [loading, setLoading] = useState(true);
 
   const avatars = [
     'https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg',
@@ -25,20 +23,6 @@ const ProfileSelection = () => {
     'https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-2fg93tmwo97u63p5.jpg',
     'https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-v7a31y8sq5tky68b.jpg',
   ];
-
-  useEffect(() => {
-    if (!currentUser) return;
-    const safetyTimer = setTimeout(() => setLoading(false), 3000);
-    const unsub = onSnapshot(collection(db, 'users', currentUser.uid, 'profiles'), (snap) => {
-      setProfiles(snap.docs.map(d => ({ id: d.id, ...d.data() } as Profile)));
-      setLoading(false);
-      clearTimeout(safetyTimer);
-    }, (err) => {
-      console.error("Profile sync error:", err);
-      setLoading(false);
-    });
-    return () => { unsub(); clearTimeout(safetyTimer); };
-  }, [currentUser?.uid]);
 
   const startAdd = () => {
     setMode('add');

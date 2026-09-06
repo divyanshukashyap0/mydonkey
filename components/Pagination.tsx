@@ -23,12 +23,12 @@ const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPage
 
         if (startPage > 1) {
             pages.push(
-                <button key={1} onClick={() => onPageChange(1)} className="w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all bg-white/5 hover:bg-white/20 text-gray-300">
+                <button key={1} onClick={() => onPageChange(1)} className="w-8 h-8 sm:w-10 sm:h-10 text-xs sm:text-sm rounded-full flex items-center justify-center font-bold transition-all bg-white/5 hover:bg-white/20 text-gray-300 cursor-pointer">
                     1
                 </button>
             );
             if (startPage > 2) {
-                pages.push(<div key="dots1" className="w-10 h-10 flex items-center justify-center text-gray-500"><MoreHorizontal size={16} /></div>);
+                pages.push(<div key="dots1" className="w-6 h-8 sm:w-10 sm:h-10 flex items-center justify-center text-gray-500"><MoreHorizontal size={14} /></div>);
             }
         }
 
@@ -37,8 +37,8 @@ const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPage
                 <button
                     key={i}
                     onClick={() => onPageChange(i)}
-                    className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all ${currentPage === i
-                            ? 'bg-brand-red text-white shadow-[0_0_15px_rgba(229,9,20,0.5)] scale-110'
+                    className={`w-8 h-8 sm:w-10 sm:h-10 text-xs sm:text-sm rounded-full flex items-center justify-center font-bold transition-all cursor-pointer ${currentPage === i
+                            ? 'bg-brand-red text-white shadow-[0_0_15px_rgba(229,9,20,0.5)] scale-105'
                             : 'bg-white/5 hover:bg-white/20 text-gray-300 hover:text-white'
                         }`}
                 >
@@ -49,10 +49,10 @@ const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPage
 
         if (endPage < totalPages) {
             if (endPage < totalPages - 1) {
-                pages.push(<div key="dots2" className="w-10 h-10 flex items-center justify-center text-gray-500"><MoreHorizontal size={16} /></div>);
+                pages.push(<div key="dots2" className="w-6 h-8 sm:w-10 sm:h-10 flex items-center justify-center text-gray-500"><MoreHorizontal size={14} /></div>);
             }
             pages.push(
-                <button key={totalPages} onClick={() => onPageChange(totalPages)} className="w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all bg-white/5 hover:bg-white/20 text-gray-300">
+                <button key={totalPages} onClick={() => onPageChange(totalPages)} className="w-8 h-8 sm:w-10 sm:h-10 text-xs sm:text-sm rounded-full flex items-center justify-center font-bold transition-all bg-white/5 hover:bg-white/20 text-gray-300 cursor-pointer">
                     {totalPages}
                 </button>
             );
@@ -62,27 +62,27 @@ const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPage
     };
 
     return (
-        <div className="flex items-center justify-center gap-2 mt-12 mb-16 animate-in fade-in">
+        <div className="flex items-center justify-center gap-1.5 sm:gap-2 mt-8 mb-12 animate-in fade-in select-none">
             <button
                 onClick={() => onPageChange(currentPage - 1)}
                 disabled={currentPage === 1}
-                className="w-10 h-10 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-white/10 transition-colors"
+                className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-white/10 transition-colors cursor-pointer disabled:cursor-not-allowed"
                 aria-label="Previous Page"
             >
-                <ChevronLeft size={20} />
+                <ChevronLeft size={18} />
             </button>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-1.5">
                 {renderPageNumbers()}
             </div>
 
             <button
                 onClick={() => onPageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className="w-10 h-10 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-white/10 transition-colors"
+                className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-white/10 transition-colors cursor-pointer disabled:cursor-not-allowed"
                 aria-label="Next Page"
             >
-                <ChevronRight size={20} />
+                <ChevronRight size={18} />
             </button>
         </div>
     );

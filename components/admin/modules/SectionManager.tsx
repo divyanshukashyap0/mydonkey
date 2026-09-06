@@ -95,7 +95,7 @@ const SectionManager = () => {
         const defaults = [
             { title: "Trending Now", type: 'trending', order: 0, enabled: true, scopes: ['home'] },
             { title: "New Cinema", type: 'new_movies', order: 1, enabled: true, scopes: ['home'] },
-            { title: "Marvel Universe", type: 'tag', tagFilter: 'Marvel', order: 2, enabled: true, scopes: ['home'] },
+            { title: "Marvel Cinematic Universe", type: 'tag', tagFilter: 'Marvel', order: 2, enabled: true, scopes: ['home'], showRanking: true },
             { title: "Your Favourites", type: 'my_list', order: 3, enabled: true, scopes: ['home'] },
             { title: "Popular Requests", type: 'curated', order: 4, enabled: true, scopes: ['home'], contentIds: [] },
             { title: "TV Shows", type: 'new_tv', order: 5, enabled: true, scopes: ['home'] }
@@ -277,7 +277,7 @@ const SectionManager = () => {
                                         if (!item) return null;
                                         return (
                                             <div key={id} className="flex items-center gap-3 bg-white/5 p-2 rounded border border-white/5">
-                                                <img src={item.poster_path || undefined} className="w-8 h-12 object-cover rounded" alt="" />
+                                                <img src={item.poster_path || '/logo.png'} className="w-8 h-12 object-cover rounded" alt="" />
                                                 <span className="flex-1 text-sm font-medium">{item.title}</span>
                                                 <button onClick={() => removeContentSelection(id)} className="p-1 hover:bg-white/10 rounded text-gray-500 hover:text-red-500">
                                                     <Trash2 size={14} />
@@ -351,7 +351,7 @@ const SectionManager = () => {
                                                     {idx + 1}
                                                 </span>
                                             )}
-                                            <img src={item.poster_path || undefined} className="w-full h-full object-cover relative z-0" alt="" />
+                                            <img src={item.poster_path || '/logo.png'} className="w-full h-full object-cover relative z-0" alt="" />
                                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2 z-20">
                                                 <span className="text-[10px] font-bold text-white leading-tight">{item.title}</span>
                                             </div>
@@ -404,7 +404,7 @@ const SectionManager = () => {
                                             }}
                                             className="w-full flex items-center gap-3 p-2 hover:bg-white/10 rounded transition text-left group"
                                         >
-                                            <img src={item.poster_path || undefined} className="w-10 h-14 object-cover rounded bg-gray-800" alt="" />
+                                            <img src={item.poster_path || '/logo.png'} className="w-10 h-14 object-cover rounded bg-gray-800" alt="" />
                                             <div className="flex-1 min-w-0">
                                                 <div className="font-bold text-sm truncate text-gray-200 group-hover:text-white">{item.title}</div>
                                                 <div className="text-xs text-gray-400 capitalize">{item.type} • {(item.release_date || '').split('-')[0]}</div>

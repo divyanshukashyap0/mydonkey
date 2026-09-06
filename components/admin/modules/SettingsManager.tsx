@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../../../context/StoreContext';
-import { Save, AlertTriangle, Globe, Shield, Mail, Monitor, CheckCircle, Bell, Smartphone, Film, Tv, Link2, RefreshCw } from 'lucide-react';
+import { Save, AlertTriangle, Globe, Shield, Monitor, CheckCircle, Smartphone, Film, Tv, Link2, RefreshCw, Mail } from 'lucide-react';
 import { SiteSettings } from '../../../types';
 import { doc, writeBatch } from 'firebase/firestore';
 import { db } from '../../../firebase';
@@ -251,11 +251,18 @@ const SettingsManager = () => {
                             <label className="text-xs text-gray-500 uppercase font-bold block mb-4">Homepage Hero Content</label>
                             {heroContent ? (
                                 <div className="flex items-start gap-4 bg-white/5 p-4 rounded-xl border border-white/10">
-                                    {heroContent.poster_path ? (
-                                        <img src={heroContent.poster_path} className="w-16 h-24 object-cover rounded-lg shadow-lg" alt="" />
-                                    ) : (
-                                        <div className="w-16 h-24 bg-white/10 rounded-lg flex items-center justify-center text-[10px] text-gray-500">No Image</div>
-                                    )}
+                                    <img 
+                                        src={heroContent.poster_path || '/logo.png'} 
+                                        className={`w-16 h-24 ${heroContent.poster_path ? 'object-cover' : 'object-contain p-2 bg-white/10'} rounded-lg shadow-lg`} 
+                                        alt="" 
+                                        onError={(e) => {
+                                            const t = e.currentTarget;
+                                            if (!t.src.endsWith('/logo.png')) {
+                                                t.src = '/logo.png';
+                                                t.className = "w-16 h-24 object-contain p-2 bg-white/10 rounded-lg shadow-lg";
+                                            }
+                                        }}
+                                    />
                                     <div className="flex-1">
                                         <div className="font-bold text-lg mb-1">{heroContent.title}</div>
                                         <div className="text-xs text-gray-400 mb-3">{heroContent.overview.substring(0, 100)}...</div>
@@ -440,28 +447,6 @@ const SettingsManager = () => {
                             <p className="text-[10px] text-gray-400 mt-2">
                                 Single universal code required for users to unlock all content marked as <span className="text-brand-red font-bold">Exclusive</span>.
                             </p>
-                        </div>
-
-                        <div>
-                            <label className="text-xs text-gray-500 uppercase font-bold block mb-4">Notification Settings (Global)</label>
-                            <div className="space-y-3">
-                                <label className="flex items-center gap-3 p-3 bg-white/5 rounded-lg border border-white/5 cursor-pointer">
-                                    <input type="checkbox" className="accent-brand-red w-4 h-4" defaultChecked />
-                                    <div className="flex-1">
-                                        <div className="text-sm font-bold">Email Notifications</div>
-                                        <div className="text-[10px] text-gray-500">Send critical alerts to admin email</div>
-                                    </div>
-                                    <Mail size={16} className="text-gray-500" />
-                                </label>
-                                <label className="flex items-center gap-3 p-3 bg-white/5 rounded-lg border border-white/5 cursor-pointer">
-                                    <input type="checkbox" className="accent-brand-red w-4 h-4" defaultChecked />
-                                    <div className="flex-1">
-                                        <div className="text-sm font-bold">Push Notifications</div>
-                                        <div className="text-[10px] text-gray-500">Enable browser push notifications for announcements</div>
-                                    </div>
-                                    <Bell size={16} className="text-gray-500" />
-                                </label>
-                            </div>
                         </div>
                     </div>
                 )}

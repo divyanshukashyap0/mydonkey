@@ -24,7 +24,18 @@ const LiveSportsRail: React.FC<LiveSportsRailProps> = ({ items, onPlay }) => {
                         className="flex-none w-[160px] md:w-[200px] group cursor-pointer relative"
                     >
                         <div className="aspect-[2/3] rounded-lg overflow-hidden border border-white/10 group-hover:border-white/40 transition-all relative">
-                            <img src={item.poster_path_mobile || item.poster_path} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={item.title} />
+                            <img 
+                                src={item.poster_path_mobile || item.poster_path || '/logo.png'} 
+                                className={`w-full h-full ${(item.poster_path_mobile || item.poster_path) ? 'object-cover' : 'object-contain p-4 bg-zinc-900'} group-hover:scale-105 transition-transform duration-500`} 
+                                alt={item.title} 
+                                onError={(e) => {
+                                    const t = e.currentTarget;
+                                    if (!t.src.endsWith('/logo.png')) {
+                                        t.src = '/logo.png';
+                                        t.className = "w-full h-full object-contain p-4 bg-zinc-900 group-hover:scale-105 transition-transform duration-500";
+                                    }
+                                }}
+                            />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 group-hover:opacity-90 transition-opacity" />
 
                             {/* Live/Coming Soon Badge */}

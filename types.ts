@@ -127,6 +127,8 @@ export interface SiteSettings {
   embedProxyBaseUrl?: string;
   embedMovieType?: string;
   embedTvType?: string;
+  announcementBanner?: string;
+  guestAccessEnabled?: boolean;
 }
 
 export interface Plan {
@@ -179,6 +181,8 @@ export interface User {
   createdAt?: string;
   bypassPassword?: boolean; // If true, user skips password gate and access codes
   favoriteGenres?: string[]; // User's preferred genres for personalized recommendations
+  searchHistoryEnabled?: boolean; // User preference to enable/disable search history
+  searchHistory?: string[]; // Array of recent search query strings
 }
 
 export interface ContinueWatchingItem {

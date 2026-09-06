@@ -123,7 +123,7 @@ const ContentRequestInline: React.FC<ContentRequestInlineProps> = ({ className =
                         </p>
                         {matches.map(match => (
                             <div key={match.id} className="flex items-center gap-3 bg-black/40 p-2 rounded-lg border border-green-500/30 hover:bg-black/60 transition cursor-pointer" onClick={() => navigate(`/browse/${match.id}`, { state: { item: match } })}>
-                                <img src={match.poster_path || undefined} className="w-8 h-12 object-cover rounded bg-gray-800" alt={match.title} />
+                                <img src={match.poster_path || '/logo.png'} className={`w-8 h-12 ${match.poster_path ? 'object-cover' : 'object-contain p-1'} rounded bg-gray-800`} alt={match.title} />
                                 <div className="flex-1 min-w-0">
                                     <h4 className="font-bold text-xs text-white line-clamp-1">{match.title}</h4>
                                     <div className="flex items-center gap-2 text-[10px] text-gray-400">

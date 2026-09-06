@@ -68,13 +68,19 @@ const MyContributions: React.FC<MyContributionsProps> = ({ userId }) => {
                 <div key={item.id} className="flex items-center gap-4 bg-white/5 rounded-xl p-3 border border-white/5 hover:border-white/10 transition group">
                     {/* Poster */}
                     <div className="flex-shrink-0 w-12 h-16 rounded-lg overflow-hidden bg-gray-800 shadow">
-                        {item.poster_path ? (
-                            <img src={item.poster_path} alt={item.title} className="w-full h-full object-cover" loading="lazy" />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                                <Film size={20} className="text-gray-600" />
-                            </div>
-                        )}
+                        <img 
+                            src={item.poster_path || '/logo.png'} 
+                            alt={item.title} 
+                            className={`w-full h-full ${item.poster_path ? 'object-cover' : 'object-contain p-1'}`} 
+                            loading="lazy" 
+                            onError={(e) => {
+                                const t = e.currentTarget;
+                                if (!t.src.endsWith('/logo.png')) {
+                                    t.src = '/logo.png';
+                                    t.className = "w-full h-full object-contain p-1";
+                                }
+                            }}
+                        />
                     </div>
 
                     {/* Info */}

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
     Content,
     User as AppUser,
@@ -13,6 +13,7 @@ import {
     Device,
     ContentRequest,
     Page,
+    ContinueWatchingItem,
 } from '../types';
 import Loader from '../components/Loader';
 import { auth, db } from '../firebase';
@@ -48,14 +49,21 @@ import {
     query,
     orderBy,
     where,
+    limit,
     serverTimestamp,
     getDocsFromCache,
     increment,
+    writeBatch,
+    disableNetwork,
 } from 'firebase/firestore';
+import { idbGet, idbSet } from '../utils/idbCache';
+import { FALLBACK_CATALOG, FALLBACK_SECTIONS, fetchDynamicFallbackContent, buildDynamicSections } from '../services/fallbackCatalog';
+import { isIndianOrMarvelContent } from '../services/recommendationService';
 
 interface StoreContextType {
     isAuthenticated: boolean;
     isLoading: boolean;
+    isQuotaExceeded: boolean;
     login: (email: string, password: string) => Promise<void>;
     signup: (email: string, password: string) => Promise<void>;
     loginWithGoogle: () => Promise<void>;
@@ -114,6 +122,9 @@ interface StoreContextType {
     incrementViews: (contentId: string) => Promise<void>;
     incrementLikes: (contentId: string) => Promise<void>;
     publishCatalog: () => Promise<void>;
+    fetchContentById: (id: string) => Promise<Content | null>;
+    likedContent: string[];
+    toggleLike: (contentId: string) => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -134,10 +145,77 @@ const DEFAULT_SETTINGS: SiteSettings = {
     linkedinUrl: '',
     embedProxyBaseUrl: 'https://proxy.garageband.rocks',
     embedMovieType: 'movie',
-    embedTvType: 'tv'
+    embedTvType: 'tv',
+    announcementBanner: '',
+    guestAccessEnabled: true
 };
 
 export const PERMANENT_ADMINS = ['divyanshukashyap2430955@gmail.com', 'divyanshu00884466@gmail.com'];
+
+/**
+ * Strict 5-Second Timeout Helper:
+ * Ensures no Firebase operation hangs indefinitely (e.g. during exponential backoff after quota exhaustion).
+ * If Firebase does not respond within 5000ms, the promise rejects and the fallback state takes over.
+ */
+function withTimeout<T>(promise: Promise<T>, timeoutMs = 5000): Promise<T> {
+    let timer: any;
+    const timeoutPromise = new Promise<T>((_, reject) => {
+        timer = setTimeout(() => {
+            reject(new Error(`Firebase operation timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+    });
+
+    return Promise.race([promise, timeoutPromise]).finally(() => {
+        clearTimeout(timer);
+    });
+}
+
+/**
+ * Ensures clean section configuration:
+ * 1. Purges any "Marvel Series & Sagas", "Marvel Saga", or redundant Marvel sections.
+ * 2. Strictly guarantees only ONE canonical "Marvel Cinematic Universe" rail exists.
+ */
+export function sanitizeSections(rawSections: Section[]): Section[] {
+    if (!rawSections || !Array.isArray(rawSections)) return [];
+
+    // Filter out any "marvel series", "marvel saga", "marvel series & sagas"
+    const withoutSagas = rawSections.filter(s => {
+        const title = (s.title || '').toLowerCase();
+        if (title.includes('marvel') && (title.includes('saga') || title.includes('series'))) {
+            return false;
+        }
+        return true;
+    });
+
+    // Deduplicate Marvel sections - strictly keep only ONE canonical "Marvel Cinematic Universe"
+    let seenMarvel = false;
+    const result: Section[] = [];
+    for (const sec of withoutSagas) {
+        const titleLower = (sec.title || '').toLowerCase();
+        const tagLower = (sec.tagFilter || '').toLowerCase();
+        const isMarvel = titleLower.includes('marvel') || tagLower === 'marvel';
+
+        if (isMarvel) {
+            if (!seenMarvel) {
+                seenMarvel = true;
+                result.push({
+                    ...sec,
+                    title: 'Marvel Cinematic Universe',
+                    tagFilter: 'Marvel',
+                    showRanking: true
+                });
+            }
+        } else if (sec.id === 'sec_indian_webseries' || (titleLower.includes('web series') && sec.tagFilter === 'Indian')) {
+            result.push({
+                ...sec,
+                tagFilter: 'Web Series'
+            });
+        } else {
+            result.push(sec);
+        }
+    }
+    return result;
+}
 
 export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [fbUser, setFbUser] = useState<FirebaseUser | null>(null);
@@ -146,15 +224,23 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const [userProfiles, setUserProfiles] = useState<Profile[]>([]);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const firebaseDataReceivedRef = useRef(false);
 
-    const [content, setContent] = useState<Content[]>([]);
+    const [content, setContent] = useState<Content[]>(FALLBACK_CATALOG);
     // Load cached settings/plans if available
     const [settings, setSettings] = useState<SiteSettings>(() => {
         const cached = localStorage.getItem('globalSettings');
         return cached ? JSON.parse(cached) : DEFAULT_SETTINGS;
     });
 
-    const [sections, setSections] = useState<Section[]>([]);
+    const [sections, setSections] = useState<Section[]>(() => sanitizeSections(FALLBACK_SECTIONS));
+    const [isQuotaExceeded, setIsQuotaExceeded] = useState<boolean>(() => {
+        try {
+            return sessionStorage.getItem('firebase_quota_exceeded') === 'true';
+        } catch {
+            return false;
+        }
+    });
     const [users, setUsers] = useState<AppUser[]>([]);
 
     // Load cached plans if available
@@ -162,16 +248,107 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         const cached = localStorage.getItem('cachedPlans');
         return cached ? JSON.parse(cached) : [];
     });
-    const [notifications, setNotifications] = useState<Notification[]>([]);
     const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
     const [isInstallable, setIsInstallable] = useState(false);
     const [isIOS, setIsIOS] = useState(false);
     const [contentRequests, setContentRequests] = useState<ContentRequest[]>([]);
     const [pages, setPages] = useState<Page[]>([]);
+    const [likedContent, setLikedContent] = useState<string[]>(() => {
+        try {
+            const cached = localStorage.getItem('my_donkey_liked_content');
+            return cached ? JSON.parse(cached) : [];
+        } catch {
+            return [];
+        }
+    });
 
     // Track versions in memory to prevent infinite loops if LocalStorage fails
     const localContentVersionRef = React.useRef(parseInt(localStorage.getItem('contentVersion') || '0'));
     const localSectionsVersionRef = React.useRef(parseInt(localStorage.getItem('sectionsVersion') || '0'));
+
+    // Helper to heal broken/dummy poster and backdrop URLs and synchronize with curated catalog
+    const healAndMergeCatalog = useCallback((existing: Content[]): Content[] => {
+        const curatedMap = new Map<string, Content>();
+        FALLBACK_CATALOG.forEach(item => curatedMap.set(item.id, item));
+
+        const brokenPatterns = ['_poster.jpg', '_backdrop.jpg', 'geCRueV3ElhRTr0xtJu3J8WODRf', 'jYW3jHl8D1wS4w7w9H4t9w8l'];
+
+        const healed = existing.map(item => {
+            const curated = curatedMap.get(item.id);
+            if (curated) {
+                return {
+                    ...item,
+                    ...curated,
+                    isPublished: true,
+                    allowPlayback: true,
+                };
+            }
+            const posterBroken = !item.poster_path || brokenPatterns.some(p => item.poster_path?.includes(p));
+            const backdropBroken = !item.backdrop_path || brokenPatterns.some(p => item.backdrop_path?.includes(p));
+            if (posterBroken && item.backdrop_path && !backdropBroken) {
+                return { ...item, poster_path: item.backdrop_path };
+            }
+            return item;
+        });
+
+        const existingIds = new Set(healed.map(h => h.id));
+        FALLBACK_CATALOG.forEach(item => {
+            if (!existingIds.has(item.id)) {
+                existingIds.add(item.id);
+                healed.push(item);
+            }
+        });
+
+        return healed;
+    }, []);
+
+    const handleQuotaExceeded = useCallback(() => {
+        setIsQuotaExceeded(true);
+        setIsLoading(false);
+        try {
+            sessionStorage.setItem('firebase_quota_exceeded', 'true');
+        } catch (e) { }
+        console.warn("[Quota Fallback] Database quota exceeded or timed out. Website seamlessly serving curated Indian, Marvel, and Anime content.");
+
+        // Immediately shut down Firestore network to stop backoff loops, quota errors, and backend overloading
+        try {
+            disableNetwork(db).catch(() => {});
+        } catch (e) { }
+
+        setContent(prev => {
+            const healed = healAndMergeCatalog(prev && prev.length > 0 ? prev : FALLBACK_CATALOG);
+            idbSet('cachedContent', healed).catch(() => {});
+            return healed;
+        });
+
+        setSections(prev => {
+            if (!prev || prev.length === 0) return sanitizeSections(FALLBACK_SECTIONS);
+            return sanitizeSections(prev);
+        });
+
+        fetchDynamicFallbackContent().then(dynamicItems => {
+            if (dynamicItems && dynamicItems.length > 0) {
+                const healed = healAndMergeCatalog(dynamicItems);
+                setContent(healed);
+                idbSet('cachedContent', healed).catch(() => {});
+                // Also update sections to match the dynamically fetched content
+                const dynSections = sanitizeSections(buildDynamicSections(healed));
+                setSections(dynSections);
+            }
+        }).catch(() => {});
+    }, [healAndMergeCatalog]);
+
+    const handleQuotaExceededRef = useRef(handleQuotaExceeded);
+    handleQuotaExceededRef.current = handleQuotaExceeded;
+
+    // If quota was already exceeded this session, disable network upfront to stop background Firestore retry spam
+    useEffect(() => {
+        if (sessionStorage.getItem('firebase_quota_exceeded') === 'true') {
+            try {
+                disableNetwork(db).catch(() => {});
+            } catch (e) { }
+        }
+    }, []);
 
     // --- Theme Application ---
     useEffect(() => {
@@ -278,7 +455,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     setIsAuthenticated(true);
 
                     const userRef = doc(db, 'users', firebaseUser.uid);
-                    const userSnap = await getDoc(userRef);
+                    const userSnap = await withTimeout(getDoc(userRef), 5000);
+                    if (userSnap.exists()) {
+                        firebaseDataReceivedRef.current = true;
+                    }
 
                     if (!userSnap.exists()) {
                         const newAppUser: AppUser = {
@@ -291,7 +471,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                             lastLoginAt: new Date().toISOString(),
                             isGuest
                         };
-                        await setDoc(userRef, newAppUser);
+                        await withTimeout(setDoc(userRef, newAppUser), 5000).catch(() => {});
 
                         // Create default profile
                         const profileId = isGuest ? 'guest' : 'main';
@@ -304,7 +484,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                             isKids: false,
                             myList: []
                         };
-                        await setDoc(doc(db, 'users', firebaseUser.uid, 'profiles', profileId), defaultProfile);
+                        await withTimeout(setDoc(doc(db, 'users', firebaseUser.uid, 'profiles', profileId), defaultProfile), 5000).catch(() => {});
                         setCurrentProfile(defaultProfile); // Set immediately for guests
                         setCurrentUser(newAppUser);
                     } else {
@@ -313,14 +493,14 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
                         // Force Admin Role for Permanent Admins
                         if (isPermanentAdmin && userData.role !== 'admin') {
-                            await setDoc(userRef, { role: 'admin' }, { merge: true });
+                            setDoc(userRef, { role: 'admin' }, { merge: true }).catch(() => {});
                             userData.role = 'admin';
                         }
 
                         if (!userData.name) {
-                            await setDoc(userRef, {
+                            setDoc(userRef, {
                                 name: firebaseUser.displayName || userEmail.split('@')[0]
-                            }, { merge: true });
+                            }, { merge: true }).catch(() => {});
                         }
                         // Check token version to force logout if needed
                         const localTokenVersion = localStorage.getItem('tokenVersion');
@@ -337,10 +517,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
                         // If guest, auto-select profile
                         if (isGuest) {
-                            const profilesSnap = await getDocs(collection(db, 'users', firebaseUser.uid, 'profiles'));
-                            if (!profilesSnap.empty) {
-                                setCurrentProfile(profilesSnap.docs[0].data() as Profile);
-                            }
+                            try {
+                                const profilesSnap = await withTimeout(getDocs(collection(db, 'users', firebaseUser.uid, 'profiles')), 5000);
+                                if (!profilesSnap.empty) {
+                                    setCurrentProfile(profilesSnap.docs[0].data() as Profile);
+                                }
+                            } catch { }
                         }
                     }
 
@@ -352,7 +534,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     setIsAuthenticated(false);
                 }
             } catch (error) {
-                console.error("Error fetching user data:", error);
+                console.warn("[Auth] Firebase took >5s or failed. Assuming database quota exceeded and running fallback state:", error);
 
                 // CRITICAL FIX: If we have a firebaseUser but DB failed, 
                 // we should STILL treat them as authenticated to avoid login loops.
@@ -362,13 +544,24 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     const fallbackUser: AppUser = {
                         uid: firebaseUser.uid,
                         email: firebaseUser.email || '',
+                        name: firebaseUser.displayName || (firebaseUser.email || '').split('@')[0] || 'User',
                         plan: 'Free',
-                        role: 'user',
+                        role: PERMANENT_ADMINS.includes(firebaseUser.email || '') ? 'admin' : 'user',
                         status: 'active',
                         lastLoginAt: new Date().toISOString()
                     };
                     setCurrentUser(fallbackUser);
+                    const fallbackProfile: Profile = {
+                        id: 'main',
+                        name: firebaseUser.displayName || 'User',
+                        avatarUrl: '/Mydonkey%20user.jpg',
+                        isKids: false,
+                        myList: []
+                    };
+                    setCurrentProfile(fallbackProfile);
+                    setUserProfiles([fallbackProfile]);
                     setIsAuthenticated(true);
+                    handleQuotaExceededRef.current();
                 } else {
                     setIsAuthenticated(false);
                 }
@@ -379,13 +572,64 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         return () => unsubscribe();
     }, []);
 
-    // 2. Data Sync Listeners
-    // 2. Data Sync Listeners - Optimized with Cache-First Strategy
+    // In-memory session tracking for view increments (zero writes on repeat views)
+    const viewedContentIds = useRef<Set<string>>(new Set());
+
+    // Instant Boot from IndexedDB Cache (0 network reads)
     useEffect(() => {
-        // A. Settings Listener (Single Doc Read - Cheap)
-        // This acts as the "Signal" for other data updates
+        let isMounted = true;
+        const loadCache = async () => {
+            try {
+                if (sessionStorage.getItem('firebase_quota_exceeded') === 'true') {
+                    handleQuotaExceededRef.current();
+                }
+
+                const [cachedContent, cachedVer, cachedSections, cachedSecVer] = await Promise.all([
+                    idbGet<Content[]>('cachedContent'),
+                    idbGet<number>('contentVersion'),
+                    idbGet<Section[]>('cachedSections'),
+                    idbGet<number>('sectionsVersion'),
+                ]);
+
+                if (isMounted) {
+                    if (cachedContent && cachedContent.length > 0) {
+                        const healed = healAndMergeCatalog(cachedContent);
+                        setContent(healed);
+                        if (cachedVer) localContentVersionRef.current = cachedVer;
+                        idbSet('cachedContent', healed).catch(() => {});
+                    } else {
+                        setContent(FALLBACK_CATALOG);
+                        idbSet('cachedContent', FALLBACK_CATALOG).catch(() => {});
+                    }
+                    if (cachedSections && cachedSections.length > 0) {
+                        const cleaned = sanitizeSections(cachedSections);
+                        setSections(cleaned);
+                        if (cleaned.length !== cachedSections.length) {
+                            idbSet('cachedSections', cleaned).catch(() => {});
+                        }
+                        if (cachedSecVer) localSectionsVersionRef.current = cachedSecVer;
+                    } else {
+                        setSections(sanitizeSections(FALLBACK_SECTIONS));
+                    }
+                }
+            } catch (err) {
+                console.warn("IndexedDB boot error:", err);
+                if (isMounted) {
+                    setContent(FALLBACK_CATALOG);
+                    setSections(sanitizeSections(FALLBACK_SECTIONS));
+                }
+            }
+        };
+        loadCache();
+        return () => { isMounted = false; };
+    }, []);
+
+    // 2. Data Sync Listeners - Decoupled from user role (Runs ONCE on mount)
+    useEffect(() => {
+        // A. Settings Listener (Single Doc Read - Signal for updates)
         const unsubSettings = onSnapshot(doc(db, 'settings', 'global'), async (docSnap) => {
             if (docSnap.exists()) {
+                firebaseDataReceivedRef.current = true;
                 const serverSettings = docSnap.data() as SiteSettings;
                 setSettings(serverSettings);
                 try {
@@ -393,164 +637,147 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 } catch (e) { console.warn("LS Full (Settings)", e); }
 
                 // B. Content Sync Logic
-                // Use Memory Ref as the source of truth for "current local version"
                 const currentLocalContentVersion = localContentVersionRef.current;
                 const serverContentVersion = Number(serverSettings.contentVersion || 0);
 
-                const cachedContentStr = localStorage.getItem('cachedContent');
+                // Check if fresh fetch is truly necessary
+                const needsContentFetch = serverContentVersion === 0 || serverContentVersion !== currentLocalContentVersion;
 
-                if (serverContentVersion !== currentLocalContentVersion || !cachedContentStr) {
-                    // Fetch fresh data with Catalog Optimization (1 read vs N reads)
+                if (needsContentFetch) {
                     let freshContent: Content[] = [];
                     try {
-                        const catalogSnap = await getDoc(doc(db, 'catalogs', 'global'));
-                        if (catalogSnap.exists()) {
-                            freshContent = catalogSnap.data().items || [];
+                        // 1. Try single compact catalog read (1 read vs 734 reads!)
+                        const catalogSnap = await withTimeout(getDoc(doc(db, 'catalogs', 'global')), 5000);
+                        if (catalogSnap.exists() && catalogSnap.data()?.items?.length > 0) {
+                            freshContent = catalogSnap.data().items;
+                            firebaseDataReceivedRef.current = true;
                         } else {
-                            const contentSnap = await getDocs(collection(db, 'content'));
+                            // 2. Fallback: only if catalog is not built yet
+                            const contentSnap = await withTimeout(getDocs(collection(db, 'content')), 5000);
                             freshContent = contentSnap.docs.map(d => ({ ...d.data(), id: d.id } as Content));
+                            if (freshContent.length > 0) firebaseDataReceivedRef.current = true;
                         }
                     } catch (err) {
+                        handleQuotaExceededRef.current();
                         try {
                             const contentSnap = await getDocsFromCache(collection(db, 'content'));
                             freshContent = contentSnap.docs.map(d => ({ ...d.data(), id: d.id } as Content));
                         } catch (cacheErr) {
-                            // Last resort: Keep existing state or empty
+                            // Keep existing state
                         }
                     }
 
-                    // Update Cache & State
-                    setContent(freshContent);
-
-                    // Update Memory Ref IMMEDIATELY to stop re-fetches
-                    localContentVersionRef.current = serverContentVersion;
-
-                    try {
-                        localStorage.setItem('cachedContent', JSON.stringify(freshContent));
-                        localStorage.setItem('contentVersion', serverContentVersion.toString());
-                    } catch (e) {
-                        // LocalStorage write full, memory updated
-                    }
-                } else {
-                    // Load from Cache
-                    if (cachedContentStr) {
-                        try {
-                            const parsedContent = JSON.parse(cachedContentStr);
-                            setContent(parsedContent);
-                        } catch (e) {
-                            // Ignore parse error
-                        }
+                    if (freshContent.length > 0) {
+                        setContent(freshContent);
+                        localContentVersionRef.current = serverContentVersion;
+                        idbSet('cachedContent', freshContent).catch(() => {});
+                        idbSet('contentVersion', serverContentVersion).catch(() => {});
                     }
                 }
 
                 // C. Sections Sync Logic
                 const currentLocalSectionsVersion = localSectionsVersionRef.current;
                 const serverSectionsVersion = Number(serverSettings.sectionsVersion || 0);
-                const cachedSectionsStr = localStorage.getItem('cachedSections');
+                const needsSectionsFetch = serverSectionsVersion === 0 || serverSectionsVersion !== currentLocalSectionsVersion;
 
-                // FORCE UPDATE logic: If (Version Mismatch) OR (No Cache) OR (Sections Length is 0 in state/cache [we check string length for speed])
-                // This ensures that if the user has no sections, we always try to fetch at least once.
-                const shouldFetchSections =
-                    serverSectionsVersion !== currentLocalSectionsVersion ||
-                    !cachedSectionsStr ||
-                    cachedSectionsStr.length < 5; // Empty array "[]" is length 2
-
-                if (shouldFetchSections) {
+                if (needsSectionsFetch) {
                     let freshSections: Section[] = [];
                     try {
-                        const sectionsSnap = await getDocs(query(collection(db, 'sections'), orderBy('order')));
+                        const sectionsSnap = await withTimeout(getDocs(query(collection(db, 'sections'), orderBy('order'))), 5000);
                         freshSections = sectionsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Section));
+                        if (freshSections.length > 0) firebaseDataReceivedRef.current = true;
                     } catch (err) {
+                        handleQuotaExceededRef.current();
                         try {
                             const sectionsSnap = await getDocsFromCache(query(collection(db, 'sections'), orderBy('order')));
                             freshSections = sectionsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Section));
                         } catch (cacheErr) { }
                     }
 
-                    setSections(freshSections);
-
-                    // Update Memory Ref IMMEDIATELY
-                    localSectionsVersionRef.current = serverSectionsVersion;
-
-                    try {
-                        localStorage.setItem('cachedSections', JSON.stringify(freshSections));
-                        localStorage.setItem('sectionsVersion', serverSectionsVersion.toString());
-                    } catch (e) { }
-                } else {
-                    if (cachedSectionsStr) {
-                        setSections(JSON.parse(cachedSectionsStr));
+                    if (freshSections.length > 0) {
+                        const cleaned = sanitizeSections(freshSections);
+                        setSections(cleaned);
+                        localSectionsVersionRef.current = serverSectionsVersion;
+                        idbSet('cachedSections', cleaned).catch(() => {});
+                        idbSet('sectionsVersion', serverSectionsVersion).catch(() => {});
                     }
                 }
             }
         }, (error) => {
-            // FAILSAFE: Try to load from LocalStorage / Cache anyway
-            const cachedContentStr = localStorage.getItem('cachedContent');
-            if (cachedContentStr) {
-                try {
-                    setContent(JSON.parse(cachedContentStr));
-                } catch (e) { }
-            } else {
-                // Try Firestore Cache if LS is empty
-                getDocsFromCache(collection(db, 'content')).then(snap => {
-                    if (!snap.empty) {
-                        setContent(snap.docs.map(d => ({ ...d.data(), id: d.id } as Content)));
-                    }
-                }).catch(() => {});
-            }
+            handleQuotaExceededRef.current();
 
-            const cachedSectionsStr = localStorage.getItem('cachedSections');
-            if (cachedSectionsStr) {
-                try {
-                    setSections(JSON.parse(cachedSectionsStr));
-                } catch (e) { }
-            } else {
-                getDocsFromCache(query(collection(db, 'sections'), orderBy('order'))).then(snap => {
-                    if (!snap.empty) {
-                        setSections(snap.docs.map(d => ({ ...d.data(), id: d.id } as Section)));
-                    }
-                }).catch(() => {});
-            }
+            // FAILSAFE: Try to load from IndexedDB / Cache
+            idbGet<Content[]>('cachedContent').then(cached => {
+                if (cached && cached.length > 0) {
+                    const healed = healAndMergeCatalog(cached);
+                    setContent(healed);
+                } else {
+                    getDocsFromCache(collection(db, 'content')).then(snap => {
+                        if (!snap.empty) {
+                            const healed = healAndMergeCatalog(snap.docs.map(d => ({ ...d.data(), id: d.id } as Content)));
+                            setContent(healed);
+                        } else {
+                            setContent(FALLBACK_CATALOG);
+                        }
+                    }).catch(() => { setContent(FALLBACK_CATALOG); });
+                }
+            }).catch(() => { setContent(FALLBACK_CATALOG); });
+
+            idbGet<Section[]>('cachedSections').then(cached => {
+                if (cached && cached.length > 0) setSections(sanitizeSections(cached));
+                else {
+                    getDocsFromCache(query(collection(db, 'sections'), orderBy('order'))).then(snap => {
+                        if (!snap.empty) setSections(sanitizeSections(snap.docs.map(d => ({ ...d.data(), id: d.id } as Section))));
+                        else setSections(sanitizeSections(FALLBACK_SECTIONS));
+                    }).catch(() => { setSections(sanitizeSections(FALLBACK_SECTIONS)); });
+                }
+            }).catch(() => { setSections(sanitizeSections(FALLBACK_SECTIONS)); });
         });
 
-        // Keep Plans & Notifications as real-time for now (low frequency updates, critical for billing)
-        const unsubPlans = onSnapshot(collection(db, 'plans'), (snap) => {
+        // Plans: Fetch once with getDocs and cache (capped at 5 seconds)
+        withTimeout(getDocs(collection(db, 'plans')), 5000).then(snap => {
+            if (!snap.empty) firebaseDataReceivedRef.current = true;
             const data = snap.docs.map(d => ({ ...d.data(), id: d.id } as Plan));
             setPlans(data);
-            try {
-                localStorage.setItem('cachedPlans', JSON.stringify(data));
-            } catch (e) { }
-        }, (error) => {
-            console.error("Plans Sync Error (Quota/Offline):", error);
+            try { localStorage.setItem('cachedPlans', JSON.stringify(data)); } catch (e) { }
+        }).catch((err) => {
+            handleQuotaExceededRef.current();
+            getDocsFromCache(collection(db, 'plans')).then(snap => {
+                if (!snap.empty) setPlans(snap.docs.map(d => ({ ...d.data(), id: d.id } as Plan)));
+            }).catch(() => {});
         });
 
-        const unsubNotifs = onSnapshot(query(collection(db, 'notifications'), orderBy('createdAt', 'desc')), (snap) => {
-            setNotifications(snap.docs.map(d => ({ ...d.data(), id: d.id } as Notification)));
-        }, (error) => {
-            console.error("Notifications Sync Error:", error);
-        });
-
-        const unsubPages = onSnapshot(collection(db, 'pages'), (snap) => {
+        // Pages: Fetch once with getDocs (capped at 5 seconds)
+        withTimeout(getDocs(collection(db, 'pages')), 5000).then(snap => {
+            if (!snap.empty) firebaseDataReceivedRef.current = true;
             setPages(snap.docs.map(d => ({ ...d.data(), id: d.id } as Page)));
-        }, (error) => {
-            console.error("Pages Sync Error:", error);
+        }).catch((err) => {
+            handleQuotaExceededRef.current();
+            getDocsFromCache(collection(db, 'pages')).then(snap => {
+                if (!snap.empty) setPages(snap.docs.map(d => ({ ...d.data(), id: d.id } as Page)));
+            }).catch(() => {});
         });
-
-        let unsubUsers = () => { };
-        if (currentUser?.role === 'admin') {
-            unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-                setUsers(snap.docs.map(d => ({ uid: d.id, ...d.data() } as AppUser)));
-            }, (error) => {
-                console.error("Error fetching users:", error);
-            });
-        }
 
         return () => {
             unsubSettings();
-            unsubPlans();
-            unsubNotifs();
-            unsubPages();
-            unsubUsers();
         };
+    }, []);
+
+    // Dedicated Admin Users Listener: Only active when an admin user is logged in
+    useEffect(() => {
+        if (currentUser?.role !== 'admin') {
+            setUsers([]);
+            return;
+        }
+
+        const qUsers = query(collection(db, 'users'), limit(50));
+        const unsubUsers = onSnapshot(qUsers, (snap) => {
+            setUsers(snap.docs.map(d => ({ uid: d.id, ...d.data() } as AppUser)));
+        }, (error) => {
+            console.warn("Admin users fetch:", error);
+        });
+
+        return () => unsubUsers();
     }, [currentUser?.role]);
 
     // 3. User Specific Sync
@@ -561,6 +788,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             if (doc.exists()) {
                 const data = doc.data() as AppUser;
                 if (data.role === 'admin' || !currentUser) setCurrentUser(data);
+            }
+        }, (error) => {
+            if (error?.code === 'resource-exhausted' || error?.message?.toLowerCase().includes('quota')) {
+                handleQuotaExceededRef.current();
             }
         });
 
@@ -586,6 +817,21 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 setCurrentProfile(active);
                 localStorage.setItem('selectedProfileId', active.id);
             }
+        }, (error) => {
+            if (error?.code === 'resource-exhausted' || error?.message?.toLowerCase().includes('quota')) {
+                handleQuotaExceededRef.current();
+            }
+            if (!currentProfile) {
+                const fallbackProfile: Profile = {
+                    id: 'main',
+                    name: fbUser.displayName || 'User',
+                    avatarUrl: '/Mydonkey%20user.jpg',
+                    isKids: false,
+                    myList: []
+                };
+                setCurrentProfile(fallbackProfile);
+                setUserProfiles([fallbackProfile]);
+            }
         });
 
         return () => {
@@ -594,8 +840,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         };
     }, [fbUser, currentProfile?.id]);
 
-    // 4. Activity Tracker (Throttled)
-    // Use a ref for in-memory throttling fallback if LocalStorage fails
+    // 4. Activity Tracker (Gentle Session Heartbeat, max once per 30 mins)
     const lastActivityRef = React.useRef<number>(0);
 
     useEffect(() => {
@@ -603,46 +848,27 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
         const updateActivity = async () => {
             const now = Date.now();
-            const localLastUpdate = parseInt(localStorage.getItem('lastActivityUpdate') || '0');
-            // Use the greater of local storage or memory ref (handling LS failure)
-            const lastUpdate = Math.max(localLastUpdate, lastActivityRef.current);
-
-            // Update only if more than 5 minutes have passed
-            if (now - lastUpdate > 5 * 60 * 1000) {
+            if (now - lastActivityRef.current > 30 * 60 * 1000) {
+                lastActivityRef.current = now;
                 try {
                     await updateDoc(doc(db, 'users', fbUser.uid), {
                         lastActiveAt: new Date().toISOString()
                     });
-                    lastActivityRef.current = now; // Update memory ref
-                    try {
-                        localStorage.setItem('lastActivityUpdate', now.toString());
-                    } catch (e) {
-                        console.warn("Failed to save activity timestamp to LS (likely full). Using memory throttle.", e);
-                    }
-                } catch (error) {
-                    // Ignore quota errors or network issues for background updates
-                    console.warn("Failed to update activity status:", error);
+                } catch {
+                    // Silently ignore background activity errors
                 }
             }
         };
 
-        const handleActivity = () => {
-            updateActivity();
-        };
-
-        window.addEventListener('click', handleActivity);
-        window.addEventListener('keydown', handleActivity);
-        window.addEventListener('touchstart', handleActivity);
-
-        // Initial update
-        updateActivity();
+        // Gentle check 15s after initial login, then every 30 minutes
+        const timer = setTimeout(updateActivity, 15000);
+        const interval = setInterval(updateActivity, 30 * 60 * 1000);
 
         return () => {
-            window.removeEventListener('click', handleActivity);
-            window.removeEventListener('keydown', handleActivity);
-            window.removeEventListener('touchstart', handleActivity);
+            clearTimeout(timer);
+            clearInterval(interval);
         };
-    }, [fbUser]);
+    }, [fbUser?.uid]);
 
     // Methods
     const login = async (email: string, password: string) => {
@@ -655,6 +881,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     const loginWithGoogle = async () => {
         const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
 
         // on mobile: typically redirect is preferred, but for local debugging/PWA contexts, popup often works better 
@@ -710,19 +937,68 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const publishCatalog = async () => {
         try {
             const contentSnap = await getDocs(collection(db, 'content'));
-            const allContent = contentSnap.docs.map(d => ({ ...d.data(), id: d.id } as Content));
+            const allContent = contentSnap.docs.map(d => {
+                const data = d.data() as Content;
+                // Compact summary: strip bulky nested seasons/episodes/cast to keep document small (< 100KB, well under 1MB Firestore limit)
+                const { seasons, episodes, cast, ...summary } = data as any;
+                return { ...summary, id: d.id } as Content;
+            });
             
-            await setDoc(doc(db, 'catalogs', 'global'), {
+            const newVersion = Date.now();
+            const batch = writeBatch(db);
+
+            // 1. Write compact catalog
+            batch.set(doc(db, 'catalogs', 'global'), {
                 items: allContent,
                 updatedAt: new Date().toISOString(),
                 count: allContent.length
             });
-            
-            // Also bump content version
-            await updateSettings({ contentVersion: Date.now() });
+
+            // 2. Atomically bump contentVersion in settings
+            batch.set(doc(db, 'settings', 'global'), {
+                contentVersion: newVersion
+            }, { merge: true });
+
+            // Commit atomically together
+            await batch.commit();
+
+            // Update local memory and IndexedDB cache
+            localContentVersionRef.current = newVersion;
+            setSettings(prev => ({ ...prev, contentVersion: newVersion }));
+            await idbSet('cachedContent', allContent);
+            await idbSet('contentVersion', newVersion);
         } catch (error) {
             console.error("[Catalog] Publication failed:", error);
         }
+    };
+
+    const fetchContentById = async (id: string): Promise<Content | null> => {
+        if (!id) return null;
+        const existing = content.find(c => c.id === id);
+        // If already in memory with full details/seasons (if applicable), return it
+        if (existing && (!existing.type || existing.type === 'movie' || (existing.seasons && existing.seasons.length > 0))) {
+            return existing;
+        }
+        try {
+            const docSnap = await withTimeout(getDoc(doc(db, 'content', id)), 5000);
+            if (docSnap.exists()) {
+                const fullItem = { ...docSnap.data(), id: docSnap.id } as Content;
+                setContent(prev => {
+                    const idx = prev.findIndex(c => c.id === id);
+                    if (idx > -1) {
+                        const updated = [...prev];
+                        updated[idx] = { ...updated[idx], ...fullItem };
+                        return updated;
+                    }
+                    return [fullItem, ...prev];
+                });
+                return fullItem;
+            }
+        } catch (e) {
+            console.warn("[Content Fetch] Firebase took >5s or failed for doc:", id, e);
+            handleQuotaExceeded();
+        }
+        return existing || null;
     };
 
     const addContent = async (item: Content) => {
@@ -746,9 +1022,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
 
     const updateSections = async (newSections: Section[]) => {
-        for (const s of newSections) {
+        const cleaned = sanitizeSections(newSections);
+        for (const s of cleaned) {
             await setDoc(doc(db, 'sections', s.id), s);
         }
+        setSections(cleaned);
+        idbSet('cachedSections', cleaned).catch(() => {});
     };
 
     const toggleSectionVisibility = async (id: string) => {
@@ -759,8 +1038,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
 
     const updateUser = async (updates: Partial<AppUser>) => {
-        if (fbUser) {
-            await updateDoc(doc(db, 'users', fbUser.uid), updates);
+        setCurrentUser(prev => prev ? ({ ...prev, ...updates }) : null);
+        if (fbUser && !isQuotaExceeded) {
+            try {
+                await updateDoc(doc(db, 'users', fbUser.uid), updates);
+            } catch (err) {
+                console.warn("updateUser Firestore skipped/failed:", err);
+            }
         }
     };
 
@@ -841,10 +1125,51 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             ? currentProfile.myList.filter(id => id !== contentId)
             : [...currentProfile.myList, contentId];
 
-        await updateDoc(doc(db, 'users', fbUser.uid, 'profiles', currentProfile.id), { myList: newList });
+        setCurrentProfile(prev => prev ? { ...prev, myList: newList } : null);
+        if (!isQuotaExceeded) {
+            try {
+                await updateDoc(doc(db, 'users', fbUser.uid, 'profiles', currentProfile.id), { myList: newList });
+            } catch (err) { }
+        }
+    };
+
+    const toggleLike = async (contentId: string) => {
+        if (!contentId) return;
+        const isCurrentlyLiked = likedContent.includes(contentId);
+        const updated = isCurrentlyLiked
+            ? likedContent.filter(id => id !== contentId)
+            : [...likedContent, contentId];
+
+        setLikedContent(updated);
+        try {
+            localStorage.setItem('my_donkey_liked_content', JSON.stringify(updated));
+        } catch (_) {}
+
+        if (!isCurrentlyLiked) {
+            try {
+                await setDoc(doc(db, 'content', contentId), {
+                    likes: increment(1)
+                }, { merge: true });
+            } catch (_) {}
+        }
     };
 
     const updatePlaybackProgress = async (movieId: string, progress: number, stoppedAt: number, duration: number) => {
+        // 1. Immediately save to local storage (survives crashes, zero cost)
+        try {
+            const raw = localStorage.getItem('my_donkey_watch_history');
+            const list = raw ? JSON.parse(raw) : [];
+            const filtered = list.filter((i: any) => i.movieId !== movieId);
+            filtered.unshift({
+                movieId,
+                progress,
+                stoppedAt,
+                duration,
+                lastWatchedAt: new Date().toISOString()
+            });
+            localStorage.setItem('my_donkey_watch_history', JSON.stringify(filtered.slice(0, 30)));
+        } catch (_) {}
+
         if (!fbUser || !currentUser) return;
         const history = currentUser.continueWatching || [];
         const existingIdx = history.findIndex(h => h.movieId === movieId);
@@ -901,12 +1226,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
             setCurrentUser(prev => prev ? { ...prev, continueWatching: updatedHistory } : null);
 
-            if (fbUser) {
+            if (fbUser && !isQuotaExceeded) {
                 try {
                     await updateDoc(doc(db, 'users', fbUser.uid), { continueWatching: updatedHistory });
-                } catch (err) {
-                    console.error("Failed to save continueWatching to Firestore:", err);
-                }
+                } catch (err) { }
             }
         }
     };
@@ -1070,7 +1393,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             return;
         }
 
-        const q = query(collection(db, 'requests'), orderBy('createdAt', 'desc'));
+        const q = query(collection(db, 'requests'), orderBy('createdAt', 'desc'), limit(30));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const reqs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContentRequest));
             setContentRequests(reqs);
@@ -1104,24 +1427,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         return { success: true, message: `Access Granted. Exclusive content unlocked!` };
     };
 
-    const markNotificationAsRead = async (notificationId: string) => {
-        if (!fbUser || !currentUser) return;
-        const currentRead = currentUser.readNotifications || [];
-        if (currentRead.includes(notificationId)) return;
-
-        const newReadList = [...currentRead, notificationId];
-        // Optimistic update
-        setCurrentUser({ ...currentUser, readNotifications: newReadList });
-
-        await updateUser({ readNotifications: newReadList });
-    };
-
-    // Compute notifications (filter out read ones)
-    const processedNotifications = useMemo(() => {
-        if (!currentUser) return notifications;
-        return notifications.filter(n => !currentUser.readNotifications?.includes(n.id));
-    }, [notifications, currentUser?.readNotifications]);
-
     // Standard Content: Strictly NO exclusive items for anyone (filtered at this layer)
     const standardContent = useMemo(() => {
         return content.filter(item => !item.isExclusive);
@@ -1135,6 +1440,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const contextValue = useMemo(() => ({
         isAuthenticated,
         isLoading,
+        isQuotaExceeded,
         login,
         signup,
         loginWithGoogle,
@@ -1151,7 +1457,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         settings,
         sections,
         plans,
-        notifications: processedNotifications,
+        notifications: [] as Notification[],
         addContent,
         updateContent,
         deleteContent,
@@ -1160,6 +1466,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         toggleSectionVisibility,
         updateUser,
         toggleWatchlist,
+        likedContent,
+        toggleLike,
         switchProfile,
         addProfile,
         updateProfile,
@@ -1178,7 +1486,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         logoutAllDevices,
         updateProfileAvatar,
         unlockContent,
-        markNotificationAsRead,
+        markNotificationAsRead: async () => {},
         isInstallable,
         isIOS,
         installPwa,
@@ -1206,7 +1514,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         },
         incrementViews: async (id: string) => {
             try {
-                if (!id) return;
+                if (!id || viewedContentIds.current.has(id)) return;
+                viewedContentIds.current.add(id);
                 await setDoc(doc(db, 'content', id), {
                     views: increment(1)
                 }, { merge: true });
@@ -1224,10 +1533,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 // Silently ignore
             }
         },
-        publishCatalog
+        publishCatalog,
+        fetchContentById
     }), [
         isAuthenticated,
         isLoading,
+        isQuotaExceeded,
         standardContent,
         content,
         exclusiveContent,
@@ -1239,7 +1550,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         settings,
         sections,
         plans,
-        processedNotifications,
         isInstallable,
         isIOS,
         contentRequests,
@@ -1247,19 +1557,24 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         updateContentRequest,
         pages,
         db,
-        publishCatalog
+        publishCatalog,
+        fetchContentById,
+        likedContent
     ]);
 
-    // Safeguard: Force loading to end after 5 seconds if auth hangs
+    // Master 5-Second Strict Deadline for Firebase:
+    // Website takes at most 5 seconds to get data from Firebase.
+    // If it fails or times out, the system assumes database quota is exceeded and runs on fallback state seamlessly without user knowing.
     useEffect(() => {
-        const timer = setTimeout(() => {
-            if (isLoading) {
-                console.warn("Auth initialization timed out, forcing app load.");
-                setIsLoading(false);
+        const quotaTimeoutTimer = setTimeout(() => {
+            if (!firebaseDataReceivedRef.current) {
+                console.warn("[Quota Fallback] Firebase took > 5s to respond. Assuming database quota is exceeded. Running on fallback state seamlessly without user knowing.");
+                handleQuotaExceededRef.current();
             }
+            setIsLoading(false);
         }, 5000);
-        return () => clearTimeout(timer);
-    }, [isLoading]);
+        return () => clearTimeout(quotaTimeoutTimer);
+    }, []);
 
     // Minimum Loading Time Logic
     const [minLoadFinished, setMinLoadFinished] = useState(false);

@@ -553,14 +553,12 @@ const CategoriesPage: React.FC<CategoriesPageProps> = ({ onDetails, onPlay }) =>
             <div className="absolute top-0 left-0 right-0 h-64 md:h-80 overflow-hidden pointer-events-none z-0 select-none opacity-20">
                 <div className="flex gap-3 justify-center scale-105 blur-[0.5px]">
                     {combinedContent.slice(0, 14).map((c, i) => (
-                        c.poster_path ? (
-                            <img 
-                                key={i} 
-                                src={c.poster_path} 
-                                alt="" 
-                                className="w-24 md:w-36 h-48 md:h-56 object-cover rounded-md shrink-0 filter brightness-90 contrast-110" 
-                            />
-                        ) : null
+                        <img 
+                            key={i} 
+                            src={c.poster_path || '/logo.png'} 
+                            alt="" 
+                            className="w-24 md:w-36 h-48 md:h-56 object-cover rounded-md shrink-0 filter brightness-90 contrast-110" 
+                        />
                     ))}
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-b from-[#0e0e11]/40 via-[#0e0e11]/85 to-[#0e0e11]" />
@@ -1076,19 +1074,19 @@ const CategoriesPage: React.FC<CategoriesPageProps> = ({ onDetails, onPlay }) =>
                                         >
                                             {/* Poster Image */}
                                             <div className="relative aspect-[2/3] w-full overflow-hidden bg-black/60">
-                                                {item.poster_path ? (
-                                                    <img
-                                                        src={item.poster_path}
-                                                        alt={item.title}
-                                                        loading="lazy"
-                                                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                                    />
-                                                ) : (
-                                                    <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center text-gray-500 text-xs">
-                                                        <Film size={20} className="mb-1 opacity-50" />
-                                                        <span>No Poster</span>
-                                                    </div>
-                                                )}
+                                                <img
+                                                    src={item.poster_path || '/logo.png'}
+                                                    alt={item.title}
+                                                    loading="lazy"
+                                                    className={`w-full h-full ${item.poster_path ? 'object-cover' : 'object-contain p-4 bg-black/60'} transition-transform duration-300 group-hover:scale-105`}
+                                                    onError={(e) => {
+                                                        const t = e.currentTarget;
+                                                        if (!t.src.endsWith('/logo.png')) {
+                                                            t.src = '/logo.png';
+                                                            t.className = "w-full h-full object-contain p-4 bg-black/60 transition-transform duration-300 group-hover:scale-105";
+                                                        }
+                                                    }}
+                                                />
 
                                                 {/* Rating Badge */}
                                                 {item.vote_average ? (

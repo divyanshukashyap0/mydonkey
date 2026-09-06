@@ -160,17 +160,18 @@ const IMDbStreamPage: React.FC = () => {
                         <div className="flex flex-col md:flex-row">
                             {/* Poster */}
                             <div className="w-full md:w-1/3 aspect-[2/3] relative flex-shrink-0 bg-gray-900">
-                                {result.detail.poster_path ? (
-                                    <img 
-                                        src={tmdbPosterUrl(result.detail.poster_path)} 
-                                        alt={result.detail.title || result.detail.name}
-                                        className="w-full h-full object-cover"
-                                    />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center">
-                                        <Film size={48} className="text-gray-700" />
-                                    </div>
-                                )}
+                                <img 
+                                    src={result.detail.poster_path ? tmdbPosterUrl(result.detail.poster_path) : '/logo.png'} 
+                                    alt={result.detail.title || result.detail.name}
+                                    className={`w-full h-full ${result.detail.poster_path ? 'object-cover' : 'object-contain p-8 bg-gray-900'}`}
+                                    onError={(e) => {
+                                        const t = e.currentTarget;
+                                        if (!t.src.endsWith('/logo.png')) {
+                                            t.src = '/logo.png';
+                                            t.className = "w-full h-full object-contain p-8 bg-gray-900";
+                                        }
+                                    }}
+                                />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent md:hidden" />
                             </div>
 

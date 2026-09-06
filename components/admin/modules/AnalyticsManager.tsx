@@ -54,10 +54,10 @@ const AnalyticsManager = () => {
         }
     };
 
-    // Initial Load
+    // Initial Load (Once on mount)
     useEffect(() => {
         fetchData();
-    }, [content]);
+    }, []);
 
     const fetchStats = async () => {
         try {
@@ -197,7 +197,7 @@ const AnalyticsManager = () => {
                     {topContentData.map((item, i) => (
                         <div key={i} className="flex items-center gap-4 p-4 hover:bg-white/5 transition border-b border-white/5 last:border-0">
                             <span className="font-black text-2xl text-gray-700 w-8">{i + 1}</span>
-                            <img src={item.poster} className="w-10 h-14 object-cover rounded bg-gray-800" />
+                            <img src={item.poster || '/logo.png'} className="w-10 h-14 object-cover rounded bg-gray-800" alt={item.title} />
                             <div className="flex-1">
                                 <div className="font-bold">{item.title}</div>
                                 <div className="text-xs text-gray-500">{item.count} views</div>
@@ -244,7 +244,7 @@ const AnalyticsManager = () => {
                     <div className="max-h-96 overflow-y-auto custom-scrollbar">
                         {globalHistory.map((item, i) => (
                             <div key={i} className="p-4 border-b border-white/5 hover:bg-white/5 transition flex gap-4">
-                                <img src={item.poster} className="w-16 h-10 object-cover rounded bg-gray-800" alt={item.contentTitle} />
+                                <img src={item.poster || '/logo.png'} className="w-16 h-10 object-cover rounded bg-gray-800" alt={item.contentTitle} />
                                 <div className="flex-1">
                                     <div className="flex justify-between items-start">
                                         <h4 className="font-bold text-sm text-white">{item.contentTitle}</h4>

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Edit, Trash2, Youtube, HardDrive, Star, Check, X, Bell, ChevronDown, ChevronRight, Play, Lock, Search, Filter, MoreVertical, Archive, LayoutTemplate } from 'lucide-react';
+import { Plus, Edit, Trash2, Youtube, HardDrive, Star, Check, X, ChevronDown, ChevronRight, Play, Lock, Search, Filter, MoreVertical, Archive, LayoutTemplate } from 'lucide-react';
 import { useStore } from '../../../context/StoreContext';
 import { Content, Season, Episode } from '../../../types';
 import { doc, setDoc, deleteDoc, updateDoc, collection, addDoc, deleteField, writeBatch } from 'firebase/firestore';
@@ -186,19 +186,6 @@ const AnimeManager = () => {
             await setDoc(doc(db, 'settings', 'global'), {
                 contentVersion: (settings.contentVersion || 0) + 1
             }, { merge: true });
-
-            // Notification for new content
-            if (!formData.id && finalData.isPublished) {
-                await addDoc(collection(db, 'notifications'), {
-                    title: `New Arrival: ${finalData.title}`,
-                    message: `Watch ${finalData.title} now on My Donkey!`,
-                    image: finalData.poster_path,
-                    type: 'content',
-                    link: `/browse/${id}`,
-                    createdAt: now,
-                    read: false
-                });
-            }
 
             alert("Anime content saved successfully!");
             setIsEditing(false);
@@ -857,7 +844,18 @@ const AnimeManager = () => {
                         </div>
 
                         <div className="relative aspect-video">
-                            <img src={item.backdrop_path || item.poster_path} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                            <img 
+                                src={item.backdrop_path || item.poster_path || '/logo.png'} 
+                                className={`w-full h-full ${(item.backdrop_path || item.poster_path) ? 'object-cover' : 'object-contain p-4 bg-black'} group-hover:scale-105 transition-transform duration-500`}
+                                alt={item.title}
+                                onError={(e) => {
+                                    const t = e.currentTarget;
+                                    if (!t.src.endsWith('/logo.png')) {
+                                        t.src = '/logo.png';
+                                        t.className = "w-full h-full object-contain p-4 bg-black group-hover:scale-105 transition-transform duration-500";
+                                    }
+                                }}
+                            />
                             <div className="absolute inset-0 bg-gradient-to-t from-[#141414] to-transparent opacity-80" />
                             <div className="absolute bottom-0 left-0 right-0 p-4">
                                 <h3 className="font-bold text-white truncate">{item.title}</h3>

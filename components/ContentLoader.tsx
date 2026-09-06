@@ -92,7 +92,7 @@ const ContentLoader: React.FC<ContentLoaderProps> = ({ item, durationAction, dur
             {/* Blurred Background of the item */}
             <div
                 className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-110 blur-xl brightness-[0.2]"
-                style={{ backgroundImage: `url(${item.backdrop_path || item.poster_path})` }}
+                style={{ backgroundImage: `url(${item.backdrop_path || item.poster_path || '/logo.png'})` }}
             />
             {/* Dark gradient overlay */}
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-black/60" />

@@ -19,6 +19,7 @@ import AccountSettings from './components/AccountSettings';
 import AdminLayout from './components/admin/AdminLayout';
 import UnlockContentModal from './components/UnlockContentModal';
 import SearchPage from './components/SearchPage';
+import ExclusiveContentPage from './components/ExclusiveContentPage';
 import CategoriesPage from './components/CategoriesPage';
 import ScrollToTop from './components/ScrollToTop';
 import ProfileSelection from './components/ProfileSelection';
@@ -28,6 +29,7 @@ import { buildEmbedUrl, parseEmbedContentType } from './utils/embedUrl';
 import Pagination from './components/Pagination';
 import GenrePreferenceModal from './components/GenrePreferenceModal';
 import PersonalizeBanner from './components/PersonalizeBanner';
+import { PaginatedMediaGrid } from './components/PaginatedMediaGrid';
 import {
     getPersonalizedRecommendations,
     getBecauseYouWatchedSection,
@@ -43,15 +45,17 @@ import {
     mapTMDBGenres,
     extractTMDBTrailer,
     fetchCuratedHeroContent,
+    fetchTMDBTrailer,
     INDIAN_LANGUAGES
 } from './services/tmdbService';
+import { FALLBACK_CATALOG } from './services/fallbackCatalog';
 import { SlidersHorizontal } from 'lucide-react';
-import { Content, ContinueWatchingItem } from './types';
-import { StoreProvider } from './context/StoreContext';
+import { Content, ContinueWatchingItem, Section } from './types';
+import { StoreProvider, PERMANENT_ADMINS } from './context/StoreContext';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, Link } from 'react-router-dom';
 
 const MainLayout = () => {
-    const { content, rawContent, currentUser, currentProfile, isLoading, isAuthenticated, sections, pages, settings, incrementViews, addToWatchHistory } = useStore();
+    const { content, rawContent, currentUser, currentProfile, isLoading, isAuthenticated, sections, pages, settings, incrementViews, addToWatchHistory, fetchContentById, isQuotaExceeded } = useStore();
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -157,92 +161,95 @@ const MainLayout = () => {
         if (location.pathname.startsWith('/browse/')) {
             const contentId = location.pathname.split('/')[2];
             const stateItem = (location.state as any)?.item;
-            if (rawContent.length > 0 || stateItem) {
 
-                if (contentId) {
-                    const item = stateItem || rawContent.find(c => c.id === contentId);
-                    if (item) {
-                        // Check for Exclusive access via URL
-                        if (item.isExclusive && !currentProfile?.unlockedContent?.includes('global_unlock')) {
-                            navigate('/exclusive', { replace: true });
-                            return;
+            if (contentId) {
+                let item = stateItem || rawContent.find(c => c.id === contentId);
+                if (!item && !contentId.startsWith('tmdb_') && fetchContentById) {
+                    fetchContentById(contentId).then(fetched => {
+                        if (fetched && !isCancelled && window.location.pathname.startsWith('/browse/')) {
+                            setViewingContent(fetched);
                         }
-                        if (isCancelled || !window.location.pathname.startsWith('/browse/')) return;
-                        if (viewingContentRef.current?.id !== item.id) {
-                            setViewingContent(item);
-                        }
-                    } else if (contentId.startsWith('tmdb_')) {
-                        const currentViewing = viewingContentRef.current;
-                        const isAlreadyViewing = currentViewing && (
-                            currentViewing.id === contentId ||
-                            `tmdb_${currentViewing.tmdbId}` === contentId
-                        );
-                        if (isAlreadyViewing) {
-                            return;
-                        }
-                        const rawId = parseInt(contentId.replace('tmdb_', ''));
-                        if (!isNaN(rawId)) {
-                            const hintType = (stateItem?.type as 'movie' | 'tv') || (location.search.includes('type=tv') ? 'tv' : undefined);
-                            const fetchResolved = async () => {
-                                let detail: any = null;
-                                let resolvedType: 'movie' | 'tv' = hintType || 'movie';
-                                if (hintType === 'tv') {
-                                    try { detail = await fetchTMDBDetails(rawId, 'tv'); } catch (_) { }
-                                    if (!detail) { try { detail = await fetchTMDBDetails(rawId, 'movie'); resolvedType = 'movie'; } catch (_) { } }
-                                } else {
-                                    try { detail = await fetchTMDBDetails(rawId, 'movie'); } catch (_) { }
-                                    if (!detail) { try { detail = await fetchTMDBDetails(rawId, 'tv'); resolvedType = 'tv'; } catch (_) { } }
-                                }
-                                if (!detail) throw new Error(`TMDB ID ${rawId} not found`);
-
-                                const trailerUrl = extractTMDBTrailer(detail);
-                                const imdbId = detail.external_ids?.imdb_id || (detail as any).imdb_id || '';
-                                const effectiveType: 'movie' | 'tv' = (detail.name || detail.media_type === 'tv' || resolvedType === 'tv') ? 'tv' : 'movie';
-                                const streamId = imdbId || String(detail.id);
-
-                                const resolved: Content = {
-                                    id: `tmdb_${detail.id}`,
-                                    title: detail.title || detail.name || 'Untitled',
-                                    type: effectiveType,
-                                    imdbId: imdbId || undefined,
-                                    genres: mapTMDBGenres(detail.genres?.map((g: any) => g.id) || []),
-                                    poster_path: detail.poster_path ? tmdbPosterUrl(detail.poster_path) : '',
-                                    backdrop_path: detail.backdrop_path ? tmdbBackdropUrl(detail.backdrop_path) : '',
-                                    description: detail.overview || '',
-                                    overview: detail.overview || '',
-                                    year: (detail.release_date || detail.first_air_date) ? parseInt((detail.release_date || detail.first_air_date)!.split('-')[0]) : new Date().getFullYear(),
-                                    rating: detail.vote_average || 0,
-                                    vote_average: detail.vote_average || 0,
-                                    trailerUrl: trailerUrl ? `https://www.youtube.com/watch?v=${trailerUrl}` : undefined,
-                                    youtubeId: trailerUrl || undefined,
-                                    videoUrl: buildEmbedUrl(streamId, effectiveType, settings),
-                                    tmdbId: detail.id,
-                                    totalSeasons: detail.number_of_seasons,
-                                    totalEpisodes: detail.number_of_episodes,
-                                    allowPlayback: true,
-                                    isPublished: true
-                                };
-                                if (isCancelled || !window.location.pathname.startsWith('/browse/')) return;
-                                setViewingContent(resolved);
-                            };
-
-                            fetchResolved().catch(() => {
-                                if (isCancelled || !window.location.pathname.startsWith('/browse/')) return;
-                                const from = (location.state as any)?.from || lastNonModalUrlRef.current;
-                                navigate(from || '/', { replace: true });
-                            });
-                        }
-                    } else {
-                        // Content loaded but ID not found
-                        console.warn(`Deep link content not found: ${contentId}`);
-                        const from = (location.state as any)?.from || lastNonModalUrlRef.current;
-                        navigate(from || '/', { replace: true });
+                    }).catch(() => { });
+                }
+                if (item) {
+                    // Check for Exclusive access via URL
+                    if (item.isExclusive && !currentProfile?.unlockedContent?.includes('global_unlock')) {
+                        navigate('/exclusive', { replace: true });
                         return;
                     }
+                    if (isCancelled || !window.location.pathname.startsWith('/browse/')) return;
+                    if (viewingContentRef.current?.id !== item.id) {
+                        setViewingContent(item);
+                    }
+                } else if (contentId.startsWith('tmdb_')) {
+                    const currentViewing = viewingContentRef.current;
+                    const isAlreadyViewing = currentViewing && (
+                        currentViewing.id === contentId ||
+                        `tmdb_${currentViewing.tmdbId}` === contentId
+                    );
+                    if (isAlreadyViewing) {
+                        return;
+                    }
+                    const rawId = parseInt(contentId.replace('tmdb_', ''));
+                    if (!isNaN(rawId)) {
+                        const hintType = (stateItem?.type as 'movie' | 'tv') || (location.search.includes('type=tv') ? 'tv' : undefined);
+                        const fetchResolved = async () => {
+                            let detail: any = null;
+                            let resolvedType: 'movie' | 'tv' = hintType || 'movie';
+                            if (hintType === 'tv') {
+                                try { detail = await fetchTMDBDetails(rawId, 'tv'); } catch (_) { }
+                                if (!detail) { try { detail = await fetchTMDBDetails(rawId, 'movie'); resolvedType = 'movie'; } catch (_) { } }
+                            } else {
+                                try { detail = await fetchTMDBDetails(rawId, 'movie'); } catch (_) { }
+                                if (!detail) { try { detail = await fetchTMDBDetails(rawId, 'tv'); resolvedType = 'tv'; } catch (_) { } }
+                            }
+                            if (!detail) throw new Error(`TMDB ID ${rawId} not found`);
+
+                            const trailerUrl = extractTMDBTrailer(detail);
+                            const imdbId = detail.external_ids?.imdb_id || (detail as any).imdb_id || '';
+                            const effectiveType: 'movie' | 'tv' = (detail.name || detail.media_type === 'tv' || resolvedType === 'tv') ? 'tv' : 'movie';
+                            const streamId = imdbId || String(detail.id);
+
+                            const resolved: Content = {
+                                id: `tmdb_${detail.id}`,
+                                title: detail.title || detail.name || 'Untitled',
+                                type: effectiveType,
+                                imdbId: imdbId || undefined,
+                                genres: mapTMDBGenres(detail.genres?.map((g: any) => g.id) || []),
+                                poster_path: detail.poster_path ? tmdbPosterUrl(detail.poster_path) : '',
+                                backdrop_path: detail.backdrop_path ? tmdbBackdropUrl(detail.backdrop_path) : '',
+                                overview: detail.overview || '',
+                                release_date: detail.release_date || detail.first_air_date || '',
+                                year: (detail.release_date || detail.first_air_date) ? parseInt((detail.release_date || detail.first_air_date)!.split('-')[0]) : new Date().getFullYear(),
+                                rating: detail.vote_average || 0,
+                                vote_average: detail.vote_average || 0,
+                                youtubeId: trailerUrl || '',
+                                videoUrl: buildEmbedUrl(streamId, effectiveType, settings),
+                                tmdbId: detail.id,
+                                allowPlayback: true,
+                                isPublished: true,
+                                createdAt: new Date().toISOString()
+                            };
+                            if (isCancelled || !window.location.pathname.startsWith('/browse/')) return;
+                            setViewingContent(resolved);
+                        };
+
+                        fetchResolved().catch(() => {
+                            if (isCancelled || !window.location.pathname.startsWith('/browse/')) return;
+                            const from = (location.state as any)?.from || lastNonModalUrlRef.current;
+                            navigate(from || '/', { replace: true });
+                        });
+                    }
                 } else {
+                    // Content loaded but ID not found
+                    console.warn(`Deep link content not found: ${contentId}`);
                     const from = (location.state as any)?.from || lastNonModalUrlRef.current;
                     navigate(from || '/', { replace: true });
+                    return;
                 }
+            } else {
+                const from = (location.state as any)?.from || lastNonModalUrlRef.current;
+                navigate(from || '/', { replace: true });
             }
         } else {
             // URL cleared, ensure modal closes
@@ -257,8 +264,8 @@ const MainLayout = () => {
             const mode = searchParams.get('mode') as 'trailer' | 'movie' || 'movie';
             const stateItem = (location.state as any)?.item;
 
-            // Wait for authentication and content to load
-            if (!isLoading && rawContent.length > 0) {
+            // Wait for authentication
+            if (!isLoading) {
                 if (contentId) {
                     let item = stateItem || rawContent.find(c => c.id === contentId);
 
@@ -283,6 +290,14 @@ const MainLayout = () => {
                             }
                             if (item) break;
                         }
+                    }
+
+                    if (!item && !contentId.startsWith('tmdb_') && !contentId.startsWith('imdb_') && fetchContentById) {
+                        fetchContentById(contentId).then(fetched => {
+                            if (fetched && !isCancelled && window.location.pathname.startsWith('/watch/')) {
+                                setPlayingContent({ ...fetched, playMode: mode });
+                            }
+                        }).catch(() => { });
                     }
 
                     if (item) {
@@ -324,7 +339,7 @@ const MainLayout = () => {
                             setPlayingContent({ ...playableItem, playMode: mode });
                             // Increment views when main movie starts
                             if (mode === 'movie') {
-                                incrementViews(playableItem.id).catch(() => {});
+                                incrementViews(playableItem.id).catch(() => { });
                             }
                         }
                     } else if (contentId && (contentId.startsWith('tmdb_') || /^\d+$/.test(contentId) || /^tt\d+$/i.test(contentId))) {
@@ -379,15 +394,13 @@ const MainLayout = () => {
                                 poster_path: detail.poster_path ? tmdbPosterUrl(detail.poster_path) : '',
                                 backdrop_path: detail.backdrop_path ? tmdbBackdropUrl(detail.backdrop_path) : '',
                                 overview: detail.overview || '',
+                                release_date: detail.release_date || detail.first_air_date || '',
                                 year: (detail.release_date || detail.first_air_date) ? parseInt((detail.release_date || detail.first_air_date)!.split('-')[0]) : new Date().getFullYear(),
                                 rating: detail.vote_average || 0,
                                 vote_average: detail.vote_average || 0,
-                                trailerUrl: trailerUrl ? `https://www.youtube.com/watch?v=${trailerUrl}` : undefined,
                                 youtubeId: trailerUrl || '',
                                 videoUrl: buildEmbedUrl(streamId, resolvedType, settings),
                                 tmdbId: detail.id,
-                                totalSeasons: detail.number_of_seasons,
-                                totalEpisodes: detail.number_of_episodes,
                                 allowPlayback: true,
                                 isPublished: true,
                                 createdAt: new Date().toISOString()
@@ -395,7 +408,7 @@ const MainLayout = () => {
                             if (isCancelled || !window.location.pathname.startsWith('/watch/')) return;
                             setPlayingContent({ ...resolved, playMode: mode });
                             if (mode === 'movie') {
-                                incrementViews(resolved.id).catch(() => {});
+                                incrementViews(resolved.id).catch(() => { });
                             }
                         };
                         fetchResolved().catch(() => {
@@ -440,7 +453,7 @@ const MainLayout = () => {
             if (!location.pathname.startsWith('/watch/')) {
                 setPlayingContent(null);
                 if (document.fullscreenElement && document.exitFullscreen) {
-                    document.exitFullscreen().catch(() => {});
+                    document.exitFullscreen().catch(() => { });
                 }
                 document.body.classList.remove('video-player-active');
                 document.documentElement.classList.remove('video-player-active');
@@ -672,7 +685,7 @@ const MainLayout = () => {
         }
     }, [activeTab, content, movies.length, tvShows.length]);
 
-    // ── Curated Hero Carousel (Indian + Marvel + DC, rating >= 7.5) ──────────
+    // ── Curated Hero Carousel (Strictly Top-Rated with Valid YouTube Trailers) ──────────
     const [heroItems, setHeroItems] = useState<Content[]>([]);
     useEffect(() => {
         // Derive preferred language from combined watch history
@@ -684,30 +697,62 @@ const MainLayout = () => {
         });
         const preferredLang = Object.entries(langCount).sort((a, b) => b[1] - a[1])[0]?.[0] || 'hi';
 
-        fetchCuratedHeroContent(preferredLang).then(results => {
-            const mapped: Content[] = results.map(r => ({
-                id: `tmdb_${r.id}`,
-                title: r.title || r.name || 'Untitled',
-                type: (r.media_type === 'tv' ? 'tv' : 'movie') as 'movie' | 'tv',
-                poster_path: r.poster_path ? tmdbPosterUrl(r.poster_path) : '',
-                backdrop_path: r.backdrop_path ? tmdbBackdropUrl(r.backdrop_path) : '',
-                overview: r.overview || '',
-                description: r.overview || '',
-                vote_average: r.vote_average,
-                release_date: r.release_date || r.first_air_date || '',
-                year: parseInt((r.release_date || r.first_air_date || '0').split('-')[0]) || new Date().getFullYear(),
-                genres: mapTMDBGenres(r.genre_ids || []),
-                tmdbId: r.id,
-                allowPlayback: true,
-                isPublished: true,
-                resolution: '4K',
-            }));
-            setHeroItems(mapped);
+        fetchCuratedHeroContent(preferredLang).then(async results => {
+            // Build trailer lookup from existing catalog
+            const catalogTrailerMap = new Map<number | string, string>();
+            content.forEach(c => {
+                if (c.tmdbId && c.youtubeId) catalogTrailerMap.set(c.tmdbId, c.youtubeId);
+                if (c.title && c.youtubeId) catalogTrailerMap.set(c.title.toLowerCase().trim(), c.youtubeId);
+            });
+
+            // Filter for top-rated candidates (vote_average >= 7.5) with backdrops
+            const topRated = results.filter(r => (r.vote_average || 0) >= 7.5 && (r.backdrop_path || r.poster_path));
+
+            const resolved: Content[] = [];
+            for (const r of topRated) {
+                const title = r.title || r.name || 'Untitled';
+                let ytId = catalogTrailerMap.get(r.id) || catalogTrailerMap.get(title.toLowerCase().trim()) || '';
+
+                if (!ytId) {
+                    try {
+                        const tr = await fetchTMDBTrailer(r.id, (r.media_type === 'tv' ? 'tv' : 'movie'));
+                        if (tr) ytId = tr;
+                    } catch { }
+                }
+
+                // STRICT: ONLY items with valid YouTube trailer are allowed into hero items
+                if (ytId) {
+                    resolved.push({
+                        id: `tmdb_${r.id}`,
+                        title,
+                        type: (r.media_type === 'tv' ? 'tv' : 'movie') as 'movie' | 'tv',
+                        poster_path: r.poster_path ? tmdbPosterUrl(r.poster_path) : '',
+                        backdrop_path: r.backdrop_path ? tmdbBackdropUrl(r.backdrop_path) : '',
+                        overview: r.overview || '',
+                        vote_average: r.vote_average,
+                        release_date: r.release_date || r.first_air_date || '',
+                        year: parseInt((r.release_date || r.first_air_date || '0').split('-')[0]) || new Date().getFullYear(),
+                        genres: mapTMDBGenres(r.genre_ids || []),
+                        tmdbId: r.id,
+                        youtubeId: ytId,
+                        createdAt: new Date().toISOString(),
+                        allowPlayback: true,
+                        isPublished: true,
+                        resolution: '4K',
+                    });
+                }
+            }
+
+            if (resolved.length > 0) {
+                // Sort top-rated first
+                resolved.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
+                setHeroItems(resolved);
+            }
         }).catch(err => {
             console.error('fetchCuratedHeroContent error:', err);
         });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [content.length]);
 
     // Handlers
     const handlePlay = (item: Content, mode: 'movie' | 'trailer' = 'movie') => {
@@ -843,7 +888,7 @@ const MainLayout = () => {
 
     const handleClosePlayer = () => {
         if (document.fullscreenElement && document.exitFullscreen) {
-            document.exitFullscreen().catch(() => {});
+            document.exitFullscreen().catch(() => { });
         }
         document.body.classList.remove('video-player-active');
         document.documentElement.classList.remove('video-player-active');
@@ -923,7 +968,7 @@ const MainLayout = () => {
 
     // Pagination State
     const [currentPage, setCurrentPage] = useState(1);
-    const ITEMS_PER_PAGE = 24;
+    const ITEMS_PER_PAGE = 20;
 
     const prevActiveTabRef = useRef(activeTab);
     useEffect(() => {
@@ -941,11 +986,52 @@ const MainLayout = () => {
     const renderSections = (scope: 'home' | 'tv' | 'movie') => {
         const scopeContent = scope === 'home' ? homeFilteredContent : (scope === 'movie' ? movies : (scope === 'tv' ? tvShows : content));
 
+        let seenMarvelSection = false;
         const scopeSections = sections
             .filter(s => s.enabled && s.scopes?.includes(scope))
-            .sort((a, b) => a.order - b.order);
+            .filter(s => {
+                const titleLower = (s.title || '').toLowerCase();
+                // Never render Marvel Saga / Series
+                if (titleLower.includes('marvel') && (titleLower.includes('saga') || titleLower.includes('series'))) {
+                    return false;
+                }
+                if (scope === 'home') {
+                    // Strictly keep only the 3 user-specified curated sections on Home:
+                    // 1. Marvel Cinematic Universe
+                    // 2. Bollywood & Indian Blockbusters
+                    // 3. Top Indian Web Series
+                    const isMarvel = titleLower.includes('marvel') || s.tagFilter?.toLowerCase() === 'marvel';
+                    const isBollywood = titleLower.includes('bollywood') || titleLower.includes('indian blockbusters') || s.tagFilter?.toLowerCase() === 'indian';
+                    const isWebSeries = titleLower.includes('web series') || titleLower.includes('indian web') || s.tagFilter?.toLowerCase() === 'web series';
+                    return isMarvel || isBollywood || isWebSeries;
+                }
+                return true;
+            })
+            .filter(s => {
+                const isMarvel = (s.title || '').toLowerCase().includes('marvel') || s.tagFilter?.toLowerCase() === 'marvel';
+                if (isMarvel) {
+                    if (seenMarvelSection) return false;
+                    seenMarvelSection = true;
+                }
+                return true;
+            })
+            .sort((a, b) => {
+                if (scope === 'home') {
+                    const getHomeOrder = (sec: Section) => {
+                        const t = (sec.title || '').toLowerCase();
+                        if (t.includes('marvel') || sec.tagFilter?.toLowerCase() === 'marvel') return 1;
+                        if (t.includes('bollywood') || t.includes('indian blockbusters') || sec.tagFilter?.toLowerCase() === 'indian') return 2;
+                        if (t.includes('web series') || t.includes('indian web') || sec.tagFilter?.toLowerCase() === 'web series') return 3;
+                        return 99;
+                    };
+                    return getHomeOrder(a) - getHomeOrder(b);
+                }
+                return a.order - b.order;
+            });
 
         if (scopeSections.length > 0) {
+            const seenContentIds = new Set<string>();
+
             return scopeSections.map(section => {
                 let autoItems: Content[] = [];
 
@@ -965,18 +1051,26 @@ const MainLayout = () => {
                 } else if (section.type === 'new_tv') {
                     autoItems = scopeContent.filter(c => c.type === 'tv').slice(0, 20);
                 } else if (section.type === 'tag' && section.tagFilter) {
-                    autoItems = scopeContent.filter(c => c.tags?.includes(section.tagFilter!) || c.genres?.includes(section.tagFilter!)).slice(0, 20);
+                    autoItems = scopeContent.filter(c => c.tags?.includes(section.tagFilter!) || c.genres?.includes(section.tagFilter!)).slice(0, 25);
                 } else if (section.type === 'my_list') {
                     if (currentProfile?.myList) {
                         autoItems = scopeContent.filter(c => currentProfile.myList.includes(c.id));
                     }
                 }
 
-                // Filter by type if scope is movie or tv and it's not a specific type section
-                if (scope === 'movie' && !['new_movies', 'new_tv'].includes(section.type)) {
-                    autoItems = autoItems.filter(c => c.type === 'movie');
-                }
-                if (scope === 'tv' && !['new_movies', 'new_tv'].includes(section.type)) {
+                // Media type differentiation: Series/Shows must NEVER have movies, Movies must NEVER have series
+                const titleLower = (section.title || '').toLowerCase();
+                const isSeriesSection = section.type === 'new_tv' ||
+                    (section.scopes?.includes('tv') && !section.scopes?.includes('movie')) ||
+                    /\b(series|shows?|web series|tv)\b/i.test(titleLower);
+
+                const isMovieSection = section.type === 'new_movies' ||
+                    (section.scopes?.includes('movie') && !section.scopes?.includes('tv')) ||
+                    /\b(movies?|cinema|blockbusters?)\b/i.test(titleLower);
+
+                if (scope === 'movie' || isMovieSection) {
+                    autoItems = autoItems.filter(c => c.type === 'movie' || !c.type);
+                } else if (scope === 'tv' || isSeriesSection) {
                     autoItems = autoItems.filter(c => c.type === 'tv');
                 }
 
@@ -985,11 +1079,24 @@ const MainLayout = () => {
                 if (scope === 'home') {
                     manualItems = manualItems.filter(isIndianOrMarvelContent);
                 }
+                if (scope === 'movie' || isMovieSection) {
+                    manualItems = manualItems.filter(c => c.type === 'movie' || !c.type);
+                } else if (scope === 'tv' || isSeriesSection) {
+                    manualItems = manualItems.filter(c => c.type === 'tv');
+                }
 
-                // Merge: Manual first, then Auto. Deduplicate.
-                const items = [...manualItems, ...autoItems].filter((item, index, self) =>
+                // Merge: Manual first, then Auto. Deduplicate within section.
+                const merged = [...manualItems, ...autoItems].filter((item, index, self) =>
                     index === self.findIndex(t => t.id === item.id)
                 );
+
+                // Cross-collection deduplication: prioritize fresh items so collections don't show the exact same content
+                const freshItems = merged.filter(item => !seenContentIds.has(item.id));
+                const repeatedItems = merged.filter(item => seenContentIds.has(item.id));
+                const items = freshItems.length >= 4 ? freshItems : [...freshItems, ...repeatedItems];
+
+                // Record seen IDs
+                items.forEach(item => seenContentIds.add(item.id));
 
                 if (items.length === 0) return null;
 
@@ -1073,19 +1180,55 @@ const MainLayout = () => {
         }
 
         if (activeTab === 'home') {
-            // Home Hero items filtered strictly to Indian movies, Indian TV shows, and Marvel movies
-            const homeHeroItems = heroItems.filter(isIndianOrMarvelContent);
-            const fallbackHero = (settings?.heroContentId && content.find(c => c.id === settings.heroContentId && isIndianOrMarvelContent(c)))
-                || (homeHeroItems.length > 0 ? homeHeroItems[0] : (homeFilteredContent.length > 0 ? homeFilteredContent[0] : null));
+            // Strictly TOP-RATED content with verified YouTube TRAILERS (rating >= 7.5, sorted highest first)
+            const catalogWithTrailers = content
+                .filter(c => isIndianOrMarvelContent(c))
+                .filter(c => Boolean(c.youtubeId && c.youtubeId.trim() !== ''))
+                .filter(c => Boolean(c.backdrop_path || c.poster_path))
+                .filter(c => (c.vote_average || 0) >= 7.5)
+                .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
+
+            // Merge with dynamically verified hero items (also strictly with trailers & rating >= 7.5)
+            const dynamicWithTrailers = heroItems
+                .filter(c => isIndianOrMarvelContent(c))
+                .filter(c => Boolean(c.youtubeId && c.youtubeId.trim() !== ''))
+                .filter(c => (c.vote_average || 0) >= 7.5);
+
+            // Deduplicate, prioritizing highest rated
+            const seenHeroIds = new Set<string>();
+            const heroCandidates: Content[] = [];
+            for (const item of [...catalogWithTrailers, ...dynamicWithTrailers]) {
+                if (!seenHeroIds.has(item.id)) {
+                    seenHeroIds.add(item.id);
+                    heroCandidates.push(item);
+                }
+            }
+
+            // Fallback if needed to any content with trailers
+            if (heroCandidates.length === 0) {
+                content
+                    .filter(c => Boolean(c.youtubeId && c.youtubeId.trim() !== ''))
+                    .filter(c => Boolean(c.backdrop_path || c.poster_path))
+                    .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0))
+                    .slice(0, 5)
+                    .forEach(c => heroCandidates.push(c));
+            }
+
+            // Always sort hero items by rating descending (highest rated first: 8.6, 8.5, 8.4...)
+            heroCandidates.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
+
+            // Strictly take up to 10 top-rated items with verified trailers
+            const effectiveHeroItems = heroCandidates.filter(c => Boolean(c.youtubeId && c.youtubeId.trim() !== '')).slice(0, 10);
+            const fallbackHero = effectiveHeroItems[0] || null;
 
             const homeContinueWatching = continueWatchingItems.filter(isIndianOrMarvelContent);
             const homeUserAdded = userAddedContent.filter(isIndianOrMarvelContent);
 
             return (
                 <>
-                    {homeHeroItems.length > 0 ? (
+                    {effectiveHeroItems.length > 0 ? (
                         <HeroBanner
-                            items={homeHeroItems}
+                            items={effectiveHeroItems}
                             onPlay={(item) => handlePlay(item, 'movie')}
                             onDetails={handleDetails}
                         />
@@ -1180,46 +1323,50 @@ const MainLayout = () => {
                             />
                         )}
 
-                        {/* Dedicated Rails for User's Explicit Favorite Genres */}
-                        {favoriteGenreRails.map(({ genre, items }) => (
-                            <ContentRail
-                                key={genre}
-                                title={`Because You Love ${genre}`}
-                                items={items}
-                                onDetails={handleDetails}
-                                onPlay={handlePlay}
-                                badge="❤️ Favourite Genre"
-                                subtitle={`Top picks in ${genre} handpicked for you`}
-                            />
-                        ))}
-
-                        {homeUserAdded.length > 0 && (
-                            <ContentRail
-                                title="Recently Added by Users"
-                                items={homeUserAdded}
-                                onDetails={handleDetails}
-                                onPlay={handlePlay}
-                            />
-                        )}
-
-                        {/* Dynamic or Automatic Sections */}
+                        {/* Curated Sections: Marvel Cinematic Universe, Bollywood & Indian Blockbusters, Top Indian Web Series */}
                         {renderSections('home')}
+
+                        {/* Endless Stream Discovery Grid */}
+                        <div className="px-4 md:px-12">
+                            <PaginatedMediaGrid
+                                title="More To Explore"
+                                subtitle="Continuous feed of trending movies, blockbuster series & fan favorites handpicked for you"
+                                type="all"
+                                catalogItems={homeFilteredContent}
+                                onDetails={handleDetails}
+                                onPlay={handlePlay}
+                                itemsPerPage={20}
+                            />
+                        </div>
                     </div>
                 </>
             );
         }
 
         if (activeTab === 'movies') {
-            const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-            const visibleMovies = movies.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-            const totalPages = Math.ceil(movies.length / ITEMS_PER_PAGE);
+            const indianOrMarvelMovies = movies.filter(isIndianOrMarvelContent);
+            const displayedMovies = isQuotaExceeded
+                ? [...movies].sort((a, b) => (isIndianOrMarvelContent(b) ? 1 : 0) - (isIndianOrMarvelContent(a) ? 1 : 0))
+                : movies;
 
-            // Random hero for movies
-            const movieHero = randomHeroes.movie || movies.find(m => m.featured) || movies[0];
+            // Strictly top-rated movies with verified YouTube trailers
+            const topRatedMovieHeroes = (indianOrMarvelMovies.length > 0 ? indianOrMarvelMovies : movies)
+                .filter(m => Boolean(m.youtubeId && m.youtubeId.trim() !== ''))
+                .filter(m => Boolean(m.backdrop_path || m.poster_path))
+                .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
+
+            const movieHeroItems = topRatedMovieHeroes.slice(0, 8);
+            const movieHero = movieHeroItems.length > 0 ? movieHeroItems[0] : (movies.find(m => m.youtubeId) || movies[0] || null);
 
             return (
                 <div className="min-h-screen pb-12 bg-[#141414]">
-                    {movieHero && (
+                    {movieHeroItems.length > 0 ? (
+                        <HeroBanner
+                            items={movieHeroItems}
+                            onPlay={(item) => handlePlay(item, 'movie')}
+                            onDetails={handleDetails}
+                        />
+                    ) : movieHero && (
                         <HeroBanner
                             item={movieHero}
                             onPlay={(item) => handlePlay(item, 'movie')}
@@ -1254,30 +1401,16 @@ const MainLayout = () => {
 
                         {renderSections('movie')}
 
-                        <div className="pt-8 pr-4 md:pr-12">
-                            <h2 className="text-2xl font-bold mb-6">Explore All Movies</h2>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-4">
-                                {visibleMovies.map(item => (
-                                    <div key={item.id} onClick={() => handleDetails(item)} className="cursor-pointer transition-transform hover:scale-105 relative aspect-[2/3]">
-                                        <img
-                                            src={item.poster_path_mobile || item.poster_path}
-                                            className="rounded-lg w-full h-full object-cover shadow-lg border border-white/5"
-                                            loading="lazy"
-                                            alt={item.title}
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                            {totalPages > 1 && (
-                                <Pagination
-                                    currentPage={currentPage}
-                                    totalPages={totalPages}
-                                    onPageChange={(page) => {
-                                        setCurrentPage(page);
-                                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                                    }}
-                                />
-                            )}
+                        <div className="pr-4 md:pr-12">
+                            <PaginatedMediaGrid
+                                title="Explore All Movies"
+                                subtitle="Endless collection of Indian cinema blockbusters, Hollywood hits & timeless favorites"
+                                type="movie"
+                                catalogItems={displayedMovies}
+                                onDetails={handleDetails}
+                                onPlay={handlePlay}
+                                itemsPerPage={20}
+                            />
                         </div>
                     </div>
                 </div>
@@ -1285,15 +1418,29 @@ const MainLayout = () => {
         }
 
         if (activeTab === 'tv') {
-            const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-            const visibleTV = tvShows.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-            const totalPages = Math.ceil(tvShows.length / ITEMS_PER_PAGE);
+            const indianOrMarvelTV = tvShows.filter(isIndianOrMarvelContent);
+            const displayedTV = isQuotaExceeded
+                ? [...tvShows].sort((a, b) => (isIndianOrMarvelContent(b) ? 1 : 0) - (isIndianOrMarvelContent(a) ? 1 : 0))
+                : tvShows;
 
-            const tvHero = randomHeroes.tv || tvShows.find(t => t.featured) || tvShows[0];
+            // Strictly top-rated TV shows & web series with verified YouTube trailers
+            const topRatedTvHeroes = (indianOrMarvelTV.length > 0 ? indianOrMarvelTV : tvShows)
+                .filter(t => Boolean(t.youtubeId && t.youtubeId.trim() !== ''))
+                .filter(t => Boolean(t.backdrop_path || t.poster_path))
+                .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
+
+            const tvHeroItems = topRatedTvHeroes.slice(0, 8);
+            const tvHero = tvHeroItems.length > 0 ? tvHeroItems[0] : (tvShows.find(t => t.youtubeId) || tvShows[0] || null);
 
             return (
                 <div className="min-h-screen pb-12 bg-[#141414]">
-                    {tvHero && (
+                    {tvHeroItems.length > 0 ? (
+                        <HeroBanner
+                            items={tvHeroItems}
+                            onPlay={(item) => handlePlay(item, 'movie')}
+                            onDetails={handleDetails}
+                        />
+                    ) : tvHero && (
                         <HeroBanner
                             item={tvHero}
                             onPlay={(item) => handlePlay(item, 'movie')}
@@ -1328,30 +1475,16 @@ const MainLayout = () => {
 
                         {renderSections('tv')}
 
-                        <div className="pt-8 pr-4 md:pr-12">
-                            <h2 className="text-2xl font-bold mb-6">Explore All TV Shows</h2>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9 gap-4">
-                                {visibleTV.map(item => (
-                                    <div key={item.id} onClick={() => handleDetails(item)} className="cursor-pointer transition-transform hover:scale-105 relative aspect-[2/3]">
-                                        <img
-                                            src={item.poster_path_mobile || item.poster_path}
-                                            className="rounded-lg w-full h-full object-cover shadow-lg border border-white/5"
-                                            loading="lazy"
-                                            alt={item.title}
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                            {totalPages > 1 && (
-                                <Pagination
-                                    currentPage={currentPage}
-                                    totalPages={totalPages}
-                                    onPageChange={(page) => {
-                                        setCurrentPage(page);
-                                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                                    }}
-                                />
-                            )}
+                        <div className="pr-4 md:pr-12">
+                            <PaginatedMediaGrid
+                                title="Explore All TV Shows"
+                                subtitle="Endless binge-worthy web series, Indian originals & international hits"
+                                type="tv"
+                                catalogItems={displayedTV}
+                                onDetails={handleDetails}
+                                onPlay={handlePlay}
+                                itemsPerPage={20}
+                            />
                         </div>
                     </div>
                 </div>
@@ -1360,9 +1493,18 @@ const MainLayout = () => {
 
         if (activeTab === 'anime') {
             // Filter Anime Content
-            const animeContent = content.filter(c =>
-                c.genres?.some(g => g.toLowerCase() === 'anime' || g.toLowerCase() === 'animation')
+            let animeContent = content.filter(c =>
+                c.genres?.some(g => g.toLowerCase() === 'anime' || g.toLowerCase() === 'animation') ||
+                c.tags?.some(t => t.toLowerCase() === 'anime')
             );
+
+            // Fallback guard: ensure Anime Library is populated even if cached data lacked anime
+            if (animeContent.length === 0) {
+                animeContent = FALLBACK_CATALOG.filter(c =>
+                    c.genres?.some(g => g.toLowerCase() === 'anime' || g.toLowerCase() === 'animation') ||
+                    c.tags?.some(t => t.toLowerCase() === 'anime')
+                );
+            }
 
             // Derived filtered list
             const filteredAnime = animeCategory === 'All'
@@ -1398,12 +1540,19 @@ const MainLayout = () => {
                                 <div className="pt-8 pr-4 md:pr-12">
                                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-4">
                                         {visibleAnime.map(item => (
-                                            <div key={item.id} onClick={() => handleDetails(item)} className="group cursor-pointer relative aspect-[2/3] overflow-hidden rounded-xl border border-white/10 hover:border-brand-red/50 transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(229,9,20,0.4)]">
+                                            <div key={item.id} onClick={() => handleDetails(item)} className="group cursor-pointer relative aspect-[2/3] overflow-hidden rounded-xl bg-zinc-900 border border-white/10 hover:border-brand-red/50 transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(229,9,20,0.4)]">
                                                 <img
-                                                    src={item.poster_path_mobile || item.poster_path}
-                                                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                                    src={item.poster_path_mobile || item.poster_path || '/logo.png'}
+                                                    className={`w-full h-full ${(item.poster_path_mobile || item.poster_path) ? 'object-cover' : 'object-contain p-4 bg-zinc-900'} transition-transform duration-500 group-hover:scale-110`}
                                                     loading="lazy"
                                                     alt={item.title}
+                                                    onError={(e) => {
+                                                        const t = e.currentTarget;
+                                                        if (!t.src.endsWith('/logo.png')) {
+                                                            t.src = '/logo.png';
+                                                            t.className = "w-full h-full object-contain p-4 bg-zinc-900 transition-transform duration-500 group-hover:scale-110";
+                                                        }
+                                                    }}
                                                 />
                                                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
                                                     <div>
@@ -1494,6 +1643,42 @@ const MainLayout = () => {
         return <Loader />;
     }
 
+    const isAdmin = currentUser?.role === 'admin' || Boolean(currentUser?.email && PERMANENT_ADMINS.includes(currentUser.email));
+
+    // Global Maintenance Mode Guard (Admins retain access to manage and review platform)
+    if (settings?.maintenanceMode && !isAdmin) {
+        return (
+            <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col items-center justify-center p-6 text-center">
+                <div className="w-20 h-20 rounded-2xl bg-brand-red/10 border border-brand-red/30 flex items-center justify-center mb-6 shadow-[0_0_50px_rgba(229,9,20,0.3)]">
+                    <span className="text-4xl">🛠️</span>
+                </div>
+                <h1 className="text-3xl sm:text-4xl font-black mb-3 tracking-tight">System Under Maintenance</h1>
+                <p className="text-gray-400 max-w-md text-base leading-relaxed mb-6">
+                    {settings?.siteName || 'My Donkey'} is currently undergoing scheduled platform upgrades. We will be back online shortly!
+                </p>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => navigate('/login')}
+                        className="px-5 py-2.5 rounded-lg bg-white/10 hover:bg-white/15 text-sm font-semibold border border-white/10 transition"
+                    >
+                        Admin Sign In
+                    </button>
+                    <button
+                        onClick={() => window.location.reload()}
+                        className="px-5 py-2.5 rounded-lg bg-brand-red hover:bg-red-700 text-sm font-semibold transition shadow-lg shadow-brand-red/20"
+                    >
+                        Refresh Page
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    // Guest Browsing Access Guard: if disabled by admin, require authentication to view catalog
+    if (settings?.guestAccessEnabled === false && !isAuthenticated) {
+        return <Navigate to="/login" replace />;
+    }
+
     // Force Profile Selection if logged in but no profile selected
     if (isAuthenticated && !currentProfile) {
         return (
@@ -1513,6 +1698,7 @@ const MainLayout = () => {
                 onSearch={() => handleTabChange('search')}
                 onUnlock={() => setShowUnlockModal(true)}
                 onLoginClick={() => navigate('/login')}
+                onDetails={handleDetails}
             />
 
             <main>

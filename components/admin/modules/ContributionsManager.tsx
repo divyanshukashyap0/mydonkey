@@ -159,13 +159,19 @@ const ContributionsManager: React.FC = () => {
                                     <td className="px-4 py-3">
                                         <div className="flex items-center gap-3">
                                             <div className="flex-shrink-0 w-9 h-12 rounded-md overflow-hidden bg-gray-800">
-                                                {item.poster_path ? (
-                                                    <img src={item.poster_path} alt={item.title} className="w-full h-full object-cover" loading="lazy" />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center">
-                                                        <Film size={14} className="text-gray-600" />
-                                                    </div>
-                                                )}
+                                                <img 
+                                                    src={item.poster_path || '/logo.png'} 
+                                                    alt={item.title} 
+                                                    className={`w-full h-full ${item.poster_path ? 'object-cover' : 'object-contain p-1'}`} 
+                                                    loading="lazy" 
+                                                    onError={(e) => {
+                                                        const t = e.currentTarget;
+                                                        if (!t.src.endsWith('/logo.png')) {
+                                                            t.src = '/logo.png';
+                                                            t.className = "w-full h-full object-contain p-1";
+                                                        }
+                                                    }}
+                                                />
                                             </div>
                                             <span className="font-medium text-white truncate max-w-[160px]">{item.title}</span>
                                         </div>

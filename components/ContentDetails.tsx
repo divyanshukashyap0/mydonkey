@@ -14,10 +14,25 @@ interface ContentDetailsProps {
     onDetails?: (item: Content) => void;
 }
 
-const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPlay, onDetails }) => {
-    const { currentProfile, toggleWatchlist, currentUser, content: allContent, deleteContent, settings } = useStore();
+const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent, onClose, onPlay, onDetails }) => {
+    const { currentProfile, toggleWatchlist, likedContent, toggleLike, currentUser, content: allContent, deleteContent, settings, fetchContentById } = useStore();
+    const [content, setContent] = useState<Content>(initialContent);
+
+    useEffect(() => {
+        setContent(initialContent);
+        if (initialContent.id && !initialContent.id.startsWith('tmdb_') && !initialContent.id.startsWith('imdb_') && fetchContentById) {
+            const needsFullDoc = initialContent.type === 'tv' && (!initialContent.seasons || initialContent.seasons.length === 0);
+            if (needsFullDoc) {
+                fetchContentById(initialContent.id).then(full => {
+                    if (full) setContent(full);
+                }).catch(() => {});
+            }
+        }
+    }, [initialContent, fetchContentById]);
+
     const isAdmin = currentUser?.role === 'admin';
-    const isAdded = currentProfile?.myList.includes(content.id);
+    const isAdded = currentProfile?.myList?.includes(content.id) ?? false;
+    const isLiked = likedContent?.includes(content.id) ?? false;
     const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
 
     const mobileScrollRef = useRef<HTMLDivElement>(null);
@@ -107,7 +122,10 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
         const titleText = content.title || 'Movie';
         const year = content.release_date?.split('-')[0] || '';
         const descText = content.overview ? `${content.overview.slice(0, 110)}...` : 'Watch in HD for free on My Donkey';
-        const shareText = `🎬 Watch "${titleText}${year ? ` (${year})` : ''}" on My Donkey!\n${descText}\n\n🍿 Stream Free: ${shareUrl}`;
+        // Message without URL for Web Share API (which appends the url parameter automatically)
+        const shareMessage = `🎬 Watch "${titleText}${year ? ` (${year})` : ''}" on My Donkey!\n${descText}\n\n🍿 Stream Free:`;
+        // Full text including URL for direct clipboard copying
+        const fullShareText = `${shareMessage} ${shareUrl}`;
 
         // Attempt rich file share with image if device supports Web Share API with files
         const thumbnailToShare = content.backdrop_path || content.poster_path;
@@ -132,7 +150,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
 
         const sharePayload: ShareData = {
             title: `${titleText} | My Donkey`,
-            text: shareText,
+            text: shareMessage,
             url: shareUrl,
             ...(shareFiles ? { files: shareFiles } : {})
         };
@@ -141,7 +159,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
             if (navigator.share) {
                 await navigator.share(sharePayload);
             } else {
-                await navigator.clipboard.writeText(shareText);
+                await navigator.clipboard.writeText(fullShareText);
                 alert('🎬 Link copied to clipboard! Paste it into your chat to share.');
             }
         } catch (err: any) {
@@ -150,14 +168,14 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                     if (navigator.share) {
                         await navigator.share({
                             title: `${titleText} | My Donkey`,
-                            text: shareText,
+                            text: shareMessage,
                             url: shareUrl
                         });
                         return;
                     }
                 } catch { }
                 try {
-                    await navigator.clipboard.writeText(shareText);
+                    await navigator.clipboard.writeText(fullShareText);
                     alert('🎬 Link copied to clipboard! Paste it into your chat to share.');
                 } catch { }
             }
@@ -221,14 +239,18 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                 <div ref={mobileScrollRef} className="md:hidden relative h-full w-full flex flex-col overflow-y-auto no-scrollbar scroll-smooth">
                     {/* Full Height Background Image */}
                     <div className="absolute inset-0 z-0 h-[50vh]">
-                        {/* Prefer Poster for mobile aspect ratio if available, else Backdrop */}
-                        {(content.poster_path || content.backdrop_path) ? (
-                            <img
-                                src={content.poster_path || content.backdrop_path}
-                                className="w-full h-full object-cover"
-                                alt={content.title}
-                            />
-                        ) : null}
+                        <img
+                            src={content.poster_path || content.backdrop_path || '/logo.png'}
+                            className={`w-full h-full ${(content.poster_path || content.backdrop_path) ? 'object-cover' : 'object-contain p-12 bg-black/80'}`}
+                            alt={content.title}
+                            onError={(e) => {
+                                const t = e.currentTarget;
+                                if (!t.src.endsWith('/logo.png')) {
+                                    t.src = '/logo.png';
+                                    t.className = "w-full h-full object-contain p-12 bg-black/80";
+                                }
+                            }}
+                        />
                         {/* Stronger Gradient for readability */}
                         <div className="absolute inset-0 bg-gradient-to-t from-[#181818] via-[#181818]/80 to-transparent" />
                     </div>
@@ -239,7 +261,9 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                         <div>
                             <h2 className="text-3xl font-black mb-2 text-white leading-tight drop-shadow-xl">{content.title}</h2>
                             <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-gray-300">
-                                <span className="text-green-400 font-bold">{(content.vote_average * 10).toFixed(0)}% Match</span>
+                                {content.vote_average ? (
+                                    <span className="text-amber-400 font-bold flex items-center gap-1">★ {content.vote_average.toFixed(1)}</span>
+                                ) : null}
                                 <span>•</span>
                                 <span>{content.release_date?.split('-')[0] || '2026'}</span>
                                 <span>•</span>
@@ -296,11 +320,9 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                 {isAdded ? <Check size={20} className="text-green-400" /> : <Plus size={20} className="text-white" />}
                                 <span className="text-[10px] text-gray-400">My List</span>
                             </div>
-                            <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-90 transition" onClick={() => {
-                                alert(`Thanks for rating ${content.title}! ⭐`);
-                            }}>
-                                <ThumbsUp size={20} className="text-white" />
-                                <span className="text-[10px] text-gray-400">Rate</span>
+                            <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-90 transition" onClick={() => toggleLike(content.id)}>
+                                <ThumbsUp size={20} className={isLiked ? "text-red-500 fill-red-500" : "text-white"} />
+                                <span className="text-[10px] text-gray-400">{isLiked ? "Liked" : "Rate"}</span>
                             </div>
                             <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-90 transition" onClick={handleShareContent}>
                                 <Share2 size={20} className="text-white" />
@@ -358,13 +380,18 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                 {/* --- Desktop: Existing Layout --- */}
                 <div ref={desktopScrollRef} className="hidden md:flex flex-col h-full bg-[#181818] overflow-y-auto no-scrollbar scroll-smooth">
                     <div className="relative h-[400px] md:h-[500px] flex-shrink-0">
-                        {(content.backdrop_path || content.poster_path) ? (
-                            <img
-                                src={content.backdrop_path || content.poster_path}
-                                className="w-full h-full object-cover"
-                                alt={content.title}
-                            />
-                        ) : null}
+                        <img
+                            src={content.backdrop_path || content.poster_path || '/logo.png'}
+                            className={`w-full h-full ${(content.backdrop_path || content.poster_path) ? 'object-cover' : 'object-contain p-16 bg-black/80'}`}
+                            alt={content.title}
+                            onError={(e) => {
+                                const t = e.currentTarget;
+                                if (!t.src.endsWith('/logo.png')) {
+                                    t.src = '/logo.png';
+                                    t.className = "w-full h-full object-contain p-16 bg-black/80";
+                                }
+                            }}
+                        />
                         <div className="absolute inset-0 bg-gradient-to-t from-[#181818] via-[#181818]/20 to-transparent" />
 
                         <div className="absolute bottom-0 left-0 w-full p-8 md:p-12">
@@ -404,11 +431,11 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                                     {isAdded ? <Check size={24} className="text-green-400" /> : <Plus size={24} />}
                                 </button>
                                 <button
-                                    onClick={() => alert(`Thanks for rating ${content.title}! ⭐`)}
-                                    className="bg-gray-600/40 backdrop-blur-md p-3 rounded-full border border-white/20 hover:border-white transition"
-                                    title="Rate"
+                                    onClick={() => toggleLike(content.id)}
+                                    className={`p-3 rounded-full border transition active:scale-95 ${isLiked ? 'bg-white/20 border-white text-white' : 'bg-gray-600/40 backdrop-blur-md border-white/20 hover:border-white text-white'}`}
+                                    title={isLiked ? "Liked" : "Rate"}
                                 >
-                                    <ThumbsUp size={24} />
+                                    <ThumbsUp size={24} className={isLiked ? "fill-white text-white" : "text-white"} />
                                 </button>
                                 <button
                                     onClick={handleShareContent}
@@ -451,7 +478,9 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content, onClose, onPla
                         <div className="grid grid-cols-[1fr_300px] gap-12">
                             <div className="space-y-6">
                                 <div className="flex flex-wrap items-center gap-3 text-lg font-medium">
-                                    <span className="text-green-400 font-bold">{(content.vote_average * 10).toFixed(0)}% Match</span>
+                                    {content.vote_average ? (
+                                        <span className="text-amber-400 font-bold flex items-center gap-1">★ {content.vote_average.toFixed(1)}</span>
+                                    ) : null}
                                     <span className="text-gray-400">{content.release_date?.split('-')[0]}</span>
                                     {content.rating && <span className="border border-gray-600 px-2 py-0.5 rounded text-xs">{content.rating}</span>}
                                     {(content.type?.toLowerCase() === 'tv' || (content.seasons && content.seasons.length > 0)) ? (

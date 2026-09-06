@@ -35,6 +35,32 @@ if (typeof window !== 'undefined') {
   console.info = filterConsole(console.info);
   console.warn = filterConsole(console.warn);
   console.error = filterConsole(console.error);
+
+  // Global Image Fallback Handler: catch any broken images across the application
+  window.addEventListener(
+    'error',
+    (e: Event) => {
+      const target = e.target;
+      if (target instanceof HTMLImageElement) {
+        const fallback = '/logo.png';
+        if (!target.src.endsWith(fallback) && target.getAttribute('src') !== fallback) {
+          target.onerror = null;
+          target.src = fallback;
+          target.srcset = '';
+          const isSmall = target.classList.contains('w-6') || 
+                          target.classList.contains('w-8') || 
+                          target.classList.contains('w-10') || 
+                          target.classList.contains('w-12') ||
+                          target.classList.contains('rounded-full');
+          if (!isSmall && target.classList.contains('object-cover')) {
+            target.classList.remove('object-cover');
+            target.classList.add('object-contain', 'p-4', 'bg-zinc-950');
+          }
+        }
+      }
+    },
+    true
+  );
 }
 
 const rootElement = document.getElementById('root');

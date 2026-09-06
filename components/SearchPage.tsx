@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Search, X, Loader2 } from 'lucide-react';
+import { Search, X, Loader2, History, Trash2, Clock, Sparkles } from 'lucide-react';
 import { Content, Section } from '../types';
 import { useStore } from '../context/StoreContext';
 import { collection, addDoc } from 'firebase/firestore';
@@ -17,7 +17,7 @@ interface SearchPageProps {
 const ITEMS_PER_PAGE = 24;
 
 const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
-    const { content, sections, currentProfile, unlockContent, settings, currentUser } = useStore();
+    const { content, sections, currentProfile, unlockContent, settings, currentUser, updateUser, isQuotaExceeded } = useStore();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const initialQuery = searchParams.get('q') || '';
@@ -26,6 +26,88 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
     const [matchingSections, setMatchingSections] = useState<Section[]>([]);
     const [currentPage, setCurrentPage] = useState(1);
     const [isSearching, setIsSearching] = useState(false);
+
+    // Search History: check if user enabled it (default true)
+    const isHistoryEnabled = currentUser?.searchHistoryEnabled !== false && localStorage.getItem('my_donkey_search_history_enabled') !== 'false';
+
+    const [searchHistory, setSearchHistory] = useState<string[]>(() => {
+        try {
+            const raw = localStorage.getItem('my_donkey_search_history');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) return parsed;
+            }
+        } catch (e) {}
+        return currentUser?.searchHistory || [];
+    });
+
+    // Keep state in sync if currentUser.searchHistory updates from DB
+    useEffect(() => {
+        if (currentUser?.searchHistory && Array.isArray(currentUser.searchHistory)) {
+            setSearchHistory(prev => {
+                const combined = Array.from(new Set([...currentUser.searchHistory!, ...prev])).slice(0, 15);
+                try {
+                    localStorage.setItem('my_donkey_search_history', JSON.stringify(combined));
+                } catch (e) {}
+                return combined;
+            });
+        }
+    }, [currentUser?.searchHistory]);
+
+    // Save query to search history
+    const saveToHistory = (queryToSave: string) => {
+        const clean = queryToSave.trim();
+        if (!clean || clean.length < 2 || !isHistoryEnabled) return;
+
+        setSearchHistory(prev => {
+            const next = [clean, ...prev.filter(q => q.toLowerCase() !== clean.toLowerCase())].slice(0, 15);
+            try {
+                localStorage.setItem('my_donkey_search_history', JSON.stringify(next));
+            } catch (e) {}
+            return next;
+        });
+
+        if (currentUser) {
+            const currentList = searchHistory.filter(q => q.toLowerCase() !== clean.toLowerCase());
+            const next = [clean, ...currentList].slice(0, 15);
+            updateUser({ searchHistory: next }).catch(() => {});
+        }
+    };
+
+    // Delete single item from history
+    const handleDeleteHistoryItem = (termToDelete: string, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        setSearchHistory(prev => {
+            const next = prev.filter(q => q !== termToDelete);
+            try {
+                localStorage.setItem('my_donkey_search_history', JSON.stringify(next));
+            } catch (e) {}
+            return next;
+        });
+
+        if (currentUser) {
+            const next = searchHistory.filter(q => q !== termToDelete);
+            updateUser({ searchHistory: next }).catch(() => {});
+        }
+    };
+
+    // Clear all history
+    const handleClearAllHistory = (e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        try {
+            localStorage.removeItem('my_donkey_search_history');
+        } catch (e) {}
+        setSearchHistory([]);
+        if (currentUser) {
+            updateUser({ searchHistory: [] }).catch(() => {});
+        }
+    };
+
+    // Clicking a recent search pill
+    const handleSelectHistory = (term: string) => {
+        handleQueryChange(term);
+        saveToHistory(term);
+    };
 
     // Sync state if URL query param changes
     useEffect(() => {
@@ -43,6 +125,15 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
             setSearchParams({}, { replace: true });
         }
     };
+
+    // Save to history automatically after user pauses typing (1.2s delay)
+    useEffect(() => {
+        if (!searchQuery.trim() || searchQuery.trim().length < 2 || !isHistoryEnabled) return;
+        const timer = setTimeout(() => {
+            saveToHistory(searchQuery);
+        }, 1200);
+        return () => clearTimeout(timer);
+    }, [searchQuery, isHistoryEnabled]);
 
     // Focus input on mount
     useEffect(() => {
@@ -73,15 +164,40 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                     });
                 }
 
-                // 2. Filter Sections Locally
-                const filteredSections = sections.filter(s =>
-                    s.enabled && s.title && s.title.toLowerCase().includes(lowerQuery)
-                );
-                setMatchingSections(filteredSections);
+                // 2. Filter Sections Locally (Strictly keep only Marvel Cinematic Universe; remove Marvel Series & Sagas)
+                const filteredSections = sections.filter(s => {
+                    if (!s.enabled || !s.title) return false;
+                    const titleLower = s.title.toLowerCase();
+                    // Remove Marvel Saga / Series
+                    if (titleLower.includes('marvel') && (titleLower.includes('saga') || titleLower.includes('series'))) {
+                        return false;
+                    }
+                    return titleLower.includes(lowerQuery) || (s.tagFilter && s.tagFilter.toLowerCase().includes(lowerQuery));
+                });
+
+                // Guarantee only one canonical Marvel rail appears
+                let seenMarvel = false;
+                const finalMatchingSections: Section[] = [];
+                for (const s of filteredSections) {
+                    const isMarvel = s.title?.toLowerCase().includes('marvel') || s.tagFilter?.toLowerCase() === 'marvel';
+                    if (isMarvel) {
+                        if (!seenMarvel) {
+                            seenMarvel = true;
+                            finalMatchingSections.push({
+                                ...s,
+                                title: 'Marvel Cinematic Universe',
+                                showRanking: true
+                            });
+                        }
+                    } else {
+                        finalMatchingSections.push(s);
+                    }
+                }
+                setMatchingSections(finalMatchingSections);
 
                 // 3. Search Locally (Database Fallback)
-                const localResults: Partial<Content>[] = (content || []).filter(c => 
-                    (c.title && c.title.toLowerCase().includes(lowerQuery)) || 
+                const localResults: Partial<Content>[] = (content || []).filter(c =>
+                    (c.title && c.title.toLowerCase().includes(lowerQuery)) ||
                     (c.overview && c.overview.toLowerCase().includes(lowerQuery))
                 );
 
@@ -143,6 +259,10 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
 
     // Handle clicking a search result - Opens INSTANTLY, enriches asynchronously
     const handleResultClick = (item: Partial<Content>) => {
+        if (searchQuery.trim()) {
+            saveToHistory(searchQuery);
+        }
+
         // 1. If already full Content in local library, open immediately
         const localMatch = content?.find(c => (item.tmdbId && c.tmdbId === item.tmdbId) || (item.id && c.id === item.id));
         if (localMatch) {
@@ -220,8 +340,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                 // Seamlessly update details view with enriched metadata
                 onDetails(enrichedContent);
 
-                // Background logging of contribution (without blocking UI or re-publishing full catalog)
-                if (currentUser) {
+                // Background logging of contribution (only when quota is available)
+                if (currentUser && !isQuotaExceeded) {
                     const addedByInfo = {
                         userId: currentUser.uid,
                         name: currentProfile?.name || currentUser.name || 'User',
@@ -237,7 +357,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                         type: enrichedContent.type,
                         addedBy: addedByInfo,
                         addedAt: new Date().toISOString()
-                    }).catch(() => {});
+                    }).catch(() => { });
                 }
             } catch (err) {
                 console.warn("Background TMDB metadata enrichment error:", err);
@@ -267,6 +387,22 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
             }
         }
 
+        // Differentiate media type (never mix web series with movies)
+        const titleLower = (section.title || '').toLowerCase();
+        const isSeriesSection = section.type === 'new_tv' ||
+            (section.scopes?.includes('tv') && !section.scopes?.includes('movie')) ||
+            /\b(series|shows?|web series|tv)\b/i.test(titleLower);
+
+        const isMovieSection = section.type === 'new_movies' ||
+            (section.scopes?.includes('movie') && !section.scopes?.includes('tv')) ||
+            /\b(movies?|cinema|blockbusters?)\b/i.test(titleLower);
+
+        if (isSeriesSection) {
+            autoItems = autoItems.filter(c => c.type === 'tv');
+        } else if (isMovieSection) {
+            autoItems = autoItems.filter(c => c.type === 'movie' || !c.type);
+        }
+
         const manualItems = (section.contentIds || []).map(id => content.find(c => c.id === id)).filter(Boolean) as Content[];
 
         return [...manualItems, ...autoItems].filter((item, index, self) =>
@@ -291,6 +427,11 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                         placeholder="Search for movies, TV shows..."
                         value={searchQuery}
                         onChange={(e) => handleQueryChange(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && searchQuery.trim()) {
+                                saveToHistory(searchQuery);
+                            }
+                        }}
                     />
                     {isSearching ? (
                         <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
@@ -308,20 +449,29 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
 
                 {searchQuery ? (
                     <div className="space-y-12">
-                        {/* 1. Matching Sections */}
+                        {/* 1. Matching Sections (Rendered in mid-size, balanced and not too big) */}
                         {matchingSections.length > 0 && (
-                            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                 {matchingSections.map(section => {
                                     const items = getSectionItems(section);
                                     if (items.length === 0) return null;
                                     return (
-                                        <div key={section.id} className="bg-white/5 rounded-2xl p-6 border border-white/5">
-                                            <div className="mb-2 text-sm text-gray-400 font-bold uppercase tracking-wider">Matching Collection</div>
+                                        <div key={section.id} className="bg-zinc-900/60 rounded-2xl p-4 md:p-6 border border-white/10 backdrop-blur-sm shadow-xl">
+                                            <div className="mb-2 text-xs md:text-sm text-gray-400 font-bold uppercase tracking-wider flex items-center justify-between">
+                                                <span className="flex items-center gap-1.5">
+                                                    <Sparkles size={14} className="text-brand-red" />
+                                                    Matching Collection
+                                                </span>
+                                                <span className="text-xs font-medium text-gray-400 normal-case bg-white/5 px-2.5 py-0.5 rounded-full border border-white/5">
+                                                    {items.length} titles
+                                                </span>
+                                            </div>
                                             <ContentRail
                                                 title={section.title}
                                                 items={items}
                                                 onDetails={(item) => handleResultClick(item)}
-                                                showRanking={section.showRanking}
+                                                size="mid"
+                                                showRanking={false}
                                             />
                                         </div>
                                     )
@@ -335,7 +485,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                                 {results.length > 0 ? (
                                     <>Found <span className="text-white font-bold">{results.length}</span> titles matching "<span className="text-white">{searchQuery}</span>"</>
                                 ) : (
-                                    matchingSections.length === 0 && !isSearching && <>No results found for "{searchQuery}"</>
+                                    matchingSections.length === 0 && !isSearching && <>Searching for "{searchQuery}"</>
                                 )}
                             </h2>
 
@@ -349,18 +499,19 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9 gap-4">
                                             {visibleResults.map((item, idx) => (
                                                 <div key={item.id || idx} onClick={() => handleResultClick(item)} className="cursor-pointer transition-transform hover:scale-105 relative aspect-[2/3] group rounded-xl overflow-hidden bg-gray-900 border border-white/5 shadow-lg hover:shadow-brand-red/20 hover:border-brand-red/50">
-                                                    {item.poster_path ? (
-                                                        <img
-                                                            src={item.poster_path}
-                                                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                                            loading="lazy"
-                                                            alt={item.title}
-                                                        />
-                                                    ) : (
-                                                        <div className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-500">
-                                                            No Image
-                                                        </div>
-                                                    )}
+                                                    <img
+                                                        src={item.poster_path || '/logo.png'}
+                                                        className={`w-full h-full ${item.poster_path ? 'object-cover' : 'object-contain p-4 bg-gray-900'} transition-transform duration-500 group-hover:scale-110`}
+                                                        loading="lazy"
+                                                        alt={item.title}
+                                                        onError={(e) => {
+                                                            const t = e.currentTarget;
+                                                            if (!t.src.endsWith('/logo.png')) {
+                                                                t.src = '/logo.png';
+                                                                t.className = "w-full h-full object-contain p-4 bg-gray-900 transition-transform duration-500 group-hover:scale-110";
+                                                            }
+                                                        }}
+                                                    />
                                                     <div className="absolute inset-0 flex flex-col justify-end p-3 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                                                         <p className="text-white text-sm font-bold leading-tight drop-shadow-md">{item.title}</p>
                                                         <div className="flex items-center gap-2 mt-1">
@@ -387,10 +538,90 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                         </div>
                     </div>
                 ) : (
-                    <div className="text-center py-32 opacity-50">
-                        <Search className="h-20 w-20 text-gray-600 mx-auto mb-6" />
-                        <p className="text-gray-400 text-2xl font-medium">Search the movie</p>
-                        <p className="text-gray-600 mt-2">Find any movie or TV show to instantly add it to your collection</p>
+                    <div className="space-y-12 animate-in fade-in duration-300">
+                        {/* 1. Recent Searches / Last Search Section */}
+                        {isHistoryEnabled ? (
+                            searchHistory.length > 0 ? (
+                                <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-6 md:p-8 backdrop-blur-md shadow-2xl">
+                                    <div className="flex items-center justify-between mb-5">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-xl bg-brand-red/10 border border-brand-red/20 flex items-center justify-center text-brand-red">
+                                                <History size={20} />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-lg md:text-xl font-black tracking-tight text-white flex items-center gap-2">
+                                                    Recent Searches
+                                                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/10 text-gray-300">
+                                                        {searchHistory.length}
+                                                    </span>
+                                                </h3>
+                                                <p className="text-xs text-gray-400">Your last searched keywords</p>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={handleClearAllHistory}
+                                            className="text-xs text-gray-400 hover:text-red-400 font-bold px-3 py-1.5 rounded-xl bg-white/5 hover:bg-red-500/10 border border-white/10 hover:border-red-500/30 transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                                            title="Clear all search history"
+                                        >
+                                            <Trash2 size={13} />
+                                            <span>Clear all</span>
+                                        </button>
+                                    </div>
+
+                                    {/* Chips / Pills List */}
+                                    <div className="flex flex-wrap gap-2.5">
+                                        {searchHistory.map((term, idx) => (
+                                            <div
+                                                key={idx}
+                                                onClick={() => handleSelectHistory(term)}
+                                                className="group flex items-center gap-2.5 px-4 py-2 bg-[#18181c] hover:bg-[#222228] border border-white/10 hover:border-brand-red/50 rounded-xl cursor-pointer transition-all duration-200 hover:scale-105 shadow-md hover:shadow-brand-red/20 text-sm font-medium text-gray-200 hover:text-white"
+                                            >
+                                                <Clock size={14} className="text-gray-500 group-hover:text-brand-red transition-colors flex-shrink-0" />
+                                                <span className="truncate max-w-[180px] md:max-w-[260px]">{term}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => handleDeleteHistoryItem(term, e)}
+                                                    className="p-1 rounded-md text-gray-500 hover:text-red-400 hover:bg-white/10 transition-colors cursor-pointer"
+                                                    title={`Delete "${term}"`}
+                                                >
+                                                    <X size={13} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : null
+                        ) : (
+                            <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-4 md:p-5 flex items-center justify-between text-xs text-gray-400">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center text-gray-500">
+                                        <History size={16} />
+                                    </div>
+                                    <div>
+                                        <span className="font-semibold text-gray-300">Search history is paused</span>
+                                        <p className="text-[11px] text-gray-500">Your searches are not currently being saved or shown.</p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => navigate('/account')}
+                                    className="text-brand-red hover:underline font-bold px-3 py-1.5 rounded-lg bg-brand-red/10 border border-brand-red/20 text-xs cursor-pointer"
+                                >
+                                    Enable in Account
+                                </button>
+                            </div>
+                        )}
+
+                        {/* 2. Empty Search Placeholder when no history */}
+                        {(!isHistoryEnabled || searchHistory.length === 0) && (
+                            <div className="text-center py-20 opacity-50">
+                                <Search className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+                                <p className="text-gray-400 text-xl font-bold">Search the movie or TV show</p>
+                                <p className="text-gray-600 text-sm mt-1">Find any title to instantly add it to your collection or stream</p>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

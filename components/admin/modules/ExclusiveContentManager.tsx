@@ -132,25 +132,24 @@ const ExclusiveContentManager = () => {
                         >
                             {/* Poster */}
                             <div className="w-12 h-16 rounded-lg overflow-hidden bg-black/40 flex-shrink-0 relative">
-                                {item.poster_path_mobile || item.poster_path ? (
-                                    <>
-                                        <img
-                                            src={item.poster_path_mobile || item.poster_path}
-                                            className="w-full h-full object-cover"
-                                            alt={item.title}
-                                        />
-                                        {isExclusive && (
-                                            <span className="absolute bottom-0 left-0 text-[10px] bg-red-500/10 text-brand-red px-2 py-0.5 rounded-tr-lg border-t border-r border-red-500/20 flex items-center gap-1 font-mono uppercase font-bold tracking-wider">
-                                                <Lock size={10} /> Exclusive
-                                            </span>
-                                        )}
-                                    </>
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-gray-600">
-                                        <Film size={20} />
-                                    </div>
-                                )}
-                            </div>
+                                    <img
+                                        src={item.poster_path_mobile || item.poster_path || '/logo.png'}
+                                        className={`w-full h-full ${(item.poster_path_mobile || item.poster_path) ? 'object-cover' : 'object-contain p-1'}`}
+                                        alt={item.title}
+                                        onError={(e) => {
+                                            const t = e.currentTarget;
+                                            if (!t.src.endsWith('/logo.png')) {
+                                                t.src = '/logo.png';
+                                                t.className = "w-full h-full object-contain p-1";
+                                            }
+                                        }}
+                                    />
+                                    {isExclusive && (
+                                        <span className="absolute bottom-0 left-0 text-[10px] bg-red-500/10 text-brand-red px-2 py-0.5 rounded-tr-lg border-t border-r border-red-500/20 flex items-center gap-1 font-mono uppercase font-bold tracking-wider">
+                                            <Lock size={10} /> Exclusive
+                                        </span>
+                                    )}
+                                </div>
 
                             {/* Info */}
                             <div className="flex-1 min-w-0">

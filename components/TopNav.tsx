@@ -1,26 +1,37 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, Bell, Menu, X, User, LogOut, Settings, LayoutDashboard, ChevronRight, Smartphone, Download } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Search, Menu, X, User, LogOut, Settings, LayoutDashboard, ChevronRight, Smartphone, Download, Loader2, Star, Play, Film } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
+import { searchTMDBMulti, tmdbPosterUrl, tmdbBackdropUrl, mapTMDBGenres } from '../services/tmdbService';
+import { buildEmbedUrl } from '../utils/embedUrl';
+import { Content } from '../types';
 
 interface TopNavProps {
     activeTab: string;
     setTab: (id: string) => void;
     onSearch: () => void;
     onUnlock: () => void;
+    onDetails?: (item: Content) => void;
 }
 
-const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeTab, setTab, onSearch, onUnlock, onLoginClick }) => {
+const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeTab, setTab, onSearch, onUnlock, onLoginClick, onDetails }) => {
     const [isScrolled, setIsScrolled] = useState(false);
     const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [isProfileMenuOpen, setProfileMenuOpen] = useState(false);
-    const [isNotifOpen, setNotifOpen] = useState(false);
+    const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<Partial<Content>[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
     const profileRef = useRef<HTMLDivElement>(null);
-    const notifRef = useRef<HTMLDivElement>(null);
+    const searchContainerRef = useRef<HTMLDivElement>(null);
+    const searchInputRef = useRef<HTMLInputElement>(null);
+    const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    const { logout, currentUser, currentProfile, userProfiles, switchProfile, notifications, markNotificationAsRead, isInstallable, installPwa, isIOS } = useStore();
+    const { logout, currentUser, currentProfile, userProfiles, switchProfile, isInstallable, installPwa, content, settings } = useStore();
     const navigate = useNavigate();
+    const location = useLocation();
 
     useEffect(() => {
         const handleScroll = () => {
@@ -30,14 +41,28 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
+    // Clean up debounce timer on unmount
+    useEffect(() => {
+        return () => {
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+            }
+        };
+    }, []);
+
+    // Close dropdown on route change
+    useEffect(() => {
+        setIsDropdownOpen(false);
+    }, [location.pathname]);
+
     // --- Click Outside to Close ---
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
                 setProfileMenuOpen(false);
             }
-            if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
-                setNotifOpen(false);
+            if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+                setIsDropdownOpen(false);
             }
         };
 
@@ -50,13 +75,180 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
     const handleNavClick = (id: string) => {
         setTab(id);
         setMobileMenuOpen(false);
+        setIsDropdownOpen(false);
+    };
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setSearchQuery(val);
+
+        if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+        }
+
+        if (!val.trim()) {
+            setSearchResults([]);
+            setIsDropdownOpen(false);
+            setIsSearching(false);
+            return;
+        }
+
+        setIsDropdownOpen(true);
+        setIsSearching(true);
+
+        debounceTimerRef.current = setTimeout(async () => {
+            try {
+                const lower = val.toLowerCase().trim();
+
+                // 1. Local catalog search (instant)
+                const localMatches = (content || []).filter(c =>
+                    (c.title && c.title.toLowerCase().includes(lower)) ||
+                    (c.genres && c.genres.some(g => g.toLowerCase().includes(lower))) ||
+                    (c.overview && c.overview.toLowerCase().includes(lower))
+                ).slice(0, 8);
+
+                // 2. TMDB Multi Search
+                let tmdbResults: any[] = [];
+                try {
+                    tmdbResults = await searchTMDBMulti(val);
+                } catch (e) {
+                    console.warn("TMDB dropdown search error:", e);
+                }
+
+                // 3. Map TMDB items
+                const mappedTMDB: Partial<Content>[] = (tmdbResults || []).map(r => {
+                    const releaseDate = r.release_date || r.first_air_date || '';
+                    const year = releaseDate ? parseInt(releaseDate.split('-')[0]) : 0;
+                    const effectiveType: 'movie' | 'tv' = r.media_type === 'tv' ? 'tv' : 'movie';
+                    return {
+                        id: `tmdb_${r.id}`,
+                        tmdbId: r.id,
+                        title: r.title || r.name || 'Untitled',
+                        type: effectiveType,
+                        poster_path: r.poster_path ? tmdbPosterUrl(r.poster_path, 'w342') : '',
+                        backdrop_path: r.backdrop_path ? tmdbBackdropUrl(r.backdrop_path, 'w780') : '',
+                        release_date: releaseDate,
+                        year: year,
+                        vote_average: r.vote_average || 0,
+                        rating: r.vote_average ? String(r.vote_average) : '0',
+                        youtubeId: '',
+                        overview: r.overview || '',
+                        genres: mapTMDBGenres(r.genre_ids || []),
+                        allowPlayback: true,
+                        isPublished: true
+                    };
+                });
+
+                // 4. Combine & Deduplicate (prioritize local matches)
+                const combined: Partial<Content>[] = [...localMatches];
+                mappedTMDB.forEach(t => {
+                    if (!combined.some(c => (c.tmdbId && c.tmdbId === t.tmdbId) || (c.title && c.title.toLowerCase() === t.title?.toLowerCase()))) {
+                        combined.push(t);
+                    }
+                });
+
+                setSearchResults(combined.slice(0, 8));
+            } catch (err) {
+                console.error("Search dropdown error:", err);
+            } finally {
+                setIsSearching(false);
+            }
+        }, 250);
+    };
+
+    const handleSelectResult = (item: Partial<Content>) => {
+        setIsDropdownOpen(false);
+        setIsSearchFocused(false);
+        searchInputRef.current?.blur();
+
+        const localMatch = content?.find(c => (item.tmdbId && c.tmdbId === item.tmdbId) || (item.id && c.id === item.id));
+        if (localMatch) {
+            if (onDetails) {
+                onDetails(localMatch);
+            } else {
+                navigate(`/browse/${localMatch.id}`, { state: { item: localMatch } });
+            }
+            return;
+        }
+
+        const immediateType: 'movie' | 'tv' = (item.type as 'movie' | 'tv') || 'movie';
+        const streamId = String(item.tmdbId || item.id || '');
+        const immediateContent: Content = {
+            id: (item.id && !item.id.startsWith('tmdb_')) ? item.id : `tmdb_${item.tmdbId}`,
+            tmdbId: item.tmdbId,
+            title: item.title || 'Untitled',
+            type: immediateType,
+            poster_path: item.poster_path || '',
+            backdrop_path: item.backdrop_path || '',
+            release_date: item.release_date || '',
+            year: item.year || (item.release_date ? parseInt(item.release_date.split('-')[0]) : 0),
+            vote_average: item.vote_average || 0,
+            rating: item.rating ? String(item.rating) : (item.vote_average ? String(item.vote_average) : '0'),
+            youtubeId: item.youtubeId || '',
+            overview: item.overview || '',
+            genres: item.genres || [],
+            videoUrl: buildEmbedUrl(streamId, immediateType, settings),
+            allowPlayback: true,
+            isPublished: true,
+            createdAt: new Date().toISOString()
+        };
+
+        if (onDetails) {
+            onDetails(immediateContent);
+        } else {
+            navigate(`/browse/${immediateContent.id}`, { state: { item: immediateContent } });
+        }
+    };
+
+    const handleSearchSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (searchResults.length > 0) {
+            handleSelectResult(searchResults[0]);
+        }
+    };
+
+    const handleSearchIconClick = () => {
+        if (searchInputRef.current) {
+            searchInputRef.current.focus();
+        }
+        if (searchQuery.trim()) {
+            setIsDropdownOpen(true);
+        }
+    };
+
+    const handleClearSearch = (e?: React.MouseEvent) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        setSearchQuery('');
+        setSearchResults([]);
+        setIsDropdownOpen(false);
+        setIsSearching(false);
+        searchInputRef.current?.focus();
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Escape') {
+            setIsDropdownOpen(false);
+            if (searchQuery) {
+                handleClearSearch();
+            } else {
+                searchInputRef.current?.blur();
+            }
+        }
     };
 
     const isAdmin = currentUser?.role === 'admin';
-    const unreadNotifs = notifications.filter(n => !n.read).length;
 
     return (
-        <nav className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-700 ${isScrolled ? 'bg-gradient-to-b from-black via-black/90 to-transparent py-4 shadow-none' : 'bg-gradient-to-b from-black/90 via-black/40 to-transparent py-4'}`}>
+        <nav className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-700 ${isScrolled ? 'bg-gradient-to-b from-black via-black/90 to-transparent shadow-none' : 'bg-gradient-to-b from-black/90 via-black/40 to-transparent'}`}>
+            {settings?.announcementBanner?.trim() && (
+                <aside aria-label="Site announcement" className="w-full bg-gradient-to-r from-red-700 via-brand-red to-red-700 text-white text-[11px] sm:text-xs font-semibold py-1.5 px-4 text-center tracking-wide flex items-center justify-center gap-2 border-b border-red-500/30 shadow-md">
+                    <span className="inline-block animate-pulse">📢</span>
+                    <span>{settings.announcementBanner}</span>
+                </aside>
+            )}
             <div className="max-w-[1920px] mx-auto px-4 md:px-12 h-16 md:h-20 flex items-center justify-between">
 
                 {/* Logo & Desktop Links */}
@@ -101,63 +293,173 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                 </div>
 
                 {/* Right Actions */}
-                <div className="flex items-center gap-4 md:gap-6">
-                    <button onClick={onSearch} className="text-white hover:scale-110 transition p-1"><Search size={24} /></button>
-
-                    {currentUser ? (
-                        <>
-                            {/* Notifications */}
-                            <div className="relative" ref={notifRef}>
+                <div className="flex items-center gap-2 sm:gap-4 md:gap-6">
+                    {/* Search Container with Instant Dropdown Results */}
+                    <div ref={searchContainerRef} className="relative">
+                        <form
+                            onSubmit={handleSearchSubmit}
+                            role="search"
+                            className={`relative flex items-center transition-all duration-300 rounded-full border backdrop-blur-md group
+                                ${isSearchFocused || searchQuery
+                                    ? 'w-44 xs:w-56 sm:w-64 md:w-72 lg:w-80 bg-black/85 border-brand-red/80 shadow-[0_0_20px_rgba(229,9,20,0.35)]'
+                                    : 'w-36 xs:w-44 sm:w-56 md:w-64 lg:w-72 bg-white/10 hover:bg-white/15 border-white/20 hover:border-white/40'
+                                }
+                                h-9 md:h-10 px-3
+                            `}
+                        >
+                            <button
+                                type="button"
+                                onClick={handleSearchIconClick}
+                                className="text-gray-400 group-hover:text-white group-focus-within:text-brand-red transition-colors flex-shrink-0 p-0.5"
+                                aria-label="Search"
+                                title="Search"
+                            >
+                                <Search size={18} className="transition-transform group-hover:scale-110" />
+                            </button>
+                            <input
+                                ref={searchInputRef}
+                                type="text"
+                                value={searchQuery}
+                                onChange={handleInputChange}
+                                onFocus={() => {
+                                    setIsSearchFocused(true);
+                                    if (searchQuery.trim()) setIsDropdownOpen(true);
+                                }}
+                                onBlur={() => setIsSearchFocused(false)}
+                                onKeyDown={handleKeyDown}
+                                placeholder="Search movies, TV shows..."
+                                className="w-full bg-transparent text-white text-xs md:text-sm pl-2 pr-1 focus:outline-none placeholder-gray-400 font-medium tracking-wide"
+                                autoComplete="off"
+                                autoCorrect="off"
+                                spellCheck="false"
+                            />
+                            {isSearching ? (
+                                <Loader2 size={16} className="text-brand-red animate-spin flex-shrink-0" />
+                            ) : searchQuery ? (
                                 <button
-                                    onClick={() => setNotifOpen(!isNotifOpen)}
-                                    className="text-white hover:scale-110 transition relative p-1"
+                                    type="button"
+                                    onClick={handleClearSearch}
+                                    className="text-gray-400 hover:text-white hover:bg-white/20 p-1 rounded-full transition-colors flex-shrink-0"
+                                    aria-label="Clear search"
+                                    title="Clear"
                                 >
-                                    <Bell size={24} />
-                                    {unreadNotifs > 0 && (
-                                        <span className="absolute top-0 right-0 bg-brand-red text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold shadow-lg border border-[#0a0a0a]">
-                                            {unreadNotifs}
-                                        </span>
-                                    )}
+                                    <X size={14} />
                                 </button>
+                            ) : null}
+                        </form>
 
-                                {isNotifOpen && (
-                                    <div className="fixed md:absolute top-16 right-4 md:right-0 w-80 md:w-96 bg-[#0a0a0a] backdrop-blur-2xl border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-in slide-in-from-top-2 z-[300] ring-1 ring-white/5">
-                                        <div className="p-4 border-b border-white/5 flex justify-between items-center bg-white/5">
-                                            <span className="font-bold text-white tracking-wide">Notifications</span>
-                                            {unreadNotifs > 0 && <span className="text-xs text-brand-red font-bold uppercase tracking-wider">{unreadNotifs} New</span>}
+                        {/* Dropdown Results Panel */}
+                        {isDropdownOpen && searchQuery.trim().length > 0 && (
+                            <div className="fixed sm:absolute left-3 right-3 sm:left-auto sm:right-0 top-16 sm:top-full mt-2 sm:w-[420px] md:w-[460px] bg-[#0e0e0e]/95 backdrop-blur-2xl border border-white/15 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.95),0_0_30px_rgba(229,9,20,0.2)] overflow-hidden z-[300] animate-in fade-in slide-in-from-top-2 duration-200">
+                                {/* Header */}
+                                <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/10 bg-white/5">
+                                    <span className="text-xs font-semibold text-gray-300">
+                                        {isSearching ? 'Searching...' : searchResults.length > 0 ? `${searchResults.length} Titles Found` : 'Search Results'}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsDropdownOpen(false)}
+                                        className="text-gray-400 hover:text-white p-1 rounded-md hover:bg-white/10 transition"
+                                        aria-label="Close dropdown"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+
+                                {/* Results List */}
+                                <div className="max-h-[60vh] sm:max-h-[380px] overflow-y-auto p-2 space-y-1 divide-y divide-white/5 custom-scrollbar">
+                                    {isSearching && searchResults.length === 0 ? (
+                                        <div className="py-10 flex flex-col items-center justify-center text-gray-400 gap-2">
+                                            <Loader2 size={24} className="animate-spin text-brand-red" />
+                                            <span className="text-xs">Searching catalog & TMDB...</span>
                                         </div>
-                                        <div className="max-h-[60vh] md:max-h-[400px] overflow-y-auto custom-scrollbar">
-                                            {notifications.length > 0 ? (
-                                                notifications.map(n => (
-                                                    <div key={n.id}
-                                                        onClick={() => {
-                                                            markNotificationAsRead(n.id);
-                                                            if (n.link) n.link.startsWith('http') ? window.open(n.link, '_blank') : navigate(n.link);
-                                                            setNotifOpen(false);
-                                                        }}
-                                                        className={`p-4 border-b border-white/5 flex gap-4 transition-all cursor-pointer hover:bg-white/10 ${n.read ? 'opacity-60' : 'bg-white/5 border-l-2 border-l-brand-red'}`}
-                                                    >
-                                                        {n.image && <img src={n.image} className="w-12 h-16 rounded object-cover flex-shrink-0 bg-gray-800" />}
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className={`text-sm mb-1 truncate ${n.read ? 'font-medium text-gray-300' : 'font-bold text-white'}`}>{n.title}</div>
-                                                            <div className="text-xs text-gray-400 line-clamp-2">{n.message}</div>
-                                                            <div className="flex justify-between mt-2">
-                                                                <span className="text-[10px] text-gray-500 font-mono">{new Date(n.createdAt).toLocaleDateString()}</span>
-                                                                {!n.read && <div className="w-2 h-2 rounded-full bg-brand-red" />}
+                                    ) : searchResults.length > 0 ? (
+                                        searchResults.map((item, idx) => {
+                                            const poster = item.poster_path || '';
+                                            const rating = item.vote_average ? item.vote_average.toFixed(1) : null;
+                                            const isSeries = item.type === 'tv';
+                                            const isAnime = item.genres?.some(g => g.toLowerCase().includes('anime'));
+                                            const displayType = isAnime ? 'Anime' : isSeries ? 'Series' : 'Movie';
+
+                                            return (
+                                                <div
+                                                    key={item.id || item.tmdbId || idx}
+                                                    onClick={() => handleSelectResult(item)}
+                                                    className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-xl cursor-pointer transition-all duration-150 group relative pt-2"
+                                                >
+                                                    {/* Poster Thumbnail */}
+                                                    <div className="relative w-11 h-16 sm:w-12 sm:h-18 flex-shrink-0 rounded-md overflow-hidden bg-neutral-900 shadow-md">
+                                                        {poster ? (
+                                                            <img
+                                                                src={poster}
+                                                                alt={item.title || 'Poster'}
+                                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                                                loading="lazy"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center text-gray-600">
+                                                                <Film size={20} />
+                                                            </div>
+                                                        )}
+                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                            <div className="w-6 h-6 rounded-full bg-brand-red flex items-center justify-center text-white shadow-lg">
+                                                                <Play size={10} className="fill-white ml-0.5" />
                                                             </div>
                                                         </div>
                                                     </div>
-                                                ))
-                                            ) : (
-                                                <div className="p-12 text-center text-gray-500 space-y-2">
-                                                    <Bell size={24} className="mx-auto opacity-30" />
-                                                    <div className="text-sm">No notifications</div>
+
+                                                    {/* Meta Info */}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="font-bold text-sm text-white truncate group-hover:text-brand-red transition-colors">
+                                                            {item.title}
+                                                        </div>
+                                                        <div className="flex items-center gap-2 mt-1 text-[11px] text-gray-400">
+                                                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wider ${
+                                                                isAnime
+                                                                    ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
+                                                                    : isSeries
+                                                                    ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                                                                    : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                                                            }`}>
+                                                                {displayType}
+                                                            </span>
+                                                            {item.year ? <span>{item.year}</span> : null}
+                                                            {rating && parseFloat(rating) > 0 ? (
+                                                                <span className="flex items-center gap-0.5 text-amber-400 font-semibold">
+                                                                    <Star size={11} className="fill-amber-400 text-amber-400" />
+                                                                    {rating}
+                                                                </span>
+                                                            ) : null}
+                                                        </div>
+                                                        {item.genres && item.genres.length > 0 ? (
+                                                            <div className="text-[10px] text-gray-400 truncate mt-0.5">
+                                                                {item.genres.slice(0, 3).join(' • ')}
+                                                            </div>
+                                                        ) : item.overview ? (
+                                                            <div className="text-[10px] text-gray-400 truncate mt-0.5">
+                                                                {item.overview}
+                                                            </div>
+                                                        ) : null}
+                                                    </div>
+
+                                                    <ChevronRight size={16} className="text-gray-500 group-hover:text-white transition-colors flex-shrink-0" />
                                                 </div>
-                                            )}
+                                            );
+                                        })
+                                    ) : (
+                                        <div className="py-8 text-center px-4">
+                                            <p className="text-sm font-medium text-gray-300">No matches found for &ldquo;{searchQuery}&rdquo;</p>
+                                            <p className="text-xs text-gray-500 mt-1">Try checking your spelling or searching for another title.</p>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </div>
+                        )}
+                    </div>
+
+                    {currentUser ? (
+                        <>
+
 
                             {/* Profile Dropdown */}
                             <div className="relative" ref={profileRef}>
@@ -246,6 +548,7 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                                     { id: 'tv', label: 'TV Shows' },
                                     { id: 'categories', label: 'Categories' },
                                     { id: 'anime', label: 'Anime' },
+                                    { id: 'search', label: 'Search' },
                                     { id: 'my-list', label: 'My List' }, // Note: My List will trigger login catch in AppNew
                                 ].map(item => (
                                     <button

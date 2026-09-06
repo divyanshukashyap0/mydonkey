@@ -64,14 +64,32 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onDetails, onPlay 
     const goNext = useCallback(() => goTo(activeIdx + 1), [goTo, activeIdx]);
     const goPrev = useCallback(() => goTo(activeIdx - 1), [goTo, activeIdx]);
 
-    // ── Auto-advance ──────────────────────────────────────────────────────
+    const goNextRef = useRef(goNext);
+    goNextRef.current = goNext;
 
+    // ── Auto-advance ──────────────────────────────────────────────────────
+    // When a trailer starts playing, pause auto-advance and let it play until it ends.
+    // When the trailer finishes (e.data === 0), it advances to the next card immediately.
     useEffect(() => {
-        if (slides.length <= 1 || isPaused) return;
+        if (slides.length <= 1 || isPaused || videoPlaying || (showVideo && currentItem?.youtubeId)) return;
         if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
         autoTimerRef.current = setTimeout(goNext, AUTO_ADVANCE_MS);
         return () => { if (autoTimerRef.current) clearTimeout(autoTimerRef.current); };
-    }, [activeIdx, isPaused, goNext, slides.length]);
+    }, [activeIdx, isPaused, videoPlaying, showVideo, currentItem?.youtubeId, goNext, slides.length]);
+
+    // Failsafe: if trailer fails to start within 8 seconds of showVideo, fallback advance
+    useEffect(() => {
+        if (!showVideo || videoPlaying || !currentItem?.youtubeId) return;
+        const failsafe = setTimeout(() => {
+            if (!videoPlaying) {
+                setShowVideo(false);
+                if (slides.length > 1 && !isPaused) {
+                    goNextRef.current();
+                }
+            }
+        }, 8000);
+        return () => clearTimeout(failsafe);
+    }, [showVideo, videoPlaying, currentItem?.youtubeId, slides.length, isPaused]);
 
     // ── Trailer autoplay ──────────────────────────────────────────────────
 
@@ -97,17 +115,31 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onDetails, onPlay 
                     height: '100%',
                     playerVars: {
                         autoplay: 1, controls: 0, mute: 1, start: 0,
-                        loop: 1, playlist: currentItem.youtubeId,
+                        loop: 0,
                         modestbranding: 1, playsinline: 1, rel: 0,
                         iv_load_policy: 3, disablekb: 1, fs: 0, enablejsapi: 1,
                     },
                     events: {
                         onReady: (e: any) => { e.target.mute(); e.target.playVideo(); },
                         onStateChange: (e: any) => {
-                            if (e.data === 1) setVideoPlaying(true);
-                            if (e.data === 0) e.target.playVideo();
+                            // YT.PlayerState.PLAYING = 1
+                            if (e.data === 1) {
+                                setVideoPlaying(true);
+                            }
+                            // YT.PlayerState.ENDED = 0: Trailer ended naturally -> advance to next card!
+                            if (e.data === 0) {
+                                setVideoPlaying(false);
+                                setShowVideo(false);
+                                goNextRef.current();
+                            }
                         },
-                        onError: (e: any) => console.error('Hero Player Error:', e.data),
+                        onError: () => {
+                            setVideoPlaying(false);
+                            setShowVideo(false);
+                            if (slides.length > 1 && !isPaused) {
+                                setTimeout(() => { goNextRef.current(); }, 1500);
+                            }
+                        },
                     },
                 });
             }
@@ -165,38 +197,52 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onDetails, onPlay 
             {slides.map((slide, idx) => (
                 <div
                     key={slide.id + idx}
-                    className={`absolute inset-0 transition-opacity duration-700 ${idx === activeIdx ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}
+                    className={`absolute inset-0 transition-opacity duration-700 ${
+                        idx === activeIdx
+                            ? (videoPlaying ? 'opacity-0 pointer-events-none z-0 invisible' : 'opacity-100 z-10 visible')
+                            : 'opacity-0 z-0 pointer-events-none invisible'
+                    }`}
                 >
                     {/* Mobile poster */}
-                    {(slide.poster_path_mobile || slide.poster_path) && (
-                        <img
-                            src={slide.poster_path_mobile || slide.poster_path}
-                            className="w-full h-full object-cover md:hidden"
-                            alt={slide.title}
-                            loading={idx === 0 ? 'eager' : 'lazy'}
-                            fetchPriority={idx === 0 ? 'high' : 'auto'}
-                            decoding="async"
-                        />
-                    )}
+                    <img
+                        src={slide.poster_path_mobile || slide.poster_path || '/logo.png'}
+                        className={`w-full h-full ${(slide.poster_path_mobile || slide.poster_path) ? 'object-cover' : 'object-contain p-12 bg-black'} md:hidden`}
+                        alt={slide.title}
+                        loading={idx === 0 ? 'eager' : 'lazy'}
+                        fetchPriority={idx === 0 ? 'high' : 'auto'}
+                        decoding="async"
+                        onError={(e) => {
+                            const t = e.currentTarget;
+                            if (!t.src.endsWith('/logo.png')) {
+                                t.src = '/logo.png';
+                                t.className = "w-full h-full object-contain p-12 bg-black md:hidden";
+                            }
+                        }}
+                    />
                     {/* Desktop backdrop */}
-                    {(slide.backdrop_path || slide.poster_path) && (
-                        <img
-                            src={slide.backdrop_path || slide.poster_path}
-                            className="w-full h-full object-cover hidden md:block"
-                            alt={slide.title}
-                            loading={idx === 0 ? 'eager' : 'lazy'}
-                            fetchPriority={idx === 0 ? 'high' : 'auto'}
-                            decoding="async"
-                        />
-                    )}
+                    <img
+                        src={slide.backdrop_path || slide.poster_path || '/logo.png'}
+                        className={`w-full h-full ${(slide.backdrop_path || slide.poster_path) ? 'object-cover' : 'object-contain p-20 bg-black'} hidden md:block`}
+                        alt={slide.title}
+                        loading={idx === 0 ? 'eager' : 'lazy'}
+                        fetchPriority={idx === 0 ? 'high' : 'auto'}
+                        decoding="async"
+                        onError={(e) => {
+                            const t = e.currentTarget;
+                            if (!t.src.endsWith('/logo.png')) {
+                                t.src = '/logo.png';
+                                t.className = "w-full h-full object-contain p-20 bg-black hidden md:block";
+                            }
+                        }}
+                    />
                     <div className="absolute inset-0 bg-gradient-to-t from-cinema-black via-cinema-black/20 to-transparent md:bg-gradient-to-r md:from-black md:via-black/40 md:to-transparent" />
                 </div>
             ))}
 
             {/* ── YouTube player ────────────────────────────────────────── */}
             {showVideo && currentItem.youtubeId && (
-                <div className={`absolute inset-0 z-20 overflow-hidden pointer-events-none transition-opacity duration-1000 ${videoPlaying ? 'opacity-100' : 'opacity-0'}`}>
-                    <div className="w-[135%] h-[135%] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-60">
+                <div className={`absolute inset-0 z-20 overflow-hidden pointer-events-none transition-opacity duration-700 ${videoPlaying ? 'opacity-100' : 'opacity-0'}`}>
+                    <div className="w-[135%] h-[135%] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-100">
                         <div id="hero-player" className="w-full h-full" />
                     </div>
                 </div>
