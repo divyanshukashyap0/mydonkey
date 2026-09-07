@@ -179,6 +179,7 @@ export default async function handler(req, res) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${safe(title)}</title>
   <meta name="description" content="${safe(description)}" />
+  <link rel="canonical" href="${safe(targetAppUrl)}" />
 
   <!-- Open Graph / WhatsApp / Facebook / Telegram / Discord / Messenger -->
   <meta property="og:site_name" content="My Donkey" />

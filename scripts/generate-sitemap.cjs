@@ -210,12 +210,10 @@ async function generateSitemap() {
         // 1. Core Top-Level Routes with keyword-rich titles and metadata
         const CORE_ROUTES = [
             { path: '/',           priority: '1.00', changefreq: 'daily',   title: 'My Donkey | Watch Free Movies, TV Shows, Anime & Marvel Movies Online in HD' },
-            { path: '/home',       priority: '1.00', changefreq: 'daily',   title: 'My Donkey Home — Stream Free Movies, Shows & Anime' },
             { path: '/movies',     priority: '0.95', changefreq: 'daily',   title: 'Watch Free Movies Online | Bollywood, Hollywood & English Movies - My Donkey' },
             { path: '/tv',         priority: '0.95', changefreq: 'daily',   title: 'Watch Free TV Shows & Web Series Online | All Seasons - My Donkey' },
             { path: '/anime',      priority: '0.95', changefreq: 'daily',   title: 'Watch Free Anime Online in HD | Anime Series & Movies - My Donkey' },
             { path: '/categories', priority: '0.90', changefreq: 'daily',   title: 'Browse All Movies & TV Series Categories | My Donkey' },
-            { path: '/search',     priority: '0.90', changefreq: 'daily',   title: 'Search Free Movies, TV Shows, Anime & Marvel Movies | My Donkey' },
             { path: '/exclusive',  priority: '0.85', changefreq: 'weekly',  title: 'My Donkey Originals & Exclusive Movies' },
             { path: '/adblocker',  priority: '0.80', changefreq: 'weekly',  title: 'Adblocker & Mobile DNS Setup Guide | My Donkey' },
             { path: '/sound-enhancements', priority: '0.80', changefreq: 'weekly', title: 'Sound Enhancements & Audio Booster Guide | My Donkey' },
@@ -323,74 +321,45 @@ async function generateSitemap() {
         }
         console.log(`✅ Added ${REGIONAL_CATEGORIES.length} regional and language landing routes.`);
 
-        // 4. Keyword Search Landing URLs (directly targeted for Google Search queries)
-        const KEYWORD_SEARCHES = [
-            { q: 'donkey',                     title: 'Donkey Movies & Shows — Watch Free Online on My Donkey' },
-            { q: 'my',                         title: 'My Donkey Free Streaming — Movies, Series & Anime' },
-            { q: 'my donkey',                  title: 'My Donkey — Watch Free Movies, TV Shows & Anime Online' },
-            { q: 'my donkey movies',           title: 'My Donkey Movies — Unlimited Free HD Streaming' },
-            { q: 'movies',                     title: 'Watch Free Movies Online in HD | My Donkey' },
-            { q: 'tv shows',                   title: 'Watch Free TV Shows & Web Series Online | My Donkey' },
-            { q: 'anime',                      title: 'Watch Free Anime Online — Subbed & Dubbed | My Donkey' },
-            { q: 'marvel movies',              title: 'Watch Marvel Movies Online Free in HD | My Donkey' },
-            { q: 'english movies',             title: 'Watch English Movies & Hollywood Hits Online Free | My Donkey' },
-            { q: 'watch free movies',          title: 'Watch Free Movies Online — No Subscription Needed | My Donkey' },
-            { q: 'online free movies',         title: 'Online Free Movies Streaming in Full HD | My Donkey' },
-            { q: 'free movies',                title: 'Free Movies Online — Thousands of Films Streaming Free | My Donkey' },
-            { q: 'free movies online',         title: 'Free Movies Online — Watch Anywhere on Mobile, TV & PC' },
-            { q: 'hindi movies',               title: 'Watch Hindi Movies Online Free | Bollywood Hits | My Donkey' },
-            { q: 'bollywood movies',           title: 'Watch Bollywood Movies Online Free | My Donkey' },
-            { q: 'hollywood movies',           title: 'Watch Hollywood Movies Online Free in HD | My Donkey' },
-            { q: 'web series',                 title: 'Watch Web Series Online Free — All Seasons & Episodes | My Donkey' },
-            { q: 'action movies',              title: 'Watch Free Action Movies Online | My Donkey' },
-            { q: 'comedy movies',              title: 'Watch Free Comedy Movies Online | My Donkey' },
-            { q: 'horror movies',              title: 'Watch Free Horror Movies Online | My Donkey' },
-            { q: 'romantic movies',            title: 'Watch Free Romantic Movies Online | My Donkey' },
-            { q: 'sci fi movies',              title: 'Watch Free Sci-Fi Movies Online | My Donkey' },
-            { q: 'thriller movies',            title: 'Watch Free Thriller & Suspense Movies Online | My Donkey' },
-            { q: 'south indian movies',        title: 'Watch South Indian Movies Hindi Dubbed Free | My Donkey' },
-            { q: 'avengers movies',            title: 'Watch Avengers & Superhero Movies Online Free | My Donkey' },
-            { q: 'dc movies',                  title: 'Watch DC Superhero Movies Online Free | My Donkey' },
-            { q: 'watch anime online free',    title: 'Watch Anime Online Free in High Definition | My Donkey' },
-            { q: 'watch series online',        title: 'Watch Series Online Free — HD Streaming | My Donkey' },
-            { q: 'hd movies online',           title: 'HD Movies Online — Stream Free in 1080p & 4K | My Donkey' },
-            { q: 'latest movies 2026',         title: 'Latest Movies 2026 — Watch New Releases Online Free | My Donkey' },
-            { q: 'free streaming movies',      title: 'Free Streaming Movies & TV Shows | My Donkey OTT' },
-            { q: 'korean drama',               title: 'Watch Korean Dramas Online Free with Subtitles | My Donkey' },
-        ];
 
-        for (const item of KEYWORD_SEARCHES) {
-            const searchUrl = `${BASE_URL}/search?q=${encodeURIComponent(item.q)}`;
-            xml += '  <url>\n';
-            xml += `    <loc>${escapeXml(searchUrl)}</loc>\n`;
-            xml += `    <lastmod>${today}</lastmod>\n`;
-            xml += '    <changefreq>daily</changefreq>\n';
-            xml += '    <priority>0.85</priority>\n';
-            xml += '    <image:image>\n';
-            xml += `      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>\n`;
-            xml += `      <image:title>${escapeXml(item.title)}</image:title>\n`;
-            xml += `      <image:caption>${escapeXml(`Search results for ${item.q} on My Donkey. Stream online free movies, TV shows, and anime in HD.`)}</image:caption>\n`;
-            xml += '    </image:image>\n';
-            xml += '  </url>\n';
-            totalUrls++;
-        }
-        console.log(`✅ Added ${KEYWORD_SEARCHES.length} keyword search landing routes.`);
 
         // 5. Fetch Dynamic Content from Firestore
         console.log('🔄 Fetching all content from Firestore...');
-        const documents = await fetchAllDocuments('content');
-        console.log(`📥 Total Firestore documents retrieved: ${documents.length}`);
-
         let contentCount = 0;
         let episodeCount = 0;
+        let documents = [];
+        let usedFallback = false;
 
-        documents.forEach(doc => {
-            const fields = doc.fields || {};
-            const pathParts = doc.name.split('/');
-            const id = pathParts[pathParts.length - 1];
+        try {
+            documents = await fetchAllDocuments('content');
+            console.log(`📥 Total Firestore documents retrieved: ${documents.length}`);
+        } catch (fetchErr) {
+            console.warn(`⚠️ Firestore fetch failed: ${fetchErr.message}`);
+            const publicDir = path.resolve(__dirname, '../public');
+            const sitemapPath = path.join(publicDir, 'sitemap.xml');
+            if (fs.existsSync(sitemapPath)) {
+                console.log('🔄 Attempting fallback: Preserving existing published content entries from public/sitemap.xml...');
+                const oldXml = fs.readFileSync(sitemapPath, 'utf8');
+                const urlMatches = oldXml.match(/<url>[\s\S]*?<loc>https:\/\/www\.mydonkey\.in\/browse\/[\s\S]*?<\/url>/g);
+                if (urlMatches && urlMatches.length > 0) {
+                    xml += urlMatches.map(u => '  ' + u.trim()).join('\n') + '\n';
+                    totalUrls += urlMatches.length;
+                    contentCount = urlMatches.length;
+                    usedFallback = true;
+                    console.log(`✅ Preserved ${contentCount} content pages from existing sitemap.`);
+                }
+            }
+            if (!usedFallback) throw fetchErr;
+        }
 
-            if (getBool(fields.isPublished)) {
-                const type = getStr(fields.type) || 'movie';
+        if (!usedFallback) {
+            documents.forEach(doc => {
+                const fields = doc.fields || {};
+                const pathParts = doc.name.split('/');
+                const id = pathParts[pathParts.length - 1];
+
+                if (getBool(fields.isPublished)) {
+                    const type = getStr(fields.type) || 'movie';
                 const rawTitle = cleanText(getStr(fields.title)) || 'Featured Title';
                 const rawOverview = cleanText(getStr(fields.overview)) || `${rawTitle} available to stream free in HD on My Donkey.`;
                 const posterPath = resolveImageUrl(getStr(fields.poster_path));
@@ -632,6 +601,7 @@ async function generateSitemap() {
         console.log(`✅ Added ${contentCount} dynamic content pages.`);
         if (episodeCount > 0) {
             console.log(`✅ Added ${episodeCount} dynamic episode pages.`);
+        }
         }
 
         xml += '</urlset>\n';

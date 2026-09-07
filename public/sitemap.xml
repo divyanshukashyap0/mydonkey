@@ -4,6 +4,578 @@
         xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
   <url>
     <loc>https://www.mydonkey.in/</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.00</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>My Donkey | Watch Free Movies, TV Shows, Anime &amp; Marvel Movies Online in HD</image:title>
+      <image:caption>Stream on My Donkey - Watch free movies, TV shows, anime, and marvel movies online in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/movies</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Watch Free Movies Online | Bollywood, Hollywood &amp; English Movies - My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Watch free movies, TV shows, anime, and marvel movies online in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/tv</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Watch Free TV Shows &amp; Web Series Online | All Seasons - My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Watch free movies, TV shows, anime, and marvel movies online in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/anime</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Watch Free Anime Online in HD | Anime Series &amp; Movies - My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Watch free movies, TV shows, anime, and marvel movies online in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.90</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Browse All Movies &amp; TV Series Categories | My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Watch free movies, TV shows, anime, and marvel movies online in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/exclusive</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>My Donkey Originals &amp; Exclusive Movies</image:title>
+      <image:caption>Stream on My Donkey - Watch free movies, TV shows, anime, and marvel movies online in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/adblocker</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Adblocker &amp; Mobile DNS Setup Guide | My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Watch free movies, TV shows, anime, and marvel movies online in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/sound-enhancements</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Sound Enhancements &amp; Audio Booster Guide | My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Watch free movies, TV shows, anime, and marvel movies online in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/my-list</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.75</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>My Watchlist — Save and Watch Free Movies Online</image:title>
+      <image:caption>Stream on My Donkey - Watch free movies, TV shows, anime, and marvel movies online in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/about</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.70</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>About My Donkey — Free Online Movie &amp; Series Streaming Platform</image:title>
+      <image:caption>Stream on My Donkey - Watch free movies, TV shows, anime, and marvel movies online in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/support</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Help &amp; Support Hub — Guides, Tools &amp; FAQs | My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Watch free movies, TV shows, anime, and marvel movies online in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/community-chat</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Community Help Chat &amp; Q&amp;A Discussion Forum | My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Watch free movies, TV shows, anime, and marvel movies online in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/help</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.70</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Help &amp; FAQ Center | My Donkey Streaming</image:title>
+      <image:caption>Stream on My Donkey - Watch free movies, TV shows, anime, and marvel movies online in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/contact</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.70</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Contact Us | My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Watch free movies, TV shows, anime, and marvel movies online in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/careers</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.65</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Careers at My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Watch free movies, TV shows, anime, and marvel movies online in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/press</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.65</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Press Room &amp; News | My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Watch free movies, TV shows, anime, and marvel movies online in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/blog</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.65</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>The Donkey Blog — Movie News &amp; Guides</image:title>
+      <image:caption>Stream on My Donkey - Watch free movies, TV shows, anime, and marvel movies online in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/investors</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.60</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Investor Relations | My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Watch free movies, TV shows, anime, and marvel movies online in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/devices</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.65</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Supported Devices — Smart TV, Mobile &amp; PC | My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Watch free movies, TV shows, anime, and marvel movies online in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/terms</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.50</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Terms of Use &amp; Privacy | My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Watch free movies, TV shows, anime, and marvel movies online in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/login</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.60</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Sign In | My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Watch free movies, TV shows, anime, and marvel movies online in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?genre=Action</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Action Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
+      <image:caption>Watch Free Action Movies, Thrillers &amp; Combat Series Online</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?genre=Adventure</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Adventure Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
+      <image:caption>Watch Free Adventure Movies &amp; Quests Online</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?genre=Animation</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Animation Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
+      <image:caption>Watch Free Animated Movies, Anime &amp; Cartoons Online</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?genre=Biography</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Biography Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
+      <image:caption>Watch Real Life Biographies, Legends &amp; True Stories Free</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?genre=Comedy</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Comedy Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
+      <image:caption>Watch Free Comedy Movies, Standup &amp; Fun Shows Online</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?genre=Crime</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Crime Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
+      <image:caption>Watch Free Crime Movies, Gangster Dramas &amp; Heists Online</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?genre=Documentary</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Documentary Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
+      <image:caption>Watch Free Documentaries &amp; Real World Revelations Online</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?genre=Drama</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Drama Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
+      <image:caption>Watch Free Drama Movies, Emotional Stories &amp; Series Online</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?genre=Family</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Family Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
+      <image:caption>Watch Free Family Movies for Kids and All Ages Online</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?genre=Fantasy</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Fantasy Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
+      <image:caption>Watch Free Fantasy Movies, Mythical Beasts &amp; Magic Online</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?genre=History</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>History Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
+      <image:caption>Watch Free Historic War &amp; Historical Movies Online</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?genre=Horror</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Horror Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
+      <image:caption>Watch Free Horror Movies, Haunted Stories &amp; Thrillers Online</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?genre=Mystery</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Mystery Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
+      <image:caption>Watch Free Mystery Movies, Detective Stories &amp; Whodunits</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?genre=Romance</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Romance Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
+      <image:caption>Watch Free Romantic Movies &amp; Love Stories Online</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?genre=Sci-Fi</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Sci-Fi Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
+      <image:caption>Watch Free Sci-Fi Movies, Space &amp; Futuristic Series Online</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?genre=Sport</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Sport Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
+      <image:caption>Watch Free Sports Movies, Matches &amp; Cricket Highlights</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?genre=Thriller</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Thriller Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
+      <image:caption>Watch Free Suspense Thrillers &amp; Edge-of-Seat Movies Online</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?genre=War</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>War Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
+      <image:caption>Watch Free War Movies, Battlefields &amp; Military Dramas</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?region=global&amp;subRegion=en</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Watch English Movies &amp; Hollywood Hits Free Online | My Donkey</image:title>
+      <image:caption>Stream English Movies &amp; Hollywood Hits in HD. Watch free movies and series on My Donkey.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?region=indian&amp;subRegion=hi</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Watch Hindi Movies &amp; Bollywood Hits Free Online | My Donkey</image:title>
+      <image:caption>Stream Hindi Movies &amp; Bollywood Hits in HD. Watch free movies and series on My Donkey.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?region=indian&amp;subRegion=te</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Watch Telugu Movies &amp; Tollywood Hits Free Online | My Donkey</image:title>
+      <image:caption>Stream Telugu Movies &amp; Tollywood Hits in HD. Watch free movies and series on My Donkey.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?region=indian&amp;subRegion=ta</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Watch Tamil Movies &amp; Kollywood Hits Free Online | My Donkey</image:title>
+      <image:caption>Stream Tamil Movies &amp; Kollywood Hits in HD. Watch free movies and series on My Donkey.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?region=indian&amp;subRegion=ml</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Watch Malayalam Movies &amp; Mollywood Hits Free Online | My Donkey</image:title>
+      <image:caption>Stream Malayalam Movies &amp; Mollywood Hits in HD. Watch free movies and series on My Donkey.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?region=indian&amp;subRegion=kn</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Watch Kannada Movies &amp; Sandalwood Hits Free Online | My Donkey</image:title>
+      <image:caption>Stream Kannada Movies &amp; Sandalwood Hits in HD. Watch free movies and series on My Donkey.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?region=indian&amp;subRegion=pa</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Watch Punjabi Movies &amp; Pollywood Hits Free Online | My Donkey</image:title>
+      <image:caption>Stream Punjabi Movies &amp; Pollywood Hits in HD. Watch free movies and series on My Donkey.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?region=indian&amp;subRegion=bn</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Watch Bengali Movies &amp; Series Free Online | My Donkey</image:title>
+      <image:caption>Stream Bengali Movies &amp; Series in HD. Watch free movies and series on My Donkey.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?region=indian&amp;subRegion=mr</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Watch Marathi Movies &amp; Regional Hits Free Online | My Donkey</image:title>
+      <image:caption>Stream Marathi Movies &amp; Regional Hits in HD. Watch free movies and series on My Donkey.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?region=global&amp;subRegion=ko</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Watch Korean Drama &amp; K-Drama Series Free Online | My Donkey</image:title>
+      <image:caption>Stream Korean Drama &amp; K-Drama Series in HD. Watch free movies and series on My Donkey.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?region=global&amp;subRegion=ja</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Watch Japanese Anime &amp; J-Drama Free Online | My Donkey</image:title>
+      <image:caption>Stream Japanese Anime &amp; J-Drama in HD. Watch free movies and series on My Donkey.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?region=global&amp;subRegion=es</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Watch Spanish Movies &amp; Latino Hits Free Online | My Donkey</image:title>
+      <image:caption>Stream Spanish Movies &amp; Latino Hits in HD. Watch free movies and series on My Donkey.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories?region=global&amp;subRegion=fr</loc>
+    <lastmod>2026-09-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Watch French Cinema &amp; European Hits Free Online | My Donkey</image:title>
+      <image:caption>Stream French Cinema &amp; European Hits in HD. Watch free movies and series on My Donkey.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/</loc>
     <lastmod>2026-09-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.00</priority>

@@ -1,12 +1,11 @@
 User-agent: *
 Allow: /
-Allow: /home
 Allow: /movies
 Allow: /tv
 Allow: /anime
 Allow: /categories
 Allow: /category
-Allow: /search*
+Disallow: /search*
 Allow: /exclusive
 Allow: /my-list
 Allow: /adblocker

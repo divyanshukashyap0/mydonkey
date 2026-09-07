@@ -502,6 +502,23 @@ const MainLayout = () => {
         }
     }, [location.pathname, navigate]);
 
+    // Synchronize dynamic canonical URL tag on client-side route navigation
+    useEffect(() => {
+        try {
+            const cleanPath = location.pathname.replace(/\/+$/, '') || '/';
+            const canonicalUrl = `https://www.mydonkey.in${cleanPath === '/' ? '/' : cleanPath}`;
+            let link = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+            if (!link) {
+                link = document.createElement('link');
+                link.rel = 'canonical';
+                document.head.appendChild(link);
+            }
+            link.href = canonicalUrl;
+        } catch (e) {
+            // Ignore error in non-browser context
+        }
+    }, [location.pathname]);
+
     // Load YouTube API
     useEffect(() => {
         if (!document.getElementById('youtube-iframe-api')) {

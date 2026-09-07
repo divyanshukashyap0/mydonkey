@@ -36,7 +36,18 @@
   <link rel="icon" type="image/png"
     href="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png" />
   <link rel="apple-touch-icon" href="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png" />
-  <link rel="canonical" href="https://www.mydonkey.in/" />
+  <link rel="canonical" id="canonical-url" href="https://www.mydonkey.in/" />
+  <script>
+    (function() {
+      try {
+        var cleanPath = window.location.pathname.replace(/\/+$/, '') || '/';
+        if (cleanPath === '/home') cleanPath = '/';
+        var canonicalUrl = 'https://www.mydonkey.in' + (cleanPath === '/' ? '/' : cleanPath);
+        var link = document.getElementById('canonical-url');
+        if (link) link.setAttribute('href', canonicalUrl);
+      } catch (e) {}
+    })();
+  </script>
   <link rel="stylesheet" href="/index.css">
   <link rel="preconnect" href="https://drive.google.com">
   <link rel="preconnect" href="https://content.googleapis.com">
