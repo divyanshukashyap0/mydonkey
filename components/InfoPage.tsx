@@ -48,7 +48,7 @@ const InfoPage: React.FC<InfoPageProps> = ({ data, onBack }) => {
             {section.buttonLabel && section.buttonLink && (
               <a
                 href={section.buttonLink}
-                target="_blank"
+                target="_self"
                 rel="noopener noreferrer"
                 className="inline-block mt-4 bg-white text-black font-bold py-3 px-8 rounded hover:bg-gray-200 transition"
               >

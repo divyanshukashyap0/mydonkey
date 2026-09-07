@@ -66,8 +66,7 @@ const SongsPlayer: React.FC<SongsPlayerProps> = ({ song, onNext, onShuffle, hasN
               : undefined
           }
           title={song.title}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
           className="w-full h-full border-0"
           loading="lazy"
         />
@@ -80,15 +79,6 @@ const SongsPlayer: React.FC<SongsPlayerProps> = ({ song, onNext, onShuffle, hasN
             <h4 className="font-bold text-white text-sm leading-snug line-clamp-2">{song.title}</h4>
             <p className="text-xs text-gray-400 mt-0.5 truncate">{song.channelTitle}</p>
           </div>
-          <a
-            href={`https://www.youtube.com/watch?v=${song.videoId}`}
-            target="_blank"
-            rel="noreferrer"
-            title="Open on YouTube"
-            className="flex-shrink-0 p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-white/5 transition"
-          >
-            <ExternalLink size={15} />
-          </a>
         </div>
 
         {/* Controls */}

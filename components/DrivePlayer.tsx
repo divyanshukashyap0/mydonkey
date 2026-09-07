@@ -92,34 +92,19 @@ const DrivePlayer: React.FC<DrivePlayerProps> = ({ driveId, title = 'Video Conte
                     <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-zinc-900 px-6 text-center">
                         <p className="text-white text-xl font-bold mb-4">Playback Error</p>
                         <p className="text-gray-400 max-w-md mb-8">
-                            We're having trouble reaching the stream. This can happen if the file is still being processed by Google or if sharing permissions are restricted.
+                            We're having trouble reaching the stream. This can happen if the file is still being processed or if permissions are restricted.
                         </p>
-                        <a
-                            href={`https://drive.google.com/file/d/${driveId}/view`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-2 px-6 py-3 bg-white text-black font-bold rounded-lg hover:bg-white/90 transition-all"
+                        <button
+                            onClick={() => {
+                                setError(false);
+                                setLoading(true);
+                                setShowWarning(false);
+                            }}
+                            className="flex items-center gap-2 px-6 py-3 bg-[#E50914] text-white font-bold rounded-lg hover:bg-red-700 transition-all shadow-lg"
                         >
-                            <ExternalLink size={18} />
-                            Open Preview in Drive
-                        </a>
+                            Retry Playback
+                        </button>
                     </div>
-                )}
-
-                {/* Watch Externally — always a compact icon-circle at top-right, never expands on mobile */}
-                {!loading && (
-                    <a
-                        href={`https://drive.google.com/file/d/${driveId}/view`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="absolute top-3 right-3 z-40 bg-black/50 hover:bg-black/80 text-white/70 hover:text-white p-2.5 rounded-full backdrop-blur-md border border-white/15 flex items-center gap-2 text-xs font-bold transition-all group shadow-xl"
-                        title="Watch Externally"
-                    >
-                        <ExternalLink size={16} />
-                        <span className="overflow-hidden max-w-0 group-hover:max-w-[120px] group-hover:pr-1 transition-all duration-300 whitespace-nowrap hidden md:block">
-                            Watch Externally
-                        </span>
-                    </a>
                 )}
 
                 {/* Stuck-loading warning — bottom-left toast, never covers the video on mobile */}

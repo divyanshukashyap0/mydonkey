@@ -47,22 +47,22 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
       <div className="max-w-7xl mx-auto">
         <div className="flex gap-6 mb-8">
           {settings.facebookUrl && (
-            <a href={settings.facebookUrl} target="_blank" rel="noopener noreferrer">
+            <a href={settings.facebookUrl} target="_self" rel="noopener noreferrer">
               <Facebook size={24} className="hover:text-white cursor-pointer transition-colors" />
             </a>
           )}
           {settings.instagramUrl && (
-            <a href={settings.instagramUrl} target="_blank" rel="noopener noreferrer">
+            <a href={settings.instagramUrl} target="_self" rel="noopener noreferrer">
               <Instagram size={24} className="hover:text-white cursor-pointer transition-colors" />
             </a>
           )}
           {settings.twitterUrl && (
-            <a href={settings.twitterUrl} target="_blank" rel="noopener noreferrer">
+            <a href={settings.twitterUrl} target="_self" rel="noopener noreferrer">
               <Twitter size={24} className="hover:text-white cursor-pointer transition-colors" />
             </a>
           )}
           {settings.youtubeUrl && (
-            <a href={settings.youtubeUrl} target="_blank" rel="noopener noreferrer">
+            <a href={settings.youtubeUrl} target="_self" rel="noopener noreferrer">
               <Youtube size={24} className="hover:text-white cursor-pointer transition-colors" />
             </a>
           )}
@@ -126,7 +126,7 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                     className="hover:underline cursor-pointer transition-colors hover:text-white"
                     onClick={() => {
                       if (link.action.endsWith('.pdf')) {
-                        window.open(link.action, '_blank');
+                        window.location.href = link.action;
                       } else {
                         onNavigate(link.action);
                       }

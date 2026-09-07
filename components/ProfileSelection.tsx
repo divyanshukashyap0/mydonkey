@@ -178,7 +178,7 @@ const ProfileSelection = () => {
   return (
     <div className="min-h-screen bg-[#141414] flex flex-col items-center justify-center text-white animate-in zoom-in-95 duration-500">
       <div className="mb-8 flex flex-col items-center">
-        <img src="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png" className="h-16 md:h-20 w-auto object-contain mb-8" alt="MY DONKEY Logo" />
+        <img src="/logo.png" className="h-16 md:h-20 w-auto object-contain mb-8" alt="MY DONKEY Logo" />
         {mode === 'select' && (
           <div className="text-center mb-2 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
             <h2 className="text-xl md:text-2xl font-light text-brand-red mb-1">{getGreeting()}, <span className="font-bold text-white">{currentUser?.name || 'Guest'}</span></h2>

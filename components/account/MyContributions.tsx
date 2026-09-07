@@ -102,7 +102,7 @@ const MyContributions: React.FC<MyContributionsProps> = ({ userId }) => {
                     {item.imdbId && (
                         <a
                             href={`https://www.imdb.com/title/${item.imdbId}/`}
-                            target="_blank"
+                            target="_self"
                             rel="noopener noreferrer"
                             className="opacity-0 group-hover:opacity-100 transition text-gray-500 hover:text-white p-1"
                         >

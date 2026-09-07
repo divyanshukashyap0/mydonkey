@@ -124,26 +124,34 @@ async function callTMDB(path: string, params: Record<string, any> = {}) {
     
     try {
         const res = await fetch(proxyUrl);
-        if (res.ok) return await res.json();
-        
-        // If proxy fails (e.g., 404 in local dev), try direct call if we have a client-side key
-        if (API_KEY) {
-            console.warn(`TMDB Proxy failed with status ${res.status}. Falling back to direct call.`);
-            const directUrl = `${TMDB_BASE}${path}?api_key=${API_KEY}&${searchParams.toString()}`;
-            const directRes = await fetch(directUrl);
-            if (!directRes.ok) throw new Error(`TMDB direct error: ${directRes.statusText}`);
-            return await directRes.json();
+        if (res.ok) {
+            const data = await res.json();
+            return data;
         }
         
-        throw new Error(`TMDB proxy error: ${res.statusText}`);
+        // If proxy fails, try direct call if we have a client-side key
+        if (API_KEY) {
+            try {
+                const directUrl = `${TMDB_BASE}${path}?api_key=${API_KEY}&${searchParams.toString()}`;
+                const directRes = await fetch(directUrl);
+                if (directRes.ok) return await directRes.json();
+            } catch {
+                // Direct call also unreachable
+            }
+        }
+        return { results: [] };
     } catch (err: any) {
         // Final fallback to direct if proxy fetch itself fails (e.g., network error)
         if (API_KEY) {
-            const directUrl = `${TMDB_BASE}${path}?api_key=${API_KEY}&${searchParams.toString()}`;
-            const directRes = await fetch(directUrl);
-            if (directRes.ok) return await directRes.json();
+            try {
+                const directUrl = `${TMDB_BASE}${path}?api_key=${API_KEY}&${searchParams.toString()}`;
+                const directRes = await fetch(directUrl);
+                if (directRes.ok) return await directRes.json();
+            } catch {
+                // Direct call also unreachable
+            }
         }
-        throw err;
+        return { results: [] };
     }
 }
 

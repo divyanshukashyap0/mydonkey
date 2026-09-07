@@ -220,7 +220,7 @@ const ComingSoonManager = () => {
                                 </td>
                                 <td className="p-4">
                                     {item.youtubeId ? (
-                                        <a href={`https://youtu.be/${item.youtubeId}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-gray-400 hover:text-red-500 transition">
+                                        <a href={`https://youtu.be/${item.youtubeId}`} target="_self" rel="noreferrer" className="flex items-center gap-2 text-gray-400 hover:text-red-500 transition">
                                             <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
                                                 <Play size={12} fill="currentColor" />
                                             </div>

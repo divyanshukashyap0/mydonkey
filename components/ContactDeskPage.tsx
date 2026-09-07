@@ -399,7 +399,7 @@ const ContactDeskPage: React.FC = () => {
                                     <span>TV Setup</span>
                                 </button>
                                 <button
-                                    onClick={() => window.open('/MyDonkey.pdf', '_blank')}
+                                    onClick={() => { window.location.href = '/MyDonkey.pdf'; }}
                                     className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-left text-xs font-bold text-white transition flex items-center gap-2"
                                 >
                                     <ExternalLink size={14} className="text-purple-400" />

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../../../context/StoreContext';
-import { Save, AlertTriangle, Globe, Shield, Monitor, CheckCircle, Smartphone, Film, Tv, Link2, RefreshCw, Mail, Star, Trash2 } from 'lucide-react';
+import { Save, AlertTriangle, Globe, Shield, ShieldCheck, Monitor, CheckCircle, Smartphone, Film, Tv, Link2, RefreshCw, Mail, Star, Trash2 } from 'lucide-react';
 import { SiteSettings, Content } from '../../../types';
 import { doc, writeBatch } from 'firebase/firestore';
 import { db } from '../../../firebase';
@@ -402,6 +402,51 @@ const SettingsManager = () => {
                                         placeholder="https://proxy.garageband.rocks"
                                     />
                                     <p className="text-[10px] text-gray-500 mt-1">Default: https://proxy.garageband.rocks — Changing this updates the stream website for all content.</p>
+                                </div>
+
+                                {/* Embed Ad Shield Configuration */}
+                                <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2.5">
+                                            <ShieldCheck size={18} className="text-emerald-400 shrink-0" />
+                                            <div>
+                                                <div className="text-xs font-bold text-white">Embed Ad Shield (Anti-Popup & Anti-Redirect)</div>
+                                                <div className="text-[10px] text-gray-400">
+                                                    Restricts external video player embeds via HTML5 sandbox to completely block popup windows, new tabs, and site hijacking redirects.
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.enableAdShield !== false}
+                                                onChange={(e) => handleChange({ enableAdShield: e.target.checked })}
+                                                className="sr-only peer"
+                                            />
+                                            <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                                        </label>
+                                    </div>
+                                    {formData.enableAdShield !== false && (
+                                        <div className="flex items-center justify-between pt-2 border-t border-emerald-500/10 text-xs">
+                                            <span className="text-gray-300 font-medium text-[11px]">Default Protection Level:</span>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleChange({ adShieldMode: 'strict' })}
+                                                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${formData.adShieldMode !== 'standard' ? 'bg-emerald-500 text-black shadow-sm' : 'bg-white/5 text-gray-400 hover:text-white'}`}
+                                                >
+                                                    Strict (Zero Popups)
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleChange({ adShieldMode: 'standard' })}
+                                                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${formData.adShieldMode === 'standard' ? 'bg-emerald-500 text-black shadow-sm' : 'bg-white/5 text-gray-400 hover:text-white'}`}
+                                                >
+                                                    Standard
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">

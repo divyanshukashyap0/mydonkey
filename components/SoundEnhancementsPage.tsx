@@ -469,7 +469,7 @@ const SoundEnhancementsPage: React.FC = () => {
                                             <a
                                                 key={link.label}
                                                 href={link.url}
-                                                target="_blank"
+                                                target="_self"
                                                 rel="noreferrer"
                                                 className={`w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl font-bold text-xs transition ${
                                                     link.primary
@@ -562,7 +562,7 @@ const SoundEnhancementsPage: React.FC = () => {
                                             <a
                                                 key={link.label}
                                                 href={link.url}
-                                                target="_blank"
+                                                target="_self"
                                                 rel="noreferrer"
                                                 className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-xs bg-emerald-500 hover:bg-emerald-400 text-black transition shadow-md shadow-emerald-500/20"
                                             >

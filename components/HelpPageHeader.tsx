@@ -43,10 +43,7 @@ export const HelpPageHeader: React.FC<HelpPageHeaderProps> = ({
                         title="My Donkey - Return to Home"
                     >
                         <img
-                            src="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png"
-                            onError={(e) => {
-                                (e.currentTarget as HTMLImageElement).src = '/logo.png';
-                            }}
+                            src="/logo.png"
                             className="h-8 sm:h-10 md:h-11 w-auto object-contain drop-shadow-[0_2px_12px_rgba(229,9,20,0.35)]"
                             alt="My Donkey"
                         />

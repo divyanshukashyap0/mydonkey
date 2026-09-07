@@ -148,7 +148,9 @@ const DEFAULT_SETTINGS: SiteSettings = {
     embedMovieType: 'movie',
     embedTvType: 'tv',
     announcementBanner: '',
-    guestAccessEnabled: true
+    guestAccessEnabled: true,
+    enableAdShield: true,
+    adShieldMode: 'strict'
 };
 
 export const PERMANENT_ADMINS = ['divyanshukashyap2430955@gmail.com', 'divyanshu00884466@gmail.com'];

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Hls from 'hls.js';
-import { Play, Pause, Volume2, Volume1, VolumeX, Maximize, Settings, SkipForward, ArrowLeft, RotateCcw, RotateCw, Subtitles, Layers, BarChart2, Minimize, Headphones, Check, MessageSquare, Wifi, ExternalLink, Scan, Scaling, AlertCircle, RefreshCw, Zap, Sliders, Sparkles, ShieldCheck } from 'lucide-react';
-import { Content } from '../types';
+import { Play, Pause, Volume2, Volume1, VolumeX, Maximize, Settings, SkipForward, ArrowLeft, RotateCcw, RotateCw, Subtitles, Layers, BarChart2, Minimize, Headphones, Check, MessageSquare, Wifi, WifiOff, X, ExternalLink, Scan, Scaling, AlertCircle, RefreshCw, Zap, Sliders, Sparkles, ShieldCheck, ChevronDown } from 'lucide-react';
+import { Content, Season, Episode } from '../types';
 import StatsPanel from './StatsPanel';
 import DrivePlayer from './DrivePlayer';
 import ContentLoader from './ContentLoader';
@@ -10,6 +10,9 @@ import { logUserActivity, incrementWatchTime } from '../utils/activityLogger';
 import { MoviVideo } from './MoviVideo';
 import { buildEmbedUrl, parseEmbedContentType } from '../utils/embedUrl';
 import { soundBooster } from '../player/SoundBooster';
+import { useAdShield } from '../utils/useAdShield';
+import { useNetworkSpeed } from '../utils/useNetworkSpeed';
+import { fetchTMDBDetails, fetchTMDBSeason } from '../services/tmdbService';
 
 interface VideoPlayerProps {
     content: Content;
@@ -26,7 +29,19 @@ declare global {
 const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const { updatePlaybackProgress, currentUser, updateContentDuration, settings, addToWatchHistory } = useStore();
 
-    // Extract IDs locally for safety
+    // Embed Ad Shield: Blocks external popups, new tabs, and site hijacking redirects
+    const {
+        isEnabled: isAdShieldEnabled,
+        mode: adShieldMode,
+        blockedCount: adShieldBlockedCount,
+        sandboxAttributes: adShieldSandbox,
+        toggleAdShield,
+        changeMode: changeAdShieldMode,
+    } = useAdShield({
+        defaultEnabled: settings?.enableAdShield !== false,
+        defaultMode: settings?.adShieldMode || 'strict',
+        isActive: true,
+    });
 
 
 
@@ -105,14 +120,293 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         setInitialLoad(false);
     }, []);
 
+    // Network Speed & Slow Internet Detection
+    const {
+        isSlow: isNetworkSlow,
+        hasSlowSpeed,
+        speedDetails,
+        isDismissed: isSlowNetDismissed,
+        dismiss: dismissSlowNetworkWarning,
+        reopen: reopenSlowNetworkWarning,
+    } = useNetworkSpeed({
+        isBufferingOrLoading: isMovieLoading || isBuffering,
+        bufferingStallThresholdMs: 7000,
+    });
+
     // Season & Episode State (TV Shows)
     const [currentSeasonIdx, setCurrentSeasonIdx] = useState(0);
     const [currentEpisodeIdx, setCurrentEpisodeIdx] = useState(0);
     const [showEpisodesMenu, setShowEpisodesMenu] = useState(false);
+    const embedIframeRef = useRef<HTMLIFrameElement | null>(null);
 
-    const isTV = content.type === 'tv' && content.seasons && content.seasons.length > 0;
-    const currentSeason = isTV ? content.seasons![currentSeasonIdx] : null;
-    const currentEpisode = (isTV && currentSeason) ? currentSeason.episodes[currentEpisodeIdx] : null;
+    // Parse season & episode from embed URL if present (e.g. /embed/tv/tt13404982/1/2)
+    const urlSeasonEp = useMemo(() => {
+        const target = content.videoUrl || '';
+        const match = target.match(/(?:embed\/tv\/|tt\d+\/)?(\d+)\/(\d+)/);
+        if (match) {
+            return { season: parseInt(match[1]), episode: parseInt(match[2]) };
+        }
+        return null;
+    }, [content.videoUrl]);
+
+    const isTV = Boolean(
+        content.type === 'tv' ||
+        (content as any).media_type === 'tv' ||
+        (content.seasons && content.seasons.length > 0) ||
+        (content.videoUrl && content.videoUrl.includes('/embed/tv/'))
+    );
+
+    const [dynamicSeasons, setDynamicSeasons] = useState<Season[]>(() => {
+        if (content.seasons && content.seasons.length > 0) {
+            return content.seasons;
+        }
+        return [];
+    });
+
+    useEffect(() => {
+        if (content.seasons && content.seasons.length > 0) {
+            setDynamicSeasons(content.seasons);
+        }
+    }, [content.seasons]);
+
+    // Synchronize initial season & episode indices with parsed URL numbers
+    useEffect(() => {
+        if (urlSeasonEp && dynamicSeasons.length > 0) {
+            const sIdx = dynamicSeasons.findIndex(s => s.seasonNumber === urlSeasonEp.season);
+            if (sIdx !== -1) {
+                setCurrentSeasonIdx(sIdx);
+                const eIdx = dynamicSeasons[sIdx].episodes.findIndex(e => e.episodeNumber === urlSeasonEp.episode);
+                if (eIdx !== -1) {
+                    setCurrentEpisodeIdx(eIdx);
+                }
+            }
+        }
+    }, [urlSeasonEp, dynamicSeasons.length]);
+
+    // Fetch seasons & episodes dynamically from TMDB for TV shows if not pre-populated
+    useEffect(() => {
+        if (!isTV) return;
+        if (content.seasons && content.seasons.length > 0 && content.seasons.some(s => s.episodes && s.episodes.length > 0)) {
+            setDynamicSeasons(content.seasons);
+            return;
+        }
+
+        let isCancelled = false;
+        const loadTvSeasons = async () => {
+            try {
+                let tmdbId = content.tmdbId;
+                if (!tmdbId && typeof content.id === 'string' && content.id.startsWith('tmdb_')) {
+                    tmdbId = parseInt(content.id.replace('tmdb_', ''));
+                }
+
+                if (!tmdbId) {
+                    if (dynamicSeasons.length === 0) {
+                        const defaultEpsCount = urlSeasonEp ? Math.max(urlSeasonEp.episode, 8) : 8;
+                        const defaultEps: Episode[] = Array.from({ length: defaultEpsCount }, (_, i) => ({
+                            id: `ep_${i + 1}`,
+                            episodeNumber: i + 1,
+                            title: `Episode ${i + 1}`,
+                        }));
+                        setDynamicSeasons([{
+                            id: 'season_1',
+                            seasonNumber: urlSeasonEp?.season || 1,
+                            title: `Season ${urlSeasonEp?.season || 1}`,
+                            episodes: defaultEps,
+                        }]);
+                    }
+                    return;
+                }
+
+                const details = await fetchTMDBDetails(tmdbId, 'tv');
+                if (isCancelled || !details) return;
+
+                const validSeasons = (details.seasons || []).filter(s => s.season_number > 0);
+                if (validSeasons.length === 0) return;
+
+                const targetSeasonNum = urlSeasonEp?.season || validSeasons[0].season_number;
+                const seasonDetail = await fetchTMDBSeason(tmdbId, targetSeasonNum);
+                if (isCancelled) return;
+
+                const populatedSeasons: Season[] = validSeasons.map(s => {
+                    if (s.season_number === targetSeasonNum && seasonDetail?.episodes) {
+                        return {
+                            id: String(s.id),
+                            seasonNumber: s.season_number,
+                            title: s.name || `Season ${s.season_number}`,
+                            episodes: seasonDetail.episodes.map(ep => ({
+                                id: String(ep.id),
+                                episodeNumber: ep.episode_number,
+                                title: ep.name || `Episode ${ep.episode_number}`,
+                                overview: ep.overview,
+                                duration: ep.runtime ? `${ep.runtime}m` : undefined,
+                                stillUrl: ep.still_path ? `https://image.tmdb.org/t/p/w500${ep.still_path}` : undefined,
+                            }))
+                        };
+                    }
+                    return {
+                        id: String(s.id),
+                        seasonNumber: s.season_number,
+                        title: s.name || `Season ${s.season_number}`,
+                        episodes: Array.from({ length: s.episode_count || 1 }, (_, i) => ({
+                            id: `s${s.season_number}_e${i + 1}`,
+                            episodeNumber: i + 1,
+                            title: `Episode ${i + 1}`,
+                        }))
+                    };
+                });
+
+                setDynamicSeasons(populatedSeasons);
+            } catch (err) {
+                console.warn('Could not fetch TMDB TV seasons:', err);
+                if (dynamicSeasons.length === 0) {
+                    const defaultEpsCount = urlSeasonEp ? Math.max(urlSeasonEp.episode, 8) : 8;
+                    setDynamicSeasons([{
+                        id: 'season_1',
+                        seasonNumber: urlSeasonEp?.season || 1,
+                        title: `Season ${urlSeasonEp?.season || 1}`,
+                        episodes: Array.from({ length: defaultEpsCount }, (_, i) => ({
+                            id: `ep_${i + 1}`,
+                            episodeNumber: i + 1,
+                            title: `Episode ${i + 1}`,
+                        }))
+                    }]);
+                }
+            }
+        };
+
+        loadTvSeasons();
+        return () => { isCancelled = true; };
+    }, [isTV, content.id, content.tmdbId]);
+
+    // Listen for TV state & info messages emitted from the embed iframe
+    useEffect(() => {
+        const handleEmbedMessage = (event: MessageEvent) => {
+            try {
+                const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+                if (!data || typeof data !== 'object') return;
+
+                if (data.type === 'TV_STATE' || data.event === 'tv_state') {
+                    if (data.season !== undefined) {
+                        const sNum = Number(data.season);
+                        const eNum = Number(data.episode);
+                        setDynamicSeasons(prev => {
+                            const sIdx = prev.findIndex(s => s.seasonNumber === sNum);
+                            if (sIdx !== -1) {
+                                setCurrentSeasonIdx(sIdx);
+                                const eIdx = prev[sIdx].episodes.findIndex(e => e.episodeNumber === eNum);
+                                if (eIdx !== -1) setCurrentEpisodeIdx(eIdx);
+                            }
+                            return prev;
+                        });
+                    }
+                } else if (data.type === 'TV_INFO' && data.eps) {
+                    setDynamicSeasons(prev => {
+                        if (prev.length > 0 && prev.some(s => s.episodes && s.episodes.length > 0 && s.episodes[0].overview)) return prev;
+                        const newSeasons: Season[] = [];
+                        Object.entries(data.eps).forEach(([sNumStr, epList]: [string, any]) => {
+                            const sNum = parseInt(sNumStr) || 1;
+                            const episodes: Episode[] = [];
+                            if (Array.isArray(epList)) {
+                                epList.forEach((epNum: any) => {
+                                    const n = Number(epNum);
+                                    episodes.push({
+                                        id: `s${sNum}_e${n}`,
+                                        episodeNumber: n,
+                                        title: `Episode ${n}`,
+                                    });
+                                });
+                            } else if (typeof epList === 'number') {
+                                for (let i = 1; i <= epList; i++) {
+                                    episodes.push({
+                                        id: `s${sNum}_e${i}`,
+                                        episodeNumber: i,
+                                        title: `Episode ${i}`,
+                                    });
+                                }
+                            }
+                            newSeasons.push({
+                                id: `season_${sNum}`,
+                                seasonNumber: sNum,
+                                title: `Season ${sNum}`,
+                                episodes
+                            });
+                        });
+                        return newSeasons.length > 0 ? newSeasons : prev;
+                    });
+                }
+            } catch {
+                // Ignore non-json messages
+            }
+        };
+
+        window.addEventListener('message', handleEmbedMessage);
+        return () => window.removeEventListener('message', handleEmbedMessage);
+    }, []);
+
+    const handleSelectSeason = async (idx: number) => {
+        setCurrentSeasonIdx(idx);
+        const selectedSeason = dynamicSeasons[idx];
+        if (!selectedSeason) return;
+
+        let tmdbId = content.tmdbId;
+        if (!tmdbId && typeof content.id === 'string' && content.id.startsWith('tmdb_')) {
+            tmdbId = parseInt(content.id.replace('tmdb_', ''));
+        }
+
+        if (tmdbId && selectedSeason.episodes.some(e => e.title === `Episode ${e.episodeNumber}`)) {
+            try {
+                const seasonDetail = await fetchTMDBSeason(tmdbId, selectedSeason.seasonNumber);
+                if (seasonDetail?.episodes) {
+                    setDynamicSeasons(prev => prev.map((s, i) => i === idx ? {
+                        ...s,
+                        episodes: seasonDetail.episodes.map(ep => ({
+                            id: String(ep.id),
+                            episodeNumber: ep.episode_number,
+                            title: ep.name || `Episode ${ep.episode_number}`,
+                            overview: ep.overview,
+                            duration: ep.runtime ? `${ep.runtime}m` : undefined,
+                            stillUrl: ep.still_path ? `https://image.tmdb.org/t/p/w500${ep.still_path}` : undefined,
+                        }))
+                    } : s));
+                }
+            } catch {
+                // Silently keep existing
+            }
+        }
+    };
+
+    const handleSelectEpisode = (seasonIdx: number, epIdx: number) => {
+        const targetSeason = dynamicSeasons[seasonIdx];
+        const targetEp = targetSeason?.episodes[epIdx];
+        if (!targetSeason || !targetEp) return;
+
+        setCurrentSeasonIdx(seasonIdx);
+        setCurrentEpisodeIdx(epIdx);
+        setShowEpisodesMenu(false);
+        setInitialLoad(true);
+        setPlaying(true);
+
+        if (embedIframeRef.current?.contentWindow) {
+            try {
+                embedIframeRef.current.contentWindow.postMessage({
+                    type: 'TV_SET',
+                    season: targetSeason.seasonNumber,
+                    episode: targetEp.episodeNumber
+                }, '*');
+            } catch (err) {
+                console.warn('Error sending TV_SET to embed iframe:', err);
+            }
+        }
+
+        showOsd(
+            `Playing S${targetSeason.seasonNumber} • E${targetEp.episodeNumber}`,
+            targetEp.title || `Episode ${targetEp.episodeNumber}`,
+            'zap'
+        );
+    };
+
+    const currentSeason = (isTV && dynamicSeasons.length > 0) ? (dynamicSeasons[currentSeasonIdx] || dynamicSeasons[0]) : null;
+    const currentEpisode = (isTV && currentSeason && currentSeason.episodes.length > 0) ? (currentSeason.episodes[currentEpisodeIdx] || currentSeason.episodes[0]) : null;
 
     const embedBaseHost = useMemo(() => {
         return (settings?.embedProxyBaseUrl || 'https://proxy.garageband.rocks').replace(/^https?:\/\//, '').replace(/\/+$/, '');
@@ -142,7 +436,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const isMovieMode = content.playMode === 'movie';
     let overrideUrl = content.videoUrl;
 
-    const extractedImdbId = content.imdbId || (typeof content.id === 'string' && content.id.startsWith('imdb_') ? content.id.replace('imdb_', '') : '') || (overrideUrl && /^tt\d+$/.test(overrideUrl.trim()) ? overrideUrl.trim() : '');
+    const extractedImdbId = content.imdbId || (typeof content.id === 'string' && content.id.startsWith('imdb_') ? content.id.replace('imdb_', '') : '') || (content.videoUrl?.match(/(tt\d+)/)?.[1]) || (overrideUrl?.match(/(tt\d+)/)?.[1]) || '';
 
     const overrideYoutubeId = overrideUrl ? getYoutubeId(overrideUrl) : '';
     const overrideDriveId = overrideUrl ? getDriveId(overrideUrl) : '';
@@ -170,12 +464,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     let directVideoUrl = (overrideUrl && !overrideYoutubeId && !overrideDriveId) ? overrideUrl : null;
 
     if (isTV) {
-        if (content.videoUrl) {
-            directVideoUrl = content.videoUrl;
-        } else if (currentEpisode) {
-            directVideoUrl = currentEpisode.videoUrl || (extractedImdbId ? buildEmbedUrl(extractedImdbId, 'tv', settings, currentSeason?.seasonNumber, currentEpisode.episodeNumber) : null);
+        const sNum = currentSeason?.seasonNumber || (urlSeasonEp?.season || 1);
+        const eNum = currentEpisode?.episodeNumber || (urlSeasonEp?.episode || 1);
+        if (currentEpisode?.videoUrl) {
+            directVideoUrl = currentEpisode.videoUrl;
         } else if (extractedImdbId) {
-            directVideoUrl = buildEmbedUrl(extractedImdbId, 'tv', settings);
+            directVideoUrl = buildEmbedUrl(extractedImdbId, 'tv', settings, sNum, eNum);
+        } else if (content.videoUrl) {
+            directVideoUrl = content.videoUrl;
         }
     } else if (overrideUrl) {
         directVideoUrl = overrideUrl;
@@ -1571,16 +1867,29 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                     onError={(err) => setPlaybackError(err.message || 'Movi player playback error')}
                                 />
                             ) : finalUrl ? (
-                                <iframe
-                                    className="w-full h-full relative z-[30] border-0"
-                                    src={finalUrl}
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-                                    allowFullScreen
-                                    scrolling="no"
-                                    referrerPolicy="origin"
-                                    title={content.title}
-                                    onLoad={handleIframeLoad}
-                                />
+                                <div className="relative w-full h-full">
+                                    {/* Top-bar click interceptor shield for TV embed (blocks external clicks/popups on #vs-bar and opens in-app popup modal) */}
+                                    {isTV && isEmbedPlayer && (
+                                        <div
+                                            className="absolute top-0 left-0 right-0 h-14 z-[35] cursor-pointer"
+                                            title="Click to open Season & Episode selection"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setShowEpisodesMenu(true);
+                                            }}
+                                        />
+                                    )}
+                                    <iframe
+                                        ref={embedIframeRef}
+                                        className="w-full h-full relative z-[30] border-0"
+                                        src={finalUrl}
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                                        scrolling="no"
+                                        referrerPolicy="origin"
+                                        title={content.title}
+                                        onLoad={handleIframeLoad}
+                                    />
+                                </div>
                             ) : null}
                         </div>
                     )}
@@ -1769,6 +2078,102 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                             <StatsPanel content={content as any} onClose={() => setShowStats(false)} />
                         </div>
                     )}
+
+                    {/* Slow Internet Speed Suggestion Card */}
+                    {isNetworkSlow && (
+                        <div
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute top-16 md:top-20 right-3 sm:right-6 left-3 sm:left-auto sm:w-96 z-[220] bg-zinc-950/95 backdrop-blur-2xl border border-amber-500/40 rounded-2xl p-4 shadow-2xl text-left text-white ring-1 ring-amber-500/20 animate-in fade-in slide-in-from-top-3 duration-300 pointer-events-auto"
+                        >
+                            <div className="flex items-start justify-between gap-2.5">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
+                                        <WifiOff size={18} />
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <h4 className="font-bold text-xs md:text-sm text-white">
+                                                Slow Internet Detected
+                                            </h4>
+                                            {speedDetails.effectiveType && (
+                                                <span className="text-[9px] uppercase font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded">
+                                                    {speedDetails.effectiveType}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-[11px] text-gray-300 mt-0.5 leading-snug">
+                                            {speedDetails.downlink !== undefined
+                                                ? `Estimated speed: ~${speedDetails.downlink} Mbps. Video may buffer.`
+                                                : 'Connection is slow or taking longer to load stream.'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={dismissSlowNetworkWarning}
+                                    className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition shrink-0 cursor-pointer"
+                                    title="Dismiss"
+                                    aria-label="Dismiss slow internet suggestion"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+
+                            {/* Helpful Suggestions */}
+                            <div className="mt-3 pt-2.5 border-t border-white/10 space-y-2 text-[11px] text-gray-300">
+                                <div className="flex items-start gap-2">
+                                    <Zap size={13} className="text-amber-400 shrink-0 mt-0.5" />
+                                    <span><strong>Lower video quality</strong> to 480p or 720p to stop buffering.</span>
+                                </div>
+                                <div className="flex items-start gap-2">
+                                    <Pause size={13} className="text-blue-400 shrink-0 mt-0.5" />
+                                    <span><strong>Pause for 15-20 seconds</strong> to allow video stream to buffer ahead.</span>
+                                </div>
+                                <div className="flex items-start gap-2">
+                                    <Wifi size={13} className="text-emerald-400 shrink-0 mt-0.5" />
+                                    <span><strong>Switch to 5GHz Wi-Fi</strong> or pause background downloads.</span>
+                                </div>
+                            </div>
+
+                            {/* Quick Action Row */}
+                            <div className="mt-3.5 flex items-center justify-between gap-2 pt-2.5 border-t border-white/10">
+                                {qualities.length > 0 ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const lowerQ = qualities.find(q => q.includes('480') || q.includes('720') || q.includes('360')) || 'auto';
+                                            handleQualityChange(lowerQ);
+                                            showOsd(`Quality switched to ${lowerQ.toUpperCase()}`, 'Optimized for slow connection', 'zap');
+                                            dismissSlowNetworkWarning();
+                                        }}
+                                        className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition active:scale-95 shadow-md shadow-amber-500/20 flex items-center gap-1.5 cursor-pointer"
+                                    >
+                                        <Zap size={13} />
+                                        <span>Lower to 480p / 720p</span>
+                                    </button>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowQualityMenu(true);
+                                            dismissSlowNetworkWarning();
+                                        }}
+                                        className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition active:scale-95 shadow-md shadow-amber-500/20 flex items-center gap-1.5 cursor-pointer"
+                                    >
+                                        <Settings size={13} />
+                                        <span>Quality Settings</span>
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={dismissSlowNetworkWarning}
+                                    className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-gray-300 hover:text-white font-semibold text-xs transition cursor-pointer"
+                                >
+                                    Got it
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </>
             )}
 
@@ -1808,8 +2213,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     resetInactivityTimer();
                 }}
                 className={`fixed z-[300] select-none touch-none cursor-grab active:cursor-grabbing transition-opacity duration-300 ${showControls
-                        ? 'opacity-50 hover:opacity-100 pointer-events-auto'
-                        : 'opacity-0 pointer-events-none'
+                    ? 'opacity-50 hover:opacity-100 pointer-events-auto'
+                    : 'opacity-0 pointer-events-none'
                     } ${pillPosition
                         ? ''
                         : isMobile && isPortrait
@@ -1836,21 +2241,52 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                         onPointerDown={(e) => e.stopPropagation()}
                         onClick={(e) => {
                             e.stopPropagation();
-                            setShowEpisodesMenu(!showEpisodesMenu);
+                            if (isTV) setShowEpisodesMenu(!showEpisodesMenu);
                         }}
-                        className="text-left pr-2 md:pr-4 group/title cursor-pointer select-none"
+                        className="text-left px-1.5 md:px-2.5 group/title cursor-pointer select-none"
                     >
-                        <div className="text-white font-bold text-xs md:text-sm leading-tight tracking-tight line-clamp-1 max-w-[120px] md:max-w-[200px] group-hover/title:text-brand-red transition-colors">
+                        <div className="text-white font-semibold text-[11px] md:text-xs leading-tight tracking-tight line-clamp-1 max-w-[100px] md:max-w-[150px] group-hover/title:text-brand-red transition-colors">
                             {content.title}
                         </div>
                         {isTV && currentEpisode && (
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                                <span className="text-brand-red font-black text-[8px] md:text-[10px] uppercase tracking-wider bg-brand-red/10 px-1.5 py-0.5 rounded">
-                                    S{currentSeason?.seasonNumber} • E{currentEpisode.episodeNumber}
+                            <div className="flex items-center gap-1 mt-0.5">
+                                <span className="text-brand-red font-black text-[7px] md:text-[9px] uppercase tracking-wider bg-brand-red/10 px-1 py-0.5 rounded">
+                                    S{currentSeason?.seasonNumber || 1} • E{currentEpisode.episodeNumber || 1}
                                 </span>
                             </div>
                         )}
                     </button>
+                    {isTV && (
+                        <>
+                            <div className="h-6 w-px bg-white/20 shrink-0 pointer-events-none"></div>
+                            <div className="flex items-center gap-1 md:gap-1.5">
+                                <button
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowEpisodesMenu(true);
+                                    }}
+                                    className="px-2 md:px-2.5 py-1 md:py-1.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 text-white text-[10px] md:text-xs font-semibold flex items-center gap-1 cursor-pointer transition-all shadow-sm"
+                                    title="Open Season selection"
+                                >
+                                    <span>Season {currentSeason?.seasonNumber || 1}</span>
+                                    <ChevronDown size={13} className="text-gray-400" />
+                                </button>
+                                <button
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowEpisodesMenu(true);
+                                    }}
+                                    className="px-2 md:px-2.5 py-1 md:py-1.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 text-white text-[10px] md:text-xs font-semibold flex items-center gap-1 cursor-pointer transition-all shadow-sm"
+                                    title="Open Episode selection"
+                                >
+                                    <span>Episode {currentEpisode?.episodeNumber || 1}</span>
+                                    <ChevronDown size={13} className="text-gray-400" />
+                                </button>
+                            </div>
+                        </>
+                    )}
                     <div className="h-6 w-px bg-white/20 shrink-0 pointer-events-none"></div>
                     <button
                         onPointerDown={(e) => e.stopPropagation()}
@@ -1864,6 +2300,23 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     >
                         {isFullscreen ? <Minimize size={18} className="md:w-5 md:h-5" /> : <Maximize size={18} className="md:w-5 md:h-5" />}
                     </button>
+                    {hasSlowSpeed && isSlowNetDismissed && (
+                        <>
+                            <div className="h-6 w-px bg-white/20 shrink-0 pointer-events-none"></div>
+                            <button
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    reopenSlowNetworkWarning();
+                                }}
+                                className="px-2 py-1 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300 text-[10px] font-bold transition flex items-center gap-1 active:scale-95 cursor-pointer shrink-0"
+                                title="Slow internet detected - Click for suggestions"
+                            >
+                                <WifiOff size={13} className="text-amber-400" />
+                                <span className="hidden sm:inline">Slow Net</span>
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -1988,8 +2441,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                             cycleBoost();
                                         }}
                                         className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wider transition-all duration-300 ${boostLevel > 1.0
-                                                ? 'bg-gradient-to-r from-red-600/30 to-amber-500/30 border border-amber-500/50 text-amber-300 shadow-[0_0_16px_rgba(245,158,11,0.35)]'
-                                                : 'text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10'
+                                            ? 'bg-gradient-to-r from-red-600/30 to-amber-500/30 border border-amber-500/50 text-amber-300 shadow-[0_0_16px_rgba(245,158,11,0.35)]'
+                                            : 'text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10'
                                             }`}
                                         title="Sound Booster: Click to cycle presets (100% → 150% → 200% → 300% → 400%). Hotkey: B"
                                     >
@@ -2045,8 +2498,53 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                                 {/* Audio Col */}
                                                 <div className="flex-1 p-4 border-l border-white/5 bg-black/20">
                                                     <h3 className="text-gray-500 font-bold text-[10px] uppercase tracking-widest mb-3 px-2 flex items-center gap-2">
-                                                        <Headphones size={12} /> Audio
+                                                        <Headphones size={12} /> Audio & Protection
                                                     </h3>
+
+                                                    {/* Embed Ad Shield Card */}
+                                                    <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-b from-emerald-500/15 to-emerald-500/5 border border-emerald-500/30 flex flex-col gap-2.5">
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-1.5 text-emerald-300 font-bold text-xs">
+                                                                <ShieldCheck size={15} />
+                                                                <span>EMBED AD SHIELD</span>
+                                                            </div>
+                                                            <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${isAdShieldEnabled ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-red-500/20 text-red-300 border-red-500/30'}`}>
+                                                                {isAdShieldEnabled ? 'Active' : 'Disabled'}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-[11px] text-gray-300 leading-snug">
+                                                            {isAdShieldEnabled
+                                                                ? `HTML5 Sandbox is active. External popups, new tabs, and site redirects are blocked (${adShieldBlockedCount} blocked).`
+                                                                : 'Ad Shield is disabled. External player may open new tabs or popups on click.'}
+                                                        </p>
+                                                        <div className="flex items-center justify-between pt-1">
+                                                            <button
+                                                                type="button"
+                                                                onClick={toggleAdShield}
+                                                                className={`px-3 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer ${isAdShieldEnabled ? 'bg-emerald-500 text-black shadow-md' : 'bg-red-500 text-white shadow-md'}`}
+                                                            >
+                                                                {isAdShieldEnabled ? 'Shield Enabled' : 'Enable Shield'}
+                                                            </button>
+                                                            {isAdShieldEnabled && (
+                                                                <div className="flex gap-1">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => changeAdShieldMode('strict')}
+                                                                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${adShieldMode === 'strict' ? 'bg-emerald-500 text-black' : 'bg-white/10 text-gray-300 hover:text-white'}`}
+                                                                    >
+                                                                        Strict
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => changeAdShieldMode('standard')}
+                                                                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${adShieldMode === 'standard' ? 'bg-emerald-500 text-black' : 'bg-white/10 text-gray-300 hover:text-white'}`}
+                                                                    >
+                                                                        Standard
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
 
                                                     {/* Sound Booster / External Embed Notice */}
                                                     {isExternalStream ? (
@@ -2066,7 +2564,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                                             </p>
                                                             <a
                                                                 href="https://chromewebstore.google.com/detail/sound-booster-that-works/gnidjfdekbljleajoeamecfijnhbgndl"
-                                                                target="_blank"
+                                                                target="_self"
                                                                 rel="noreferrer"
                                                                 className="flex items-center justify-between p-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 text-xs font-bold transition group"
                                                             >
@@ -2093,8 +2591,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                                                         soundBooster.toggleTestSound((active) => setIsTestingAudio(active));
                                                                     }}
                                                                     className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl font-bold text-xs transition border ${isTestingAudio
-                                                                            ? 'bg-amber-400 text-black border-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.5)]'
-                                                                            : 'bg-white/10 hover:bg-white/15 text-amber-100 border-amber-500/30'
+                                                                        ? 'bg-amber-400 text-black border-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.5)]'
+                                                                        : 'bg-white/10 hover:bg-white/15 text-amber-100 border-amber-500/30'
                                                                         }`}
                                                                 >
                                                                     <Volume2 size={14} />
@@ -2138,8 +2636,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                                                     <span className="text-xs font-bold text-white tracking-wide">SOUND BOOSTER</span>
                                                                 </div>
                                                                 <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${boostLevel > 1.0
-                                                                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
-                                                                        : 'bg-white/5 text-gray-400 border-white/10'
+                                                                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
+                                                                    : 'bg-white/5 text-gray-400 border-white/10'
                                                                     }`}>
                                                                     {boostLevel > 1.0 ? `${Math.round(boostLevel * 100)}% (${boostLevel}x)` : '100% (NORMAL)'}
                                                                 </span>
@@ -2154,8 +2652,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                                                             key={lvl}
                                                                             onClick={() => setBoostPreset(lvl)}
                                                                             className={`py-1.5 px-1 rounded-lg text-[10px] font-bold text-center transition-all ${isActive
-                                                                                    ? 'bg-brand-red text-white shadow-md shadow-brand-red/30 ring-1 ring-white/20'
-                                                                                    : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
+                                                                                ? 'bg-brand-red text-white shadow-md shadow-brand-red/30 ring-1 ring-white/20'
+                                                                                : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
                                                                                 }`}
                                                                         >
                                                                             {Math.round(lvl * 100)}%
@@ -2236,8 +2734,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                                                         soundBooster.toggleTestSound((active) => setIsTestingAudio(active));
                                                                     }}
                                                                     className={`w-full flex items-center justify-center gap-2 py-1.5 px-2 rounded-lg font-bold text-[11px] transition border ${isTestingAudio
-                                                                            ? 'bg-amber-400 text-black border-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.5)]'
-                                                                            : 'bg-white/5 hover:bg-white/10 text-gray-300 border-white/10'
+                                                                        ? 'bg-amber-400 text-black border-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.5)]'
+                                                                        : 'bg-white/5 hover:bg-white/10 text-gray-300 border-white/10'
                                                                         }`}
                                                                 >
                                                                     <Volume2 size={13} />
@@ -2351,75 +2849,157 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     </div>
                 )}
 
-            {/* Episodes Menu Overlay */}
+            {/* Season & Episodes Popup Modal */}
             {showEpisodesMenu && isTV && (
                 <div
-                    className="fixed inset-0 z-[500] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300"
+                    className="fixed inset-0 z-[500] bg-black/85 backdrop-blur-xl flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200"
                     onClick={() => setShowEpisodesMenu(false)}
                 >
                     <div
-                        className="bg-[#0f0f0f] border border-white/10 rounded-3xl p-0 w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.8)] ring-1 ring-white/10 animate-in zoom-in-95 duration-300"
+                        className="bg-[#111215] border border-white/15 rounded-3xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden shadow-[0_25px_80px_rgba(0,0,0,0.95)] ring-1 ring-white/10 animate-in zoom-in-95 duration-200"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="p-5 md:p-6 border-b border-white/5 bg-white/[0.02] flex justify-between items-center">
+                        {/* Modal Header */}
+                        <div className="p-5 md:p-6 border-b border-white/10 bg-white/[0.03] flex justify-between items-center shrink-0">
                             <div>
-                                <h3 className="text-white font-black text-xl md:text-2xl tracking-tighter">Episodes</h3>
-                                <p className="text-gray-500 text-xs font-bold uppercase tracking-widest mt-0.5">{content.title}</p>
+                                <div className="flex items-center gap-2">
+                                    <h3 className="text-white font-black text-xl md:text-2xl tracking-tight">
+                                        Episodes
+                                    </h3>
+                                    <span className="px-2.5 py-0.5 rounded-full bg-brand-red/20 border border-brand-red/30 text-brand-red text-[11px] font-bold">
+                                        Season {currentSeason?.seasonNumber || 1}
+                                    </span>
+                                </div>
+                                <p className="text-gray-400 text-xs font-medium mt-1">
+                                    {content.title} {content.releaseYear ? `• ${content.releaseYear}` : ''}
+                                </p>
                             </div>
-                            <select
-                                value={currentSeasonIdx}
-                                onChange={(e) => {
-                                    setCurrentSeasonIdx(parseInt(e.target.value));
-                                    setCurrentEpisodeIdx(0);
-                                }}
-                                className="bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-xs font-black text-white outline-none focus:ring-2 ring-brand-red/50 transition-all cursor-pointer hover:bg-white/10"
-                            >
-                                {content.seasons?.map((s, idx) => (
-                                    <option key={s.id} value={idx} className="bg-[#0f0f0f]">
-                                        {s.title}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-2">
-                            {currentSeason?.episodes.map((ep, idx) => (
-                                <button
-                                    key={ep.id}
-                                    onClick={() => {
-                                        setCurrentEpisodeIdx(idx);
-                                        setShowEpisodesMenu(false);
-                                        setInitialLoad(true);
-                                        setPlaying(true);
-                                    }}
-                                    className={`w-full text-left p-4 rounded-[1.5rem] flex items-center gap-4 transition-all duration-300 group ${currentEpisodeIdx === idx ? 'bg-brand-red text-white shadow-xl shadow-brand-red/20 scale-[1.02]' : 'text-gray-400 hover:bg-white/5 hover:text-white hover:scale-[1.01]'}`}
-                                >
-                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-sm font-black shrink-0 transition-colors ${currentEpisodeIdx === idx ? 'bg-white/20' : 'bg-black/40 group-hover:bg-white/10'}`}>
-                                        {ep.episodeNumber}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-sm md:text-base font-black truncate">{ep.title}</div>
-                                        <div className={`text-xs mt-0.5 font-bold ${currentEpisodeIdx === idx ? 'text-white/70' : 'text-gray-500'}`}>
-                                            {ep.duration || 'Duration Unknown'}
-                                        </div>
-                                    </div>
-                                    {currentEpisodeIdx === idx ? (
-                                        <Play size={20} className="fill-current" />
-                                    ) : (
-                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <Play size={20} />
-                                        </div>
-                                    )}
-                                </button>
-                            ))}
-                        </div>
-
-                        <div className="p-4 border-t border-white/5 flex justify-center">
                             <button
                                 onClick={() => setShowEpisodesMenu(false)}
-                                className="text-gray-500 hover:text-white font-bold text-xs uppercase tracking-widest p-2 transition-colors"
+                                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white transition-colors cursor-pointer"
+                                aria-label="Close"
                             >
-                                Close Menu
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Season Tabs (Horizontal Pill Selector) */}
+                        {dynamicSeasons.length > 1 && (
+                            <div className="px-5 py-3 border-b border-white/10 bg-black/30 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
+                                {dynamicSeasons.map((s, idx) => {
+                                    const isSelected = currentSeasonIdx === idx;
+                                    return (
+                                        <button
+                                            key={s.id || `season_${s.seasonNumber}`}
+                                            onClick={() => handleSelectSeason(idx)}
+                                            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                                                isSelected
+                                                    ? 'bg-brand-red text-white shadow-md shadow-brand-red/30 scale-[1.02]'
+                                                    : 'bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white'
+                                            }`}
+                                        >
+                                            <span>{s.title || `Season ${s.seasonNumber}`}</span>
+                                            {s.episodes && s.episodes.length > 0 && (
+                                                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? 'bg-black/30 text-white' : 'bg-white/10 text-gray-400'}`}>
+                                                    {s.episodes.length}
+                                                </span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {/* Episodes List */}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-2.5">
+                            {currentSeason?.episodes.map((ep, idx) => {
+                                const isCurrent = currentEpisodeIdx === idx;
+                                return (
+                                    <button
+                                        key={ep.id || `ep_${ep.episodeNumber}`}
+                                        onClick={() => handleSelectEpisode(currentSeasonIdx, idx)}
+                                        className={`w-full text-left p-3.5 sm:p-4 rounded-2xl flex items-center gap-3.5 sm:gap-4 transition-all duration-200 group cursor-pointer border ${
+                                            isCurrent
+                                                ? 'bg-brand-red/15 border-brand-red/50 shadow-lg shadow-brand-red/10 ring-1 ring-brand-red/30'
+                                                : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.06] hover:border-white/15'
+                                        }`}
+                                    >
+                                        {/* Episode Thumbnail or Number Box */}
+                                        {ep.stillUrl ? (
+                                            <div className="w-24 sm:w-28 aspect-video rounded-xl overflow-hidden bg-black/60 relative shrink-0 border border-white/10">
+                                                <img
+                                                    src={ep.stillUrl}
+                                                    alt={ep.title}
+                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                                    loading="lazy"
+                                                />
+                                                <div className={`absolute inset-0 flex items-center justify-center transition-opacity ${isCurrent ? 'bg-black/40 opacity-100' : 'bg-black/30 opacity-0 group-hover:opacity-100'}`}>
+                                                    <Play size={20} className={isCurrent ? 'text-brand-red fill-current' : 'text-white fill-current'} />
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex flex-col items-center justify-center font-black shrink-0 transition-colors ${
+                                                isCurrent ? 'bg-brand-red text-white' : 'bg-white/5 text-gray-300 group-hover:bg-white/10 group-hover:text-white'
+                                            }`}>
+                                                <span className="text-[9px] uppercase tracking-wider opacity-60 font-semibold">EP</span>
+                                                <span className="text-base sm:text-lg leading-none">{ep.episodeNumber}</span>
+                                            </div>
+                                        )}
+
+                                        {/* Episode Details */}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className={`text-xs font-bold ${isCurrent ? 'text-brand-red' : 'text-gray-400'}`}>
+                                                    Episode {ep.episodeNumber}
+                                                </span>
+                                                {ep.duration && (
+                                                    <span className="text-[11px] text-gray-500 font-medium">
+                                                        • {ep.duration}
+                                                    </span>
+                                                )}
+                                                {isCurrent && (
+                                                    <span className="px-1.5 py-0.5 rounded bg-brand-red text-white text-[9px] font-black uppercase tracking-wider animate-pulse">
+                                                        Now Playing
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <h4 className={`text-sm sm:text-base font-bold mt-0.5 truncate ${isCurrent ? 'text-white' : 'text-gray-200 group-hover:text-white'}`}>
+                                                {ep.title}
+                                            </h4>
+                                            {ep.overview && (
+                                                <p className="text-xs text-gray-400 line-clamp-2 mt-1 font-normal leading-relaxed">
+                                                    {ep.overview}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        {/* Action Icon */}
+                                        <div className="shrink-0 pl-1">
+                                            {isCurrent ? (
+                                                <div className="w-8 h-8 rounded-full bg-brand-red/20 border border-brand-red/40 flex items-center justify-center">
+                                                    <Play size={14} className="text-brand-red fill-current ml-0.5" />
+                                                </div>
+                                            ) : (
+                                                <div className="w-8 h-8 rounded-full bg-white/5 group-hover:bg-white/20 border border-white/5 flex items-center justify-center opacity-40 group-hover:opacity-100 transition-all">
+                                                    <Play size={14} className="text-white fill-current ml-0.5" />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="p-3.5 border-t border-white/10 bg-white/[0.02] flex justify-between items-center shrink-0">
+                            <span className="text-xs text-gray-500 font-medium pl-2">
+                                {currentSeason?.episodes.length || 0} episode{currentSeason?.episodes.length !== 1 ? 's' : ''} available
+                            </span>
+                            <button
+                                onClick={() => setShowEpisodesMenu(false)}
+                                className="text-gray-400 hover:text-white font-bold text-xs uppercase tracking-wider px-4 py-2 rounded-xl hover:bg-white/5 transition-colors cursor-pointer"
+                            >
+                                Close
                             </button>
                         </div>
                     </div>
@@ -2429,10 +3009,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             {/* Unclickable Low-Opacity Corner Watermark Logo (Always visible in normal, embedded, and fullscreen modes) */}
             <div
                 className={`video-watermark absolute z-[999] pointer-events-none select-none transition-all duration-300 drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] ${isFullscreen
-                        ? 'top-6 right-6 md:top-8 md:right-10 opacity-35'
-                        : (isMobile && isPortrait
-                            ? 'top-16 right-4 opacity-30'
-                            : 'top-4 right-4 md:top-6 md:right-8 opacity-30')
+                    ? 'top-6 right-6 md:top-8 md:right-10 opacity-35'
+                    : (isMobile && isPortrait
+                        ? 'top-16 right-4 opacity-30'
+                        : 'top-4 right-4 md:top-6 md:right-8 opacity-30')
                     }`}
                 aria-hidden="true"
             >

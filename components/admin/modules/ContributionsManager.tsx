@@ -226,7 +226,7 @@ const ContributionsManager: React.FC = () => {
                                             {item.imdbId && (
                                                 <a
                                                     href={`https://www.imdb.com/title/${item.imdbId}/`}
-                                                    target="_blank"
+                                                    target="_self"
                                                     rel="noopener noreferrer"
                                                     className="text-yellow-500 hover:text-yellow-400 transition"
                                                     title="Open on IMDb"

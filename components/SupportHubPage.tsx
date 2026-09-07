@@ -226,7 +226,7 @@ const SupportHubPage: React.FC = () => {
         if (card.actionType === 'navigate') {
             navigate(card.target);
         } else if (card.actionType === 'pdf') {
-            window.open(card.target, '_blank');
+            window.location.href = card.target;
         } else if (card.actionType === 'mail') {
             navigate('/contact');
         }

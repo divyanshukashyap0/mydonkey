@@ -20,13 +20,29 @@ const PlanSelectionModal: React.FC<PlanSelectionModalProps> = ({ onClose }) => {
             return;
         }
 
+        // Dynamically load Razorpay script on demand if not already loaded
+        if (!(window as any).Razorpay) {
+            const loaded = await new Promise<boolean>((resolve) => {
+                const script = document.createElement('script');
+                script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+                script.async = true;
+                script.onload = () => resolve(true);
+                script.onerror = () => resolve(false);
+                document.body.appendChild(script);
+            });
+            if (!loaded) {
+                alert("Could not load payment gateway. Please check your internet connection.");
+                return;
+            }
+        }
+
         const options = {
             key: key,
             amount: plan.price * 100, // Amount in paise
             currency: plan.currency || "INR",
             name: "My Donkey",
             description: `Subscription for ${plan.name}`,
-            image: "https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png",
+            image: window.location.origin + '/logo.png',
             handler: async function (response: any) {
                 // Payment Success
                 try {

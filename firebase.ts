@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
-import { getAnalytics } from 'firebase/analytics';
+import { getAnalytics, isSupported } from 'firebase/analytics';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -15,7 +15,20 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const analytics = getAnalytics(app);
+
+// Safe Analytics initialization - prevents GTM 404 errors if measurementId is a placeholder or blocked
+export let analytics: any = null;
+if (typeof window !== 'undefined' && firebaseConfig.measurementId) {
+  isSupported().then(supported => {
+    if (supported) {
+      try {
+        analytics = getAnalytics(app);
+      } catch {
+        // Analytics disabled or blocked by client
+      }
+    }
+  }).catch(() => {});
+}
 
 // Initialize Firestore with modern persistent cache settings (multi-tab enabled)
 export const db = initializeFirestore(app, {

@@ -130,6 +130,8 @@ export interface SiteSettings {
   embedTvType?: string;
   announcementBanner?: string;
   guestAccessEnabled?: boolean;
+  enableAdShield?: boolean;
+  adShieldMode?: 'strict' | 'standard';
 }
 
 export interface Plan {

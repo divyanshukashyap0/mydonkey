@@ -106,16 +106,12 @@ const SongsSection: React.FC<SongsSectionProps> = ({ movieName, contentType }) =
             <p className="text-gray-300 font-semibold text-sm">{reason}</p>
             <p className="text-gray-500 text-xs mt-1">Try searching directly on YouTube</p>
           </div>
-          <a
-            href={fallbackUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-2 bg-red-600/90 hover:bg-red-500 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition shadow-lg shadow-red-900/30"
+          <button
+            onClick={() => fetchSongs()}
+            className="flex items-center gap-2 bg-[#E50914] hover:bg-red-700 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition shadow-lg"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z" /></svg>
-            Search on YouTube
-            <ExternalLink size={13} />
-          </a>
+            Retry Loading Songs
+          </button>
         </div>
       </div>
     );
@@ -127,10 +123,12 @@ const SongsSection: React.FC<SongsSectionProps> = ({ movieName, contentType }) =
       <div className="py-10 text-center text-sm text-gray-500">
         <Music2 size={32} className="mx-auto mb-3 text-gray-700" />
         <p>{error}</p>
-        <a href={fallbackUrl} target="_blank" rel="noreferrer"
-          className="mt-3 inline-flex items-center gap-1 text-red-400 hover:underline text-xs font-bold">
-          Search on YouTube <ExternalLink size={12} />
-        </a>
+        <button
+          onClick={() => fetchSongs()}
+          className="mt-3 inline-flex items-center gap-1 text-red-400 hover:underline text-xs font-bold"
+        >
+          Retry Loading
+        </button>
       </div>
     );
   }

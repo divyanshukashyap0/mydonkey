@@ -108,12 +108,17 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
         if (links.length > 0) {
             setDownloadOptions(item);
         } else if (legacyId) {
-            window.open(`https://drive.google.com/uc?id=${legacyId}&export=download`, '_blank');
-        } else if (videoUrl) {
-            // Fallback: Download the streaming URL directly
-            window.open(videoUrl, '_blank');
+            window.location.href = `https://drive.google.com/uc?id=${legacyId}&export=download`;
+        } else if (videoUrl && !videoUrl.includes('/embed/')) {
+            // Fallback: Trigger direct file download without navigating the window
+            const a = document.createElement('a');
+            a.href = videoUrl;
+            a.setAttribute('download', `${item.title || 'video'}.mp4`);
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         } else {
-            alert('Download not available for this content');
+            alert('Direct download is not available for this stream. You can watch it directly in the player.');
         }
     };
 
@@ -202,7 +207,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                                 <a
                                     key={idx}
                                     href={link.url}
-                                    target="_blank"
+                                    target="_self"
                                     rel="noreferrer"
                                     className="block p-4 bg-white/5 hover:bg-white/10 border border-white/5 rounded-lg text-center font-bold text-white transition flex justify-between items-center group"
                                     onClick={() => setDownloadOptions(null)}

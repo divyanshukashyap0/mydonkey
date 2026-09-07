@@ -257,7 +257,7 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                         className="cursor-pointer"
                         onClick={() => handleNavClick('home')}
                     >
-                        <img src="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png" className="h-10 md:h-12 lg:h-14 w-auto object-contain" alt="MY DONKEY Logo" />
+                        <img src="/logo.png" className="h-10 md:h-12 lg:h-14 w-auto object-contain" alt="MY DONKEY Logo" />
                     </div>
 
                     <div className="hidden lg:flex items-center gap-6">

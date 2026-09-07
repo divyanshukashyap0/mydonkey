@@ -216,8 +216,8 @@ export default function RequestsManager() {
                                 </button>
 
                                 <button
-                                    onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(req.contentTitle + ' movie series watch online')}`, '_blank')}
-                                    title="Search Web"
+                                    onClick={() => { window.location.href = `/search?q=${encodeURIComponent(req.contentTitle)}`; }}
+                                    title="Search in My Donkey"
                                     className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded transition"
                                 >
                                     <ExternalLink size={16} />

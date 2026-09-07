@@ -407,7 +407,7 @@ const AdblockerGuidePage: React.FC = () => {
                                     {dns.setupGuideUrl && (
                                         <a
                                             href={dns.setupGuideUrl}
-                                            target="_blank"
+                                            target="_self"
                                             rel="noopener noreferrer"
                                             className="inline-flex items-center gap-1 text-xs font-bold text-cyan-400 hover:text-cyan-300 transition-colors"
                                         >
@@ -499,7 +499,7 @@ const AdblockerGuidePage: React.FC = () => {
                                             </p>
                                             <a
                                                 href="https://adguard-dns.io/en/public-dns.html"
-                                                target="_blank"
+                                                target="_self"
                                                 rel="noopener noreferrer"
                                                 className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all"
                                             >
@@ -519,7 +519,7 @@ const AdblockerGuidePage: React.FC = () => {
                                             </p>
                                             <a
                                                 href="https://apps.apple.com/app/adguard-adblocker-privacy/id1047223162"
-                                                target="_blank"
+                                                target="_self"
                                                 rel="noopener noreferrer"
                                                 className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl text-xs font-bold transition-all shadow"
                                             >
@@ -608,7 +608,7 @@ const AdblockerGuidePage: React.FC = () => {
                                                     <a
                                                         key={lIdx}
                                                         href={link.url}
-                                                        target="_blank"
+                                                        target="_self"
                                                         rel="noopener noreferrer"
                                                         className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white font-bold text-xs flex items-center justify-between gap-3 transition-all border border-white/10 shadow-sm"
                                                     >
@@ -666,7 +666,7 @@ const AdblockerGuidePage: React.FC = () => {
                                         {browser.playUrl && (
                                             <a
                                                 href={browser.playUrl}
-                                                target="_blank"
+                                                target="_self"
                                                 rel="noopener noreferrer"
                                                 className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold flex items-center justify-between transition-colors"
                                             >
@@ -677,7 +677,7 @@ const AdblockerGuidePage: React.FC = () => {
                                         {browser.appStoreUrl && (
                                             <a
                                                 href={browser.appStoreUrl}
-                                                target="_blank"
+                                                target="_self"
                                                 rel="noopener noreferrer"
                                                 className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold flex items-center justify-between transition-colors"
                                             >

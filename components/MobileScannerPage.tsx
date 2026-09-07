@@ -236,8 +236,7 @@ const MobileScannerPage = () => {
                     title="Return to Home"
                 >
                     <img
-                        src="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png"
-                        onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.png'; }}
+                        src="/logo.png"
                         className="h-7 sm:h-8 w-auto object-contain drop-shadow"
                         alt="My Donkey"
                     />

@@ -87,7 +87,7 @@ export default function AdminLayout({ onExit }: { onExit: () => void }) {
           </button>
           <span className="font-bold">Admin Panel</span>
         </div>
-        <img src="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png" className="h-6 w-auto" alt="Logo" />
+        <img src="/logo.png" className="h-6 w-auto" alt="Logo" />
       </div>
 
       {/* Sidebar Backdrop (Mobile) */}
@@ -101,7 +101,7 @@ export default function AdminLayout({ onExit }: { onExit: () => void }) {
         {/* Sidebar Header */}
         <div className="p-6 flex items-center justify-between border-b border-white/5">
           <div>
-            <img src="https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png" className="h-8 w-auto object-contain mb-1" alt="DONKEY ADMIN" />
+            <img src="/logo.png" className="h-8 w-auto object-contain mb-1" alt="DONKEY ADMIN" />
             <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Consigliere Mode</p>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="md:hidden text-gray-400"><X size={20} /></button>
