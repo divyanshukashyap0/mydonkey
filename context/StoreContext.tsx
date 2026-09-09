@@ -885,15 +885,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const loginWithGoogle = async () => {
         const provider = new GoogleAuthProvider();
         provider.setCustomParameters({ prompt: 'select_account' });
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
 
-        // on mobile: typically redirect is preferred, but for local debugging/PWA contexts, popup often works better 
-        // or avoids domain mismatch errors.
         try {
             await signInWithPopup(auth, provider);
         } catch (error: any) {
             console.error("Popup login failed, trying redirect override:", error);
-            if (isMobile && error.code === 'auth/popup-blocked') {
+            if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
                 await signInWithRedirect(auth, provider);
             } else {
                 throw error;
@@ -910,10 +907,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             await signInWithPopup(auth, provider);
         } catch (error: any) {
             console.error("Apple login failed:", error);
-            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
 
-            // Fallback to redirect if popup is blocked (common on mobile)
-            if (isMobile && (error.code === 'auth/popup-blocked' || error.code === 'auth/operation-not-supported-in-this-environment')) {
+            // Fallback to redirect if popup is blocked
+            if (error.code === 'auth/popup-blocked' || error.code === 'auth/operation-not-supported-in-this-environment') {
                 await signInWithRedirect(auth, provider);
             } else if (error.code === 'auth/operation-not-allowed') {
                 throw new Error("Apple Sign-In is not enabled in the database. Please contact support.");
@@ -1175,7 +1171,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
         if (!fbUser || !currentUser) return;
         const history = currentUser.continueWatching || [];
-        const existingIdx = history.findIndex(h => h.movieId === movieId);
         const newEntry = {
             movieId,
             progress,
@@ -1183,10 +1178,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             duration,
             lastWatchedAt: new Date().toISOString()
         };
-        let updatedHistory = [...history];
-        if (existingIdx > -1) updatedHistory[existingIdx] = newEntry;
-        else updatedHistory.unshift(newEntry);
-        updatedHistory = updatedHistory.slice(0, 20);
+        // Always place the most recently watched show at the front (first place)
+        const updatedHistory = [
+            newEntry,
+            ...history.filter(h => h.movieId !== movieId)
+        ].slice(0, 30);
+        setCurrentUser(prev => prev ? { ...prev, continueWatching: updatedHistory } : null);
         await updateUser({ continueWatching: updatedHistory });
     };
 
@@ -1214,7 +1211,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         // 2. Update currentUser continueWatching in Firestore
         if (currentUser) {
             const history = currentUser.continueWatching || [];
-            const existingIdx = history.findIndex(h => h.movieId === movieId);
             const newEntry: ContinueWatchingItem = {
                 movieId,
                 progress: 15,
@@ -1222,10 +1218,11 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 duration: 7200,
                 lastWatchedAt: now
             };
-            let updatedHistory = [...history];
-            if (existingIdx > -1) updatedHistory[existingIdx] = newEntry;
-            else updatedHistory.unshift(newEntry);
-            updatedHistory = updatedHistory.slice(0, 30);
+            // Always place the most recently watched show at the front (first place)
+            const updatedHistory = [
+                newEntry,
+                ...history.filter(h => h.movieId !== movieId)
+            ].slice(0, 30);
 
             setCurrentUser(prev => prev ? { ...prev, continueWatching: updatedHistory } : null);
 

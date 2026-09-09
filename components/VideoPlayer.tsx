@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Hls from 'hls.js';
-import { Play, Pause, Volume2, Volume1, VolumeX, Maximize, Settings, SkipForward, ArrowLeft, RotateCcw, RotateCw, Subtitles, Layers, BarChart2, Minimize, Headphones, Check, MessageSquare, Wifi, WifiOff, X, ExternalLink, Scan, Scaling, AlertCircle, RefreshCw, Zap, Sliders, Sparkles, ShieldCheck, ChevronDown } from 'lucide-react';
+import { Play, Pause, Volume2, Volume1, VolumeX, Maximize, Settings, SkipForward, ArrowLeft, RotateCcw, RotateCw, Subtitles, Layers, BarChart2, Minimize, Headphones, Check, MessageSquare, Wifi, X, ExternalLink, Scan, Scaling, AlertCircle, RefreshCw, Zap, Sliders, Sparkles, ShieldCheck, ChevronDown } from 'lucide-react';
 import { Content, Season, Episode } from '../types';
 import StatsPanel from './StatsPanel';
 import DrivePlayer from './DrivePlayer';
@@ -11,7 +11,6 @@ import { MoviVideo } from './MoviVideo';
 import { buildEmbedUrl, parseEmbedContentType } from '../utils/embedUrl';
 import { soundBooster } from '../player/SoundBooster';
 import { useAdShield } from '../utils/useAdShield';
-import { useNetworkSpeed } from '../utils/useNetworkSpeed';
 import { fetchTMDBDetails, fetchTMDBSeason } from '../services/tmdbService';
 
 interface VideoPlayerProps {
@@ -120,18 +119,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         setInitialLoad(false);
     }, []);
 
-    // Network Speed & Slow Internet Detection
-    const {
-        isSlow: isNetworkSlow,
-        hasSlowSpeed,
-        speedDetails,
-        isDismissed: isSlowNetDismissed,
-        dismiss: dismissSlowNetworkWarning,
-        reopen: reopenSlowNetworkWarning,
-    } = useNetworkSpeed({
-        isBufferingOrLoading: isMovieLoading || isBuffering,
-        bufferingStallThresholdMs: 7000,
-    });
 
     // Season & Episode State (TV Shows)
     const [currentSeasonIdx, setCurrentSeasonIdx] = useState(0);
@@ -731,105 +718,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const progressRef = useRef(initialProgress);
     const playerContainerRef = useRef<HTMLDivElement>(null);
-    const isHoveringHeaderRef = useRef(false);
-
-    // Floating Header Pill - Permanently visible in any activity & draggable to any location
-    const [pillPosition, setPillPosition] = useState<{ x: number; y: number } | null>(null);
-    const pillRef = useRef<HTMLDivElement>(null);
-    const dragDataRef = useRef<{
-        isDragging: boolean;
-        startX: number;
-        startY: number;
-        initialLeft: number;
-        initialTop: number;
-        hasMoved: boolean;
-    }>({
-        isDragging: false,
-        startX: 0,
-        startY: 0,
-        initialLeft: 0,
-        initialTop: 0,
-        hasMoved: false,
-    });
-
-    const handlePillPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-        // Never start drag or capture pointer when interacting with any button inside the pill
-        if ((e.target as HTMLElement).closest('button')) return;
-        if (e.button !== 0 && e.pointerType === 'mouse') return;
-        const pill = pillRef.current;
-        if (!pill) return;
-
-        const rect = pill.getBoundingClientRect();
-        dragDataRef.current = {
-            isDragging: true,
-            startX: e.clientX,
-            startY: e.clientY,
-            initialLeft: rect.left,
-            initialTop: rect.top,
-            hasMoved: false,
-        };
-
-        try {
-            pill.setPointerCapture(e.pointerId);
-        } catch (_) { }
-    };
-
-    const handlePillPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-        if (!dragDataRef.current.isDragging) return;
-
-        const deltaX = e.clientX - dragDataRef.current.startX;
-        const deltaY = e.clientY - dragDataRef.current.startY;
-
-        if (!dragDataRef.current.hasMoved && Math.hypot(deltaX, deltaY) > 5) {
-            dragDataRef.current.hasMoved = true;
-        }
-
-        if (dragDataRef.current.hasMoved) {
-            const pill = pillRef.current;
-            const width = pill ? pill.offsetWidth : 240;
-            const height = pill ? pill.offsetHeight : 50;
-
-            const nextX = dragDataRef.current.initialLeft + deltaX;
-            const nextY = dragDataRef.current.initialTop + deltaY;
-
-            const clampedX = Math.max(8, Math.min(window.innerWidth - width - 8, nextX));
-            const clampedY = Math.max(8, Math.min(window.innerHeight - height - 8, nextY));
-
-            setPillPosition({ x: clampedX, y: clampedY });
-        }
-    };
-
-    const handlePillPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-        if (!dragDataRef.current.isDragging) return;
-        dragDataRef.current.isDragging = false;
-        setTimeout(() => {
-            dragDataRef.current.hasMoved = false;
-        }, 50);
-
-        const pill = pillRef.current;
-        if (pill) {
-            try {
-                pill.releasePointerCapture(e.pointerId);
-            } catch (_) { }
-        }
-    };
 
 
-    // Auto-clamp floating pill if window resizes
-    useEffect(() => {
-        const handleResize = () => {
-            if (!pillPosition || !pillRef.current) return;
-            const width = pillRef.current.offsetWidth || 240;
-            const height = pillRef.current.offsetHeight || 50;
-            const clampedX = Math.max(8, Math.min(window.innerWidth - width - 8, pillPosition.x));
-            const clampedY = Math.max(8, Math.min(window.innerHeight - height - 8, pillPosition.y));
-            if (clampedX !== pillPosition.x || clampedY !== pillPosition.y) {
-                setPillPosition({ x: clampedX, y: clampedY });
-            }
-        };
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, [pillPosition]);
 
     // Dynamic Audio Options
     const [audioTracks, setDynamicAudioTracks] = useState<any[]>([]);
@@ -1431,18 +1321,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     // Controls & Movie Card Visibility Timer (Hides after 3 seconds of inactivity)
     const resetInactivityTimer = useCallback(() => {
-        if (isHoveringHeaderRef.current) return;
         setShowControls(true);
         if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
         controlsTimeoutRef.current = setTimeout(() => {
-            if (!isHoveringHeaderRef.current && !showStats && !showAudioSubMenu && !showQualityMenu && !showEpisodesMenu) {
+            if (!showStats && !showAudioSubMenu && !showQualityMenu && !showEpisodesMenu) {
                 setShowControls(false);
-                // When controls hide, restore window focus so subsequent clicks into iframe fire blur
-                try {
-                    if (document.activeElement?.tagName === 'IFRAME') {
-                        window.focus();
-                    }
-                } catch (_) { }
             }
         }, 3000);
     }, [showStats, showAudioSubMenu, showQualityMenu, showEpisodesMenu]);
@@ -1452,17 +1335,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             if (document.activeElement?.tagName === 'IFRAME') {
                 finishLoading();
             }
-            if (!isHoveringHeaderRef.current) {
-                resetInactivityTimer();
-            }
+            resetInactivityTimer();
         };
 
-        const events = ['mousemove', 'pointermove', 'mousedown', 'pointerdown', 'touchstart', 'touchmove', 'wheel', 'scroll', 'keydown', 'click'];
+        const events = ['mousemove', 'pointermove', 'mousedown', 'pointerdown', 'touchstart', 'touchmove', 'wheel', 'scroll', 'keydown'];
         events.forEach(evt => {
             window.addEventListener(evt, handleUserActivity, { capture: true, passive: true });
         });
-        window.addEventListener('focus', handleUserActivity);
-        window.addEventListener('blur', handleUserActivity);
 
         // Initial 3-second timer on mount
         resetInactivityTimer();
@@ -1471,11 +1350,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             events.forEach(evt => {
                 window.removeEventListener(evt, handleUserActivity, { capture: true } as any);
             });
-            window.removeEventListener('focus', handleUserActivity);
-            window.removeEventListener('blur', handleUserActivity);
             if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
         };
     }, [resetInactivityTimer]);
+
+    // When menus (episodes, quality, audio, stats) close, automatically begin 3s inactivity hide countdown
+    useEffect(() => {
+        if (!showEpisodesMenu && !showQualityMenu && !showAudioSubMenu && !showStats) {
+            resetInactivityTimer();
+        }
+    }, [showEpisodesMenu, showQualityMenu, showAudioSubMenu, showStats, resetInactivityTimer]);
 
     // Keyboard Shortcuts
     useEffect(() => {
@@ -1647,7 +1531,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const startHideTimer = useCallback(() => {
         if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
         controlsTimeoutRef.current = setTimeout(() => {
-            if (!isHoveringHeaderRef.current && !showStats && !showAudioSubMenu && !showQualityMenu && !showEpisodesMenu) {
+            if (!showStats && !showAudioSubMenu && !showQualityMenu && !showEpisodesMenu) {
                 setShowControls(false);
             }
         }, 3000);
@@ -2079,109 +1963,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                         </div>
                     )}
 
-                    {/* Slow Internet Speed Suggestion Card */}
-                    {isNetworkSlow && (
-                        <div
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => e.stopPropagation()}
-                            className="absolute top-16 md:top-20 right-3 sm:right-6 left-3 sm:left-auto sm:w-96 z-[220] bg-zinc-950/95 backdrop-blur-2xl border border-amber-500/40 rounded-2xl p-4 shadow-2xl text-left text-white ring-1 ring-amber-500/20 animate-in fade-in slide-in-from-top-3 duration-300 pointer-events-auto"
-                        >
-                            <div className="flex items-start justify-between gap-2.5">
-                                <div className="flex items-center gap-2.5">
-                                    <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
-                                        <WifiOff size={18} />
-                                    </div>
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            <h4 className="font-bold text-xs md:text-sm text-white">
-                                                Slow Internet Detected
-                                            </h4>
-                                            {speedDetails.effectiveType && (
-                                                <span className="text-[9px] uppercase font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded">
-                                                    {speedDetails.effectiveType}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <p className="text-[11px] text-gray-300 mt-0.5 leading-snug">
-                                            {speedDetails.downlink !== undefined
-                                                ? `Estimated speed: ~${speedDetails.downlink} Mbps. Video may buffer.`
-                                                : 'Connection is slow or taking longer to load stream.'}
-                                        </p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={dismissSlowNetworkWarning}
-                                    className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition shrink-0 cursor-pointer"
-                                    title="Dismiss"
-                                    aria-label="Dismiss slow internet suggestion"
-                                >
-                                    <X size={16} />
-                                </button>
-                            </div>
 
-                            {/* Helpful Suggestions */}
-                            <div className="mt-3 pt-2.5 border-t border-white/10 space-y-2 text-[11px] text-gray-300">
-                                <div className="flex items-start gap-2">
-                                    <Zap size={13} className="text-amber-400 shrink-0 mt-0.5" />
-                                    <span><strong>Lower video quality</strong> to 480p or 720p to stop buffering.</span>
-                                </div>
-                                <div className="flex items-start gap-2">
-                                    <Pause size={13} className="text-blue-400 shrink-0 mt-0.5" />
-                                    <span><strong>Pause for 15-20 seconds</strong> to allow video stream to buffer ahead.</span>
-                                </div>
-                                <div className="flex items-start gap-2">
-                                    <Wifi size={13} className="text-emerald-400 shrink-0 mt-0.5" />
-                                    <span><strong>Switch to 5GHz Wi-Fi</strong> or pause background downloads.</span>
-                                </div>
-                            </div>
-
-                            {/* Quick Action Row */}
-                            <div className="mt-3.5 flex items-center justify-between gap-2 pt-2.5 border-t border-white/10">
-                                {qualities.length > 0 ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const lowerQ = qualities.find(q => q.includes('480') || q.includes('720') || q.includes('360')) || 'auto';
-                                            handleQualityChange(lowerQ);
-                                            showOsd(`Quality switched to ${lowerQ.toUpperCase()}`, 'Optimized for slow connection', 'zap');
-                                            dismissSlowNetworkWarning();
-                                        }}
-                                        className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition active:scale-95 shadow-md shadow-amber-500/20 flex items-center gap-1.5 cursor-pointer"
-                                    >
-                                        <Zap size={13} />
-                                        <span>Lower to 480p / 720p</span>
-                                    </button>
-                                ) : (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setShowQualityMenu(true);
-                                            dismissSlowNetworkWarning();
-                                        }}
-                                        className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition active:scale-95 shadow-md shadow-amber-500/20 flex items-center gap-1.5 cursor-pointer"
-                                    >
-                                        <Settings size={13} />
-                                        <span>Quality Settings</span>
-                                    </button>
-                                )}
-                                <button
-                                    type="button"
-                                    onClick={dismissSlowNetworkWarning}
-                                    className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-gray-300 hover:text-white font-semibold text-xs transition cursor-pointer"
-                                >
-                                    Got it
-                                </button>
-                            </div>
-                        </div>
-                    )}
                 </>
             )}
 
             {/* Screen Activity Detector: Detects mouse movement and touch across the screen when controls are hidden, while leaving bottom player controls 100% uncovered & interactive */}
+            {/* Screen Activity Detector: Detects mouse movement and touch across the screen when controls are hidden */}
             {!showControls && (
                 <div
                     id="vp-activity-detector"
-                    className={`fixed top-0 left-0 right-0 ${isMobile && isPortrait ? 'bottom-1/2' : 'bottom-20 md:bottom-24'} z-[90] bg-transparent select-none cursor-auto`}
+                    className={`fixed top-0 left-0 right-0 ${isMobile && isPortrait ? 'bottom-1/2' : 'bottom-16 md:bottom-20'} z-[90] bg-transparent select-none cursor-auto`}
                     onPointerMove={resetInactivityTimer}
                     onMouseMove={resetInactivityTimer}
                     onMouseEnter={resetInactivityTimer}
@@ -2190,40 +1981,26 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 />
             )}
 
-            {/* Floating Navigation Pill Header (Permanently visible in any activity & any location) */}
+            {/* Corner Activity Detector for Bottom-Right Fullscreen button */}
+            {!showControls && !isPortrait && (isDirectIframeEmbed || isDriveVideo) && (
+                <div
+                    className="fixed bottom-0 right-0 w-16 h-16 z-[95] bg-transparent cursor-pointer"
+                    onPointerMove={resetInactivityTimer}
+                    onMouseMove={resetInactivityTimer}
+                    onMouseEnter={resetInactivityTimer}
+                />
+            )}
+
+            {/* Navigation Pill Header - Fixed in top-left corner */}
             <div
-                ref={pillRef}
-                style={
-                    pillPosition
-                        ? { left: `${pillPosition.x}px`, top: `${pillPosition.y}px`, transform: 'none' }
-                        : undefined
-                }
-                onPointerDown={handlePillPointerDown}
-                onPointerMove={handlePillPointerMove}
-                onPointerUp={handlePillPointerUp}
-                onPointerCancel={handlePillPointerUp}
-                onDoubleClick={() => setPillPosition(null)}
-                onMouseEnter={() => {
-                    isHoveringHeaderRef.current = true;
-                    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-                    setShowControls(true);
-                }}
-                onMouseLeave={() => {
-                    isHoveringHeaderRef.current = false;
-                    resetInactivityTimer();
-                }}
-                className={`fixed z-[300] select-none touch-none cursor-grab active:cursor-grabbing transition-opacity duration-300 ${showControls
-                    ? 'opacity-50 hover:opacity-100 pointer-events-auto'
+                onPointerMove={resetInactivityTimer}
+                onMouseMove={resetInactivityTimer}
+                className={`fixed z-[300] top-2.5 left-2.5 md:top-4 md:left-4 select-none transition-opacity duration-300 ${showControls
+                    ? 'opacity-100 pointer-events-auto'
                     : 'opacity-0 pointer-events-none'
-                    } ${pillPosition
-                        ? ''
-                        : isMobile && isPortrait
-                            ? 'top-3 left-3'
-                            : 'top-1/2 left-2 md:left-6 -translate-y-1/2'
                     }`}
-                title="Drag to reposition anywhere, double-click to reset"
             >
-                <div className="bg-black/60 backdrop-blur-xl border border-white/20 inline-flex items-center gap-2 md:gap-3 px-2 py-2 md:px-3 md:py-2.5 rounded-2xl pointer-events-auto hover:bg-black/85 transition-all shadow-2xl ring-1 ring-white/10 group/header">
+                <div className="bg-black/95 backdrop-blur-2xl border border-white/20 inline-flex items-center gap-2 md:gap-3 px-2 py-2 md:px-3 md:py-2.5 rounded-2xl pointer-events-auto hover:bg-black transition-all shadow-2xl ring-1 ring-white/10 group/header min-w-[200px] md:min-w-[260px]">
                     <button
                         onPointerDown={(e) => e.stopPropagation()}
                         onClick={(e) => {
@@ -2245,7 +2022,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                         }}
                         className="text-left px-1.5 md:px-2.5 group/title cursor-pointer select-none"
                     >
-                        <div className="text-white font-semibold text-[11px] md:text-xs leading-tight tracking-tight line-clamp-1 max-w-[100px] md:max-w-[150px] group-hover/title:text-brand-red transition-colors">
+                        <div className="text-white font-semibold text-[11px] md:text-xs leading-tight tracking-tight line-clamp-1 max-w-[120px] md:max-w-[200px] group-hover/title:text-brand-red transition-colors">
                             {content.title}
                         </div>
                         {isTV && currentEpisode && (
@@ -2287,38 +2064,39 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                             </div>
                         </>
                     )}
-                    <div className="h-6 w-px bg-white/20 shrink-0 pointer-events-none"></div>
-                    <button
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            toggleFullscreen();
-                        }}
-                        className="text-white hover:text-brand-red transition-all p-2 rounded-xl bg-white/10 hover:bg-white/20 active:scale-90 flex items-center justify-center cursor-pointer shrink-0"
-                        title={isFullscreen ? "Exit Fullscreen (Esc)" : "Full Screen (F)"}
-                        aria-label="Toggle Fullscreen"
-                    >
-                        {isFullscreen ? <Minimize size={18} className="md:w-5 md:h-5" /> : <Maximize size={18} className="md:w-5 md:h-5" />}
-                    </button>
-                    {hasSlowSpeed && isSlowNetDismissed && (
-                        <>
-                            <div className="h-6 w-px bg-white/20 shrink-0 pointer-events-none"></div>
-                            <button
-                                onPointerDown={(e) => e.stopPropagation()}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    reopenSlowNetworkWarning();
-                                }}
-                                className="px-2 py-1 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300 text-[10px] font-bold transition flex items-center gap-1 active:scale-95 cursor-pointer shrink-0"
-                                title="Slow internet detected - Click for suggestions"
-                            >
-                                <WifiOff size={13} className="text-amber-400" />
-                                <span className="hidden sm:inline">Slow Net</span>
-                            </button>
-                        </>
-                    )}
+
                 </div>
             </div>
+
+            {/* Right Down Corner Fullscreen Button (in exact corner, in place of player fullscreen button) */}
+            {!isPortrait && (isDirectIframeEmbed || isDriveVideo) && (
+                <div
+                    onPointerMove={resetInactivityTimer}
+                    onMouseMove={resetInactivityTimer}
+                    className={`fixed z-[300] bottom-0 right-0 select-none transition-opacity duration-300 ${showControls
+                        ? 'opacity-100 pointer-events-auto'
+                        : 'opacity-0 pointer-events-none'
+                        }`}
+                >
+                    <div className="bg-black/90 hover:bg-black backdrop-blur-xl border-t border-l border-white/20 rounded-tl-xl p-1 md:p-1.5 shadow-2xl pointer-events-auto transition-all">
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                toggleFullscreen();
+                            }}
+                            className="text-white hover:text-brand-red transition-all p-1.5 md:p-2 rounded-lg bg-white/10 hover:bg-white/20 active:scale-90 flex items-center justify-center cursor-pointer"
+                            title={isFullscreen ? "Exit Fullscreen (Esc)" : "Full Screen (F)"}
+                            aria-label="Toggle Fullscreen"
+                        >
+                            {isFullscreen ? (
+                                <Minimize size={18} className="md:w-5 md:h-5" />
+                            ) : (
+                                <Maximize size={18} className="md:w-5 md:h-5" />
+                            )}
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Gesture Layer (Mobile Landscape Only) */}
             {
@@ -2892,11 +2670,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                         <button
                                             key={s.id || `season_${s.seasonNumber}`}
                                             onClick={() => handleSelectSeason(idx)}
-                                            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
-                                                isSelected
-                                                    ? 'bg-brand-red text-white shadow-md shadow-brand-red/30 scale-[1.02]'
-                                                    : 'bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white'
-                                            }`}
+                                            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${isSelected
+                                                ? 'bg-brand-red text-white shadow-md shadow-brand-red/30 scale-[1.02]'
+                                                : 'bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white'
+                                                }`}
                                         >
                                             <span>{s.title || `Season ${s.seasonNumber}`}</span>
                                             {s.episodes && s.episodes.length > 0 && (
@@ -2918,11 +2695,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                     <button
                                         key={ep.id || `ep_${ep.episodeNumber}`}
                                         onClick={() => handleSelectEpisode(currentSeasonIdx, idx)}
-                                        className={`w-full text-left p-3.5 sm:p-4 rounded-2xl flex items-center gap-3.5 sm:gap-4 transition-all duration-200 group cursor-pointer border ${
-                                            isCurrent
-                                                ? 'bg-brand-red/15 border-brand-red/50 shadow-lg shadow-brand-red/10 ring-1 ring-brand-red/30'
-                                                : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.06] hover:border-white/15'
-                                        }`}
+                                        className={`w-full text-left p-3.5 sm:p-4 rounded-2xl flex items-center gap-3.5 sm:gap-4 transition-all duration-200 group cursor-pointer border ${isCurrent
+                                            ? 'bg-brand-red/15 border-brand-red/50 shadow-lg shadow-brand-red/10 ring-1 ring-brand-red/30'
+                                            : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.06] hover:border-white/15'
+                                            }`}
                                     >
                                         {/* Episode Thumbnail or Number Box */}
                                         {ep.stillUrl ? (
@@ -2938,9 +2714,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex flex-col items-center justify-center font-black shrink-0 transition-colors ${
-                                                isCurrent ? 'bg-brand-red text-white' : 'bg-white/5 text-gray-300 group-hover:bg-white/10 group-hover:text-white'
-                                            }`}>
+                                            <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex flex-col items-center justify-center font-black shrink-0 transition-colors ${isCurrent ? 'bg-brand-red text-white' : 'bg-white/5 text-gray-300 group-hover:bg-white/10 group-hover:text-white'
+                                                }`}>
                                                 <span className="text-[9px] uppercase tracking-wider opacity-60 font-semibold">EP</span>
                                                 <span className="text-base sm:text-lg leading-none">{ep.episodeNumber}</span>
                                             </div>

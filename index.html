@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <!-- ZERO-NEW-TAB & ANTI-MALICIOUS REDIRECT SECURITY ENGINE -->
-  <meta http-equiv="Content-Security-Policy" content="base-uri 'self'; form-action 'self';" />
+  <meta http-equiv="Content-Security-Policy" content="base-uri 'self'; form-action 'self' https://accounts.google.com https://*.firebaseapp.com https://appleid.apple.com https://*.razorpay.com https://*.google.com;" />
   <script>
     (function() {
       // Helper to show modern in-app security notice
@@ -26,12 +26,13 @@
         } catch (e) {}
       }
 
-      // Safe Destination Checker
+      // Safe Destination Checker: Identifies trusted internal and external domains (Auth, CDN, Payments)
       var isSafeDestination = function(href) {
         if (!href) return true;
         var trimmed = String(href).trim().toLowerCase();
-        // Allow internal router, hashes, relative paths, javascript:; or blob/data URIs
-        if (trimmed.startsWith('/') || trimmed.startsWith('#') || trimmed.startsWith('./') || trimmed.startsWith('../') || trimmed === '' || trimmed === 'javascript:void(0)' || trimmed === 'javascript:;') return true;
+        // Allow internal router, hashes, relative paths, javascript:; or blob/data/blank URIs
+        if (trimmed === '' || trimmed === 'about:blank' || trimmed === 'javascript:void(0)' || trimmed === 'javascript:;') return true;
+        if (trimmed.startsWith('/') || trimmed.startsWith('#') || trimmed.startsWith('./') || trimmed.startsWith('../')) return true;
         if (trimmed.startsWith('blob:') || trimmed.startsWith('data:')) return true;
         
         try {
@@ -43,15 +44,44 @@
           if (u.hostname.includes('drive.google.com') && (u.search.includes('export=download') || u.pathname.includes('/uc'))) {
             return true;
           }
+
+          // Safe authentication, payments, and platform providers (Google, Firebase, Apple, Razorpay)
+          var safeHostPatterns = [
+            'accounts.google.com',
+            'accounts.youtube.com',
+            'firebaseapp.com',
+            'googleapis.com',
+            'google.com',
+            'appleid.apple.com',
+            'apple.com',
+            'razorpay.com',
+            'api.razorpay.com',
+            'checkout.razorpay.com'
+          ];
+          for (var i = 0; i < safeHostPatterns.length; i++) {
+            var pat = safeHostPatterns[i];
+            if (u.hostname === pat || u.hostname.endsWith('.' + pat)) {
+              return true;
+            }
+          }
         } catch (e) {
           return false;
         }
         return false;
       };
+      window.isSafeDestination = isSafeDestination;
 
-      // 1. Strict Window.open & showModalDialog Lockdown: Never open new tabs/windows
+      // 1. Safe Window.open Interceptor: Allow authentication & trusted popups, block rogue ad popups
+      var origOpen = window.open;
       var blockOpen = function(url, target, features) {
-        console.warn('[AdShield] Blocked window.open attempt to open another tab:', url);
+        // Firebase Auth opens a blank popup synchronously with window.open("", target, features)
+        // or window.open("about:blank", ...), or directly navigates to trusted OAuth endpoints.
+        if (!url || url === 'about:blank' || isSafeDestination(url)) {
+          if (typeof origOpen === 'function') {
+            return origOpen.apply(window, arguments);
+          }
+        }
+        console.warn('[AdShield] Blocked untrusted window.open attempt:', url);
         if (url && !isSafeDestination(url)) {
           showSecurityToast(url);
         }
@@ -59,34 +89,21 @@
       };
       try {
         window.open = blockOpen;
-        Object.defineProperty(window, 'open', {
-          value: blockOpen,
-          writable: false,
-          configurable: false
-        });
       } catch (e) {}
       try { window.showModalDialog = function() { return null; }; } catch (e) {}
 
-      // 2. Lock target="_blank" permanently to _self
-      try {
-        var origSetAttribute = Element.prototype.setAttribute;
-        Element.prototype.setAttribute = function(name, value) {
-          if (typeof name === 'string' && name.toLowerCase() === 'target') {
-            return origSetAttribute.call(this, name, '_self');
-          }
-          return origSetAttribute.apply(this, arguments);
-        };
-      } catch (e) {}
-
+      // 2. Lock untrusted links to _self without breaking popup targeting in forms or trusted links
       try {
         Object.defineProperty(HTMLAnchorElement.prototype, 'target', {
           get: function() { return this.getAttribute('target') || '_self'; },
-          set: function(val) { this.setAttribute('target', '_self'); },
-          configurable: true
-        });
-        Object.defineProperty(HTMLFormElement.prototype, 'target', {
-          get: function() { return this.getAttribute('target') || '_self'; },
-          set: function(val) { this.setAttribute('target', '_self'); },
+          set: function(val) {
+            var href = this.getAttribute('href') || this.href || '';
+            if (href && !isSafeDestination(href)) {
+              this.setAttribute('target', '_self');
+            } else {
+              this.setAttribute('target', val);
+            }
+          },
           configurable: true
         });
       } catch (e) {}
@@ -129,11 +146,10 @@
         while (el && el !== document.documentElement) {
           if (el.tagName === 'A') {
             var href = el.getAttribute('href') || el.href || '';
-            el.setAttribute('target', '_self');
-            el.target = '_self';
-
             // If destination is external / untrusted
             if (!isSafeDestination(href)) {
+              el.setAttribute('target', '_self');
+              el.target = '_self';
               console.warn('[AdShield] Blocked click navigation to external website:', href);
               e.preventDefault();
               e.stopPropagation();
@@ -168,9 +184,6 @@
         var origAnchorClick = HTMLAnchorElement.prototype.click;
         HTMLAnchorElement.prototype.click = function() {
           var href = this.getAttribute('href') || this.href || '';
-          this.setAttribute('target', '_self');
-          this.target = '_self';
-
           if (!isSafeDestination(href)) {
             console.warn('[AdShield] Blocked programmatic external redirect to:', href);
             showSecurityToast(href);
@@ -207,13 +220,6 @@
           }
         }
       }, true);
-
-      // 8. Focus Recovery: Popunder defense
-      window.addEventListener('blur', function() {
-        setTimeout(function() {
-          try { window.focus(); } catch (e) {}
-        }, 80);
-      });
     })();
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />

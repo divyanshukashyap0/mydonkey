@@ -549,42 +549,71 @@ const MainLayout = () => {
         };
     }, [content]);
 
-    // Continue Watching Items (User Watch History)
+    // Continue Watching Items (User Watch History - sorted so last watched show is always in first place)
     const continueWatchingItems = useMemo(() => {
-        const historyList = currentUser?.continueWatching || [];
-        let items: (Content & { progress?: number })[] = [];
+        const historyMap = new Map<string, { movieId: string; progress: number; lastWatchedAt: number; stoppedAt?: number; duration?: number }>();
 
-        if (historyList.length > 0) {
-            items = historyList.map(h => {
-                const c = content.find(x => x.id === h.movieId || (x.imdbId && x.imdbId === h.movieId));
-                return c ? { ...c, progress: h.progress || 15 } : null;
-            }).filter(Boolean) as (Content & { progress?: number })[];
+        // 1. Ingest currentUser continueWatching from Firestore / state
+        if (currentUser?.continueWatching && Array.isArray(currentUser.continueWatching)) {
+            currentUser.continueWatching.forEach(h => {
+                if (!h || !h.movieId) return;
+                const timestamp = h.lastWatchedAt ? new Date(h.lastWatchedAt).getTime() : 0;
+                historyMap.set(h.movieId, {
+                    movieId: h.movieId,
+                    progress: h.progress || 15,
+                    lastWatchedAt: timestamp,
+                    stoppedAt: h.stoppedAt,
+                    duration: h.duration
+                });
+            });
         }
 
-        // Supplement from local storage
+        // 2. Supplement and merge with local storage (taking the most recent progress & timestamp)
         try {
             const raw = localStorage.getItem('my_donkey_watch_history');
             if (raw) {
                 const localList = JSON.parse(raw);
-                localList.forEach((lh: any) => {
-                    if (!items.some(it => it.id === lh.movieId || it.imdbId === lh.movieId)) {
-                        const c = content.find(x => x.id === lh.movieId || (x.imdbId && x.imdbId === lh.movieId));
-                        if (c) {
-                            items.push({ ...c, progress: lh.progress || 15 });
+                if (Array.isArray(localList)) {
+                    localList.forEach((lh: any) => {
+                        if (!lh || !lh.movieId) return;
+                        const localTimestamp = lh.lastWatchedAt ? new Date(lh.lastWatchedAt).getTime() : 0;
+                        const existing = historyMap.get(lh.movieId);
+                        if (!existing || localTimestamp >= existing.lastWatchedAt) {
+                            historyMap.set(lh.movieId, {
+                                movieId: lh.movieId,
+                                progress: lh.progress || 15,
+                                lastWatchedAt: Math.max(localTimestamp, existing?.lastWatchedAt || 0),
+                                stoppedAt: lh.stoppedAt ?? existing?.stoppedAt,
+                                duration: lh.duration ?? existing?.duration
+                            });
                         }
-                    }
-                });
+                    });
+                }
             }
         } catch (e) { }
+
+        // 3. Sort entries strictly by lastWatchedAt DESCENDING (most recently watched first)
+        const sortedHistory = Array.from(historyMap.values()).sort((a, b) => b.lastWatchedAt - a.lastWatchedAt);
+
+        // 4. Map to Content objects preserving exact descending order
+        const items: (Content & { progress?: number })[] = [];
+        for (const h of sortedHistory) {
+            const c = content.find(x => x.id === h.movieId || (x.imdbId && x.imdbId === h.movieId));
+            if (c && !items.some(it => it.id === c.id)) {
+                items.push({ ...c, progress: h.progress || 15 });
+            }
+        }
 
         return items;
     }, [currentUser?.continueWatching, content]);
 
-    // Combined Watch History (Firestore + LocalStorage fallback)
+    // Combined Watch History (Firestore + LocalStorage fallback, sorted newest first)
     const combinedWatchHistory = useMemo(() => {
-        const list: (ContinueWatchingItem | { movieId: string; progress?: number; lastWatchedAt?: string })[] = [];
-        if (currentUser?.continueWatching) {
-            list.push(...currentUser.continueWatching);
+        const historyMap = new Map<string, ContinueWatchingItem | { movieId: string; progress?: number; lastWatchedAt?: string }>();
+        if (currentUser?.continueWatching && Array.isArray(currentUser.continueWatching)) {
+            currentUser.continueWatching.forEach(item => {
+                if (item?.movieId) historyMap.set(item.movieId, item);
+            });
         }
         try {
             const raw = localStorage.getItem('my_donkey_watch_history');
@@ -592,14 +621,24 @@ const MainLayout = () => {
                 const localList = JSON.parse(raw);
                 if (Array.isArray(localList)) {
                     localList.forEach((lh: any) => {
-                        if (!list.some(it => it.movieId === lh.movieId)) {
-                            list.push(lh);
+                        if (lh?.movieId) {
+                            const existing = historyMap.get(lh.movieId);
+                            const localTime = lh.lastWatchedAt ? new Date(lh.lastWatchedAt).getTime() : 0;
+                            const existingTime = existing?.lastWatchedAt ? new Date(existing.lastWatchedAt).getTime() : 0;
+                            if (!existing || localTime >= existingTime) {
+                                historyMap.set(lh.movieId, lh);
+                            }
                         }
                     });
                 }
             }
         } catch (e) { }
-        return list;
+
+        return Array.from(historyMap.values()).sort((a, b) => {
+            const timeA = a.lastWatchedAt ? new Date(a.lastWatchedAt).getTime() : 0;
+            const timeB = b.lastWatchedAt ? new Date(b.lastWatchedAt).getTime() : 0;
+            return timeB - timeA;
+        });
     }, [currentUser?.continueWatching]);
 
     // Resolved User Favorite Genres (Profile -> Account -> LocalStorage)
@@ -1290,7 +1329,7 @@ const MainLayout = () => {
             const effectiveHeroItems = heroCandidates.slice(0, 10);
             const fallbackHero = effectiveHeroItems[0] || null;
 
-            const homeContinueWatching = continueWatchingItems.filter(isIndianOrMarvelContent);
+            const homeContinueWatching = continueWatchingItems;
             const homeUserAdded = userAddedContent.filter(isIndianOrMarvelContent);
 
             return (

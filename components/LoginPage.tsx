@@ -184,7 +184,9 @@ const LoginPage = () => {
                                     navigate(redirect, { replace: true });
                                 } catch (err: any) {
                                     console.error("Google Sign-In Error:", err);
-                                    setError(err.message || 'Google Sign-In failed');
+                                    if (err.code !== 'auth/popup-closed-by-user') {
+                                        setError(err.message || 'Google Sign-In failed');
+                                    }
                                 } finally {
                                     setIsGoogleLoading(false);
                                 }

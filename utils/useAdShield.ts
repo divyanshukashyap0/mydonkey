@@ -70,11 +70,19 @@ export function useAdShield(options: UseAdShieldOptions = {}) {
     useEffect(() => {
         if (!isActive || !isEnabled || typeof window === 'undefined') return;
 
-        // Override window.open to trap any popup calls escaping to the parent frame
+        // Override window.open to trap rogue ad popup calls escaping to the parent frame
+        const originalOpen = window.open;
         try {
             window.open = function (...args: any[]) {
-                const targetUrl = args[0] || 'blank';
-                console.info('[AdShield] Blocked popup attempt:', targetUrl);
+                const targetUrl = args[0] || '';
+                // Allow empty/about:blank popups (used by auth SDKs) or safe whitelist destinations
+                const isSafe = (window as any).isSafeDestination;
+                if (!targetUrl || targetUrl === 'about:blank' || (typeof isSafe === 'function' && isSafe(targetUrl))) {
+                    if (typeof originalOpen === 'function') {
+                        return originalOpen.apply(window, args as any);
+                    }
+                }
+                console.info('[AdShield] Blocked popup attempt:', targetUrl || 'blank');
                 setBlockedCount(prev => prev + 1);
                 return null;
             };
@@ -105,6 +113,9 @@ export function useAdShield(options: UseAdShieldOptions = {}) {
         window.addEventListener('blur', handleWindowBlur);
 
         return () => {
+            try {
+                window.open = originalOpen;
+            } catch {}
             window.removeEventListener('message', handleWindowMessage);
             window.removeEventListener('blur', handleWindowBlur);
         };
