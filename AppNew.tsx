@@ -159,6 +159,30 @@ const MainLayout = () => {
         };
     }, [!!playingContent, location.pathname]);
 
+    // Keep document title synced with active content or current page
+    useEffect(() => {
+        const isBrowseRoute = location.pathname.startsWith('/browse/');
+        const isWatchRoute = location.pathname.startsWith('/watch/');
+
+        if (isBrowseRoute && viewingContent?.title) {
+            document.title = `${viewingContent.title} | My Donkey`;
+        } else if (isWatchRoute && playingContent?.title) {
+            document.title = `${playingContent.title} | My Donkey`;
+        } else if (!isBrowseRoute && !isWatchRoute) {
+            const tabTitles: Record<string, string> = {
+                home: 'My Donkey | Watch Free Movies, TV Shows, Anime & Marvel Movies Online in HD',
+                movies: 'Movies — Stream HD & 4K Movies | My Donkey',
+                tv: 'TV Shows & Web Series | My Donkey',
+                anime: 'Anime — Watch Trending & Classic Anime | My Donkey',
+                exclusive: 'Exclusive Content | My Donkey',
+                categories: 'Browse All Movies & TV Series Categories | My Donkey',
+                mylist: 'My List | My Donkey',
+                search: 'Search Movies & Shows | My Donkey',
+            };
+            document.title = tabTitles[activeTab] || 'My Donkey | Watch Free Movies, TV Shows, Anime & Marvel Movies Online in HD';
+        }
+    }, [viewingContent?.title, playingContent?.title, location.pathname, activeTab]);
+
     // Deep Link Handler (e.g. /browse/content_123 or /watch/content_123)
     useEffect(() => {
         let isCancelled = false;

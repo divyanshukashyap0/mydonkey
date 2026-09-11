@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Play, Plus, X, ThumbsUp, Check, Download, Share2, Search, Music2, Trash2 } from 'lucide-react';
+import { Play, Plus, X, ThumbsUp, Check, Download, Share2, Search, Music2, Trash2, ArrowLeft, Maximize, Minimize } from 'lucide-react';
 import { Content, Season, Episode } from '../types';
 import { useStore } from '../context/StoreContext';
 import ContentRail from './ContentRail';
@@ -38,6 +38,71 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
     const mobileScrollRef = useRef<HTMLDivElement>(null);
     const desktopScrollRef = useRef<HTMLDivElement>(null);
 
+    // Fullscreen state management
+    const [isBrowserFullscreen, setIsBrowserFullscreen] = useState(false);
+
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setIsBrowserFullscreen(!!document.fullscreenElement);
+        };
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }, []);
+
+    const toggleFullscreen = async () => {
+        try {
+            if (!document.fullscreenElement) {
+                if (document.documentElement.requestFullscreen) {
+                    await document.documentElement.requestFullscreen();
+                } else if ((document.documentElement as any).webkitRequestFullscreen) {
+                    await (document.documentElement as any).webkitRequestFullscreen();
+                }
+            } else {
+                if (document.exitFullscreen) {
+                    await document.exitFullscreen();
+                } else if ((document as any).webkitExitFullscreen) {
+                    await (document as any).webkitExitFullscreen();
+                }
+            }
+        } catch (err) {
+            console.warn('Fullscreen toggle failed', err);
+        }
+    };
+
+    const handleClose = () => {
+        if (document.fullscreenElement) {
+            try {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            } catch {}
+        }
+        onClose();
+    };
+
+    // Dynamically update document title to content name when viewing content page
+    useEffect(() => {
+        const prevTitle = document.title;
+        if (content?.title) {
+            document.title = `${content.title} | My Donkey`;
+        }
+        return () => {
+            document.title = prevTitle;
+        };
+    }, [content?.title]);
+
+    // Prevent background scrolling while full-screen content page is open
+    useEffect(() => {
+        const prevOverflow = document.body.style.overflow;
+        const prevDocOverflow = document.documentElement.style.overflow;
+        document.body.style.overflow = 'hidden';
+        document.documentElement.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = prevOverflow;
+            document.documentElement.style.overflow = prevDocOverflow;
+        };
+    }, []);
+
     // Ensure movie card details always start from top smoothly
     useEffect(() => {
         setIsOverviewExpanded(false);
@@ -53,7 +118,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
-                onClose();
+                handleClose();
             }
         };
         window.addEventListener('keydown', handleKeyDown);
@@ -188,10 +253,10 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
     };
 
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center md:p-8 animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[200] w-full h-full bg-[#121212] flex flex-col overflow-hidden animate-in fade-in duration-300">
             {/* Download Options Modal */}
             {downloadOptions && (
-                <div className="absolute inset-0 z-[210] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
+                <div className="absolute inset-0 z-[220] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
                     <div className="bg-[#181818] border border-white/10 p-6 rounded-xl w-full max-w-sm shadow-2xl relative">
                         <button
                             onClick={() => setDownloadOptions(null)}
@@ -221,29 +286,42 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                 </div>
             )}
 
-            {/* Backdrop Overlay (Universal) */}
-            <div
-                className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
-                onClick={onClose}
-            />
-
-            {/* Modal Container */}
-            {/* Added max-w-full and h-full for mobile to ensure full intersection */}
-            <div className="relative w-[95%] md:w-full h-[90vh] md:h-auto md:max-w-5xl md:max-h-[90vh] bg-[#181818] rounded-2xl md:rounded-xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-500 flex flex-col">
-
-
-                {/* Close Button */}
+            {/* Top Navigation Bar: Back, Fullscreen Toggle, & Close */}
+            <div className="absolute top-4 left-4 right-4 md:top-6 md:left-8 md:right-8 z-[70] flex items-center justify-between pointer-events-none">
                 <button
-                    onClick={onClose}
-                    className="absolute top-4 right-4 z-[60] bg-black/40 backdrop-blur-md p-2 rounded-full hover:bg-white/10 transition text-white border border-white/10"
+                    onClick={handleClose}
+                    className="pointer-events-auto flex items-center gap-2 bg-black/60 hover:bg-black/85 backdrop-blur-md px-4 py-2.5 rounded-full text-white font-semibold text-sm transition-all border border-white/15 hover:border-white/35 shadow-2xl active:scale-95 group"
+                    title="Go Back"
                 >
-                    <X size={20} />
+                    <ArrowLeft size={18} className="group-hover:-translate-x-0.5 transition-transform" />
+                    <span>Back</span>
                 </button>
 
+                <div className="pointer-events-auto flex items-center gap-2.5">
+                    <button
+                        onClick={toggleFullscreen}
+                        className="bg-black/60 hover:bg-black/85 backdrop-blur-md p-2.5 rounded-full text-white border border-white/15 hover:border-white/35 shadow-2xl transition active:scale-95"
+                        title={isBrowserFullscreen ? "Exit Fullscreen (F11)" : "Fullscreen (F11)"}
+                    >
+                        {isBrowserFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
+                    </button>
+                    <button
+                        onClick={handleClose}
+                        className="bg-black/60 hover:bg-black/85 backdrop-blur-md p-2.5 rounded-full text-white border border-white/15 hover:border-white/35 shadow-2xl transition active:scale-95"
+                        title="Close"
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
+            </div>
+
+            {/* Full Screen Page Content Container */}
+            <div className="relative w-full h-full bg-[#121212] overflow-hidden flex flex-col">
+
                 {/* --- Mobile: Full Screen Layout (Single Frame) --- */}
-                <div ref={mobileScrollRef} className="md:hidden relative h-full w-full flex flex-col overflow-y-auto no-scrollbar scroll-smooth">
+                <div ref={mobileScrollRef} className="md:hidden relative h-full w-full flex flex-col overflow-y-auto no-scrollbar scroll-smooth bg-[#121212]">
                     {/* Full Height Background Image */}
-                    <div className="absolute inset-0 z-0 h-[50vh]">
+                    <div className="absolute top-0 left-0 right-0 z-0 h-[52vh]">
                         <img
                             src={content.poster_path || content.backdrop_path || '/logo.png'}
                             className={`w-full h-full ${(content.poster_path || content.backdrop_path) ? 'object-cover' : 'object-contain p-12 bg-black/80'}`}
@@ -257,11 +335,11 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                             }}
                         />
                         {/* Stronger Gradient for readability */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#181818] via-[#181818]/80 to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-[#121212]/80 to-transparent" />
                     </div>
 
                     {/* Content Overlay - Anchored to Bottom */}
-                    <div className="relative z-10 mt-[35vh] p-5 pb-8 flex flex-col gap-4 bg-gradient-to-t from-[#181818] via-[#181818] to-[#181818]">
+                    <div className="relative z-10 mt-[36vh] p-5 pb-12 flex flex-col gap-4 bg-gradient-to-t from-[#121212] via-[#121212] to-[#121212]">
                         {/* Title & Metadata */}
                         <div>
                             <h2 className="text-3xl font-black mb-2 text-white leading-tight drop-shadow-xl">{content.title}</h2>
@@ -360,7 +438,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                                         if (window.confirm(`Admin: Remove "${content.title}" from the platform?\n\nThis will immediately remove this content and its images from Recently Added by Users and the catalog.`)) {
                                             try {
                                                 await deleteContent(content.id);
-                                                onClose();
+                                                handleClose();
                                             } catch (err: any) {
                                                 alert(`Delete failed: ${err.message || err}`);
                                             }
@@ -382,9 +460,9 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                     </div>
                 </div>
 
-                {/* --- Desktop: Existing Layout --- */}
-                <div ref={desktopScrollRef} className="hidden md:flex flex-col h-full bg-[#181818] overflow-y-auto no-scrollbar scroll-smooth">
-                    <div className="relative h-[400px] md:h-[500px] flex-shrink-0">
+                {/* --- Desktop: Full Screen Cinematic Layout --- */}
+                <div ref={desktopScrollRef} className="hidden md:flex flex-col h-full w-full bg-[#121212] overflow-y-auto no-scrollbar scroll-smooth">
+                    <div className="relative h-[65vh] min-h-[500px] max-h-[750px] w-full flex-shrink-0">
                         <img
                             src={content.backdrop_path || content.poster_path || '/logo.png'}
                             className={`w-full h-full ${(content.backdrop_path || content.poster_path) ? 'object-cover' : 'object-contain p-16 bg-black/80'}`}
@@ -397,90 +475,92 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                                 }
                             }}
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#181818] via-[#181818]/20 to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-[#121212]/30 to-transparent" />
 
-                        <div className="absolute bottom-0 left-0 w-full p-8 md:p-12">
-                            <h2 className="text-4xl md:text-6xl font-black mb-6 drop-shadow-lg">{content.title}</h2>
+                        <div className="absolute bottom-0 left-0 w-full p-8 md:p-14 bg-gradient-to-t from-[#121212] via-[#121212]/80 to-transparent">
+                            <div className="max-w-7xl mx-auto w-full">
+                                <h2 className="text-4xl md:text-6xl font-black mb-6 drop-shadow-2xl">{content.title}</h2>
 
-                            <div className="flex flex-wrap items-center gap-4">
-                                {isPlayable ? (
+                                <div className="flex flex-wrap items-center gap-4">
+                                    {isPlayable ? (
+                                        <button
+                                            onClick={() => { onPlay(content, 'movie'); }}
+                                            className="bg-white text-black px-8 py-3.5 rounded-xl font-bold text-lg flex items-center gap-2 hover:bg-gray-200 transition-all hover:scale-105 active:scale-95 shadow-2xl"
+                                        >
+                                            <Play size={24} fill="black" /> Play {content.type === 'tv' ? 'Series' : 'Now'}
+                                        </button>
+                                    ) : (
+                                        // Only show Coming Soon if truly coming soon, otherwise Not Available
+                                        <button
+                                            className="bg-white/20 text-white/50 px-8 py-3.5 rounded-xl font-bold text-lg flex items-center gap-2 cursor-not-allowed"
+                                        >
+                                            {content.comingSoon ? 'Coming Soon' : 'Not Available'}
+                                        </button>
+                                    )}
+
+                                    {content.youtubeId && (
+                                        <button
+                                            onClick={() => { onPlay(content, 'trailer'); }}
+                                            className={`px-8 py-3.5 rounded-xl font-bold text-lg flex items-center gap-2 transition-all hover:scale-105 active:scale-95 shadow-xl ${!(isPlayable && isSingleVideoType) ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-600/60 hover:bg-gray-600 text-white backdrop-blur-md'}`}
+                                        >
+                                            <Play size={24} fill={(isPlayable && isSingleVideoType) ? "white" : "black"} /> {(isPlayable && isSingleVideoType) ? 'Trailer' : 'Play Trailer'}
+                                        </button>
+                                    )}
+
                                     <button
-                                        onClick={() => { onPlay(content, 'movie'); }}
-                                        className="bg-white text-black px-8 py-3 rounded font-bold text-lg flex items-center gap-2 hover:bg-gray-200 transition-transform active:scale-95"
+                                        onClick={() => toggleWatchlist(content.id)}
+                                        className="bg-gray-600/40 backdrop-blur-md p-3.5 rounded-full border border-white/20 hover:border-white transition hover:scale-105 active:scale-95 group"
+                                        title="My List"
                                     >
-                                        <Play size={24} fill="black" /> Play {content.type === 'tv' ? 'Series' : 'Now'}
+                                        {isAdded ? <Check size={24} className="text-green-400" /> : <Plus size={24} />}
                                     </button>
-                                ) : (
-                                    // Only show Coming Soon if truly coming soon, otherwise Not Available
                                     <button
-                                        className="bg-white/20 text-white/50 px-8 py-3 rounded font-bold text-lg flex items-center gap-2 cursor-not-allowed"
+                                        onClick={() => toggleLike(content.id)}
+                                        className={`p-3.5 rounded-full border transition hover:scale-105 active:scale-95 ${isLiked ? 'bg-white/20 border-white text-white' : 'bg-gray-600/40 backdrop-blur-md border-white/20 hover:border-white text-white'}`}
+                                        title={isLiked ? "Liked" : "Rate"}
                                     >
-                                        {content.comingSoon ? 'Coming Soon' : 'Not Available'}
+                                        <ThumbsUp size={24} className={isLiked ? "fill-white text-white" : "text-white"} />
                                     </button>
-                                )}
-
-                                {content.youtubeId && (
                                     <button
-                                        onClick={() => { onPlay(content, 'trailer'); }}
-                                        className={`px-8 py-3 rounded font-bold text-lg flex items-center gap-2 transition-transform active:scale-95 ${!(isPlayable && isSingleVideoType) ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-600/60 hover:bg-gray-600 text-white'}`}
+                                        onClick={handleShareContent}
+                                        className="bg-gray-600/40 backdrop-blur-md p-3.5 rounded-full border border-white/20 hover:border-white transition hover:scale-105 active:scale-95"
+                                        title="Share"
                                     >
-                                        <Play size={24} fill={(isPlayable && isSingleVideoType) ? "white" : "black"} /> {(isPlayable && isSingleVideoType) ? 'Trailer' : 'Play Trailer'}
+                                        <Share2 size={24} />
                                     </button>
-                                )}
-
-                                <button
-                                    onClick={() => toggleWatchlist(content.id)}
-                                    className="bg-gray-600/40 backdrop-blur-md p-3 rounded-full border border-white/20 hover:border-white transition group"
-                                    title="My List"
-                                >
-                                    {isAdded ? <Check size={24} className="text-green-400" /> : <Plus size={24} />}
-                                </button>
-                                <button
-                                    onClick={() => toggleLike(content.id)}
-                                    className={`p-3 rounded-full border transition active:scale-95 ${isLiked ? 'bg-white/20 border-white text-white' : 'bg-gray-600/40 backdrop-blur-md border-white/20 hover:border-white text-white'}`}
-                                    title={isLiked ? "Liked" : "Rate"}
-                                >
-                                    <ThumbsUp size={24} className={isLiked ? "fill-white text-white" : "text-white"} />
-                                </button>
-                                <button
-                                    onClick={handleShareContent}
-                                    className="bg-gray-600/40 backdrop-blur-md p-3 rounded-full border border-white/20 hover:border-white transition"
-                                    title="Share"
-                                >
-                                    <Share2 size={24} />
-                                </button>
-                                <button
-                                    onClick={() => handleDownload(content)}
-                                    className={`backdrop-blur-md p-3 rounded-full border transition ${content.allowDownload ? 'bg-gray-600/40 border-white/20 hover:border-white' : 'bg-gray-800/40 border-gray-700 cursor-not-allowed'}`}
-                                    title="Download"
-                                >
-                                    <Download size={24} className={content.allowDownload ? 'text-white' : 'text-gray-600'} />
-                                </button>
-
-                                {isAdmin && (
                                     <button
-                                        onClick={async () => {
-                                            if (window.confirm(`Admin: Remove "${content.title}" from platform?\n\nThis will immediately remove this content and its images from Recently Added by Users and the catalog.`)) {
-                                                try {
-                                                    await deleteContent(content.id);
-                                                    onClose();
-                                                } catch (err: any) {
-                                                    alert(`Delete failed: ${err.message || err}`);
+                                        onClick={() => handleDownload(content)}
+                                        className={`backdrop-blur-md p-3.5 rounded-full border transition hover:scale-105 active:scale-95 ${content.allowDownload ? 'bg-gray-600/40 border-white/20 hover:border-white' : 'bg-gray-800/40 border-gray-700 cursor-not-allowed'}`}
+                                        title="Download"
+                                    >
+                                        <Download size={24} className={content.allowDownload ? 'text-white' : 'text-gray-600'} />
+                                    </button>
+
+                                    {isAdmin && (
+                                        <button
+                                            onClick={async () => {
+                                                if (window.confirm(`Admin: Remove "${content.title}" from platform?\n\nThis will immediately remove this content and its images from Recently Added by Users and the catalog.`)) {
+                                                    try {
+                                                        await deleteContent(content.id);
+                                                        handleClose();
+                                                    } catch (err: any) {
+                                                        alert(`Delete failed: ${err.message || err}`);
+                                                    }
                                                 }
-                                            }
-                                        }}
-                                        className="bg-red-600/20 hover:bg-red-600 border border-red-500/40 hover:border-red-500 text-red-400 hover:text-white px-5 py-3 rounded-full font-bold text-sm flex items-center gap-2 transition ml-auto active:scale-95 shadow-lg"
-                                        title="Admin: Remove content from platform"
-                                    >
-                                        <Trash2 size={20} /> Remove (Admin)
-                                    </button>
-                                )}
+                                            }}
+                                            className="bg-red-600/20 hover:bg-red-600 border border-red-500/40 hover:border-red-500 text-red-400 hover:text-white px-5 py-3 rounded-full font-bold text-sm flex items-center gap-2 transition ml-auto active:scale-95 shadow-lg"
+                                            title="Admin: Remove content from platform"
+                                        >
+                                            <Trash2 size={20} /> Remove (Admin)
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div className="p-8 md:p-12 flex-1">
-                        <div className="grid grid-cols-[1fr_300px] gap-12">
+                    <div className="p-8 md:p-14 flex-1 w-full max-w-7xl mx-auto">
+                        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-14">
                             <div className="space-y-6">
                                 <div className="flex flex-wrap items-center gap-3 text-lg font-medium">
                                     {content.vote_average ? (
