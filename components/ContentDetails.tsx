@@ -5,7 +5,7 @@ import { useStore } from '../context/StoreContext';
 import ContentRail from './ContentRail';
 import SongsSection from './SongsSection';
 
-import { buildEmbedUrl } from '../utils/embedUrl';
+import { buildEmbedUrl, hasDriveSource, isExternalEmbedUrl } from '../utils/embedUrl';
 import { saveContentTitle, setWebpageTitle } from '../utils/titleManager';
 
 interface ContentDetailsProps {
@@ -191,7 +191,12 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
     const isPlayable = hasVideoSource || hasEpisodes;
 
     // Ensure videoUrl is ready for playback if from TMDB/IMDb and missing
-    if (isTmdbOrImdb && !content.videoUrl) {
+    const hasDrive = hasDriveSource(content);
+    if (hasDrive) {
+        if (content.videoUrl && isExternalEmbedUrl(content.videoUrl, settings?.embedProxyBaseUrl)) {
+            content.videoUrl = '';
+        }
+    } else if (isTmdbOrImdb && !content.videoUrl) {
         const streamId = content.imdbId || (content.tmdbId ? String(content.tmdbId) : (typeof content.id === 'string' ? content.id.replace(/^(tmdb_|imdb_)/, '') : ''));
         if (streamId) {
             content.videoUrl = buildEmbedUrl(streamId, content.type || 'movie', settings);

@@ -10,7 +10,7 @@ import {
     TMDBSearchResult, fetchTMDBSeason, tmdbStillUrl, extractTMDBTrailer,
     fetchTMDBEpisode, extractTMDBEpisodeVideo
 } from '../../../services/tmdbService';
-import { buildEmbedUrl, parseEmbedContentType, switchEmbedContentType } from '../../../utils/embedUrl';
+import { buildEmbedUrl, parseEmbedContentType, switchEmbedContentType, extractDriveId, isExternalEmbedUrl } from '../../../utils/embedUrl';
 
 const MOVIE_GENRES = ["Action", "Adventure", "Comedy", "Drama", "Horror", "Sci-Fi", "Thriller", "Romance", "Documentary", "Animation"];
 const TV_GENRES = ["Drama", "Comedy", "Reality", "Action", "Sci-Fi", "Documentary", "Kids", "Mystery"];
@@ -223,13 +223,6 @@ const ContentManager = () => {
         return (match && match[2].length === 11) ? match[2] : url;
     };
 
-    const extractDriveId = (url: string) => {
-        if (!url) return '';
-        const regExp = /[-\w]{25,}/;
-        const match = url.match(regExp);
-        return match ? match[0] : url;
-    };
-
     const extractVideoUrl = (url: string) => {
         if (!url) return '';
         const iframeMatch = url.match(/<iframe.*?src=["'](.*?)["']/);
@@ -312,6 +305,12 @@ const ContentManager = () => {
             const now = new Date().toISOString();
 
             // Clean Data
+            const resolvedDriveId = formData.type === 'movie' ? extractDriveId(formData.movieDriveId || formData.videoUrl || '') : undefined;
+            let finalVideoUrl = formData.videoUrl || '';
+            if (resolvedDriveId && isExternalEmbedUrl(finalVideoUrl, settings?.embedProxyBaseUrl)) {
+                finalVideoUrl = '';
+            }
+
             const finalData: Content = {
                 id,
                 tmdbId: Number(formData.tmdbId) || undefined,
@@ -323,9 +322,9 @@ const ContentManager = () => {
                 backdrop_path: formData.backdrop_path || formData.poster_path,
                 backdrop_path_mobile: formData.backdrop_path_mobile || undefined,
                 youtubeId: extractYoutubeId(formData.youtubeId || ''),
-                movieDriveId: formData.type === 'movie' ? extractDriveId(formData.movieDriveId || '') : undefined,
+                movieDriveId: resolvedDriveId,
                 movieYoutubeId: formData.type === 'movie' ? extractYoutubeId(formData.movieYoutubeId || '') : undefined,
-                videoUrl: formData.videoUrl || '',
+                videoUrl: finalVideoUrl,
                 type: formData.type || 'movie',
                 genres: formData.genres || [],
                 release_date: formData.release_date || now.split('T')[0],
@@ -793,7 +792,11 @@ const ContentManager = () => {
                                         if (extractYoutubeId(val).length === 11) {
                                             setFormData({ ...formData, movieYoutubeId: val, movieDriveId: '' });
                                         } else {
-                                            setFormData({ ...formData, movieDriveId: val, movieYoutubeId: '' });
+                                            const driveId = extractDriveId(val);
+                                            const cleanVideoUrl = (driveId && isExternalEmbedUrl(formData.videoUrl, settings?.embedProxyBaseUrl))
+                                                ? ''
+                                                : formData.videoUrl;
+                                            setFormData({ ...formData, movieDriveId: val, movieYoutubeId: '', videoUrl: cleanVideoUrl });
                                         }
                                     }}
                                     placeholder="Paste Drive Link or YouTube Link" />
@@ -825,7 +828,21 @@ const ContentManager = () => {
                             <input
                                 className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none font-mono text-sm focus:border-brand-red transition"
                                 value={formData.videoUrl || ''}
-                                onChange={e => setFormData({ ...formData, videoUrl: extractVideoUrl(e.target.value) })}
+                                onChange={e => {
+                                    const rawVal = e.target.value;
+                                    const extractedVal = extractVideoUrl(rawVal);
+                                    const detectedDriveId = extractDriveId(extractedVal);
+                                    if (detectedDriveId) {
+                                        setFormData({
+                                            ...formData,
+                                            movieDriveId: detectedDriveId,
+                                            movieYoutubeId: '',
+                                            videoUrl: ''
+                                        });
+                                    } else {
+                                        setFormData({ ...formData, videoUrl: extractedVal });
+                                    }
+                                }}
                                 placeholder="https://proxy.garageband.rocks/embed/movie/tt1234567"
                             />
 
@@ -910,12 +927,12 @@ const ContentManager = () => {
                         {(extractYoutubeId(formData.youtubeId || '').length === 11 || (formData.movieYoutubeId && extractYoutubeId(formData.movieYoutubeId).length === 11) || (formData.movieDriveId && extractDriveId(formData.movieDriveId)) || formData.videoUrl) && (
                             <div className="mt-4 bg-black/50 rounded-lg p-2 border border-white/10 h-40 overflow-hidden relative">
                                 <div className="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded text-xs text-white z-10">
-                                    {formData.videoUrl ? 'Direct Video URL' : formData.movieDriveId ? 'Drive Source' : formData.movieYoutubeId ? 'YouTube Movie' : 'Trailer'}
+                                    {(formData.movieDriveId && extractDriveId(formData.movieDriveId)) ? 'Drive Source' : formData.videoUrl ? 'Direct Video URL' : formData.movieYoutubeId ? 'YouTube Movie' : 'Trailer'}
                                 </div>
-                                {formData.videoUrl ? (
-                                    <iframe className="w-full h-full rounded" src={formData.videoUrl} title="Preview" allowFullScreen />
-                                ) : formData.movieDriveId ? (
+                                {(formData.movieDriveId && extractDriveId(formData.movieDriveId)) ? (
                                     <iframe className="w-full h-full rounded" src={`https://drive.google.com/file/d/${extractDriveId(formData.movieDriveId)}/preview`} title="Preview" allowFullScreen />
+                                ) : formData.videoUrl ? (
+                                    <iframe className="w-full h-full rounded" src={formData.videoUrl} title="Preview" allowFullScreen />
                                 ) : (
                                     <iframe className="w-full h-full rounded" src={`https://www.youtube.com/embed/${extractYoutubeId(formData.movieYoutubeId || formData.youtubeId || '')}`} title="Preview" allowFullScreen />
                                 )}

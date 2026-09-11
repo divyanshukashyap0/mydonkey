@@ -4,6 +4,7 @@ import { useStore } from '../../../context/StoreContext';
 import { Content, Season, Episode } from '../../../types';
 import { doc, setDoc, deleteDoc, updateDoc, collection, addDoc, deleteField, writeBatch } from 'firebase/firestore';
 import { db } from '../../../firebase';
+import { extractDriveId, isExternalEmbedUrl } from '../../../utils/embedUrl';
 
 const MOVIE_GENRES = ["Action", "Adventure", "Comedy", "Drama", "Horror", "Sci-Fi", "Thriller", "Romance", "Documentary", "Animation"];
 const TV_GENRES = ["Drama", "Comedy", "Reality", "Action", "Sci-Fi", "Documentary", "Kids", "Mystery"];
@@ -52,13 +53,6 @@ const AnimeManager = () => {
         const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
         const match = url.match(regExp);
         return (match && match[2].length === 11) ? match[2] : url;
-    };
-
-    const extractDriveId = (url: string) => {
-        if (!url) return '';
-        const regExp = /[-\w]{25,}/;
-        const match = url.match(regExp);
-        return match ? match[0] : url;
     };
 
     // --- Season & Episode Handlers ---
@@ -140,6 +134,12 @@ const AnimeManager = () => {
             if (!finalGenres.includes('Anime')) finalGenres.push('Anime');
 
             // Clean Data
+            const resolvedDriveId = formData.type === 'movie' ? extractDriveId(formData.movieDriveId || formData.videoUrl || '') : undefined;
+            let finalVideoUrl = formData.videoUrl || '';
+            if (resolvedDriveId && isExternalEmbedUrl(finalVideoUrl, settings?.embedProxyBaseUrl)) {
+                finalVideoUrl = '';
+            }
+
             const finalData: Content = {
                 id,
                 title: formData.title,
@@ -149,8 +149,9 @@ const AnimeManager = () => {
                 backdrop_path: formData.backdrop_path || formData.poster_path,
                 backdrop_path_mobile: formData.backdrop_path_mobile || undefined,
                 youtubeId: extractYoutubeId(formData.youtubeId || ''),
-                movieDriveId: formData.type === 'movie' ? extractDriveId(formData.movieDriveId || '') : undefined,
+                movieDriveId: resolvedDriveId,
                 movieYoutubeId: formData.type === 'movie' ? extractYoutubeId(formData.movieYoutubeId || '') : undefined,
+                videoUrl: finalVideoUrl,
                 type: formData.type || 'movie',
                 genres: finalGenres,
                 release_date: formData.release_date || now.split('T')[0],
@@ -404,7 +405,11 @@ const AnimeManager = () => {
                                         if (extractYoutubeId(val).length === 11) {
                                             setFormData({ ...formData, movieYoutubeId: val, movieDriveId: '' });
                                         } else {
-                                            setFormData({ ...formData, movieDriveId: val, movieYoutubeId: '' });
+                                            const driveId = extractDriveId(val);
+                                            const cleanVideoUrl = (driveId && isExternalEmbedUrl(formData.videoUrl, settings?.embedProxyBaseUrl))
+                                                ? ''
+                                                : formData.videoUrl;
+                                            setFormData({ ...formData, movieDriveId: val, movieYoutubeId: '', videoUrl: cleanVideoUrl });
                                         }
                                     }}
                                     placeholder="Paste Drive Link or YouTube Link" />
@@ -413,7 +418,20 @@ const AnimeManager = () => {
                                 <div className="text-[10px] text-gray-400 mb-1">Overrides the Movie Source for playback only. Useful if you want the download link to be different from the player.</div>
                                 <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none font-mono text-sm"
                                     value={formData.videoUrl || ''}
-                                    onChange={e => setFormData({ ...formData, videoUrl: e.target.value })}
+                                    onChange={e => {
+                                        const rawVal = e.target.value;
+                                        const detectedDriveId = extractDriveId(rawVal);
+                                        if (detectedDriveId) {
+                                            setFormData({
+                                                ...formData,
+                                                movieDriveId: detectedDriveId,
+                                                movieYoutubeId: '',
+                                                videoUrl: ''
+                                            });
+                                        } else {
+                                            setFormData({ ...formData, videoUrl: rawVal });
+                                        }
+                                    }}
                                     placeholder="https://example.com/video.mp4" />
                             </div>
                         )}
@@ -422,12 +440,12 @@ const AnimeManager = () => {
                         {(extractYoutubeId(formData.youtubeId || '').length === 11 || (formData.movieYoutubeId && extractYoutubeId(formData.movieYoutubeId).length === 11) || (formData.movieDriveId && extractDriveId(formData.movieDriveId)) || formData.videoUrl) && (
                             <div className="mt-4 bg-black/50 rounded-lg p-2 border border-white/10 h-40 overflow-hidden relative">
                                 <div className="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded text-xs text-white z-10">
-                                    {formData.videoUrl ? 'Direct Video URL' : formData.movieDriveId ? 'Drive Source' : formData.movieYoutubeId ? 'YouTube Movie' : 'Trailer'}
+                                    {(formData.movieDriveId && extractDriveId(formData.movieDriveId)) ? 'Drive Source' : formData.videoUrl ? 'Direct Video URL' : formData.movieYoutubeId ? 'YouTube Movie' : 'Trailer'}
                                 </div>
-                                {formData.videoUrl ? (
-                                    <iframe className="w-full h-full rounded" src={formData.videoUrl} title="Preview" allowFullScreen />
-                                ) : formData.movieDriveId ? (
+                                {(formData.movieDriveId && extractDriveId(formData.movieDriveId)) ? (
                                     <iframe className="w-full h-full rounded" src={`https://drive.google.com/file/d/${extractDriveId(formData.movieDriveId)}/preview`} title="Preview" allowFullScreen />
+                                ) : formData.videoUrl ? (
+                                    <iframe className="w-full h-full rounded" src={formData.videoUrl} title="Preview" allowFullScreen />
                                 ) : (
                                     <iframe className="w-full h-full rounded" src={`https://www.youtube.com/embed/${extractYoutubeId(formData.movieYoutubeId || formData.youtubeId || '')}`} title="Preview" allowFullScreen />
                                 )}

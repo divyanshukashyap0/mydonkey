@@ -8,7 +8,7 @@ import ContentLoader from './ContentLoader';
 import { useStore } from '../context/StoreContext';
 import { logUserActivity, incrementWatchTime } from '../utils/activityLogger';
 import { MoviVideo } from './MoviVideo';
-import { buildEmbedUrl, parseEmbedContentType } from '../utils/embedUrl';
+import { buildEmbedUrl, parseEmbedContentType, extractDriveId, isExternalEmbedUrl } from '../utils/embedUrl';
 import { soundBooster } from '../player/SoundBooster';
 import { useAdShield } from '../utils/useAdShield';
 import { fetchTMDBDetails, fetchTMDBSeason } from '../services/tmdbService';
@@ -402,14 +402,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     // --- Video Source Logic ---
     const getDriveId = (url: string) => {
-        if (!url) return '';
-        if (url.includes('youtube.com') || url.includes('youtu.be') || url.includes('proxy.garageband.rocks') || (embedBaseHost && url.includes(embedBaseHost)) || url.includes('imdb.com')) return '';
-        const driveUrlMatch = url.match(/\/file\/d\/([-\w]{25,})/);
-        if (driveUrlMatch) return driveUrlMatch[1];
-        const rawIdMatch = url.match(/^[-\w]{25,}$/);
-        if (rawIdMatch && !url.startsWith('tt')) return url;
-        const match = url.match(/[-\w]{25,}/);
-        return match ? match[0] : '';
+        return extractDriveId(url);
     };
 
     const getYoutubeId = (url: string) => {
@@ -440,29 +433,42 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     }
 
     let finalDriveId = '';
-    if (overrideDriveId) {
-        finalDriveId = overrideDriveId;
-    } else if (isMovieMode) {
-        finalDriveId = getDriveId(content.movieDriveId || '');
+    if (isTV) {
+        const episodeDriveId = getDriveId(currentEpisode?.driveId || currentEpisode?.videoUrl || '');
+        if (episodeDriveId) {
+            finalDriveId = episodeDriveId;
+        } else if (overrideDriveId) {
+            finalDriveId = overrideDriveId;
+        } else if (content.movieDriveId) {
+            finalDriveId = getDriveId(content.movieDriveId);
+        }
     } else {
-        if (!finalYoutubeId) {
-            finalDriveId = getDriveId(content.youtubeId || '');
+        if (overrideDriveId) {
+            finalDriveId = overrideDriveId;
+        } else if (isMovieMode) {
+            finalDriveId = getDriveId(content.movieDriveId || (content as any).driveId || '');
+        } else {
+            if (!finalYoutubeId) {
+                finalDriveId = getDriveId(content.movieDriveId || (content as any).driveId || content.youtubeId || '');
+            }
         }
     }
 
-    let directVideoUrl = (overrideUrl && !overrideYoutubeId && !overrideDriveId) ? overrideUrl : null;
-
-    if (isTV) {
+    let directVideoUrl: string | null = null;
+    if (finalDriveId) {
+        // When admin enters a Drive link, external links (iframe embed) MUST NOT OPEN
+        directVideoUrl = null;
+    } else if (isTV) {
         const sNum = currentSeason?.seasonNumber || (urlSeasonEp?.season || 1);
         const eNum = currentEpisode?.episodeNumber || (urlSeasonEp?.episode || 1);
-        if (currentEpisode?.videoUrl) {
+        if (currentEpisode?.videoUrl && !getDriveId(currentEpisode.videoUrl)) {
             directVideoUrl = currentEpisode.videoUrl;
         } else if (extractedImdbId) {
             directVideoUrl = buildEmbedUrl(extractedImdbId, 'tv', settings, sNum, eNum);
-        } else if (content.videoUrl) {
+        } else if (content.videoUrl && !getDriveId(content.videoUrl)) {
             directVideoUrl = content.videoUrl;
         }
-    } else if (overrideUrl) {
+    } else if (overrideUrl && !overrideDriveId && !overrideYoutubeId) {
         directVideoUrl = overrideUrl;
     } else if (extractedImdbId && !finalDriveId && !finalYoutubeId) {
         directVideoUrl = buildEmbedUrl(extractedImdbId, 'movie', settings);
@@ -500,15 +506,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     ) : false;
     const isDirectIframeEmbed = (directVideoUrl && !isHls && !isNativeVideo) || isEmbedPlayer;
 
-    const useDirect = !!directVideoUrl;
-    const isLegacyMovieDriveScale = isMovieMode && !overrideUrl && !!finalDriveId && !finalYoutubeId;
-    const isLegacyStandardDrive = !isMovieMode && !overrideUrl && !!finalDriveId && !finalYoutubeId;
-    const useDrive = (!!overrideDriveId) || isLegacyMovieDriveScale || isLegacyStandardDrive;
+    const useDirect = Boolean(directVideoUrl && (isHls || isNativeVideo || isDirectIframeEmbed));
+    const useDrive = Boolean(finalDriveId && !useDirect);
 
     const youtubeVideoId = finalYoutubeId;
     const driveIdToUse = finalDriveId;
-    const isDriveVideo = useDrive && !useDirect;
-    const isExternalStream = isDirectIframeEmbed || isDriveVideo || (!directVideoUrl && !!youtubeVideoId);
+    const isDriveVideo = useDrive;
+    const isExternalStream = isDirectIframeEmbed && !isDriveVideo;
     // --- End Video Source Logic ---
 
     const isMobile = useMemo(() => {
@@ -1843,7 +1847,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     </div>
 
                     {/* 2. Direct Video (HLS/Native/Iframe) */}
-                    {directVideoUrl && (
+                    {directVideoUrl && !isDriveVideo && (
                         <div className="absolute inset-0 w-full h-full pointer-events-auto z-[20]">
                             {(isHls || isNativeVideo) ? (
                                 <MoviVideo
