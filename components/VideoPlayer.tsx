@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Hls from 'hls.js';
-import { Play, Pause, Volume2, Volume1, VolumeX, Maximize, Settings, SkipForward, ArrowLeft, RotateCcw, RotateCw, Subtitles, Layers, BarChart2, Minimize, Headphones, Check, MessageSquare, Wifi, X, ExternalLink, Scan, Scaling, AlertCircle, RefreshCw, Zap, Sliders, Sparkles, ShieldCheck, ChevronDown } from 'lucide-react';
+import { Play, Pause, Volume2, Volume1, VolumeX, Maximize, Settings, SkipForward, ArrowLeft, RotateCcw, RotateCw, Subtitles, Layers, BarChart2, Minimize, Headphones, Check, MessageSquare, Wifi, X, ExternalLink, Scan, Scaling, AlertCircle, RefreshCw, Zap, Sliders, Sparkles, ShieldCheck, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Content, Season, Episode } from '../types';
 import StatsPanel from './StatsPanel';
 import DrivePlayer from './DrivePlayer';
@@ -12,6 +12,7 @@ import { buildEmbedUrl, parseEmbedContentType } from '../utils/embedUrl';
 import { soundBooster } from '../player/SoundBooster';
 import { useAdShield } from '../utils/useAdShield';
 import { fetchTMDBDetails, fetchTMDBSeason } from '../services/tmdbService';
+import { saveContentTitle, setWebpageTitle } from '../utils/titleManager';
 
 interface VideoPlayerProps {
     content: Content;
@@ -421,7 +422,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     };
 
     const isMovieMode = content.playMode === 'movie';
-    let overrideUrl = content.videoUrl;
+    const isTrailerMode = content.playMode === 'trailer';
+    let overrideUrl = isTrailerMode ? '' : content.videoUrl;
 
     const extractedImdbId = content.imdbId || (typeof content.id === 'string' && content.id.startsWith('imdb_') ? content.id.replace('imdb_', '') : '') || (content.videoUrl?.match(/(tt\d+)/)?.[1]) || (overrideUrl?.match(/(tt\d+)/)?.[1]) || '';
 
@@ -791,14 +793,57 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     };
 
     const handleSkip = useCallback((seconds: number) => {
-        if (isDriveVideo) return;
+        // 1. Native or HLS Video (Direct DOM / MoviEngine)
         if ((isHls || isNativeVideo) && videoRef.current) {
             videoRef.current.currentTime += seconds;
-        } else if (playerRef.current && playerRef.current.getCurrentTime) {
+            const absSec = Math.abs(seconds);
+            showOsd(
+                seconds > 0 ? `+${absSec}s` : `-${absSec}s`,
+                seconds > 0 ? 'Forward 5s' : 'Rewind 5s',
+                'zap'
+            );
+        } 
+        // 2. YouTube IFrame Player (Only when YouTube is the active visible player)
+        else if (!directVideoUrl && !isDriveVideo && playerRef.current && playerRef.current.getCurrentTime) {
             const curr = playerRef.current.getCurrentTime();
             playerRef.current.seekTo(curr + seconds, true);
+            const absSec = Math.abs(seconds);
+            showOsd(
+                seconds > 0 ? `+${absSec}s` : `-${absSec}s`,
+                seconds > 0 ? 'Forward 5s' : 'Rewind 5s',
+                'zap'
+            );
+        } 
+        // 3. External Link Player (Iframe Embed) - Browser CORS security prevents outer script from manipulating third-party video
+        else if (isDirectIframeEmbed) {
+            showOsd(
+                'External Stream Player',
+                'Click inside player to use internal seekbar or ← / → arrow keys',
+                'zap'
+            );
         }
-    }, [isDriveVideo, isHls, isNativeVideo]);
+    }, [isHls, isNativeVideo, directVideoUrl, isDriveVideo, isDirectIframeEmbed, showOsd]);
+
+    // Unified Play/Pause toggle supporting HLS, native video, and YouTube API
+    const togglePlayState = useCallback(() => {
+        if ((isHls || isNativeVideo) && videoRef.current) {
+            const nextPlaying = !playing;
+            setPlaying(nextPlaying);
+            if (nextPlaying) videoRef.current.play().catch(() => {});
+            else videoRef.current.pause();
+        } else if (!directVideoUrl && !isDriveVideo && playerRef.current && playerRef.current.playVideo) {
+            const nextPlaying = !playing;
+            setPlaying(nextPlaying);
+            if (nextPlaying) playerRef.current.playVideo();
+            else playerRef.current.pauseVideo();
+        } else if (isDirectIframeEmbed) {
+            showOsd(
+                'External Stream Player',
+                'Use the play/pause button directly on the video player',
+                'zap'
+            );
+        }
+    }, [playing, isHls, isNativeVideo, directVideoUrl, isDriveVideo, isDirectIframeEmbed, showOsd]);
 
     const handleQualityChange = (quality: string) => {
         if (!playerRef.current) return;
@@ -870,11 +915,27 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         soundBooster.setLimiter(limiterEnabled);
     }, [limiterEnabled]);
 
-    const triggerRipple = useCallback((side: 'left' | 'right') => {
+    // YouTube-style Double-Tap Seek Feedback
+    const [seekFeedback, setSeekFeedback] = useState<{ side: 'left' | 'right'; seconds: number } | null>(null);
+    const seekFeedbackTimeoutRef = useRef<any>(null);
+
+    const triggerRipple = useCallback((side: 'left' | 'right', deltaSeconds: number = 5) => {
         setRippleSides(prev => [...prev, side]);
         setTimeout(() => {
             setRippleSides(prev => prev.filter(s => s !== side));
         }, 500);
+
+        setSeekFeedback(prev => {
+            if (prev && prev.side === side) {
+                return { side, seconds: prev.seconds + deltaSeconds };
+            }
+            return { side, seconds: deltaSeconds };
+        });
+
+        if (seekFeedbackTimeoutRef.current) clearTimeout(seekFeedbackTimeoutRef.current);
+        seekFeedbackTimeoutRef.current = setTimeout(() => {
+            setSeekFeedback(null);
+        }, 800);
     }, []);
 
     const onPlayerApiChange = () => {
@@ -1319,7 +1380,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     }, [syncProgressToFirestore]);
 
 
-    // Controls & Movie Card Visibility Timer (Hides after 3 seconds of inactivity)
+    // Controls & Movie Card Visibility Timer (Hides after 2 seconds of inactivity)
     const resetInactivityTimer = useCallback(() => {
         setShowControls(true);
         if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
@@ -1327,7 +1388,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             if (!showStats && !showAudioSubMenu && !showQualityMenu && !showEpisodesMenu) {
                 setShowControls(false);
             }
-        }, 3000);
+        }, 2000);
     }, [showStats, showAudioSubMenu, showQualityMenu, showEpisodesMenu]);
 
     useEffect(() => {
@@ -1343,18 +1404,51 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             window.addEventListener(evt, handleUserActivity, { capture: true, passive: true });
         });
 
-        // Initial 3-second timer on mount
+        // Detect interactions when user clicks into or focuses iframe player
+        window.addEventListener('blur', handleUserActivity);
+        window.addEventListener('focus', handleUserActivity);
+
+        // Initial 2-second timer on mount
         resetInactivityTimer();
 
         return () => {
             events.forEach(evt => {
                 window.removeEventListener(evt, handleUserActivity, { capture: true } as any);
             });
+            window.removeEventListener('blur', handleUserActivity);
+            window.removeEventListener('focus', handleUserActivity);
             if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
         };
     }, [resetInactivityTimer]);
 
-    // When menus (episodes, quality, audio, stats) close, automatically begin 3s inactivity hide countdown
+    // Fullscreen change listener to keep isFullscreen state in sync with browser
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            const doc = document as any;
+            const isFull = !!(
+                doc.fullscreenElement ||
+                doc.webkitFullscreenElement ||
+                doc.mozFullScreenElement ||
+                doc.msFullscreenElement
+            );
+            setIsFullscreen(isFull);
+            resetInactivityTimer();
+        };
+
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+        document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+        return () => {
+            document.removeEventListener('fullscreenchange', handleFullscreenChange);
+            document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+            document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+            document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+        };
+    }, [resetInactivityTimer]);
+
+    // When menus (episodes, quality, audio, stats) close, automatically begin 2s inactivity hide countdown
     useEffect(() => {
         if (!showEpisodesMenu && !showQualityMenu && !showAudioSubMenu && !showStats) {
             resetInactivityTimer();
@@ -1367,23 +1461,43 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             // Ignore if user is typing in an input
             if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
 
+            // 'f' or 'F' button: ALWAYS toggle fullscreen across ALL player modes (including external iframe embeds)
+            if (e.key === 'f' || e.key === 'F' || e.code === 'KeyF') {
+                e.preventDefault();
+                toggleFullscreen();
+                resetInactivityTimer();
+                return;
+            }
+
+            if (e.key === 'Escape' || e.code === 'Escape') {
+                if (document.fullscreenElement) {
+                    toggleFullscreen();
+                } else {
+                    onClose();
+                }
+                return;
+            }
+
+            // For external embeds, do not intercept Space/Arrows so the iframe receives them natively
+            if (isDirectIframeEmbed) return;
+
             switch (e.code) {
                 case 'Space':
                 case 'KeyK':
                     e.preventDefault();
-                    setPlaying(prev => !prev);
+                    togglePlayState();
                     break;
                 case 'ArrowLeft':
                 case 'KeyJ':
                     e.preventDefault();
-                    handleSkip(-10);
-                    triggerRipple('left');
+                    handleSkip(-5);
+                    triggerRipple('left', 5);
                     break;
                 case 'ArrowRight':
                 case 'KeyL':
                     e.preventDefault();
-                    handleSkip(10);
-                    triggerRipple('right');
+                    handleSkip(5);
+                    triggerRipple('right', 5);
                     break;
                 case 'KeyB':
                     e.preventDefault();
@@ -1405,10 +1519,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                         return next;
                     });
                     break;
-                case 'KeyF':
-                    e.preventDefault();
-                    toggleFullscreen();
-                    break;
                 case 'KeyM':
                     e.preventDefault();
                     setIsMuted(prev => {
@@ -1417,19 +1527,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                         return next;
                     });
                     break;
-                case 'Escape':
-                    if (document.fullscreenElement) {
-                        toggleFullscreen();
-                    } else {
-                        onClose();
-                    }
-                    break;
             }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [handleSkip, triggerRipple, toggleFullscreen, onClose, cycleBoost, boostLevel, showOsd]);
+    }, [handleSkip, triggerRipple, toggleFullscreen, onClose, cycleBoost, boostLevel, showOsd, isDirectIframeEmbed, resetInactivityTimer]);
 
 
     // Resume Logic: Watch for currentUser to populate if it wasn't ready initially
@@ -1546,15 +1649,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             toggleFullscreen();
         }
 
-        // Double Tap Logic
-        if (lastTapRef.current && (now - lastTapRef.current.time) < 300) {
+        // Double Tap Logic: 5 seconds skip like YouTube
+        if (lastTapRef.current && (now - lastTapRef.current.time) < 320) {
             const isLeft = x < window.innerWidth / 2;
             if (isLeft) {
-                handleSkip(-10);
-                triggerRipple('left');
+                handleSkip(-5);
+                triggerRipple('left', 5);
             } else {
-                handleSkip(10);
-                triggerRipple('right');
+                handleSkip(5);
+                triggerRipple('right', 5);
             }
             lastTapRef.current = null; // Reset
         } else {
@@ -1685,14 +1788,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     // Dynamically update document title to movie/show name during playback
     useEffect(() => {
-        const prevTitle = document.title;
         if (content?.title) {
-            document.title = `${content.title} | My Donkey`;
+            setWebpageTitle(content.title);
+            if (content.id) saveContentTitle(content.id, content.title);
         }
         return () => {
-            document.title = prevTitle;
+            if (!window.location.pathname.startsWith('/browse/') && !window.location.pathname.startsWith('/watch/')) {
+                document.title = 'My Donkey | Watch Free Movies, TV Shows, Anime & Marvel Movies Online in HD';
+            }
         };
-    }, [content?.title]);
+    }, [content?.title, content?.id]);
 
     // Record watch history for stream sources without redirecting away (guarded to once per content ID)
     const hasRecordedWatchHistoryRef = useRef<string | null>(null);
@@ -1838,20 +1943,56 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     </div>
                 )}
 
-                {/* Center playback controls (Mobile Portrait only) */}
-                {isMobile && isPortrait && !isDriveVideo && !isDirectIframeEmbed && (
+                {/* Center playback controls (Mobile Portrait) - Small, sleek & unobtrusive */}
+                {isMobile && isPortrait && (
                     <div
-                        className={`absolute inset-0 z-10 flex items-center justify-center gap-8 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-                        onClick={handleTap}
+                        className={`absolute inset-0 z-10 flex items-center justify-center gap-3 pointer-events-none transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
                     >
-                        <button className="text-white/80 bg-black/30 backdrop-blur-sm p-3 rounded-full active:scale-90 transition pointer-events-auto" onClick={(e) => { e.stopPropagation(); handleSkip(-10); }}>
-                            <RotateCcw size={22} />
+                        {/* 5s Previous Button */}
+                        <button
+                            className="relative flex items-center justify-center w-8 h-8 text-white/90 bg-black/60 hover:bg-black/85 backdrop-blur-md p-1.5 rounded-full border border-white/20 active:scale-90 transition pointer-events-auto shadow-md"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleSkip(-5);
+                                triggerRipple('left', 5);
+                            }}
+                            title="Rewind 5s"
+                            aria-label="Rewind 5 seconds"
+                        >
+                            <RotateCcw size={15} />
+                            <span className="absolute inset-0 flex items-center justify-center text-[7px] font-black tracking-tighter pointer-events-none mt-0.5">
+                                5
+                            </span>
                         </button>
-                        <button className="text-white bg-black/50 backdrop-blur-md p-4 rounded-full border border-white/10 active:scale-90 transition pointer-events-auto" onClick={(e) => { e.stopPropagation(); setPlaying(!playing); }}>
-                            {playing ? <Pause size={28} className="fill-current" /> : <Play size={28} className="fill-current ml-0.5" />}
+
+                        {/* Play/Pause Button */}
+                        <button
+                            className="flex items-center justify-center w-10 h-10 text-white bg-black/70 hover:bg-black/95 backdrop-blur-md p-2 rounded-full border border-white/25 active:scale-90 transition pointer-events-auto shadow-xl"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                togglePlayState();
+                            }}
+                            title={playing ? "Pause" : "Play"}
+                            aria-label={playing ? "Pause video" : "Play video"}
+                        >
+                            {playing ? <Pause size={18} className="fill-current" /> : <Play size={18} className="fill-current ml-0.5" />}
                         </button>
-                        <button className="text-white/80 bg-black/30 backdrop-blur-sm p-3 rounded-full active:scale-90 transition pointer-events-auto" onClick={(e) => { e.stopPropagation(); handleSkip(10); }}>
-                            <RotateCw size={22} />
+
+                        {/* 5s Next Button */}
+                        <button
+                            className="relative flex items-center justify-center w-8 h-8 text-white/90 bg-black/60 hover:bg-black/85 backdrop-blur-md p-1.5 rounded-full border border-white/20 active:scale-90 transition pointer-events-auto shadow-md"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleSkip(5);
+                                triggerRipple('right', 5);
+                            }}
+                            title="Forward 5s"
+                            aria-label="Forward 5 seconds"
+                        >
+                            <RotateCw size={15} />
+                            <span className="absolute inset-0 flex items-center justify-center text-[7px] font-black tracking-tighter pointer-events-none mt-0.5">
+                                5
+                            </span>
                         </button>
                     </div>
                 )}
@@ -1967,9 +2108,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 </>
             )}
 
-            {/* Screen Activity Detector: Detects mouse movement and touch across the screen when controls are hidden, while leaving bottom player controls 100% uncovered & interactive */}
-            {/* Screen Activity Detector: Detects mouse movement and touch across the screen when controls are hidden */}
-            {!showControls && (
+            {/* Screen Activity Detector: Detects mouse movement and touch across the screen when controls are hidden for native players */}
+            {!showControls && !isDirectIframeEmbed && !isDriveVideo && (
                 <div
                     id="vp-activity-detector"
                     className={`fixed top-0 left-0 right-0 ${isMobile && isPortrait ? 'bottom-1/2' : 'bottom-16 md:bottom-20'} z-[90] bg-transparent select-none cursor-auto`}
@@ -1981,13 +2121,25 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 />
             )}
 
-            {/* Corner Activity Detector for Bottom-Right Fullscreen button */}
-            {!showControls && !isPortrait && (isDirectIframeEmbed || isDriveVideo) && (
+            {/* Top Activity Detector: Detects mouse movement and touch near top header area when controls are hidden */}
+            {!showControls && (
                 <div
-                    className="fixed bottom-0 right-0 w-16 h-16 z-[95] bg-transparent cursor-pointer"
+                    className="fixed top-0 left-0 right-0 h-16 z-[95] bg-transparent cursor-pointer"
                     onPointerMove={resetInactivityTimer}
                     onMouseMove={resetInactivityTimer}
                     onMouseEnter={resetInactivityTimer}
+                    onTouchStart={resetInactivityTimer}
+                />
+            )}
+
+            {/* Corner Activity Detector for Bottom-Right Fullscreen button */}
+            {!showControls && !isPortrait && (isDirectIframeEmbed || isDriveVideo) && (
+                <div
+                    className="fixed bottom-0 right-0 w-24 h-24 z-[95] bg-transparent cursor-pointer"
+                    onPointerMove={resetInactivityTimer}
+                    onMouseMove={resetInactivityTimer}
+                    onMouseEnter={resetInactivityTimer}
+                    onTouchStart={resetInactivityTimer}
                 />
             )}
 
@@ -2098,41 +2250,94 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 </div>
             )}
 
-            {/* Gesture Layer (Mobile Landscape Only) */}
-            {
-                !isDriveVideo && !isDirectIframeEmbed && !isPortrait && (
+            {/* Visual Feedback for Double Tap / Seek: YouTube style animation (100% pointer-events-none so player is never blocked) */}
+            {seekFeedback && !isDirectIframeEmbed && !isDriveVideo && (
+                <div className="absolute inset-0 z-[130] pointer-events-none overflow-hidden">
                     <div
-                        className="absolute inset-0 z-[115]"
-                        onClick={handleTap}
-                        style={{ WebkitTapHighlightColor: 'rgba(0,0,0,0)', outline: 'none' }}
+                        className={`absolute top-0 bottom-0 ${seekFeedback.side === 'left' ? 'left-0 rounded-r-full pr-8 md:pr-14' : 'right-0 rounded-l-full pl-8 md:pl-14'} w-[35%] max-w-xs flex flex-col items-center justify-center pointer-events-none bg-white/15 backdrop-blur-[2px] animate-in fade-in zoom-in-95 duration-200`}
                     >
-                        {/* Visual Feedback for Double Tap */}
-                        {rippleSides.map((side) => (
-                            <div key={side} className={`absolute top-0 bottom-0 ${side === 'left' ? 'left-0' : 'right-0'} w-1/3 flex items-center justify-center pointer-events-none animate-ping opacity-0`}>
-                                <div className="bg-white/20 p-4 rounded-full">
-                                    {side === 'left' ? <RotateCcw size={40} /> : <RotateCw size={40} />}
+                        <div className="flex items-center text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
+                            {seekFeedback.side === 'left' ? (
+                                <div className="flex items-center -space-x-3">
+                                    <ChevronLeft size={30} className="animate-pulse" />
+                                    <ChevronLeft size={30} className="animate-pulse delay-75" />
+                                    <ChevronLeft size={30} className="animate-pulse delay-150" />
                                 </div>
-                            </div>
-                        ))}
+                            ) : (
+                                <div className="flex items-center -space-x-3">
+                                    <ChevronRight size={30} className="animate-pulse delay-150" />
+                                    <ChevronRight size={30} className="animate-pulse delay-75" />
+                                    <ChevronRight size={30} className="animate-pulse delay-150" />
+                                </div>
+                            )}
+                        </div>
+                        <span className="text-white text-[11px] md:text-xs font-black tracking-wider uppercase mt-1.5 drop-shadow-md">
+                            {seekFeedback.seconds} seconds
+                        </span>
                     </div>
-                )
-            }
+                </div>
+            )}
 
-            {/* Centered Playback Controls (Landscape/Desktop only) */}
-            {!isDriveVideo && !isDirectIframeEmbed && !isPortrait && (
-                <div className={`vp-center-controls absolute inset-0 z-[116] pointer-events-none flex flex-row items-center justify-center gap-4 md:gap-16 transition-all duration-300 ${showControls ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
-                    <button className="text-white/80 hover:text-white bg-black/20 hover:bg-black/40 backdrop-blur-sm transition-all p-3 md:p-5 rounded-full pointer-events-auto active:scale-95" onClick={(e) => { e.stopPropagation(); handleSkip(-10); }} title="-10s">
-                        <RotateCcw size={24} className="md:w-10 md:h-10" />
+            {/* Gesture Layer (Landscape/Desktop for native videos ONLY - external iframe players must NOT be blocked) */}
+            {!isPortrait && !isDirectIframeEmbed && !isDriveVideo && (
+                <div
+                    className="absolute inset-0 z-[115]"
+                    onClick={handleTap}
+                    style={{ WebkitTapHighlightColor: 'rgba(0,0,0,0)', outline: 'none' }}
+                />
+            )}
+
+            {/* Centered Playback Controls: YouTube-style Small & Sleek 5s Previous, Play/Pause, 5s Next */}
+            {!isPortrait && !isDirectIframeEmbed && !isDriveVideo && (
+                <div className={`vp-center-controls absolute inset-0 z-[116] pointer-events-none flex flex-row items-center justify-center gap-3 md:gap-5 transition-all duration-300 ${showControls ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}>
+                    {/* 5s Previous Button - Small, compact & sleek */}
+                    <button
+                        className="relative flex items-center justify-center w-8 h-8 md:w-10 md:h-10 text-white/90 hover:text-white bg-black/60 hover:bg-black/85 backdrop-blur-md transition-all p-1.5 md:p-2 rounded-full pointer-events-auto border border-white/20 hover:border-white/40 shadow-xl active:scale-90 group"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleSkip(-5);
+                            triggerRipple('left', 5);
+                        }}
+                        title="Rewind 5s"
+                        aria-label="Rewind 5 seconds"
+                    >
+                        <RotateCcw size={15} className="md:w-4 md:h-4 group-hover:-rotate-12 transition-transform" />
+                        <span className="absolute inset-0 flex items-center justify-center text-[7px] md:text-[8px] font-black tracking-tighter pointer-events-none mt-0.5">
+                            5
+                        </span>
                     </button>
-                    <button onClick={(e) => { e.stopPropagation(); setPlaying(!playing); }}
-                        className="text-white hover:text-brand-red bg-black/40 backdrop-blur-md hover:bg-black/60 transition-all p-4 md:p-7 rounded-full active:scale-95 pointer-events-auto border border-white/10 shadow-2xl">
+
+                    {/* Play/Pause Button - Compact & sleek */}
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            togglePlayState();
+                        }}
+                        className="flex items-center justify-center w-10 h-10 md:w-12 md:h-12 text-white hover:text-brand-red bg-black/70 hover:bg-black/90 backdrop-blur-md transition-all p-2 md:p-2.5 rounded-full active:scale-90 pointer-events-auto border border-white/25 hover:border-white/50 shadow-2xl"
+                        title={playing ? "Pause" : "Play"}
+                        aria-label={playing ? "Pause video" : "Play video"}
+                    >
                         {playing ?
-                            <Pause size={34} className="fill-current md:w-16 md:h-16" /> :
-                            <Play size={34} className="fill-current ml-1 md:ml-2 md:w-16 md:h-16" />
+                            <Pause size={18} className="fill-current md:w-5 md:h-5" /> :
+                            <Play size={18} className="fill-current ml-0.5 md:w-5 md:h-5" />
                         }
                     </button>
-                    <button className="text-white/80 hover:text-white bg-black/20 hover:bg-black/40 backdrop-blur-sm transition-all p-3 md:p-5 rounded-full pointer-events-auto active:scale-95" onClick={(e) => { e.stopPropagation(); handleSkip(10); }} title="+10s">
-                        <RotateCw size={24} className="md:w-10 md:h-10" />
+
+                    {/* 5s Next Button - Small, compact & sleek */}
+                    <button
+                        className="relative flex items-center justify-center w-8 h-8 md:w-10 md:h-10 text-white/90 hover:text-white bg-black/60 hover:bg-black/85 backdrop-blur-md transition-all p-1.5 md:p-2 rounded-full pointer-events-auto border border-white/20 hover:border-white/40 shadow-xl active:scale-90 group"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleSkip(5);
+                            triggerRipple('right', 5);
+                        }}
+                        title="Forward 5s"
+                        aria-label="Forward 5 seconds"
+                    >
+                        <RotateCw size={15} className="md:w-4 md:h-4 group-hover:rotate-12 transition-transform" />
+                        <span className="absolute inset-0 flex items-center justify-center text-[7px] md:text-[8px] font-black tracking-tighter pointer-events-none mt-0.5">
+                            5
+                        </span>
                     </button>
                 </div>
             )}
@@ -2184,10 +2389,53 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                             {/* Lower Controls Row */}
                             <div className="flex justify-between items-center">
 
-                                {/* LEFT: Play/Pause, Volume Slider, and Sound Booster */}
-                                <div className="flex flex-1 items-center gap-1 md:gap-3">
-                                    <button onClick={(e) => { e.stopPropagation(); setPlaying(!playing); }} className="text-gray-300 hover:text-white p-1.5 md:p-2 rounded-full hover:bg-white/10 transition" title={playing ? "Pause" : "Play"}>
+                                {/* LEFT: 5s Previous, Play/Pause, 5s Next, Volume Slider, and Sound Booster */}
+                                <div className="flex flex-1 items-center gap-1 md:gap-2">
+                                    {/* 5s Previous Button */}
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleSkip(-5);
+                                            triggerRipple('left', 5);
+                                        }}
+                                        className="relative flex items-center justify-center text-gray-300 hover:text-white p-1.5 md:p-2 rounded-full hover:bg-white/10 transition group"
+                                        title="Rewind 5s (J or ←)"
+                                        aria-label="Rewind 5 seconds"
+                                    >
+                                        <RotateCcw size={18} className="md:w-5 md:h-5 group-hover:-rotate-12 transition-transform" />
+                                        <span className="absolute inset-0 flex items-center justify-center text-[8px] md:text-[9px] font-black pointer-events-none mt-0.5">
+                                            5
+                                        </span>
+                                    </button>
+
+                                    {/* Play/Pause Button */}
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            togglePlayState();
+                                        }}
+                                        className="text-gray-300 hover:text-white p-1.5 md:p-2 rounded-full hover:bg-white/10 transition"
+                                        title={playing ? "Pause (k or Space)" : "Play (k or Space)"}
+                                        aria-label={playing ? "Pause" : "Play"}
+                                    >
                                         {playing ? <Pause size={18} className="md:w-[22px] md:h-[22px] fill-current" /> : <Play size={18} className="md:w-[22px] md:h-[22px] fill-current ml-0.5" />}
+                                    </button>
+
+                                    {/* 5s Next Button */}
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleSkip(5);
+                                            triggerRipple('right', 5);
+                                        }}
+                                        className="relative flex items-center justify-center text-gray-300 hover:text-white p-1.5 md:p-2 rounded-full hover:bg-white/10 transition group"
+                                        title="Forward 5s (L or →)"
+                                        aria-label="Forward 5 seconds"
+                                    >
+                                        <RotateCw size={18} className="md:w-5 md:h-5 group-hover:rotate-12 transition-transform" />
+                                        <span className="absolute inset-0 flex items-center justify-center text-[8px] md:text-[9px] font-black pointer-events-none mt-0.5">
+                                            5
+                                        </span>
                                     </button>
 
                                     {/* Volume & Hover Slider */}

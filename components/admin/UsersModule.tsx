@@ -10,11 +10,12 @@ const UsersModule = () => {
     const { users, plans, content } = useStore();
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'blocked'>('all');
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState<number | 'all'>(50);
 
     // Edit Mode State
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [userInvoices, setUserInvoices] = useState<Invoice[]>([]);
-    // userActivity state removed
     const [loadingInvoices, setLoadingInvoices] = useState(false);
     const [activeTab, setActiveTab] = useState<'details'>('details');
 
@@ -22,11 +23,30 @@ const UsersModule = () => {
     const filteredUsers = users.filter(user => {
         const email = user.email || '';
         const uid = user.uid || '';
-        const matchesSearch = email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            uid.toLowerCase().includes(searchTerm.toLowerCase());
+        const name = user.name || '';
+        const term = searchTerm.toLowerCase();
+        const matchesSearch = !term || email.toLowerCase().includes(term) ||
+            uid.toLowerCase().includes(term) ||
+            name.toLowerCase().includes(term);
         const matchesFilter = statusFilter === 'all' || (user.status || 'active') === statusFilter;
         return matchesSearch && matchesFilter;
     });
+
+    const totalPages = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(filteredUsers.length / Number(pageSize)));
+    const currentPage = Math.min(page, totalPages);
+    const paginatedUsers = pageSize === 'all'
+        ? filteredUsers
+        : filteredUsers.slice((currentPage - 1) * Number(pageSize), currentPage * Number(pageSize));
+
+    const handleSearchChange = (val: string) => {
+        setSearchTerm(val);
+        setPage(1);
+    };
+
+    const handleFilterChange = (val: any) => {
+        setStatusFilter(val);
+        setPage(1);
+    };
 
     const handleEditClick = async (user: User) => {
         setEditingUser(user);
@@ -42,8 +62,6 @@ const UsersModule = () => {
             console.error("Failed to fetch invoices", e);
             setUserInvoices([]);
         }
-
-        // Activity Logs fetching removed
 
         setLoadingInvoices(false);
     };
@@ -78,7 +96,7 @@ const UsersModule = () => {
                     <h2 className="text-3xl font-bold">User Management</h2>
                     <p className="text-gray-400 mt-1">View user details, watch history, and manage access.</p>
                 </div>
-                <div className="flex gap-2 text-sm">
+                <div className="flex items-center gap-2 text-sm flex-wrap">
                     <div className="bg-[#141414] border border-white/10 px-4 py-2 rounded-lg text-center min-w-[100px]">
                         <div className="text-xs text-gray-500 uppercase font-bold text-left">Total Users</div>
                         <div className="text-2xl font-black text-white text-left">{users.length}</div>
@@ -96,9 +114,9 @@ const UsersModule = () => {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
                     <input
                         type="text"
-                        placeholder="Search by email or UID..."
+                        placeholder="Search by email, name or UID..."
                         value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onChange={(e) => handleSearchChange(e.target.value)}
                         className="w-full bg-black/40 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-white/20 transition-colors placeholder:text-gray-600"
                     />
                 </div>
@@ -106,12 +124,27 @@ const UsersModule = () => {
                     <Filter className="text-gray-500" size={18} />
                     <select
                         value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value as any)}
+                        onChange={(e) => handleFilterChange(e.target.value as any)}
                         className="bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-white/20 transition-colors cursor-pointer text-gray-300"
                     >
                         <option value="all">All Status</option>
                         <option value="active">Active</option>
                         <option value="blocked">Blocked</option>
+                    </select>
+
+                    <select
+                        value={pageSize}
+                        onChange={(e) => {
+                            const val = e.target.value === 'all' ? 'all' : Number(e.target.value);
+                            setPageSize(val);
+                            setPage(1);
+                        }}
+                        className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-white/20 transition-colors cursor-pointer text-gray-300"
+                    >
+                        <option value={25}>25 / page</option>
+                        <option value={50}>50 / page</option>
+                        <option value={100}>100 / page</option>
+                        <option value="all">Show All</option>
                     </select>
                 </div>
             </div>
@@ -129,43 +162,63 @@ const UsersModule = () => {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                        {filteredUsers.map(user => (
-                            <tr key={user.uid} className="hover:bg-white/5 transition group">
-                                <td className="p-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center text-xs font-bold text-gray-400 border border-white/10">
-                                            {(user.email || '??').substring(0, 2).toUpperCase()}
+                        {paginatedUsers.map(user => {
+                            const displayName = user.name || user.email || 'User';
+                            const initials = (user.name || user.email || 'US').substring(0, 2).toUpperCase();
+                            const joinedDate = user.createdAt 
+                                ? new Date(user.createdAt).toLocaleDateString() 
+                                : (user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString() : null);
+
+                            return (
+                                <tr key={user.uid} className="hover:bg-white/5 transition group">
+                                    <td className="p-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center text-xs font-bold text-gray-400 border border-white/10 flex-shrink-0">
+                                                {initials}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="font-bold text-white group-hover:text-blue-400 transition-colors flex items-center gap-2 truncate">
+                                                    <span className="truncate">{user.email || user.name || 'Anonymous User'}</span>
+                                                    {user.isGuest && (
+                                                        <span className="text-[9px] bg-white/10 px-1.5 py-0.5 rounded text-gray-400 font-normal uppercase">
+                                                            Guest
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {user.name && user.email && user.name !== user.email && (
+                                                    <div className="text-[11px] text-gray-400 truncate">{user.name}</div>
+                                                )}
+                                                <div className="text-[10px] text-gray-600 font-mono flex items-center gap-1">
+                                                    <CreditCard size={10} /> {(user.uid || 'unknown').substring(0, 8)}...
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <div className="font-bold text-white group-hover:text-blue-400 transition-colors">{user.email}</div>
-                                            <div className="text-[10px] text-gray-600 font-mono flex items-center gap-1"><CreditCard size={10} /> {(user.uid || 'unknown').substring(0, 8)}...</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="p-4 text-gray-500 text-xs">
-                                    {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : <span className="text-gray-700">-</span>}
-                                </td>
-                                <td className="p-4">
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${user.plan === 'Premium' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' : 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
-                                        {user.plan}
-                                    </span>
-                                </td>
-                                <td className="p-4 text-gray-500 text-xs font-mono">
-                                    {user.lastActiveAt ? new Date(user.lastActiveAt).toLocaleString() : 'Never'}
-                                </td>
-                                <td className="p-4 text-center">
-                                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${user.status === 'blocked' ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
-                                        <div className={`w-1.5 h-1.5 rounded-full ${user.status === 'blocked' ? 'bg-red-500' : 'bg-green-500'} animate-pulse`} />
-                                        {(user.status || 'active').toUpperCase()}
-                                    </span>
-                                </td>
-                                <td className="p-4 text-right">
-                                    <button onClick={() => handleEditClick(user)} className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 rounded text-xs font-bold text-gray-300 hover:text-white transition flex items-center gap-2 ml-auto">
-                                        <Edit size={12} /> Manage
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
+                                    </td>
+                                    <td className="p-4 text-gray-500 text-xs">
+                                        {joinedDate || <span className="text-gray-700">-</span>}
+                                    </td>
+                                    <td className="p-4">
+                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${user.plan === 'Premium' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' : 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
+                                            {user.plan}
+                                        </span>
+                                    </td>
+                                    <td className="p-4 text-gray-500 text-xs font-mono">
+                                        {user.lastActiveAt ? new Date(user.lastActiveAt).toLocaleString() : (user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : 'Never')}
+                                    </td>
+                                    <td className="p-4 text-center">
+                                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${user.status === 'blocked' ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
+                                            <div className={`w-1.5 h-1.5 rounded-full ${user.status === 'blocked' ? 'bg-red-500' : 'bg-green-500'} animate-pulse`} />
+                                            {(user.status || 'active').toUpperCase()}
+                                        </span>
+                                    </td>
+                                    <td className="p-4 text-right">
+                                        <button onClick={() => handleEditClick(user)} className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 rounded text-xs font-bold text-gray-300 hover:text-white transition flex items-center gap-2 ml-auto">
+                                            <Edit size={12} /> Manage
+                                        </button>
+                                    </td>
+                                </tr>
+                            );
+                        })}
                         {filteredUsers.length === 0 && (
                             <tr>
                                 <td colSpan={6} className="p-12 text-center text-gray-500">
@@ -178,6 +231,34 @@ const UsersModule = () => {
                         )}
                     </tbody>
                 </table>
+
+                {/* Pagination Controls */}
+                {filteredUsers.length > 0 && pageSize !== 'all' && totalPages > 1 && (
+                    <div className="p-4 bg-white/[0.02] border-t border-white/5 flex items-center justify-between text-xs text-gray-400 flex-wrap gap-3">
+                        <div>
+                            Showing {((currentPage - 1) * Number(pageSize)) + 1} - {Math.min(currentPage * Number(pageSize), filteredUsers.length)} of {filteredUsers.length} users
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setPage(p => Math.max(1, p - 1))}
+                                disabled={currentPage === 1}
+                                className="px-3 py-1.5 rounded bg-white/5 hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-white/5 text-white transition"
+                            >
+                                Previous
+                            </button>
+                            <span className="px-2">
+                                Page {currentPage} of {totalPages}
+                            </span>
+                            <button
+                                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                disabled={currentPage === totalPages}
+                                className="px-3 py-1.5 rounded bg-white/5 hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-white/5 text-white transition"
+                            >
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Edit User Modal */}

@@ -59,6 +59,7 @@ import {
 import { idbGet, idbSet } from '../utils/idbCache';
 import { FALLBACK_CATALOG, FALLBACK_SECTIONS, fetchDynamicFallbackContent, buildDynamicSections } from '../services/fallbackCatalog';
 import { isIndianOrMarvelContent } from '../services/recommendationService';
+import { bulkSaveContentTitles, saveContentTitle } from '../utils/titleManager';
 
 interface StoreContextType {
     isAuthenticated: boolean;
@@ -268,6 +269,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     // Track versions in memory to prevent infinite loops if LocalStorage fails
     const localContentVersionRef = React.useRef(parseInt(localStorage.getItem('contentVersion') || '0'));
     const localSectionsVersionRef = React.useRef(parseInt(localStorage.getItem('sectionsVersion') || '0'));
+    const fetchedContentDocsRef = useRef<Map<string, Content>>(new Map());
+    const inFlightDocFetchesRef = useRef<Map<string, Promise<Content | null>>>(new Map());
 
     // Helper to heal broken/dummy poster and backdrop URLs and synchronize with curated catalog
     const healAndMergeCatalog = useCallback((existing: Content[]): Content[] => {
@@ -464,6 +467,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     }
 
                     if (!userSnap.exists()) {
+                        const nowIso = new Date().toISOString();
                         const newAppUser: AppUser = {
                             uid: firebaseUser.uid,
                             email: userEmail,
@@ -471,7 +475,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                             plan: 'Free',
                             role: role, // Use calculated role
                             status: 'active',
-                            lastLoginAt: new Date().toISOString(),
+                            createdAt: nowIso,
+                            lastLoginAt: nowIso,
+                            lastActiveAt: nowIso,
                             isGuest
                         };
                         await withTimeout(setDoc(userRef, newAppUser), 5000).catch(() => {});
@@ -493,18 +499,28 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     } else {
                         // Backfill name if missing for existing users
                         const userData = userSnap.data() as AppUser;
+                        const nowIso = new Date().toISOString();
+                        const userUpdates: Partial<AppUser> = {
+                            lastLoginAt: nowIso,
+                            lastActiveAt: nowIso
+                        };
+
+                        if (!userData.createdAt) {
+                            userUpdates.createdAt = userData.lastLoginAt || nowIso;
+                        }
 
                         // Force Admin Role for Permanent Admins
                         if (isPermanentAdmin && userData.role !== 'admin') {
-                            setDoc(userRef, { role: 'admin' }, { merge: true }).catch(() => {});
+                            userUpdates.role = 'admin';
                             userData.role = 'admin';
                         }
 
                         if (!userData.name) {
-                            setDoc(userRef, {
-                                name: firebaseUser.displayName || userEmail.split('@')[0]
-                            }, { merge: true }).catch(() => {});
+                            userUpdates.name = firebaseUser.displayName || userEmail.split('@')[0];
+                            userData.name = userUpdates.name;
                         }
+
+                        setDoc(userRef, userUpdates, { merge: true }).catch(() => {});
                         // Check token version to force logout if needed
                         const localTokenVersion = localStorage.getItem('tokenVersion');
                         if (userData.tokenVersion && localTokenVersion && parseInt(localTokenVersion) < userData.tokenVersion) {
@@ -766,6 +782,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         };
     }, []);
 
+    // Automatically synchronize library titles with fast title cache for instant title resolution
+    useEffect(() => {
+        if (content && content.length > 0) {
+            bulkSaveContentTitles(content);
+        }
+    }, [content]);
+
     // Dedicated Admin Users Listener: Only active when an admin user is logged in
     useEffect(() => {
         if (currentUser?.role !== 'admin') {
@@ -773,11 +796,24 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             return;
         }
 
-        const qUsers = query(collection(db, 'users'), limit(50));
+        const qUsers = query(collection(db, 'users'));
+        const handleDocs = (docs: any[]) => {
+            const list = docs.map(d => ({ uid: d.id, ...d.data() } as AppUser));
+            list.sort((a, b) => {
+                const timeA = new Date(a.lastActiveAt || a.lastLoginAt || a.createdAt || 0).getTime();
+                const timeB = new Date(b.lastActiveAt || b.lastLoginAt || b.createdAt || 0).getTime();
+                return timeB - timeA;
+            });
+            setUsers(list);
+        };
+
         const unsubUsers = onSnapshot(qUsers, (snap) => {
-            setUsers(snap.docs.map(d => ({ uid: d.id, ...d.data() } as AppUser)));
+            handleDocs(snap.docs);
         }, (error) => {
-            console.warn("Admin users fetch:", error);
+            console.warn("Admin users snapshot fetch error, falling back to getDocs:", error);
+            getDocs(collection(db, 'users')).then(snap => {
+                handleDocs(snap.docs);
+            }).catch(e => console.warn("Admin users getDocs error:", e));
         });
 
         return () => unsubUsers();
@@ -971,34 +1007,67 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
     };
 
-    const fetchContentById = async (id: string): Promise<Content | null> => {
+    const fetchContentById = useCallback(async (id: string): Promise<Content | null> => {
         if (!id) return null;
+
+        // 1. Check in-memory cache of fully fetched docs
+        const cached = fetchedContentDocsRef.current.get(id);
+        if (cached) return cached;
+
+        // 2. Return existing in-flight promise if already being fetched
+        if (inFlightDocFetchesRef.current.has(id)) {
+            return inFlightDocFetchesRef.current.get(id)!;
+        }
+
         const existing = content.find(c => c.id === id);
         // If already in memory with full details/seasons (if applicable), return it
-        if (existing && (!existing.type || existing.type === 'movie' || (existing.seasons && existing.seasons.length > 0))) {
+        if (existing && ((existing.type === 'movie' && (existing.cast?.length || 0) > 0) || (existing.seasons && existing.seasons.length > 0))) {
+            fetchedContentDocsRef.current.set(id, existing);
             return existing;
         }
-        try {
-            const docSnap = await withTimeout(getDoc(doc(db, 'content', id)), 5000);
-            if (docSnap.exists()) {
-                const fullItem = { ...docSnap.data(), id: docSnap.id } as Content;
-                setContent(prev => {
-                    const idx = prev.findIndex(c => c.id === id);
-                    if (idx > -1) {
-                        const updated = [...prev];
-                        updated[idx] = { ...updated[idx], ...fullItem };
-                        return updated;
+
+        const fetchPromise = (async () => {
+            try {
+                const docSnap = await withTimeout(getDoc(doc(db, 'content', id)), 5000);
+                if (docSnap.exists()) {
+                    const fullItem = { ...docSnap.data(), id: docSnap.id } as Content;
+                    if (fullItem.title) {
+                        saveContentTitle(fullItem.id, fullItem.title);
                     }
-                    return [fullItem, ...prev];
-                });
-                return fullItem;
+                    fetchedContentDocsRef.current.set(id, fullItem);
+                    setContent(prev => {
+                        const idx = prev.findIndex(c => c.id === id);
+                        if (idx > -1) {
+                            const curr = prev[idx];
+                            // Avoid unnecessary state reference churn if seasons and cast are identical
+                            const seasonsSame = (curr.seasons?.length || 0) === (fullItem.seasons?.length || 0);
+                            const castSame = (curr.cast?.length || 0) === (fullItem.cast?.length || 0);
+                            if (seasonsSame && castSame && curr.videoUrl === fullItem.videoUrl) {
+                                return prev;
+                            }
+                            const updated = [...prev];
+                            updated[idx] = { ...updated[idx], ...fullItem };
+                            return updated;
+                        }
+                        return [fullItem, ...prev];
+                    });
+                    return fullItem;
+                }
+            } catch (e) {
+                console.warn("[Content Fetch] Firebase took >5s or failed for doc:", id, e);
+                handleQuotaExceeded();
+            } finally {
+                inFlightDocFetchesRef.current.delete(id);
             }
-        } catch (e) {
-            console.warn("[Content Fetch] Firebase took >5s or failed for doc:", id, e);
-            handleQuotaExceeded();
-        }
-        return existing || null;
-    };
+            if (existing) {
+                fetchedContentDocsRef.current.set(id, existing);
+            }
+            return existing || null;
+        })();
+
+        inFlightDocFetchesRef.current.set(id, fetchPromise);
+        return fetchPromise;
+    }, [content, handleQuotaExceeded]);
 
     const addContent = async (item: Content) => {
         await setDoc(doc(db, 'content', item.id), item);

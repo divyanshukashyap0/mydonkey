@@ -228,6 +228,42 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="/manifest.json" />
   <title>My Donkey | Watch Free Movies, TV Shows, Anime &amp; Marvel Movies Online in HD</title>
+  <script>
+    (function() {
+      try {
+        var path = window.location.pathname;
+        var isBrowse = path.indexOf('/browse/') !== -1;
+        var isWatch = path.indexOf('/watch/') !== -1;
+        if (isBrowse || isWatch) {
+          // 1. Instant check from URL query param ?title= (0ms for shared/copied links)
+          var params = new URLSearchParams(window.location.search);
+          var paramTitle = params.get('title');
+          if (paramTitle) {
+            document.title = decodeURIComponent(paramTitle) + ' | My Donkey';
+            return;
+          }
+          // 2. Instant check from localStorage title cache
+          var parts = path.split('/');
+          var id = '';
+          for (var i = 0; i < parts.length; i++) {
+            if (parts[i] === 'browse' || parts[i] === 'watch') {
+              id = parts[i + 1] ? parts[i + 1].split('?')[0].split('#')[0] : '';
+              break;
+            }
+          }
+          if (id) {
+            var raw = localStorage.getItem('mydonkey_content_titles');
+            if (raw) {
+              var cache = JSON.parse(raw);
+              if (cache && cache[id]) {
+                document.title = cache[id] + ' | My Donkey';
+              }
+            }
+          }
+        }
+      } catch (e) {}
+    })();
+  </script>
   <meta name="description"
     content="Watch free movies, TV shows, anime, and Marvel movies online in HD on My Donkey. Stream thousands of Hollywood, Bollywood, English movies, and web series with authentic audio and zero subscription fees." />
   <meta name="keywords"

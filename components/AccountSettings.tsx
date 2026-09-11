@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronUp, ChevronRight, Monitor, User as UserIcon, Plus, Calendar, Camera, Wifi, Settings, PlayCircle, Smartphone, Download, Send, Maximize, X, Trash2, Film, QrCode, ScanLine, Tv, Sparkles, ArrowRight, ShieldCheck, History, SlidersHorizontal, Globe, Volume2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronRight, Monitor, User as UserIcon, Plus, Calendar, Camera, Wifi, Settings, PlayCircle, Smartphone, Download, Send, Maximize, X, Trash2, Film, QrCode, ScanLine, Tv, Sparkles, ArrowRight, ShieldCheck, History, SlidersHorizontal, Globe, Volume2, LayoutDashboard } from 'lucide-react';
 import { useStore, PERMANENT_ADMINS } from '../context/StoreContext';
 import DeviceManagementModal from './account/DeviceManagementModal';
 import MyContributions from './account/MyContributions';
@@ -192,7 +192,7 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                 <div className="flex items-center gap-4 mb-8">
                     <div className="relative group">
                         <img
-                            src={userProfiles[0]?.avatarUrl || '/Mydonkey%20user.jpg'}
+                            src={currentProfile?.avatarUrl || userProfiles[0]?.avatarUrl || '/Mydonkey%20user.jpg'}
                             className="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover ring-2 ring-cyan-500/50 shadow-lg shadow-cyan-500/20"
                         />
                         <button
@@ -203,16 +203,36 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                         </button>
                     </div>
                     <div>
-                        <h1 className="text-xl md:text-2xl font-bold text-white">{userProfiles[0]?.name || 'User'}</h1>
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-xl md:text-2xl font-bold text-white">{currentProfile?.name || userProfiles[0]?.name || 'User'}</h1>
+                            {isAdmin && (
+                                <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-brand-red text-white shadow-sm tracking-wide">
+                                    ADMIN
+                                </span>
+                            )}
+                        </div>
                         <p className="text-sm text-gray-400 truncate max-w-[200px]">{currentUser.email}</p>
                     </div>
-                    <button
-                        onClick={() => navigate('/scan')}
-                        className="ml-auto flex items-center gap-2 px-3.5 py-2 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 transition-all font-bold text-xs shadow-lg shadow-cyan-500/10 active:scale-95"
-                    >
-                        <QrCode size={16} />
-                        <span>Scan</span>
-                    </button>
+                    <div className="ml-auto flex items-center gap-2.5">
+                        {isAdmin && (
+                            <button
+                                onClick={() => navigate('/admin')}
+                                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-brand-red/15 border border-brand-red/40 text-brand-red hover:bg-brand-red/25 transition-all font-bold text-xs shadow-lg shadow-brand-red/10 active:scale-95 cursor-pointer"
+                                title="Open Admin Dashboard"
+                            >
+                                <LayoutDashboard size={16} />
+                                <span className="hidden sm:inline">Admin Dashboard</span>
+                                <span className="sm:hidden">Admin</span>
+                            </button>
+                        )}
+                        <button
+                            onClick={() => navigate('/scan')}
+                            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 transition-all font-bold text-xs shadow-lg shadow-cyan-500/10 active:scale-95"
+                        >
+                            <QrCode size={16} />
+                            <span>Scan</span>
+                        </button>
+                    </div>
                 </div>
 
                 {/* 100% Free Lifetime Access Banner */}
@@ -596,11 +616,41 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                 {isAdmin && (
                     <div className="bg-gradient-to-br from-[#18111e] via-[#141021] to-black rounded-xl overflow-hidden border border-brand-red/30 shadow-lg shadow-brand-red/10">
                         <div className="px-5 py-3 border-b border-white/5 flex items-center justify-between">
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Administrator Controls</span>
+                            <div className="flex items-center gap-2">
+                                <LayoutDashboard size={15} className="text-brand-red" />
+                                <span className="text-xs font-bold text-gray-300 uppercase tracking-wider">Administrator Controls</span>
+                            </div>
                             <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-brand-red/20 text-brand-red border border-brand-red/30">
                                 ADMIN ONLY
                             </span>
                         </div>
+
+                        {/* Admin Dashboard Option */}
+                        <button
+                            onClick={() => navigate('/admin')}
+                            className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition group text-left cursor-pointer border-b border-white/5"
+                        >
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-red to-purple-600 flex items-center justify-center text-white shadow-md shadow-brand-red/30 group-hover:scale-105 transition-transform">
+                                    <LayoutDashboard size={20} />
+                                </div>
+                                <div className="text-left">
+                                    <div className="font-bold flex items-center gap-2 text-white">
+                                        Admin Dashboard
+                                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-brand-red/20 text-brand-red border border-brand-red/40">
+                                            DASHBOARD
+                                        </span>
+                                    </div>
+                                    <div className="text-xs text-gray-400">
+                                        Manage movies, TV shows, anime, users, catalog, analytics & content requests
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-brand-red font-bold text-xs group-hover:translate-x-1 transition-transform">
+                                <span>Open Panel</span>
+                                <ChevronRight size={18} />
+                            </div>
+                        </button>
 
                         <button
                             onClick={() => setShowGlobalSettings(true)}

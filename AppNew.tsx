@@ -54,6 +54,7 @@ import {
     INDIAN_LANGUAGES
 } from './services/tmdbService';
 import { FALLBACK_CATALOG } from './services/fallbackCatalog';
+import { saveContentTitle, setWebpageTitle, resolveContentTitleInstant } from './utils/titleManager';
 import { SlidersHorizontal } from 'lucide-react';
 import { Content, ContinueWatchingItem, Section } from './types';
 import { StoreProvider, PERMANENT_ADMINS } from './context/StoreContext';
@@ -159,16 +160,26 @@ const MainLayout = () => {
         };
     }, [!!playingContent, location.pathname]);
 
-    // Keep document title synced with active content or current page
+    // Keep document title synced automatically and instantly with active content or current page
     useEffect(() => {
         const isBrowseRoute = location.pathname.startsWith('/browse/');
         const isWatchRoute = location.pathname.startsWith('/watch/');
 
-        if (isBrowseRoute && viewingContent?.title) {
-            document.title = `${viewingContent.title} | My Donkey`;
-        } else if (isWatchRoute && playingContent?.title) {
-            document.title = `${playingContent.title} | My Donkey`;
-        } else if (!isBrowseRoute && !isWatchRoute) {
+        if (isBrowseRoute || isWatchRoute) {
+            // 1. Direct active state in memory
+            const activeTitle = (isBrowseRoute ? viewingContent?.title : playingContent?.title);
+            if (activeTitle) {
+                setWebpageTitle(activeTitle);
+                return;
+            }
+
+            // 2. Immediately resolve from URL search (?title=), location state, memory cache, or fallback catalog
+            const instantTitle = resolveContentTitleInstant(location.pathname, location.search, location.state, rawContent || content);
+            if (instantTitle) {
+                setWebpageTitle(instantTitle);
+                return;
+            }
+        } else {
             const tabTitles: Record<string, string> = {
                 home: 'My Donkey | Watch Free Movies, TV Shows, Anime & Marvel Movies Online in HD',
                 movies: 'Movies — Stream HD & 4K Movies | My Donkey',
@@ -181,7 +192,7 @@ const MainLayout = () => {
             };
             document.title = tabTitles[activeTab] || 'My Donkey | Watch Free Movies, TV Shows, Anime & Marvel Movies Online in HD';
         }
-    }, [viewingContent?.title, playingContent?.title, location.pathname, activeTab]);
+    }, [viewingContent?.title, playingContent?.title, location.pathname, location.search, location.state, activeTab, rawContent, content]);
 
     // Deep Link Handler (e.g. /browse/content_123 or /watch/content_123)
     useEffect(() => {
@@ -191,15 +202,15 @@ const MainLayout = () => {
             const contentId = location.pathname.split('/')[2];
             const stateItem = (location.state as any)?.item;
 
+            // Instant title resolution for deep link before any network calls
+            const earlyTitle = stateItem?.title || resolveContentTitleInstant(location.pathname, location.search, location.state, rawContent || content);
+            if (earlyTitle) {
+                setWebpageTitle(earlyTitle);
+            }
+
             if (contentId) {
                 let item = stateItem || rawContent.find(c => c.id === contentId);
-                if (!item && !contentId.startsWith('tmdb_') && fetchContentById) {
-                    fetchContentById(contentId).then(fetched => {
-                        if (fetched && !isCancelled && window.location.pathname.startsWith('/browse/')) {
-                            setViewingContent(fetched);
-                        }
-                    }).catch(() => { });
-                }
+
                 if (item) {
                     // Check for Exclusive access via URL
                     if (item.isExclusive && !currentProfile?.unlockedContent?.includes('global_unlock')) {
@@ -209,6 +220,10 @@ const MainLayout = () => {
                     if (isCancelled || !window.location.pathname.startsWith('/browse/')) return;
                     if (viewingContentRef.current?.id !== item.id) {
                         setViewingContent(item);
+                    }
+                    if (item.title) {
+                        setWebpageTitle(item.title);
+                        saveContentTitle(item.id, item.title);
                     }
                 } else if (contentId.startsWith('tmdb_')) {
                     const currentViewing = viewingContentRef.current;
@@ -257,10 +272,17 @@ const MainLayout = () => {
                                 tmdbId: detail.id,
                                 allowPlayback: true,
                                 isPublished: true,
+                                cast: detail.credits?.cast ? detail.credits.cast.slice(0, 12).map((c: any) => c.name) : undefined,
+                                director: detail.credits?.crew?.find((c: any) => c.job === 'Director')?.name || undefined,
+                                creators: detail.created_by?.map((c: any) => c.name) || undefined,
                                 createdAt: new Date().toISOString()
                             };
                             if (isCancelled || !window.location.pathname.startsWith('/browse/')) return;
                             setViewingContent(resolved);
+                            if (resolved.title) {
+                                setWebpageTitle(resolved.title);
+                                saveContentTitle(resolved.id, resolved.title);
+                            }
                         };
 
                         fetchResolved().catch(() => {
@@ -269,16 +291,34 @@ const MainLayout = () => {
                             navigate(from || '/', { replace: true });
                         });
                     }
+                } else if (fetchContentById) {
+                    // Document is not in local memory, asynchronously fetch from Firestore
+                    fetchContentById(contentId).then(fetched => {
+                        if (isCancelled || !window.location.pathname.startsWith('/browse/')) return;
+                        if (fetched) {
+                            if (fetched.isExclusive && !currentProfile?.unlockedContent?.includes('global_unlock')) {
+                                navigate('/exclusive', { replace: true });
+                                return;
+                            }
+                            setViewingContent(fetched);
+                            if (fetched.title) {
+                                setWebpageTitle(fetched.title);
+                                saveContentTitle(fetched.id, fetched.title);
+                            }
+                        } else {
+                            console.warn(`Deep link content not found: ${contentId}`);
+                            const from = (location.state as any)?.from || lastNonModalUrlRef.current;
+                            navigate(from || '/', { replace: true });
+                        }
+                    }).catch(() => {
+                        if (isCancelled || !window.location.pathname.startsWith('/browse/')) return;
+                        const from = (location.state as any)?.from || lastNonModalUrlRef.current;
+                        navigate(from || '/', { replace: true });
+                    });
                 } else {
-                    // Content loaded but ID not found
-                    console.warn(`Deep link content not found: ${contentId}`);
                     const from = (location.state as any)?.from || lastNonModalUrlRef.current;
                     navigate(from || '/', { replace: true });
-                    return;
                 }
-            } else {
-                const from = (location.state as any)?.from || lastNonModalUrlRef.current;
-                navigate(from || '/', { replace: true });
             }
         } else {
             // URL cleared, ensure modal closes
@@ -292,6 +332,12 @@ const MainLayout = () => {
             const searchParams = new URLSearchParams(location.search);
             const mode = searchParams.get('mode') as 'trailer' | 'movie' || 'movie';
             const stateItem = (location.state as any)?.item;
+
+            // Instant title resolution for watch deep link before any network calls
+            const earlyTitle = stateItem?.title || resolveContentTitleInstant(location.pathname, location.search, location.state, rawContent || content);
+            if (earlyTitle) {
+                setWebpageTitle(earlyTitle);
+            }
 
             // Wait for authentication
             if (!isLoading) {
@@ -325,6 +371,10 @@ const MainLayout = () => {
                         fetchContentById(contentId).then(fetched => {
                             if (fetched && !isCancelled && window.location.pathname.startsWith('/watch/')) {
                                 setPlayingContent({ ...fetched, playMode: mode });
+                                if (fetched.title) {
+                                    setWebpageTitle(fetched.title);
+                                    saveContentTitle(fetched.id, fetched.title);
+                                }
                             }
                         }).catch(() => { });
                     }
@@ -366,6 +416,10 @@ const MainLayout = () => {
                         if (!playingContentRef.current || playingContentRef.current.id !== playableItem.id || playingContentRef.current.playMode !== mode) {
                             if (isCancelled || !window.location.pathname.startsWith('/watch/')) return;
                             setPlayingContent({ ...playableItem, playMode: mode });
+                            if (playableItem.title) {
+                                setWebpageTitle(playableItem.title);
+                                saveContentTitle(playableItem.id, playableItem.title);
+                            }
                             // Increment views when main movie starts
                             if (mode === 'movie') {
                                 incrementViews(playableItem.id).catch(() => { });
@@ -436,6 +490,10 @@ const MainLayout = () => {
                             };
                             if (isCancelled || !window.location.pathname.startsWith('/watch/')) return;
                             setPlayingContent({ ...resolved, playMode: mode });
+                            if (resolved.title) {
+                                setWebpageTitle(resolved.title);
+                                saveContentTitle(resolved.id, resolved.title);
+                            }
                             if (mode === 'movie') {
                                 incrementViews(resolved.id).catch(() => { });
                             }
@@ -507,7 +565,7 @@ const MainLayout = () => {
         if (playingContent && location.pathname.startsWith('/watch/')) {
             const targetWatchPath = `/watch/${playingContent.id}`;
             if (!location.pathname.startsWith(targetWatchPath)) {
-                navigate(`${targetWatchPath}?mode=${playingContent.playMode || 'movie'}`, {
+                navigate(`${targetWatchPath}?mode=${playingContent.playMode || 'movie'}&title=${encodeURIComponent(playingContent.title)}`, {
                     replace: true,
                     state: {
                         item: playingContent,
@@ -927,7 +985,9 @@ const MainLayout = () => {
             const isFromBrowse = location.pathname.startsWith('/browse/');
             setViewingContent(null);
             setPlayingContent(fullItem);
-            navigate(`/watch/${targetId}?mode=movie`, {
+            setWebpageTitle(fullItem.title);
+            saveContentTitle(targetId, fullItem.title);
+            navigate(`/watch/${targetId}?mode=movie&title=${encodeURIComponent(fullItem.title)}`, {
                 replace: isFromBrowse,
                 state: {
                     item: fullItem,
@@ -942,10 +1002,13 @@ const MainLayout = () => {
 
     const handleDetails = (item: Content) => {
         setViewingContent(item);
+        setWebpageTitle(item.title);
+        saveContentTitle(item.id, item.title);
         const fromUrl = (location.state as any)?.from || (isModalRoute ? lastNonModalUrlRef.current : (location.pathname + location.search));
         const fromTab = (location.state as any)?.fromTab || activeTab;
-        const search = (!isModalRoute && location.search) ? location.search : '';
-        navigate(`/browse/${item.id}${search}`, {
+        const searchParams = new URLSearchParams((!isModalRoute && location.search) ? location.search : '');
+        searchParams.set('title', item.title);
+        navigate(`/browse/${item.id}?${searchParams.toString()}`, {
             state: {
                 item,
                 from: fromUrl,
@@ -1838,7 +1901,7 @@ const MainLayout = () => {
             </main>
 
             <Footer onNavigate={handleNavigate} />
-            <MobileNav activeTab={activeTab} setTab={handleTabChange} />
+            <MobileNav activeTab={activeTab} setTab={handleTabChange} currentProfile={currentProfile} />
 
 
 
@@ -1975,7 +2038,7 @@ const AppRoutes = () => {
                 element={
                     isLoading ? (
                         <Loader />
-                    ) : (currentUser?.role === 'admin' || (isAuthenticated && window.location.pathname.startsWith('/admin'))) ? (
+                    ) : (currentUser?.role === 'admin' || Boolean(currentUser?.email && PERMANENT_ADMINS.includes(currentUser.email)) || (isAuthenticated && window.location.pathname.startsWith('/admin'))) ? (
                         <AdminLayout onExit={() => navigate('/')} />
                     ) : (
                         <Navigate to="/" replace />

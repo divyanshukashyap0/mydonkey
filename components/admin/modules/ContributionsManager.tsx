@@ -17,22 +17,59 @@ interface Contribution {
 }
 
 const ContributionsManager: React.FC = () => {
-    const { publishCatalog, deleteContent } = useStore();
+    const { publishCatalog, deleteContent, content } = useStore();
     const [contributions, setContributions] = useState<Contribution[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState<number | 'all'>(50);
 
     const fetchContributions = async () => {
         setIsLoading(true);
         try {
-            const q = query(
-                collection(db, 'content_contributions'),
-                orderBy('addedAt', 'desc'),
-                limit(100)
-            );
-            const snap = await getDocs(q);
-            setContributions(snap.docs.map(d => ({ id: d.id, ...d.data() } as Contribution)));
+            let directContributions: Contribution[] = [];
+            try {
+                const q = query(
+                    collection(db, 'content_contributions'),
+                    orderBy('addedAt', 'desc')
+                );
+                const snap = await getDocs(q);
+                directContributions = snap.docs.map(d => ({ id: d.id, ...d.data() } as Contribution));
+            } catch (err) {
+                console.warn("orderBy query failed, fetching all content_contributions without orderBy:", err);
+                const snap = await getDocs(collection(db, 'content_contributions'));
+                directContributions = snap.docs.map(d => ({ id: d.id, ...d.data() } as Contribution));
+            }
+
+            // Also check items from content catalog that have addedBy attribution
+            const catalogContributions: Contribution[] = (content || [])
+                .filter(c => c.addedBy && (c.addedBy.userId || c.addedBy.email || c.addedBy.name))
+                .map(c => ({
+                    id: c.id,
+                    contentId: c.id,
+                    tmdbId: c.tmdbId || 0,
+                    imdbId: c.imdbId || '',
+                    title: c.title,
+                    poster_path: c.poster_path || '',
+                    type: c.type || 'movie',
+                    addedAt: c.addedBy?.addedAt || (c as any).createdAt || new Date().toISOString(),
+                    addedBy: c.addedBy!
+                }));
+
+            // Merge & deduplicate by contentId / id / tmdbId
+            const seen = new Set<string>();
+            const combined: Contribution[] = [];
+
+            for (const item of [...directContributions, ...catalogContributions]) {
+                const key = item.contentId || item.id || (item.tmdbId ? `tmdb_${item.tmdbId}` : null);
+                if (key && seen.has(key)) continue;
+                if (key) seen.add(key);
+                combined.push(item);
+            }
+
+            combined.sort((a, b) => new Date(b.addedAt || 0).getTime() - new Date(a.addedAt || 0).getTime());
+            setContributions(combined);
         } catch (e) {
             console.error('Failed to load contributions:', e);
         } finally {
@@ -65,13 +102,25 @@ const ContributionsManager: React.FC = () => {
         }
     };
 
-    const filtered = contributions.filter(c =>
-        !search ||
-        (c.title || '').toLowerCase().includes(search.toLowerCase()) ||
-        (c.addedBy?.name || '').toLowerCase().includes(search.toLowerCase()) ||
-        (c.addedBy?.email || '').toLowerCase().includes(search.toLowerCase()) ||
-        c.addedBy?.userId?.includes(search)
-    );
+    const filtered = contributions.filter(c => {
+        const term = search.toLowerCase();
+        return !term ||
+            (c.title || '').toLowerCase().includes(term) ||
+            (c.addedBy?.name || '').toLowerCase().includes(term) ||
+            (c.addedBy?.email || '').toLowerCase().includes(term) ||
+            c.addedBy?.userId?.includes(search);
+    });
+
+    const totalPages = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(filtered.length / Number(pageSize)));
+    const currentPage = Math.min(page, totalPages);
+    const paginated = pageSize === 'all'
+        ? filtered
+        : filtered.slice((currentPage - 1) * Number(pageSize), currentPage * Number(pageSize));
+
+    const handleSearchChange = (val: string) => {
+        setSearch(val);
+        setPage(1);
+    };
 
     return (
         <div className="space-y-6">
@@ -97,7 +146,7 @@ const ContributionsManager: React.FC = () => {
                 </div>
                 <div className="bg-white/5 border border-white/10 rounded-xl p-4">
                     <div className="text-2xl font-black text-white">
-                        {new Set(contributions.map(c => c.addedBy?.userId)).size}
+                        {new Set(contributions.map(c => c.addedBy?.userId || c.addedBy?.email || c.addedBy?.name).filter(Boolean)).size}
                     </div>
                     <div className="text-xs text-gray-400 mt-1">Unique Contributors</div>
                 </div>
@@ -115,16 +164,32 @@ const ContributionsManager: React.FC = () => {
                 </div>
             </div>
 
-            {/* Search */}
-            <div className="relative">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                <input
-                    type="text"
-                    placeholder="Search by title, user name, email or user ID..."
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-brand-red/50"
-                />
+            {/* Search & Page Size Filter */}
+            <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                    <input
+                        type="text"
+                        placeholder="Search by title, user name, email or user ID..."
+                        value={search}
+                        onChange={e => handleSearchChange(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-brand-red/50"
+                    />
+                </div>
+                <select
+                    value={pageSize}
+                    onChange={(e) => {
+                        const val = e.target.value === 'all' ? 'all' : Number(e.target.value);
+                        setPageSize(val);
+                        setPage(1);
+                    }}
+                    className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-white/20 transition-colors cursor-pointer text-gray-300"
+                >
+                    <option value={25}>25 / page</option>
+                    <option value={50}>50 / page</option>
+                    <option value={100}>100 / page</option>
+                    <option value="all">Show All</option>
+                </select>
             </div>
 
             {/* Table */}
@@ -153,7 +218,7 @@ const ContributionsManager: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
-                            {filtered.map(item => (
+                            {paginated.map(item => (
                                 <tr key={item.id} className="hover:bg-white/5 transition">
                                     {/* Content */}
                                     <td className="px-4 py-3">
@@ -257,6 +322,34 @@ const ContributionsManager: React.FC = () => {
                             ))}
                         </tbody>
                     </table>
+
+                    {/* Pagination Controls */}
+                    {filtered.length > 0 && pageSize !== 'all' && totalPages > 1 && (
+                        <div className="p-4 bg-white/[0.02] border-t border-white/5 flex items-center justify-between text-xs text-gray-400 flex-wrap gap-3">
+                            <div>
+                                Showing {((currentPage - 1) * Number(pageSize)) + 1} - {Math.min(currentPage * Number(pageSize), filtered.length)} of {filtered.length} contributions
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                                    disabled={currentPage === 1}
+                                    className="px-3 py-1.5 rounded bg-white/5 hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-white/5 text-white transition"
+                                >
+                                    Previous
+                                </button>
+                                <span className="px-2">
+                                    Page {currentPage} of {totalPages}
+                                </span>
+                                <button
+                                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                    disabled={currentPage === totalPages}
+                                    className="px-3 py-1.5 rounded bg-white/5 hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-white/5 text-white transition"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

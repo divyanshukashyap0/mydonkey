@@ -341,11 +341,11 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                 onDetails(enrichedContent);
 
                 // Background logging of contribution (only when quota is available)
-                if (currentUser && !isQuotaExceeded) {
+                if (!isQuotaExceeded) {
                     const addedByInfo = {
-                        userId: currentUser.uid,
-                        name: currentProfile?.name || currentUser.name || 'User',
-                        email: currentUser.email || '',
+                        userId: currentUser?.uid || 'guest-search',
+                        name: currentProfile?.name || currentUser?.name || (currentUser?.isGuest ? 'Guest' : 'User'),
+                        email: currentUser?.email || '',
                         addedAt: new Date().toISOString()
                     };
                     addDoc(collection(db, 'content_contributions'), {

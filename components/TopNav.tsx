@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Search, Menu, X, User, LogOut, Settings, LayoutDashboard, ChevronRight, Smartphone, Download, Loader2, Star, Play, Film } from 'lucide-react';
+import { Search, Menu, X, User, LogOut, Settings, LayoutDashboard, ChevronRight, ChevronDown, Smartphone, Download, Loader2, Star, Play, Film } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { searchTMDBMulti, tmdbPosterUrl, tmdbBackdropUrl, mapTMDBGenres } from '../services/tmdbService';
 import { buildEmbedUrl } from '../utils/embedUrl';
+import { saveContentTitle, setWebpageTitle } from '../utils/titleManager';
 import { Content } from '../types';
 
 interface TopNavProps {
@@ -163,10 +164,12 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
 
         const localMatch = content?.find(c => (item.tmdbId && c.tmdbId === item.tmdbId) || (item.id && c.id === item.id));
         if (localMatch) {
+            setWebpageTitle(localMatch.title);
+            saveContentTitle(localMatch.id, localMatch.title);
             if (onDetails) {
                 onDetails(localMatch);
             } else {
-                navigate(`/browse/${localMatch.id}`, { state: { item: localMatch } });
+                navigate(`/browse/${localMatch.id}?title=${encodeURIComponent(localMatch.title)}`, { state: { item: localMatch } });
             }
             return;
         }
@@ -193,10 +196,15 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
             createdAt: new Date().toISOString()
         };
 
+        if (immediateContent.title) {
+            setWebpageTitle(immediateContent.title);
+            saveContentTitle(immediateContent.id, immediateContent.title);
+        }
+
         if (onDetails) {
             onDetails(immediateContent);
         } else {
-            navigate(`/browse/${immediateContent.id}`, { state: { item: immediateContent } });
+            navigate(`/browse/${immediateContent.id}?title=${encodeURIComponent(immediateContent.title)}`, { state: { item: immediateContent } });
         }
     };
 
@@ -461,13 +469,29 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                         <>
 
 
-                            {/* Profile Dropdown */}
-                            <div className="relative" ref={profileRef}>
+                            {/* Profile / Account Nav & Dropdown */}
+                            <div className="relative flex items-center" ref={profileRef}>
+                                <button
+                                    onClick={() => {
+                                        setProfileMenuOpen(false);
+                                        handleNavClick('account');
+                                    }}
+                                    className="flex items-center gap-1.5 group cursor-pointer focus:outline-none"
+                                    title="Go to Account & Settings"
+                                >
+                                    <img
+                                        src={currentProfile?.avatarUrl || "/Mydonkey%20user.jpg"}
+                                        className="w-8 h-8 rounded border-2 border-transparent group-hover:border-white transition object-cover shadow-sm"
+                                        alt={currentProfile?.name || "Profile"}
+                                    />
+                                </button>
                                 <button
                                     onClick={() => setProfileMenuOpen(!isProfileMenuOpen)}
-                                    className="flex items-center gap-2 group"
+                                    className="text-gray-400 hover:text-white p-1 transition cursor-pointer"
+                                    aria-label="Toggle profile menu"
+                                    title="Quick Menu"
                                 >
-                                    <img src={currentProfile?.avatarUrl || "/Mydonkey%20user.jpg"} className="w-8 h-8 rounded border-2 border-transparent group-hover:border-white transition object-cover" />
+                                    <ChevronDown size={14} className={`transition-transform duration-200 ${isProfileMenuOpen ? 'rotate-180' : ''}`} />
                                 </button>
 
                                 {isProfileMenuOpen && (

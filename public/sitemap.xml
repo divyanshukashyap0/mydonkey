@@ -4,7 +4,7 @@
         xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
   <url>
     <loc>https://www.mydonkey.in/</loc>
-    <lastmod>2026-09-07</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.00</priority>
     <image:image>
@@ -15,7 +15,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/movies</loc>
-    <lastmod>2026-09-07</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.95</priority>
     <image:image>
@@ -26,7 +26,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/tv</loc>
-    <lastmod>2026-09-07</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.95</priority>
     <image:image>
@@ -37,7 +37,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/anime</loc>
-    <lastmod>2026-09-07</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.95</priority>
     <image:image>
@@ -48,7 +48,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/categories</loc>
-    <lastmod>2026-09-07</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.90</priority>
     <image:image>
@@ -59,7 +59,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/exclusive</loc>
-    <lastmod>2026-09-07</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -70,7 +70,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/adblocker</loc>
-    <lastmod>2026-09-07</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.80</priority>
     <image:image>
@@ -81,7 +81,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/sound-enhancements</loc>
-    <lastmod>2026-09-07</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.80</priority>
     <image:image>
@@ -92,7 +92,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/my-list</loc>
-    <lastmod>2026-09-07</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.75</priority>
     <image:image>
@@ -103,7 +103,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/about</loc>
-    <lastmod>2026-09-07</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.70</priority>
     <image:image>
@@ -114,7 +114,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/support</loc>
-    <lastmod>2026-09-07</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -125,7 +125,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/community-chat</loc>
-    <lastmod>2026-09-07</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
     <image:image>
@@ -136,7 +136,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/help</loc>
-    <lastmod>2026-09-07</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.70</priority>
     <image:image>
@@ -147,7 +147,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/contact</loc>
-    <lastmod>2026-09-07</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.70</priority>
     <image:image>
@@ -158,7 +158,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/careers</loc>
-    <lastmod>2026-09-07</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <image:image>
@@ -169,7 +169,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/press</loc>
-    <lastmod>2026-09-07</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <image:image>
@@ -180,7 +180,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/blog</loc>
-    <lastmod>2026-09-07</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.65</priority>
     <image:image>
@@ -191,7 +191,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/investors</loc>
-    <lastmod>2026-09-07</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.60</priority>
     <image:image>
@@ -202,7 +202,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/devices</loc>
-    <lastmod>2026-09-07</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <image:image>
@@ -213,7 +213,7 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/terms</loc>
-    <lastmod>2026-09-07</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.50</priority>
     <image:image>
@@ -224,354 +224,13 @@
   </url>
   <url>
     <loc>https://www.mydonkey.in/login</loc>
-    <lastmod>2026-09-07</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.60</priority>
     <image:image>
       <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
       <image:title>Sign In | My Donkey</image:title>
       <image:caption>Stream on My Donkey - Watch free movies, TV shows, anime, and marvel movies online in HD.</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?genre=Action</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Action Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
-      <image:caption>Watch Free Action Movies, Thrillers &amp; Combat Series Online</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?genre=Adventure</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Adventure Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
-      <image:caption>Watch Free Adventure Movies &amp; Quests Online</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?genre=Animation</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Animation Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
-      <image:caption>Watch Free Animated Movies, Anime &amp; Cartoons Online</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?genre=Biography</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Biography Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
-      <image:caption>Watch Real Life Biographies, Legends &amp; True Stories Free</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?genre=Comedy</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Comedy Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
-      <image:caption>Watch Free Comedy Movies, Standup &amp; Fun Shows Online</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?genre=Crime</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Crime Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
-      <image:caption>Watch Free Crime Movies, Gangster Dramas &amp; Heists Online</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?genre=Documentary</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Documentary Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
-      <image:caption>Watch Free Documentaries &amp; Real World Revelations Online</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?genre=Drama</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Drama Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
-      <image:caption>Watch Free Drama Movies, Emotional Stories &amp; Series Online</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?genre=Family</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Family Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
-      <image:caption>Watch Free Family Movies for Kids and All Ages Online</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?genre=Fantasy</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Fantasy Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
-      <image:caption>Watch Free Fantasy Movies, Mythical Beasts &amp; Magic Online</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?genre=History</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>History Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
-      <image:caption>Watch Free Historic War &amp; Historical Movies Online</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?genre=Horror</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Horror Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
-      <image:caption>Watch Free Horror Movies, Haunted Stories &amp; Thrillers Online</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?genre=Mystery</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Mystery Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
-      <image:caption>Watch Free Mystery Movies, Detective Stories &amp; Whodunits</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?genre=Romance</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Romance Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
-      <image:caption>Watch Free Romantic Movies &amp; Love Stories Online</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?genre=Sci-Fi</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Sci-Fi Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
-      <image:caption>Watch Free Sci-Fi Movies, Space &amp; Futuristic Series Online</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?genre=Sport</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Sport Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
-      <image:caption>Watch Free Sports Movies, Matches &amp; Cricket Highlights</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?genre=Thriller</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Thriller Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
-      <image:caption>Watch Free Suspense Thrillers &amp; Edge-of-Seat Movies Online</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?genre=War</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>War Movies &amp; TV Shows - Watch Free on My Donkey</image:title>
-      <image:caption>Watch Free War Movies, Battlefields &amp; Military Dramas</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?region=global&amp;subRegion=en</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Watch English Movies &amp; Hollywood Hits Free Online | My Donkey</image:title>
-      <image:caption>Stream English Movies &amp; Hollywood Hits in HD. Watch free movies and series on My Donkey.</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?region=indian&amp;subRegion=hi</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Watch Hindi Movies &amp; Bollywood Hits Free Online | My Donkey</image:title>
-      <image:caption>Stream Hindi Movies &amp; Bollywood Hits in HD. Watch free movies and series on My Donkey.</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?region=indian&amp;subRegion=te</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Watch Telugu Movies &amp; Tollywood Hits Free Online | My Donkey</image:title>
-      <image:caption>Stream Telugu Movies &amp; Tollywood Hits in HD. Watch free movies and series on My Donkey.</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?region=indian&amp;subRegion=ta</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Watch Tamil Movies &amp; Kollywood Hits Free Online | My Donkey</image:title>
-      <image:caption>Stream Tamil Movies &amp; Kollywood Hits in HD. Watch free movies and series on My Donkey.</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?region=indian&amp;subRegion=ml</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Watch Malayalam Movies &amp; Mollywood Hits Free Online | My Donkey</image:title>
-      <image:caption>Stream Malayalam Movies &amp; Mollywood Hits in HD. Watch free movies and series on My Donkey.</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?region=indian&amp;subRegion=kn</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Watch Kannada Movies &amp; Sandalwood Hits Free Online | My Donkey</image:title>
-      <image:caption>Stream Kannada Movies &amp; Sandalwood Hits in HD. Watch free movies and series on My Donkey.</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?region=indian&amp;subRegion=pa</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Watch Punjabi Movies &amp; Pollywood Hits Free Online | My Donkey</image:title>
-      <image:caption>Stream Punjabi Movies &amp; Pollywood Hits in HD. Watch free movies and series on My Donkey.</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?region=indian&amp;subRegion=bn</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Watch Bengali Movies &amp; Series Free Online | My Donkey</image:title>
-      <image:caption>Stream Bengali Movies &amp; Series in HD. Watch free movies and series on My Donkey.</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?region=indian&amp;subRegion=mr</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Watch Marathi Movies &amp; Regional Hits Free Online | My Donkey</image:title>
-      <image:caption>Stream Marathi Movies &amp; Regional Hits in HD. Watch free movies and series on My Donkey.</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?region=global&amp;subRegion=ko</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Watch Korean Drama &amp; K-Drama Series Free Online | My Donkey</image:title>
-      <image:caption>Stream Korean Drama &amp; K-Drama Series in HD. Watch free movies and series on My Donkey.</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?region=global&amp;subRegion=ja</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Watch Japanese Anime &amp; J-Drama Free Online | My Donkey</image:title>
-      <image:caption>Stream Japanese Anime &amp; J-Drama in HD. Watch free movies and series on My Donkey.</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?region=global&amp;subRegion=es</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Watch Spanish Movies &amp; Latino Hits Free Online | My Donkey</image:title>
-      <image:caption>Stream Spanish Movies &amp; Latino Hits in HD. Watch free movies and series on My Donkey.</image:caption>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/categories?region=global&amp;subRegion=fr</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.88</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
-      <image:title>Watch French Cinema &amp; European Hits Free Online | My Donkey</image:title>
-      <image:caption>Stream French Cinema &amp; European Hits in HD. Watch free movies and series on My Donkey.</image:caption>
     </image:image>
   </url>
   <url>
@@ -1162,22 +821,27 @@
     </video:video>
   </url>
   <url>
-    <loc>https://www.mydonkey.in/browse/11</loc>
-    <lastmod>2026-02-15</lastmod>
+    <loc>https://www.mydonkey.in/browse/SDXvJva1B4NxALXlpJVj</loc>
+    <lastmod>2026-09-04</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
     <image:image>
-      <image:loc>https://wallpaperaccess.com/full/3836551.jpg</image:loc>
-      <image:title>Watch Vikram Vedha (2026) Free Online - My Donkey Movies</image:title>
+      <image:loc>https://image.tmdb.org/t/p/w500/8L4vvIQvO8viLw8wyi2slQmU2sW.jpg</image:loc>
+      <image:title>Watch Vikram Vedha (2022) Free Online - My Donkey Movies</image:title>
       <image:caption>Stream Vikram Vedha in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
     </image:image>
+    <image:image>
+      <image:loc>https://image.tmdb.org/t/p/w1280/iOWXSdxNDCCTrJh2Pyst3SgRsfG.jpg</image:loc>
+      <image:title>Vikram Vedha HD Wallpaper &amp; Backdrop - My Donkey</image:title>
+      <image:caption>High definition backdrop for Vikram Vedha on My Donkey streaming platform.</image:caption>
+    </image:image>
     <video:video>
-      <video:thumbnail_loc>https://wallpaperaccess.com/full/3836551.jpg</video:thumbnail_loc>
-      <video:title>Watch Vikram Vedha (2026) Online Free | My Donkey</video:title>
-      <video:description>Stream Vikram Vedha (2026) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Vikram Vedha is a neo-noir action thriller exploring morality and the gray areas between good and evil</video:description>
-      <video:publication_date>2026-02-15</video:publication_date>
-      <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/1sVr-uWZPjE</video:player_loc>
-      <video:category>Thriller Movies</video:category>
+      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/iOWXSdxNDCCTrJh2Pyst3SgRsfG.jpg</video:thumbnail_loc>
+      <video:title>Watch Vikram Vedha (2022) Online Free | My Donkey</video:title>
+      <video:description>Stream Vikram Vedha (2022) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Vikram, an honest officer with the Lucknow police, is on a mission to find and eliminate gangster Vedha. However, when Vedha surrenders himself to the police and starts narrating stories to Vikram, it blurs the lines between good and evil. Vedha questions Vikram&apos;s righteousness while the latter believes he is fair and just. But is he?</video:description>
+      <video:publication_date>2022-09-29</video:publication_date>
+      <video:player_loc allow_embed="yes">https://proxy.garageband.rocks/embed/movie/tt13131350</video:player_loc>
+      <video:category>Action Movies</video:category>
       <video:family_friendly>yes</video:family_friendly>
       <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
       <video:platform relationship="allow">web mobile tv</video:platform>
@@ -1189,40 +853,43 @@
       <video:tag>hd streaming</video:tag>
       <video:tag>movies</video:tag>
       <video:tag>full movie online</video:tag>
-      <video:tag>hindi movies</video:tag>
-      <video:tag>bollywood movies</video:tag>
+      <video:tag>english movies</video:tag>
+      <video:tag>hollywood movies</video:tag>
       <video:tag>vikram vedha</video:tag>
       <video:tag>watch vikram vedha</video:tag>
-      <video:tag>thriller</video:tag>
-      <video:tag>thriller movies</video:tag>
-      <video:tag>adventure</video:tag>
-      <video:tag>adventure movies</video:tag>
       <video:tag>action</video:tag>
       <video:tag>action movies</video:tag>
       <video:tag>drama</video:tag>
       <video:tag>drama movies</video:tag>
-      <video:tag>r. madhavan</video:tag>
-      <video:tag>vijay sethupathi</video:tag>
-      <video:tag>shraddha srinath</video:tag>
+      <video:tag>thriller</video:tag>
+      <video:tag>thriller movies</video:tag>
+      <video:tag>saif ali khan</video:tag>
+      <video:tag>hrithik roshan</video:tag>
+      <video:tag>radhika apte</video:tag>
     </video:video>
   </url>
   <url>
-    <loc>https://www.mydonkey.in/browse/12</loc>
-    <lastmod>2026-02-15</lastmod>
+    <loc>https://www.mydonkey.in/browse/NJg3yKfsH3ADnHBAl3BE</loc>
+    <lastmod>2026-09-04</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
     <image:image>
-      <image:loc>https://wallpaperaccess.com/full/7892075.jpg</image:loc>
+      <image:loc>https://image.tmdb.org/t/p/w500/oiT1cwxlcpRzlrUwsdUBD4Rh1lX.jpg</image:loc>
       <image:title>Watch Pushpa: The Rise (2021) Free Online - My Donkey Movies</image:title>
       <image:caption>Stream Pushpa: The Rise in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
     </image:image>
+    <image:image>
+      <image:loc>https://image.tmdb.org/t/p/w1280/jQIcn51nsvMrpB9NFwEOb9QHhFt.jpg</image:loc>
+      <image:title>Pushpa: The Rise HD Wallpaper &amp; Backdrop - My Donkey</image:title>
+      <image:caption>High definition backdrop for Pushpa: The Rise on My Donkey streaming platform.</image:caption>
+    </image:image>
     <video:video>
-      <video:thumbnail_loc>https://wallpaperaccess.com/full/7892075.jpg</video:thumbnail_loc>
+      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/jQIcn51nsvMrpB9NFwEOb9QHhFt.jpg</video:thumbnail_loc>
       <video:title>Watch Pushpa: The Rise (2021) Online Free | My Donkey</video:title>
-      <video:description>Stream Pushpa: The Rise (2021) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Pushpa: The Rise is a 2021 Telugu-language action drama film that follows the rise of a daily wage laborer, Pushpa Raj, as he becomes a powerful figure in the red sandalwood smuggling world, featuring Allu Arjun in the lead role.</video:description>
-      <video:publication_date>2021-12-17</video:publication_date>
-      <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/pKctjlxbFDQ</video:player_loc>
-      <video:category>Thriller Movies</video:category>
+      <video:description>Stream Pushpa: The Rise (2021) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. As Pushpa, a labourer, rises in the world of red sandalwood smuggling, he ends up making many enemies. However, violence ensues when the police try to topple his illegal business.</video:description>
+      <video:publication_date>2021-12-16</video:publication_date>
+      <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/ou6h-22tMnA</video:player_loc>
+      <video:category>Action Movies</video:category>
       <video:family_friendly>yes</video:family_friendly>
       <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
       <video:platform relationship="allow">web mobile tv</video:platform>
@@ -1234,18 +901,19 @@
       <video:tag>hd streaming</video:tag>
       <video:tag>movies</video:tag>
       <video:tag>full movie online</video:tag>
-      <video:tag>hindi movies</video:tag>
-      <video:tag>bollywood movies</video:tag>
+      <video:tag>english movies</video:tag>
+      <video:tag>hollywood movies</video:tag>
       <video:tag>pushpa: the rise</video:tag>
       <video:tag>watch pushpa: the rise</video:tag>
-      <video:tag>thriller</video:tag>
-      <video:tag>thriller movies</video:tag>
       <video:tag>action</video:tag>
       <video:tag>action movies</video:tag>
-      <video:tag>adventure</video:tag>
-      <video:tag>adventure movies</video:tag>
       <video:tag>drama</video:tag>
       <video:tag>drama movies</video:tag>
+      <video:tag>thriller</video:tag>
+      <video:tag>thriller movies</video:tag>
+      <video:tag>allu arjun</video:tag>
+      <video:tag>fahadh faasil</video:tag>
+      <video:tag>rashmika mandanna</video:tag>
     </video:video>
   </url>
   <url>
@@ -3123,27 +2791,27 @@
     </video:video>
   </url>
   <url>
-    <loc>https://www.mydonkey.in/browse/5Desn9pSJovH8vjaHrXI</loc>
+    <loc>https://www.mydonkey.in/browse/ogapVNTYPwnJEGsY3MmQ</loc>
     <lastmod>2026-09-04</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
     <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w500/64GehpDMk6PzjIkL4wKQciljF59.jpg</image:loc>
-      <image:title>Watch Obsession (1954) Free Online - My Donkey Movies</image:title>
+      <image:loc>https://image.tmdb.org/t/p/w500/bRwnj8WEKBCvmfeUNOukJPwB43K.jpg</image:loc>
+      <image:title>Watch Obsession (2026) Free Online - My Donkey Movies</image:title>
       <image:caption>Stream Obsession in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
     </image:image>
     <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w1280/jzC78tyJNtbXDZJQyWdrlHCKBDe.jpg</image:loc>
+      <image:loc>https://image.tmdb.org/t/p/w1280/rZfmzpixLKLR3Hg2u0WgC7XLFl8.jpg</image:loc>
       <image:title>Obsession HD Wallpaper &amp; Backdrop - My Donkey</image:title>
       <image:caption>High definition backdrop for Obsession on My Donkey streaming platform.</image:caption>
     </image:image>
     <video:video>
-      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/jzC78tyJNtbXDZJQyWdrlHCKBDe.jpg</video:thumbnail_loc>
-      <video:title>Watch Obsession (1954) Online Free | My Donkey</video:title>
-      <video:description>Stream Obsession (1954) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Hélène and Aldo Giovanni are a circus trapeze double act and a couple. Aldo is temporarily replaced by former-partner Alexandre when the former is injured. The two get into a fight and the following day Alexandre is discovered dead. Hélène suspects her husband is responsible for the murder.</video:description>
-      <video:publication_date>2026-09-04</video:publication_date>
-      <video:player_loc allow_embed="yes">https://proxy.garageband.rocks/embed/movie/tt0047291</video:player_loc>
-      <video:category>Drama Movies</video:category>
+      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/rZfmzpixLKLR3Hg2u0WgC7XLFl8.jpg</video:thumbnail_loc>
+      <video:title>Watch Obsession (2026) Online Free | My Donkey</video:title>
+      <video:description>Stream Obsession (2026) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. After breaking the mysterious &quot;One Wish Willow&quot; to win his crush&apos;s heart, a hopeless romantic finds himself getting exactly what he asked for but soon discovers that some desires come at a dark, sinister price.</video:description>
+      <video:publication_date>2026-05-13</video:publication_date>
+      <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/gMC8kkwbIQQ</video:player_loc>
+      <video:category>Horror Movies</video:category>
       <video:family_friendly>yes</video:family_friendly>
       <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
       <video:platform relationship="allow">web mobile tv</video:platform>
@@ -3159,11 +2827,13 @@
       <video:tag>hollywood movies</video:tag>
       <video:tag>obsession</video:tag>
       <video:tag>watch obsession</video:tag>
-      <video:tag>drama</video:tag>
-      <video:tag>drama movies</video:tag>
-      <video:tag>michèle morgan</video:tag>
-      <video:tag>raf vallone</video:tag>
-      <video:tag>marthe mercadier</video:tag>
+      <video:tag>horror</video:tag>
+      <video:tag>horror movies</video:tag>
+      <video:tag>thriller</video:tag>
+      <video:tag>thriller movies</video:tag>
+      <video:tag>michael johnston</video:tag>
+      <video:tag>inde navarrette</video:tag>
+      <video:tag>cooper tomlinson</video:tag>
     </video:video>
   </url>
   <url>
@@ -4816,26 +4486,26 @@
     <priority>0.85</priority>
   </url>
   <url>
-    <loc>https://www.mydonkey.in/browse/8czhtzMUliJJhW1r5fE9</loc>
+    <loc>https://www.mydonkey.in/browse/idiUApQtIVqrSRtC2jIV</loc>
     <lastmod>2026-09-04</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
     <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w500/cQoQUpeOqiQNc4Ft6IzsTDkAKLj.jpg</image:loc>
-      <image:title>Watch Business Proposal (2023) Free Online - My Donkey Movies</image:title>
+      <image:loc>https://image.tmdb.org/t/p/w500/iLh7L8ZuvgdxFaM9sImyv2iKYLe.jpg</image:loc>
+      <image:title>Watch Business Proposal (2022) Free Online - My Donkey Movies</image:title>
       <image:caption>Stream Business Proposal in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
     </image:image>
     <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w1280/hMJZCkmdaC2ZMzjP76a9TPNQFsS.jpg</image:loc>
+      <image:loc>https://image.tmdb.org/t/p/w1280/lq0YqJuffMuZhoKTiC5xDqvtCSn.jpg</image:loc>
       <image:title>Business Proposal HD Wallpaper &amp; Backdrop - My Donkey</image:title>
       <image:caption>High definition backdrop for Business Proposal on My Donkey streaming platform.</image:caption>
     </image:image>
     <video:video>
-      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/hMJZCkmdaC2ZMzjP76a9TPNQFsS.jpg</video:thumbnail_loc>
-      <video:title>Watch Business Proposal (2023) Online Free | My Donkey</video:title>
-      <video:description>Stream Business Proposal (2023) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Hollie dressed in disguise as her best friend Ying Shu at a matchmaking blind date, in order to scare off the suitor. However, Hollie hadn&apos;t expected the other matchmaking party to be Timo, the new CEO of Hollie&apos;s company. Hollie behaved badly on the date to try to get Timo to reject her, but Timo decided to marry Hollie so as to avoid being forced into perpetual matchmaking by his grandpa. The real Ying Shu bumped into Alfred, Timo&apos;s best friend and PA, in a car park, and Timo realised that Hollie was in pretense all along, and dreamt up a business proposal Hollie couldn&apos;t refuse. At the same time, however, Hollie didn&apos;t want Timo to discover that she is in reality his company employee, so she could only use the fake name &quot;Mei Ling Suen&quot; and started on the pursuit of a double life. The whole plan could only go wrong.</video:description>
-      <video:publication_date>2023-11-27</video:publication_date>
-      <video:player_loc allow_embed="yes">https://proxy.garageband.rocks/embed/tv/tt30145363</video:player_loc>
+      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/lq0YqJuffMuZhoKTiC5xDqvtCSn.jpg</video:thumbnail_loc>
+      <video:title>Watch Business Proposal (2022) Online Free | My Donkey</video:title>
+      <video:description>Stream Business Proposal (2022) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. In disguise as her friend, Ha-ri shows up to a blind date to scare him away. But plans go awry when he turns out to be her CEO — and makes a proposal.</video:description>
+      <video:publication_date>2022-02-28</video:publication_date>
+      <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/M-PHcxPyasA</video:player_loc>
       <video:category>TV Shows</video:category>
       <video:family_friendly>yes</video:family_friendly>
       <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
@@ -4853,11 +4523,13 @@
       <video:tag>hollywood movies</video:tag>
       <video:tag>business proposal</video:tag>
       <video:tag>watch business proposal</video:tag>
+      <video:tag>comedy</video:tag>
+      <video:tag>comedy movies</video:tag>
       <video:tag>drama</video:tag>
       <video:tag>drama movies</video:tag>
-      <video:tag>anson lo</video:tag>
-      <video:tag>hanna chan</video:tag>
-      <video:tag>edan lui</video:tag>
+      <video:tag>ahn hyo-seop</video:tag>
+      <video:tag>kim se-jeong</video:tag>
+      <video:tag>kim min-gue</video:tag>
     </video:video>
   </url>
   <url>
@@ -5794,6 +5466,42 @@
       <video:tag>bob odenkirk</video:tag>
       <video:tag>jonathan banks</video:tag>
       <video:tag>rhea seehorn</video:tag>
+    </video:video>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/browse/9sOYuvVCZaYJ5O1gH7RH</loc>
+    <lastmod>2026-09-09</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://image.tmdb.org/t/p/w500/oniyFOleOeXR6a45dBV5E4JuGYc.jpg</image:loc>
+      <image:title>Watch Sheep Reels 1-7 (2018) Free Online - My Donkey Movies</image:title>
+      <image:caption>Stream Sheep Reels 1-7 in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
+    </image:image>
+    <video:video>
+      <video:thumbnail_loc>https://image.tmdb.org/t/p/w500/oniyFOleOeXR6a45dBV5E4JuGYc.jpg</video:thumbnail_loc>
+      <video:title>Watch Sheep Reels 1-7 (2018) Online Free | My Donkey</video:title>
+      <video:description>Stream Sheep Reels 1-7 (2018) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. A film about the black head Carranza sheep and the ways of subsistence cattle related to them in Karrantza Valley (Bizkaia, Spain). A series of seven in-camera edited Super-8 reels explores the link between grass, sheep, feeding, wool, milking, cheese, threads. It is a project that began with the recalling of first moving pictures of sheep (MOUTONS ENTRANT À L’ABATTOIR, Lumière Brothers, 1896) and with the correlation between wool spinning and the film rolling pace.</video:description>
+      <video:publication_date>2018-11-01</video:publication_date>
+      <video:player_loc allow_embed="yes">https://www.playimdb.com/movie/583749/</video:player_loc>
+      <video:category>Documentary Movies</video:category>
+      <video:family_friendly>yes</video:family_friendly>
+      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
+      <video:platform relationship="allow">web mobile tv</video:platform>
+      <video:tag>donkey</video:tag>
+      <video:tag>my donkey</video:tag>
+      <video:tag>watch free movies</video:tag>
+      <video:tag>online free movies</video:tag>
+      <video:tag>free movies</video:tag>
+      <video:tag>hd streaming</video:tag>
+      <video:tag>movies</video:tag>
+      <video:tag>full movie online</video:tag>
+      <video:tag>english movies</video:tag>
+      <video:tag>hollywood movies</video:tag>
+      <video:tag>sheep reels 1-7</video:tag>
+      <video:tag>watch sheep reels 1-7</video:tag>
+      <video:tag>documentary</video:tag>
+      <video:tag>documentary movies</video:tag>
     </video:video>
   </url>
   <url>
@@ -7442,46 +7150,6 @@
       <video:tag>i̇lsu demirci</video:tag>
       <video:tag>emin günenç</video:tag>
       <video:tag>aleyna çalışkan</video:tag>
-    </video:video>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/browse/DfEsXLnLeOVqopMoihYJ</loc>
-    <lastmod>2026-09-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w500/dxAfBkatT2lZdRGqxZNLXoCl5dC.jpg</image:loc>
-      <image:title>Watch That&apos;s My Boy (1981) Free Online - My Donkey Movies</image:title>
-      <image:caption>Stream That&apos;s My Boy in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
-    </image:image>
-    <video:video>
-      <video:thumbnail_loc>https://image.tmdb.org/t/p/w500/dxAfBkatT2lZdRGqxZNLXoCl5dC.jpg</video:thumbnail_loc>
-      <video:title>Watch That&apos;s My Boy (1981) Online Free | My Donkey</video:title>
-      <video:description>Stream That&apos;s My Boy (1981) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. That&apos;s My Boy is a British sitcom produced by Yorkshire Television for ITV from 1981 to 1986. It stars Mollie Sugden as Ida Willis, who takes a job as a housekeeper for her son, whom she gave up for adoption years earlier.</video:description>
-      <video:publication_date>1981-10-23</video:publication_date>
-      <video:player_loc allow_embed="yes">https://proxy.garageband.rocks/embed/tv/tt0081945</video:player_loc>
-      <video:category>TV Shows</video:category>
-      <video:family_friendly>yes</video:family_friendly>
-      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
-      <video:platform relationship="allow">web mobile tv</video:platform>
-      <video:tag>donkey</video:tag>
-      <video:tag>my donkey</video:tag>
-      <video:tag>watch free movies</video:tag>
-      <video:tag>online free movies</video:tag>
-      <video:tag>free movies</video:tag>
-      <video:tag>hd streaming</video:tag>
-      <video:tag>tv shows</video:tag>
-      <video:tag>web series</video:tag>
-      <video:tag>watch series online</video:tag>
-      <video:tag>english movies</video:tag>
-      <video:tag>hollywood movies</video:tag>
-      <video:tag>that&apos;s my boy</video:tag>
-      <video:tag>watch that&apos;s my boy</video:tag>
-      <video:tag>comedy</video:tag>
-      <video:tag>comedy movies</video:tag>
-      <video:tag>mollie sugden</video:tag>
-      <video:tag>christopher blake</video:tag>
-      <video:tag>jennifer lonsdale</video:tag>
     </video:video>
   </url>
   <url>
@@ -12459,54 +12127,6 @@
     </video:video>
   </url>
   <url>
-    <loc>https://www.mydonkey.in/browse/NJg3yKfsH3ADnHBAl3BE</loc>
-    <lastmod>2026-09-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w500/oiT1cwxlcpRzlrUwsdUBD4Rh1lX.jpg</image:loc>
-      <image:title>Watch Pushpa: The Rise (2021) Free Online - My Donkey Movies</image:title>
-      <image:caption>Stream Pushpa: The Rise in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
-    </image:image>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w1280/jQIcn51nsvMrpB9NFwEOb9QHhFt.jpg</image:loc>
-      <image:title>Pushpa: The Rise HD Wallpaper &amp; Backdrop - My Donkey</image:title>
-      <image:caption>High definition backdrop for Pushpa: The Rise on My Donkey streaming platform.</image:caption>
-    </image:image>
-    <video:video>
-      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/jQIcn51nsvMrpB9NFwEOb9QHhFt.jpg</video:thumbnail_loc>
-      <video:title>Watch Pushpa: The Rise (2021) Online Free | My Donkey</video:title>
-      <video:description>Stream Pushpa: The Rise (2021) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. As Pushpa, a labourer, rises in the world of red sandalwood smuggling, he ends up making many enemies. However, violence ensues when the police try to topple his illegal business.</video:description>
-      <video:publication_date>2021-12-16</video:publication_date>
-      <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/ou6h-22tMnA</video:player_loc>
-      <video:category>Action Movies</video:category>
-      <video:family_friendly>yes</video:family_friendly>
-      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
-      <video:platform relationship="allow">web mobile tv</video:platform>
-      <video:tag>donkey</video:tag>
-      <video:tag>my donkey</video:tag>
-      <video:tag>watch free movies</video:tag>
-      <video:tag>online free movies</video:tag>
-      <video:tag>free movies</video:tag>
-      <video:tag>hd streaming</video:tag>
-      <video:tag>movies</video:tag>
-      <video:tag>full movie online</video:tag>
-      <video:tag>english movies</video:tag>
-      <video:tag>hollywood movies</video:tag>
-      <video:tag>pushpa: the rise</video:tag>
-      <video:tag>watch pushpa: the rise</video:tag>
-      <video:tag>action</video:tag>
-      <video:tag>action movies</video:tag>
-      <video:tag>drama</video:tag>
-      <video:tag>drama movies</video:tag>
-      <video:tag>thriller</video:tag>
-      <video:tag>thriller movies</video:tag>
-      <video:tag>allu arjun</video:tag>
-      <video:tag>fahadh faasil</video:tag>
-      <video:tag>rashmika mandanna</video:tag>
-    </video:video>
-  </url>
-  <url>
     <loc>https://www.mydonkey.in/browse/NMXFR4DrusSkYfrMj0XU</loc>
     <lastmod>2026-09-04</lastmod>
     <changefreq>weekly</changefreq>
@@ -14019,52 +13639,6 @@
     </video:video>
   </url>
   <url>
-    <loc>https://www.mydonkey.in/browse/PhLYG4v8SUZ0zmRxyevr</loc>
-    <lastmod>2026-09-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w500/19S6nijSPa9zFMMSlQAd33VFzgx.jpg</image:loc>
-      <image:title>Watch OBJECT OF OBSSESSION (2025) Free Online - My Donkey Movies</image:title>
-      <image:caption>Stream OBJECT OF OBSSESSION in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
-    </image:image>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w1280/q1Avbyeo98ct9MmCzWrmDT5MIRU.jpg</image:loc>
-      <image:title>OBJECT OF OBSSESSION HD Wallpaper &amp; Backdrop - My Donkey</image:title>
-      <image:caption>High definition backdrop for OBJECT OF OBSSESSION on My Donkey streaming platform.</image:caption>
-    </image:image>
-    <video:video>
-      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/q1Avbyeo98ct9MmCzWrmDT5MIRU.jpg</video:thumbnail_loc>
-      <video:title>Watch OBJECT OF OBSSESSION (2025) Online Free | My Donkey</video:title>
-      <video:description>Stream OBJECT OF OBSSESSION (2025) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. OBJECT OF OBSSESSION available to stream free in HD on My Donkey.</video:description>
-      <video:publication_date>2025-02-08</video:publication_date>
-      <video:player_loc allow_embed="yes">https://www.playimdb.com/movie/1437758/</video:player_loc>
-      <video:category>Horror Movies</video:category>
-      <video:family_friendly>yes</video:family_friendly>
-      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
-      <video:platform relationship="allow">web mobile tv</video:platform>
-      <video:tag>donkey</video:tag>
-      <video:tag>my donkey</video:tag>
-      <video:tag>watch free movies</video:tag>
-      <video:tag>online free movies</video:tag>
-      <video:tag>free movies</video:tag>
-      <video:tag>hd streaming</video:tag>
-      <video:tag>movies</video:tag>
-      <video:tag>full movie online</video:tag>
-      <video:tag>english movies</video:tag>
-      <video:tag>hollywood movies</video:tag>
-      <video:tag>object of obssession</video:tag>
-      <video:tag>watch object of obssession</video:tag>
-      <video:tag>horror</video:tag>
-      <video:tag>horror movies</video:tag>
-      <video:tag>mystery</video:tag>
-      <video:tag>mystery movies</video:tag>
-      <video:tag>yasmin taube</video:tag>
-      <video:tag>maithê machado</video:tag>
-      <video:tag>judite</video:tag>
-    </video:video>
-  </url>
-  <url>
     <loc>https://www.mydonkey.in/browse/PlKYLDDAmbloiaNkCBFR</loc>
     <lastmod>2026-09-04</lastmod>
     <changefreq>weekly</changefreq>
@@ -15066,54 +14640,6 @@
       <video:tag>nobuyo oyama</video:tag>
       <video:tag>noriko ohara</video:tag>
       <video:tag>michiko nomura</video:tag>
-    </video:video>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/browse/SDXvJva1B4NxALXlpJVj</loc>
-    <lastmod>2026-09-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w500/8L4vvIQvO8viLw8wyi2slQmU2sW.jpg</image:loc>
-      <image:title>Watch Vikram Vedha (2022) Free Online - My Donkey Movies</image:title>
-      <image:caption>Stream Vikram Vedha in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
-    </image:image>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w1280/iOWXSdxNDCCTrJh2Pyst3SgRsfG.jpg</image:loc>
-      <image:title>Vikram Vedha HD Wallpaper &amp; Backdrop - My Donkey</image:title>
-      <image:caption>High definition backdrop for Vikram Vedha on My Donkey streaming platform.</image:caption>
-    </image:image>
-    <video:video>
-      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/iOWXSdxNDCCTrJh2Pyst3SgRsfG.jpg</video:thumbnail_loc>
-      <video:title>Watch Vikram Vedha (2022) Online Free | My Donkey</video:title>
-      <video:description>Stream Vikram Vedha (2022) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Vikram, an honest officer with the Lucknow police, is on a mission to find and eliminate gangster Vedha. However, when Vedha surrenders himself to the police and starts narrating stories to Vikram, it blurs the lines between good and evil. Vedha questions Vikram&apos;s righteousness while the latter believes he is fair and just. But is he?</video:description>
-      <video:publication_date>2022-09-29</video:publication_date>
-      <video:player_loc allow_embed="yes">https://proxy.garageband.rocks/embed/movie/tt13131350</video:player_loc>
-      <video:category>Action Movies</video:category>
-      <video:family_friendly>yes</video:family_friendly>
-      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
-      <video:platform relationship="allow">web mobile tv</video:platform>
-      <video:tag>donkey</video:tag>
-      <video:tag>my donkey</video:tag>
-      <video:tag>watch free movies</video:tag>
-      <video:tag>online free movies</video:tag>
-      <video:tag>free movies</video:tag>
-      <video:tag>hd streaming</video:tag>
-      <video:tag>movies</video:tag>
-      <video:tag>full movie online</video:tag>
-      <video:tag>english movies</video:tag>
-      <video:tag>hollywood movies</video:tag>
-      <video:tag>vikram vedha</video:tag>
-      <video:tag>watch vikram vedha</video:tag>
-      <video:tag>action</video:tag>
-      <video:tag>action movies</video:tag>
-      <video:tag>drama</video:tag>
-      <video:tag>drama movies</video:tag>
-      <video:tag>thriller</video:tag>
-      <video:tag>thriller movies</video:tag>
-      <video:tag>saif ali khan</video:tag>
-      <video:tag>hrithik roshan</video:tag>
-      <video:tag>radhika apte</video:tag>
     </video:video>
   </url>
   <url>
@@ -16820,21 +16346,26 @@
     </video:video>
   </url>
   <url>
-    <loc>https://www.mydonkey.in/browse/W9ckmpjCSEuY051rlZ2B</loc>
-    <lastmod>2026-06-28</lastmod>
+    <loc>https://www.mydonkey.in/browse/YY2IJQCdQy7ebdcoCcDL</loc>
+    <lastmod>2026-09-04</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
     <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w500/ap8pBWU5601uAQFoGWwurEo7Ugy.jpg</image:loc>
+      <image:loc>https://image.tmdb.org/t/p/w500/6KwrHucIE3CvNT7kTm2MAlZ4fYF.jpg</image:loc>
       <image:title>Watch 365 Days (2020) Free Online - My Donkey Movies</image:title>
       <image:caption>Stream 365 Days in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
     </image:image>
+    <image:image>
+      <image:loc>https://image.tmdb.org/t/p/w1280/29mZ5bR5m2w3xuvwJH7BHMFQQwH.jpg</image:loc>
+      <image:title>365 Days HD Wallpaper &amp; Backdrop - My Donkey</image:title>
+      <image:caption>High definition backdrop for 365 Days on My Donkey streaming platform.</image:caption>
+    </image:image>
     <video:video>
-      <video:thumbnail_loc>https://image.tmdb.org/t/p/w500/ap8pBWU5601uAQFoGWwurEo7Ugy.jpg</video:thumbnail_loc>
+      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/29mZ5bR5m2w3xuvwJH7BHMFQQwH.jpg</video:thumbnail_loc>
       <video:title>Watch 365 Days (2020) Online Free | My Donkey</video:title>
-      <video:description>Stream 365 Days (2020) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Massimo is a member of the Sicilian Mafia family and Laura is a sales director. She does not expect that on a trip to Sicily trying to save her relationship, Massimo will kidnap her and give her 365 days to fall in love with him.</video:description>
-      <video:publication_date>2020-06-07</video:publication_date>
-      <video:player_loc allow_embed="yes">https://www.playimdb.com/movie/1689043/</video:player_loc>
+      <video:description>Stream 365 Days (2020) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. A woman falls victim to a dominant mafia boss, who imprisons her and gives her one year to fall in love with him.</video:description>
+      <video:publication_date>2020-02-07</video:publication_date>
+      <video:player_loc allow_embed="yes">https://proxy.garageband.rocks/embed/movie/tt10886166</video:player_loc>
       <video:category>Romance Movies</video:category>
       <video:family_friendly>yes</video:family_friendly>
       <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
@@ -16853,6 +16384,11 @@
       <video:tag>watch 365 days</video:tag>
       <video:tag>romance</video:tag>
       <video:tag>romance movies</video:tag>
+      <video:tag>drama</video:tag>
+      <video:tag>drama movies</video:tag>
+      <video:tag>anna-maria sieklucka</video:tag>
+      <video:tag>michele morrone</video:tag>
+      <video:tag>bronisław wrocławski</video:tag>
     </video:video>
   </url>
   <url>
@@ -17152,7 +16688,7 @@
       <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/p1Xk8xNHHP1HJx2yGZuREp8Etab.jpg</video:thumbnail_loc>
       <video:title>Watch The Love Hypothesis (2026) Online Free | My Donkey</video:title>
       <video:description>Stream The Love Hypothesis (2026) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Olive Smith, a biology PhD candidate, and Dr. Adam Carlsen, a hotshot professor and well-known tyrant, enter into a fake relationship, seeing each of their carefully calculated theories on love get thrown into chaos.</video:description>
-      <video:publication_date>2026-09-07</video:publication_date>
+      <video:publication_date>2026-09-11</video:publication_date>
       <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/xwdamnfS6IM</video:player_loc>
       <video:category>Romance Movies</video:category>
       <video:family_friendly>yes</video:family_friendly>
@@ -18300,52 +17836,6 @@
       <video:tag>natalie portman</video:tag>
       <video:tag>mila kunis</video:tag>
       <video:tag>vincent cassel</video:tag>
-    </video:video>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/browse/YY2IJQCdQy7ebdcoCcDL</loc>
-    <lastmod>2026-09-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w500/6KwrHucIE3CvNT7kTm2MAlZ4fYF.jpg</image:loc>
-      <image:title>Watch 365 Days (2020) Free Online - My Donkey Movies</image:title>
-      <image:caption>Stream 365 Days in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
-    </image:image>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w1280/29mZ5bR5m2w3xuvwJH7BHMFQQwH.jpg</image:loc>
-      <image:title>365 Days HD Wallpaper &amp; Backdrop - My Donkey</image:title>
-      <image:caption>High definition backdrop for 365 Days on My Donkey streaming platform.</image:caption>
-    </image:image>
-    <video:video>
-      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/29mZ5bR5m2w3xuvwJH7BHMFQQwH.jpg</video:thumbnail_loc>
-      <video:title>Watch 365 Days (2020) Online Free | My Donkey</video:title>
-      <video:description>Stream 365 Days (2020) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. A woman falls victim to a dominant mafia boss, who imprisons her and gives her one year to fall in love with him.</video:description>
-      <video:publication_date>2020-02-07</video:publication_date>
-      <video:player_loc allow_embed="yes">https://proxy.garageband.rocks/embed/movie/tt10886166</video:player_loc>
-      <video:category>Romance Movies</video:category>
-      <video:family_friendly>yes</video:family_friendly>
-      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
-      <video:platform relationship="allow">web mobile tv</video:platform>
-      <video:tag>donkey</video:tag>
-      <video:tag>my donkey</video:tag>
-      <video:tag>watch free movies</video:tag>
-      <video:tag>online free movies</video:tag>
-      <video:tag>free movies</video:tag>
-      <video:tag>hd streaming</video:tag>
-      <video:tag>movies</video:tag>
-      <video:tag>full movie online</video:tag>
-      <video:tag>english movies</video:tag>
-      <video:tag>hollywood movies</video:tag>
-      <video:tag>365 days</video:tag>
-      <video:tag>watch 365 days</video:tag>
-      <video:tag>romance</video:tag>
-      <video:tag>romance movies</video:tag>
-      <video:tag>drama</video:tag>
-      <video:tag>drama movies</video:tag>
-      <video:tag>anna-maria sieklucka</video:tag>
-      <video:tag>michele morrone</video:tag>
-      <video:tag>bronisław wrocławski</video:tag>
     </video:video>
   </url>
   <url>
@@ -19591,7 +19081,7 @@
       <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/ieAytQ8YcWEZGQpbBy7vHVddwd.jpg</video:thumbnail_loc>
       <video:title>Watch The Angry Birds Movie 3 (2026) Online Free | My Donkey</video:title>
       <video:description>Stream The Angry Birds Movie 3 (2026) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Red faces his greatest challenge yet… surviving fatherhood while saving the world.</video:description>
-      <video:publication_date>2026-09-07</video:publication_date>
+      <video:publication_date>2026-09-11</video:publication_date>
       <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/a9DB_aUMzME</video:player_loc>
       <video:category>Anime</video:category>
       <video:family_friendly>yes</video:family_friendly>
@@ -20155,7 +19645,7 @@
       <video:thumbnail_loc>https://wallpaperaccess.com/full/22193958.jpg</video:thumbnail_loc>
       <video:title>Watch Avengers : Doomsday (2026) Online Free | My Donkey</video:title>
       <video:description>Stream Avengers : Doomsday (2026) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Avengers: Doomsday is an upcoming Marvel Cinematic Universe film set for release on December 18, 2026, directed by the Russo Brothers.</video:description>
-      <video:publication_date>2026-09-07</video:publication_date>
+      <video:publication_date>2026-09-11</video:publication_date>
       <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/1clWprLC5Ak</video:player_loc>
       <video:category>Action Movies</video:category>
       <video:family_friendly>yes</video:family_friendly>
@@ -20232,22 +19722,27 @@
     </video:video>
   </url>
   <url>
-    <loc>https://www.mydonkey.in/browse/content_1771144782861</loc>
-    <lastmod>2026-02-15</lastmod>
+    <loc>https://www.mydonkey.in/browse/pMhSIcXq6AcWwE0w6Sgi</loc>
+    <lastmod>2026-09-04</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
     <image:image>
-      <image:loc>https://i.ytimg.com/vi/ebAznVtYY84/hq720.jpg?sqp=-oaymwEnCNAFEJQDSFryq4qpAxkIARUAAIhCGAHYAQHiAQoIGBACGAY4AUAB&amp;rs=AOn4CLB7dzPmE4XF0gJ0sKvla57C2dUOZg</image:loc>
+      <image:loc>https://image.tmdb.org/t/p/w500/dtdZ6QhcPyxGhpwamo8W8Yeiguh.jpg</image:loc>
       <image:title>Watch Ikkis (2026) Free Online - My Donkey Movies</image:title>
       <image:caption>Stream Ikkis in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
     </image:image>
+    <image:image>
+      <image:loc>https://image.tmdb.org/t/p/w1280/wbhoYwvqgadchfMgUOfOp87QZDS.jpg</image:loc>
+      <image:title>Ikkis HD Wallpaper &amp; Backdrop - My Donkey</image:title>
+      <image:caption>High definition backdrop for Ikkis on My Donkey streaming platform.</image:caption>
+    </image:image>
     <video:video>
-      <video:thumbnail_loc>https://i.ytimg.com/vi/ebAznVtYY84/hq720.jpg?sqp=-oaymwEnCNAFEJQDSFryq4qpAxkIARUAAIhCGAHYAQHiAQoIGBACGAY4AUAB&amp;rs=AOn4CLB7dzPmE4XF0gJ0sKvla57C2dUOZg</video:thumbnail_loc>
+      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/wbhoYwvqgadchfMgUOfOp87QZDS.jpg</video:thumbnail_loc>
       <video:title>Watch Ikkis (2026) Online Free | My Donkey</video:title>
-      <video:description>Stream Ikkis (2026) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Ikkis is a 2026 Hindi biographical war drama depicting the life of Second Lieutenant Arun Khetarpal, starring Agastya Nanda in his debut and marking Dharmendra’s final film.</video:description>
+      <video:description>Stream Ikkis (2026) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Second Lieutenant and India&apos;s youngest Param Vir Chakra recipient, Arun Khetarpal, gave his life fighting for his battalion and the country during the 1971 Battle of Basantar. Ikkis also takes a reflective look at the futility of war through the eyes of Khetarpal&apos;s father, who visits his ancestral home in Sargodha and Alma Mater for reunion, which now happens to be in post-partition Pakistan, 30 years later.</video:description>
       <video:publication_date>2026-01-01</video:publication_date>
       <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/QfnyH8odcus</video:player_loc>
-      <video:category>Thriller Movies</video:category>
+      <video:category>History Movies</video:category>
       <video:family_friendly>yes</video:family_friendly>
       <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
       <video:platform relationship="allow">web mobile tv</video:platform>
@@ -20259,106 +19754,19 @@
       <video:tag>hd streaming</video:tag>
       <video:tag>movies</video:tag>
       <video:tag>full movie online</video:tag>
-      <video:tag>hindi movies</video:tag>
-      <video:tag>bollywood movies</video:tag>
+      <video:tag>english movies</video:tag>
+      <video:tag>hollywood movies</video:tag>
       <video:tag>ikkis</video:tag>
       <video:tag>watch ikkis</video:tag>
-      <video:tag>thriller</video:tag>
-      <video:tag>thriller movies</video:tag>
-      <video:tag>adventure</video:tag>
-      <video:tag>adventure movies</video:tag>
-      <video:tag>drama</video:tag>
-      <video:tag>drama movies</video:tag>
-      <video:tag>documentary</video:tag>
-      <video:tag>documentary movies</video:tag>
-      <video:tag>agastya nanda</video:tag>
-      <video:tag>simar bhatia</video:tag>
-      <video:tag>dharmendra</video:tag>
-    </video:video>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/browse/content_1771150038540</loc>
-    <lastmod>2026-02-15</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://i.ytimg.com/vi/Dydmpfo68DA/hq720.jpg?sqp=-oaymwEnCNAFEJQDSFryq4qpAxkIARUAAIhCGAHYAQHiAQoIGBACGAY4AUAB&amp;rs=AOn4CLCYlIIU_k0w-HxKqqvuYyoqcdvpDg</image:loc>
-      <image:title>Watch Animal (2023) Free Online - My Donkey Movies</image:title>
-      <image:caption>Stream Animal in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
-    </image:image>
-    <video:video>
-      <video:thumbnail_loc>https://i.ytimg.com/vi/Dydmpfo68DA/hq720.jpg?sqp=-oaymwEnCNAFEJQDSFryq4qpAxkIARUAAIhCGAHYAQHiAQoIGBACGAY4AUAB&amp;rs=AOn4CLCYlIIU_k0w-HxKqqvuYyoqcdvpDg</video:thumbnail_loc>
-      <video:title>Watch Animal (2023) Online Free | My Donkey</video:title>
-      <video:description>Stream Animal (2023) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Animal is a Hindi-language action-crime drama directed by Sandeep Reddy Vanga. The story revolves around Ranvijay Singh, the hardened son of a powerful industrialist, who returns home after years abroad. His strained relationship with his father, Balbir Singh, unfolds against a violent backdrop of gang wars and betrayal. The film explores themes of family, revenge, and the psychological toll of violence.</video:description>
-      <video:publication_date>2023-12-01</video:publication_date>
-      <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/8FkLRUJj-o0</video:player_loc>
-      <video:category>Action Movies</video:category>
-      <video:family_friendly>yes</video:family_friendly>
-      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
-      <video:platform relationship="allow">web mobile tv</video:platform>
-      <video:tag>donkey</video:tag>
-      <video:tag>my donkey</video:tag>
-      <video:tag>watch free movies</video:tag>
-      <video:tag>online free movies</video:tag>
-      <video:tag>free movies</video:tag>
-      <video:tag>hd streaming</video:tag>
-      <video:tag>movies</video:tag>
-      <video:tag>full movie online</video:tag>
-      <video:tag>hindi movies</video:tag>
-      <video:tag>bollywood movies</video:tag>
-      <video:tag>animal</video:tag>
-      <video:tag>watch animal</video:tag>
+      <video:tag>history</video:tag>
+      <video:tag>history movies</video:tag>
       <video:tag>action</video:tag>
       <video:tag>action movies</video:tag>
-      <video:tag>thriller</video:tag>
-      <video:tag>thriller movies</video:tag>
       <video:tag>drama</video:tag>
       <video:tag>drama movies</video:tag>
-      <video:tag>ranbir kapoor</video:tag>
-      <video:tag>anil kapoor</video:tag>
-      <video:tag>bobby deol</video:tag>
-    </video:video>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/browse/content_1771155975870</loc>
-    <lastmod>2026-02-15</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://wallpapercave.com/dwp2x/wp9360012.jpg</image:loc>
-      <image:title>Watch Stree (2026) Free Online - My Donkey Movies</image:title>
-      <image:caption>Stream Stree in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
-    </image:image>
-    <video:video>
-      <video:thumbnail_loc>https://wallpapercave.com/dwp2x/wp9360012.jpg</video:thumbnail_loc>
-      <video:title>Watch Stree (2026) Online Free | My Donkey</video:title>
-      <video:description>Stream Stree (2026) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. A supernatural horror-comedy about a mysterious female entity known as &apos;Stree&apos; that haunts a small town. Rajkummar Rao and Shraddha Kapoor star in this innovative Bollywood thriller that blends folklore with modern storytelling.</video:description>
-      <video:publication_date>2026-02-15</video:publication_date>
-      <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/gzeaGcLLl_A</video:player_loc>
-      <video:category>Horror Movies</video:category>
-      <video:family_friendly>yes</video:family_friendly>
-      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
-      <video:platform relationship="allow">web mobile tv</video:platform>
-      <video:tag>donkey</video:tag>
-      <video:tag>my donkey</video:tag>
-      <video:tag>watch free movies</video:tag>
-      <video:tag>online free movies</video:tag>
-      <video:tag>free movies</video:tag>
-      <video:tag>hd streaming</video:tag>
-      <video:tag>movies</video:tag>
-      <video:tag>full movie online</video:tag>
-      <video:tag>hindi movies</video:tag>
-      <video:tag>bollywood movies</video:tag>
-      <video:tag>stree</video:tag>
-      <video:tag>watch stree</video:tag>
-      <video:tag>horror</video:tag>
-      <video:tag>horror movies</video:tag>
-      <video:tag>comedy</video:tag>
-      <video:tag>comedy movies</video:tag>
-      <video:tag>thriller</video:tag>
-      <video:tag>thriller movies</video:tag>
-      <video:tag>romance</video:tag>
-      <video:tag>romance movies</video:tag>
+      <video:tag>dharmendra</video:tag>
+      <video:tag>jaideep ahlawat</video:tag>
+      <video:tag>agastya nanda</video:tag>
     </video:video>
   </url>
   <url>
@@ -20559,51 +19967,6 @@
       <video:tag>comedy movies</video:tag>
       <video:tag>sci-fi</video:tag>
       <video:tag>sci-fi movies</video:tag>
-    </video:video>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/browse/content_1771517358150</loc>
-    <lastmod>2026-02-19</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://wallpaperaccess.com/full/5918.jpg</image:loc>
-      <image:title>Watch Avengers: Infinity War (2026) Free Online - My Donkey Movies</image:title>
-      <image:caption>Stream Avengers: Infinity War in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
-    </image:image>
-    <video:video>
-      <video:thumbnail_loc>https://wallpaperaccess.com/full/5918.jpg</video:thumbnail_loc>
-      <video:title>Watch Avengers: Infinity War (2026) Online Free | My Donkey</video:title>
-      <video:description>Stream Avengers: Infinity War (2026) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Avengers: Infinity War is a 2018 Marvel superhero film where the Avengers and Guardians of the Galaxy unite to stop Thanos from collecting all six Infinity Stones and wiping out half of all life in the universe.</video:description>
-      <video:publication_date>2026-02-19</video:publication_date>
-      <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/6ZfuNTqbHE8</video:player_loc>
-      <video:category>Action Movies</video:category>
-      <video:family_friendly>yes</video:family_friendly>
-      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
-      <video:platform relationship="allow">web mobile tv</video:platform>
-      <video:tag>donkey</video:tag>
-      <video:tag>my donkey</video:tag>
-      <video:tag>watch free movies</video:tag>
-      <video:tag>online free movies</video:tag>
-      <video:tag>free movies</video:tag>
-      <video:tag>hd streaming</video:tag>
-      <video:tag>movies</video:tag>
-      <video:tag>full movie online</video:tag>
-      <video:tag>marvel movies</video:tag>
-      <video:tag>mcu</video:tag>
-      <video:tag>superhero</video:tag>
-      <video:tag>english movies</video:tag>
-      <video:tag>hollywood movies</video:tag>
-      <video:tag>avengers: infinity war</video:tag>
-      <video:tag>watch avengers: infinity war</video:tag>
-      <video:tag>action</video:tag>
-      <video:tag>action movies</video:tag>
-      <video:tag>adventure</video:tag>
-      <video:tag>adventure movies</video:tag>
-      <video:tag>sci-fi</video:tag>
-      <video:tag>sci-fi movies</video:tag>
-      <video:tag>thriller</video:tag>
-      <video:tag>thriller movies</video:tag>
     </video:video>
   </url>
   <url>
@@ -22146,57 +21509,6 @@
     </video:video>
   </url>
   <url>
-    <loc>https://www.mydonkey.in/browse/eJjn5RiJnZtbLunKu32Y</loc>
-    <lastmod>2026-09-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w500/hTP1DtLGFamjfu8WqjnuQdP1n4i.jpg</image:loc>
-      <image:title>Watch Attack on Titan (2013) Free Online - My Donkey Movies</image:title>
-      <image:caption>Stream Attack on Titan in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
-    </image:image>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w1280/rqbCbjB19amtOtFQbb3K2lgm2zv.jpg</image:loc>
-      <image:title>Attack on Titan HD Wallpaper &amp; Backdrop - My Donkey</image:title>
-      <image:caption>High definition backdrop for Attack on Titan on My Donkey streaming platform.</image:caption>
-    </image:image>
-    <video:video>
-      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/rqbCbjB19amtOtFQbb3K2lgm2zv.jpg</video:thumbnail_loc>
-      <video:title>Watch Attack on Titan (2013) Online Free | My Donkey</video:title>
-      <video:description>Stream Attack on Titan (2013) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. 100 years ago, the last remnants of humanity were forced to retreat behind the towering walls of a fortified city to escape the massive, man-eating Titans that roamed the land outside their fortress. Only the members of the Scouting Legion dared to stray beyond the safety of the walls – but even those brave warriors seldom returned alive. Those within the city clung to the illusion of a peaceful existence until the day that dream was shattered, and their slim chance at survival was reduced to one horrifying choice: kill – or be devoured!</video:description>
-      <video:publication_date>2013-04-07</video:publication_date>
-      <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/HJaUvV9Hwgs</video:player_loc>
-      <video:category>Anime</video:category>
-      <video:family_friendly>yes</video:family_friendly>
-      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
-      <video:platform relationship="allow">web mobile tv</video:platform>
-      <video:tag>donkey</video:tag>
-      <video:tag>my donkey</video:tag>
-      <video:tag>watch free movies</video:tag>
-      <video:tag>online free movies</video:tag>
-      <video:tag>free movies</video:tag>
-      <video:tag>hd streaming</video:tag>
-      <video:tag>tv shows</video:tag>
-      <video:tag>web series</video:tag>
-      <video:tag>watch series online</video:tag>
-      <video:tag>anime</video:tag>
-      <video:tag>watch anime free</video:tag>
-      <video:tag>english movies</video:tag>
-      <video:tag>hollywood movies</video:tag>
-      <video:tag>attack on titan</video:tag>
-      <video:tag>watch attack on titan</video:tag>
-      <video:tag>animation</video:tag>
-      <video:tag>animation movies</video:tag>
-      <video:tag>sci-fi</video:tag>
-      <video:tag>sci-fi movies</video:tag>
-      <video:tag>action</video:tag>
-      <video:tag>action movies</video:tag>
-      <video:tag>marina inoue</video:tag>
-      <video:tag>hiro shimono</video:tag>
-      <video:tag>yuki kaji</video:tag>
-    </video:video>
-  </url>
-  <url>
     <loc>https://www.mydonkey.in/browse/eLHCLjEUYEBxsqEMcFgX</loc>
     <lastmod>2026-09-04</lastmod>
     <changefreq>weekly</changefreq>
@@ -23602,57 +22914,6 @@
     </video:video>
   </url>
   <url>
-    <loc>https://www.mydonkey.in/browse/h2txD8GZtHPxgDqtZljm</loc>
-    <lastmod>2026-09-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w500/3WBs0P1DgeQlDyLBudtACzJqtLf.jpg</image:loc>
-      <image:title>Watch Jagadhatri (2023) Free Online - My Donkey Movies</image:title>
-      <image:caption>Stream Jagadhatri in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
-    </image:image>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w1280/tNLRNmWnR8hMdVPg4NSiPBE17fQ.jpg</image:loc>
-      <image:title>Jagadhatri HD Wallpaper &amp; Backdrop - My Donkey</image:title>
-      <image:caption>High definition backdrop for Jagadhatri on My Donkey streaming platform.</image:caption>
-    </image:image>
-    <video:video>
-      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/tNLRNmWnR8hMdVPg4NSiPBE17fQ.jpg</video:thumbnail_loc>
-      <video:title>Watch Jagadhatri (2023) Online Free | My Donkey</video:title>
-      <video:description>Stream Jagadhatri (2023) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Jagadhatri is a secret service officer but pretends to be timid with her family. When her cruel stepmother plans to get her elder daughter married, Jagadhatri discovers the groom&apos;s hidden reality.</video:description>
-      <video:publication_date>2023-08-21</video:publication_date>
-      <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/m57LjKtyklQ</video:player_loc>
-      <video:category>TV Shows</video:category>
-      <video:family_friendly>yes</video:family_friendly>
-      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
-      <video:platform relationship="allow">web mobile tv</video:platform>
-      <video:tag>donkey</video:tag>
-      <video:tag>my donkey</video:tag>
-      <video:tag>watch free movies</video:tag>
-      <video:tag>online free movies</video:tag>
-      <video:tag>free movies</video:tag>
-      <video:tag>hd streaming</video:tag>
-      <video:tag>tv shows</video:tag>
-      <video:tag>web series</video:tag>
-      <video:tag>watch series online</video:tag>
-      <video:tag>english movies</video:tag>
-      <video:tag>hollywood movies</video:tag>
-      <video:tag>jagadhatri</video:tag>
-      <video:tag>watch jagadhatri</video:tag>
-      <video:tag>drama</video:tag>
-      <video:tag>drama movies</video:tag>
-      <video:tag>kids</video:tag>
-      <video:tag>kids movies</video:tag>
-      <video:tag>comedy</video:tag>
-      <video:tag>comedy movies</video:tag>
-      <video:tag>reality</video:tag>
-      <video:tag>reality movies</video:tag>
-      <video:tag>deepthi manne</video:tag>
-      <video:tag>darsh chandrappa</video:tag>
-      <video:tag>preethi</video:tag>
-    </video:video>
-  </url>
-  <url>
     <loc>https://www.mydonkey.in/browse/h55yjNWnTdEZBzRJfFrF</loc>
     <lastmod>2026-09-04</lastmod>
     <changefreq>weekly</changefreq>
@@ -24007,52 +23268,6 @@
       <video:tag>action movies</video:tag>
       <video:tag>drama</video:tag>
       <video:tag>drama movies</video:tag>
-    </video:video>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/browse/hnyj5RXHRWQ7LPTWIir8</loc>
-    <lastmod>2026-09-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w500/3bEqHqeaQlFykaLQ7N4gDkIvL5w.jpg</image:loc>
-      <image:title>Watch Desire (2026) Free Online - My Donkey Movies</image:title>
-      <image:caption>Stream Desire in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
-    </image:image>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w1280/oBter8Y5p2ZFUwWgQ1T9pulGFTJ.jpg</image:loc>
-      <image:title>Desire HD Wallpaper &amp; Backdrop - My Donkey</image:title>
-      <image:caption>High definition backdrop for Desire on My Donkey streaming platform.</image:caption>
-    </image:image>
-    <video:video>
-      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/oBter8Y5p2ZFUwWgQ1T9pulGFTJ.jpg</video:thumbnail_loc>
-      <video:title>Watch Desire (2026) Online Free | My Donkey</video:title>
-      <video:description>Stream Desire (2026) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Lucero’s life appears immaculate: a wealthy household, a devoted husband, and two children who embody the promise of a perfect family. Yet beneath this surface simmers a quiet dissatisfaction. When Matías, a young swimming coach hired by her husband, enters their lives, Lucero finds herself pulled into a risky and consuming relationship. As secrecy, desire, and jealousy tighten their grip, the boundaries within the family begin to collapse, placing mother and daughter in a dangerous emotional triangle that threatens to shatter everything Lucero has built.</video:description>
-      <video:publication_date>2026-05-07</video:publication_date>
-      <video:player_loc allow_embed="yes">https://proxy.garageband.rocks/embed/movie/tt41617470</video:player_loc>
-      <video:category>Mystery Movies</video:category>
-      <video:family_friendly>yes</video:family_friendly>
-      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
-      <video:platform relationship="allow">web mobile tv</video:platform>
-      <video:tag>donkey</video:tag>
-      <video:tag>my donkey</video:tag>
-      <video:tag>watch free movies</video:tag>
-      <video:tag>online free movies</video:tag>
-      <video:tag>free movies</video:tag>
-      <video:tag>hd streaming</video:tag>
-      <video:tag>movies</video:tag>
-      <video:tag>full movie online</video:tag>
-      <video:tag>english movies</video:tag>
-      <video:tag>hollywood movies</video:tag>
-      <video:tag>desire</video:tag>
-      <video:tag>watch desire</video:tag>
-      <video:tag>mystery</video:tag>
-      <video:tag>mystery movies</video:tag>
-      <video:tag>drama</video:tag>
-      <video:tag>drama movies</video:tag>
-      <video:tag>ludwika paleta</video:tag>
-      <video:tag>josé maría yázpik</video:tag>
-      <video:tag>óscar casas</video:tag>
     </video:video>
   </url>
   <url>
@@ -24648,53 +23863,6 @@
     </video:video>
   </url>
   <url>
-    <loc>https://www.mydonkey.in/browse/idiUApQtIVqrSRtC2jIV</loc>
-    <lastmod>2026-09-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w500/iLh7L8ZuvgdxFaM9sImyv2iKYLe.jpg</image:loc>
-      <image:title>Watch Business Proposal (2022) Free Online - My Donkey Movies</image:title>
-      <image:caption>Stream Business Proposal in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
-    </image:image>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w1280/lq0YqJuffMuZhoKTiC5xDqvtCSn.jpg</image:loc>
-      <image:title>Business Proposal HD Wallpaper &amp; Backdrop - My Donkey</image:title>
-      <image:caption>High definition backdrop for Business Proposal on My Donkey streaming platform.</image:caption>
-    </image:image>
-    <video:video>
-      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/lq0YqJuffMuZhoKTiC5xDqvtCSn.jpg</video:thumbnail_loc>
-      <video:title>Watch Business Proposal (2022) Online Free | My Donkey</video:title>
-      <video:description>Stream Business Proposal (2022) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. In disguise as her friend, Ha-ri shows up to a blind date to scare him away. But plans go awry when he turns out to be her CEO — and makes a proposal.</video:description>
-      <video:publication_date>2022-02-28</video:publication_date>
-      <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/M-PHcxPyasA</video:player_loc>
-      <video:category>TV Shows</video:category>
-      <video:family_friendly>yes</video:family_friendly>
-      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
-      <video:platform relationship="allow">web mobile tv</video:platform>
-      <video:tag>donkey</video:tag>
-      <video:tag>my donkey</video:tag>
-      <video:tag>watch free movies</video:tag>
-      <video:tag>online free movies</video:tag>
-      <video:tag>free movies</video:tag>
-      <video:tag>hd streaming</video:tag>
-      <video:tag>tv shows</video:tag>
-      <video:tag>web series</video:tag>
-      <video:tag>watch series online</video:tag>
-      <video:tag>english movies</video:tag>
-      <video:tag>hollywood movies</video:tag>
-      <video:tag>business proposal</video:tag>
-      <video:tag>watch business proposal</video:tag>
-      <video:tag>comedy</video:tag>
-      <video:tag>comedy movies</video:tag>
-      <video:tag>drama</video:tag>
-      <video:tag>drama movies</video:tag>
-      <video:tag>ahn hyo-seop</video:tag>
-      <video:tag>kim se-jeong</video:tag>
-      <video:tag>kim min-gue</video:tag>
-    </video:video>
-  </url>
-  <url>
     <loc>https://www.mydonkey.in/browse/ixBj5ZMqQfTUYBRxhOty</loc>
     <lastmod>2026-09-04</lastmod>
     <changefreq>weekly</changefreq>
@@ -24970,53 +24138,6 @@
       <video:tag>dakota johnson</video:tag>
       <video:tag>jamie dornan</video:tag>
       <video:tag>eric johnson</video:tag>
-    </video:video>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/browse/jKrcLw72hw08za0RL90G</loc>
-    <lastmod>2026-09-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w500/blWCPEqDGLBuLB9u89CxP9ORQP4.jpg</image:loc>
-      <image:title>Watch ONE PIECE (2023) Free Online - My Donkey Movies</image:title>
-      <image:caption>Stream ONE PIECE in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
-    </image:image>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w1280/qD211Hb5XwFxrszzBBe5EUYJerh.jpg</image:loc>
-      <image:title>ONE PIECE HD Wallpaper &amp; Backdrop - My Donkey</image:title>
-      <image:caption>High definition backdrop for ONE PIECE on My Donkey streaming platform.</image:caption>
-    </image:image>
-    <video:video>
-      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/qD211Hb5XwFxrszzBBe5EUYJerh.jpg</video:thumbnail_loc>
-      <video:title>Watch ONE PIECE (2023) Online Free | My Donkey</video:title>
-      <video:description>Stream ONE PIECE (2023) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. With his straw hat and ragtag crew, young pirate Monkey D. Luffy goes on an epic voyage for treasure.</video:description>
-      <video:publication_date>2023-08-31</video:publication_date>
-      <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/l6kp780S-os</video:player_loc>
-      <video:category>TV Shows</video:category>
-      <video:family_friendly>yes</video:family_friendly>
-      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
-      <video:platform relationship="allow">web mobile tv</video:platform>
-      <video:tag>donkey</video:tag>
-      <video:tag>my donkey</video:tag>
-      <video:tag>watch free movies</video:tag>
-      <video:tag>online free movies</video:tag>
-      <video:tag>free movies</video:tag>
-      <video:tag>hd streaming</video:tag>
-      <video:tag>tv shows</video:tag>
-      <video:tag>web series</video:tag>
-      <video:tag>watch series online</video:tag>
-      <video:tag>english movies</video:tag>
-      <video:tag>hollywood movies</video:tag>
-      <video:tag>one piece</video:tag>
-      <video:tag>watch one piece</video:tag>
-      <video:tag>action</video:tag>
-      <video:tag>action movies</video:tag>
-      <video:tag>sci-fi</video:tag>
-      <video:tag>sci-fi movies</video:tag>
-      <video:tag>iñaki godoy</video:tag>
-      <video:tag>emily rudd</video:tag>
-      <video:tag>mackenyu</video:tag>
     </video:video>
   </url>
   <url>
@@ -27088,54 +26209,6 @@
     </video:video>
   </url>
   <url>
-    <loc>https://www.mydonkey.in/browse/mov_11</loc>
-    <lastmod>2026-02-15</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://wallpaperaccess.com/full/1089104.png</image:loc>
-      <image:title>Watch Avengers: Endgame (2019) Free Online - My Donkey Movies</image:title>
-      <image:caption>Stream Avengers: Endgame in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
-    </image:image>
-    <video:video>
-      <video:thumbnail_loc>https://wallpaperaccess.com/full/1089104.png</video:thumbnail_loc>
-      <video:title>Watch Avengers: Endgame (2019) Online Free | My Donkey</video:title>
-      <video:description>Stream Avengers: Endgame (2019) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Avengers: Endgame is a superhero film that serves as the culmination of the Marvel Cinematic Universe&apos;s Infinity Saga.</video:description>
-      <video:publication_date>2019-04-26</video:publication_date>
-      <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/TcMBFSGVi1c</video:player_loc>
-      <video:category>Action Movies</video:category>
-      <video:family_friendly>yes</video:family_friendly>
-      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
-      <video:platform relationship="allow">web mobile tv</video:platform>
-      <video:tag>donkey</video:tag>
-      <video:tag>my donkey</video:tag>
-      <video:tag>watch free movies</video:tag>
-      <video:tag>online free movies</video:tag>
-      <video:tag>free movies</video:tag>
-      <video:tag>hd streaming</video:tag>
-      <video:tag>movies</video:tag>
-      <video:tag>full movie online</video:tag>
-      <video:tag>marvel movies</video:tag>
-      <video:tag>mcu</video:tag>
-      <video:tag>superhero</video:tag>
-      <video:tag>english movies</video:tag>
-      <video:tag>hollywood movies</video:tag>
-      <video:tag>avengers: endgame</video:tag>
-      <video:tag>watch avengers: endgame</video:tag>
-      <video:tag>action</video:tag>
-      <video:tag>action movies</video:tag>
-      <video:tag>sci-fi</video:tag>
-      <video:tag>sci-fi movies</video:tag>
-      <video:tag>thriller</video:tag>
-      <video:tag>thriller movies</video:tag>
-      <video:tag>drama</video:tag>
-      <video:tag>drama movies</video:tag>
-      <video:tag>robert downey jr</video:tag>
-      <video:tag>chris evans</video:tag>
-      <video:tag>scarlett johansson</video:tag>
-    </video:video>
-  </url>
-  <url>
     <loc>https://www.mydonkey.in/browse/mov_14</loc>
     <lastmod>2026-02-15</lastmod>
     <changefreq>weekly</changefreq>
@@ -28122,52 +27195,6 @@
     </video:video>
   </url>
   <url>
-    <loc>https://www.mydonkey.in/browse/ogapVNTYPwnJEGsY3MmQ</loc>
-    <lastmod>2026-09-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w500/bRwnj8WEKBCvmfeUNOukJPwB43K.jpg</image:loc>
-      <image:title>Watch Obsession (2026) Free Online - My Donkey Movies</image:title>
-      <image:caption>Stream Obsession in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
-    </image:image>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w1280/rZfmzpixLKLR3Hg2u0WgC7XLFl8.jpg</image:loc>
-      <image:title>Obsession HD Wallpaper &amp; Backdrop - My Donkey</image:title>
-      <image:caption>High definition backdrop for Obsession on My Donkey streaming platform.</image:caption>
-    </image:image>
-    <video:video>
-      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/rZfmzpixLKLR3Hg2u0WgC7XLFl8.jpg</video:thumbnail_loc>
-      <video:title>Watch Obsession (2026) Online Free | My Donkey</video:title>
-      <video:description>Stream Obsession (2026) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. After breaking the mysterious &quot;One Wish Willow&quot; to win his crush&apos;s heart, a hopeless romantic finds himself getting exactly what he asked for but soon discovers that some desires come at a dark, sinister price.</video:description>
-      <video:publication_date>2026-05-13</video:publication_date>
-      <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/gMC8kkwbIQQ</video:player_loc>
-      <video:category>Horror Movies</video:category>
-      <video:family_friendly>yes</video:family_friendly>
-      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
-      <video:platform relationship="allow">web mobile tv</video:platform>
-      <video:tag>donkey</video:tag>
-      <video:tag>my donkey</video:tag>
-      <video:tag>watch free movies</video:tag>
-      <video:tag>online free movies</video:tag>
-      <video:tag>free movies</video:tag>
-      <video:tag>hd streaming</video:tag>
-      <video:tag>movies</video:tag>
-      <video:tag>full movie online</video:tag>
-      <video:tag>english movies</video:tag>
-      <video:tag>hollywood movies</video:tag>
-      <video:tag>obsession</video:tag>
-      <video:tag>watch obsession</video:tag>
-      <video:tag>horror</video:tag>
-      <video:tag>horror movies</video:tag>
-      <video:tag>thriller</video:tag>
-      <video:tag>thriller movies</video:tag>
-      <video:tag>michael johnston</video:tag>
-      <video:tag>inde navarrette</video:tag>
-      <video:tag>cooper tomlinson</video:tag>
-    </video:video>
-  </url>
-  <url>
     <loc>https://www.mydonkey.in/browse/opZsTEM3shOtVH0w35Im</loc>
     <lastmod>2026-09-04</lastmod>
     <changefreq>weekly</changefreq>
@@ -28488,54 +27515,6 @@
     </video:video>
   </url>
   <url>
-    <loc>https://www.mydonkey.in/browse/pMhSIcXq6AcWwE0w6Sgi</loc>
-    <lastmod>2026-09-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w500/dtdZ6QhcPyxGhpwamo8W8Yeiguh.jpg</image:loc>
-      <image:title>Watch Ikkis (2026) Free Online - My Donkey Movies</image:title>
-      <image:caption>Stream Ikkis in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
-    </image:image>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w1280/wbhoYwvqgadchfMgUOfOp87QZDS.jpg</image:loc>
-      <image:title>Ikkis HD Wallpaper &amp; Backdrop - My Donkey</image:title>
-      <image:caption>High definition backdrop for Ikkis on My Donkey streaming platform.</image:caption>
-    </image:image>
-    <video:video>
-      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/wbhoYwvqgadchfMgUOfOp87QZDS.jpg</video:thumbnail_loc>
-      <video:title>Watch Ikkis (2026) Online Free | My Donkey</video:title>
-      <video:description>Stream Ikkis (2026) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Second Lieutenant and India&apos;s youngest Param Vir Chakra recipient, Arun Khetarpal, gave his life fighting for his battalion and the country during the 1971 Battle of Basantar. Ikkis also takes a reflective look at the futility of war through the eyes of Khetarpal&apos;s father, who visits his ancestral home in Sargodha and Alma Mater for reunion, which now happens to be in post-partition Pakistan, 30 years later.</video:description>
-      <video:publication_date>2026-01-01</video:publication_date>
-      <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/QfnyH8odcus</video:player_loc>
-      <video:category>History Movies</video:category>
-      <video:family_friendly>yes</video:family_friendly>
-      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
-      <video:platform relationship="allow">web mobile tv</video:platform>
-      <video:tag>donkey</video:tag>
-      <video:tag>my donkey</video:tag>
-      <video:tag>watch free movies</video:tag>
-      <video:tag>online free movies</video:tag>
-      <video:tag>free movies</video:tag>
-      <video:tag>hd streaming</video:tag>
-      <video:tag>movies</video:tag>
-      <video:tag>full movie online</video:tag>
-      <video:tag>english movies</video:tag>
-      <video:tag>hollywood movies</video:tag>
-      <video:tag>ikkis</video:tag>
-      <video:tag>watch ikkis</video:tag>
-      <video:tag>history</video:tag>
-      <video:tag>history movies</video:tag>
-      <video:tag>action</video:tag>
-      <video:tag>action movies</video:tag>
-      <video:tag>drama</video:tag>
-      <video:tag>drama movies</video:tag>
-      <video:tag>dharmendra</video:tag>
-      <video:tag>jaideep ahlawat</video:tag>
-      <video:tag>agastya nanda</video:tag>
-    </video:video>
-  </url>
-  <url>
     <loc>https://www.mydonkey.in/browse/pZfWc5EBt7FxaamhLJIo</loc>
     <lastmod>2026-09-04</lastmod>
     <changefreq>weekly</changefreq>
@@ -28580,53 +27559,6 @@
       <video:tag>prabhas</video:tag>
       <video:tag>rana daggubati</video:tag>
       <video:tag>anushka shetty</video:tag>
-    </video:video>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/browse/pZxiJEvEQ9Bb31JGL3gS</loc>
-    <lastmod>2026-09-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w500/iQ7H87WvamQRyduAqN2zAZeirji.jpg</image:loc>
-      <image:title>Watch Asur (2020) Free Online - My Donkey Movies</image:title>
-      <image:caption>Stream Asur in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
-    </image:image>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w1280/eXUr34XTqYaDwyOerFpL6sUOgDL.jpg</image:loc>
-      <image:title>Asur HD Wallpaper &amp; Backdrop - My Donkey</image:title>
-      <image:caption>High definition backdrop for Asur on My Donkey streaming platform.</image:caption>
-    </image:image>
-    <video:video>
-      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/eXUr34XTqYaDwyOerFpL6sUOgDL.jpg</video:thumbnail_loc>
-      <video:title>Watch Asur (2020) Online Free | My Donkey</video:title>
-      <video:description>Stream Asur (2020) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Set in the backdrop of the mystical city of Varanasi, Asur follows Nikhil Nair, a forensic-expert-turned-teacher, who returns to his roots at the Central Bureau of Investigation, and along with his former mentor Dhananjay Rajpoot, finds himself caught in a cat-and-mouse game with a brutal serial killer. What follows is a blend of suspense, mythology and the murders of some people totally unrelated.</video:description>
-      <video:publication_date>2020-03-02</video:publication_date>
-      <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/0ZwyCRhhK60</video:player_loc>
-      <video:category>TV Shows</video:category>
-      <video:family_friendly>yes</video:family_friendly>
-      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
-      <video:platform relationship="allow">web mobile tv</video:platform>
-      <video:tag>donkey</video:tag>
-      <video:tag>my donkey</video:tag>
-      <video:tag>watch free movies</video:tag>
-      <video:tag>online free movies</video:tag>
-      <video:tag>free movies</video:tag>
-      <video:tag>hd streaming</video:tag>
-      <video:tag>tv shows</video:tag>
-      <video:tag>web series</video:tag>
-      <video:tag>watch series online</video:tag>
-      <video:tag>english movies</video:tag>
-      <video:tag>hollywood movies</video:tag>
-      <video:tag>asur</video:tag>
-      <video:tag>watch asur</video:tag>
-      <video:tag>drama</video:tag>
-      <video:tag>drama movies</video:tag>
-      <video:tag>mystery</video:tag>
-      <video:tag>mystery movies</video:tag>
-      <video:tag>arshad warsi</video:tag>
-      <video:tag>anupriya goenka</video:tag>
-      <video:tag>ridhi dogra</video:tag>
     </video:video>
   </url>
   <url>
@@ -28995,54 +27927,6 @@
       <video:tag>eric nam</video:tag>
       <video:tag>dave bautista</video:tag>
       <video:tag>jessica matten</video:tag>
-    </video:video>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/browse/qA8Ijzd9ijO5PvHCrKkr</loc>
-    <lastmod>2026-09-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w500/vfTIOhYUHnCCUcYyEL7OUgTpXtH.jpg</image:loc>
-      <image:title>Watch Roti (1974) Free Online - My Donkey Movies</image:title>
-      <image:caption>Stream Roti in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
-    </image:image>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w1280/cBCCz4bv106pMGgC014hYjXkOun.jpg</image:loc>
-      <image:title>Roti HD Wallpaper &amp; Backdrop - My Donkey</image:title>
-      <image:caption>High definition backdrop for Roti on My Donkey streaming platform.</image:caption>
-    </image:image>
-    <video:video>
-      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/cBCCz4bv106pMGgC014hYjXkOun.jpg</video:thumbnail_loc>
-      <video:title>Watch Roti (1974) Online Free | My Donkey</video:title>
-      <video:description>Stream Roti (1974) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. An escaped criminal finds refuge with the family of a man he killed accidentally.</video:description>
-      <video:publication_date>1974-10-11</video:publication_date>
-      <video:player_loc allow_embed="yes">https://proxy.garageband.rocks/embed/movie/tt0176105</video:player_loc>
-      <video:category>Drama Movies</video:category>
-      <video:family_friendly>yes</video:family_friendly>
-      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
-      <video:platform relationship="allow">web mobile tv</video:platform>
-      <video:tag>donkey</video:tag>
-      <video:tag>my donkey</video:tag>
-      <video:tag>watch free movies</video:tag>
-      <video:tag>online free movies</video:tag>
-      <video:tag>free movies</video:tag>
-      <video:tag>hd streaming</video:tag>
-      <video:tag>movies</video:tag>
-      <video:tag>full movie online</video:tag>
-      <video:tag>english movies</video:tag>
-      <video:tag>hollywood movies</video:tag>
-      <video:tag>roti</video:tag>
-      <video:tag>watch roti</video:tag>
-      <video:tag>drama</video:tag>
-      <video:tag>drama movies</video:tag>
-      <video:tag>romance</video:tag>
-      <video:tag>romance movies</video:tag>
-      <video:tag>action</video:tag>
-      <video:tag>action movies</video:tag>
-      <video:tag>rajesh khanna</video:tag>
-      <video:tag>mumtaz askari</video:tag>
-      <video:tag>nirupa roy</video:tag>
     </video:video>
   </url>
   <url>
@@ -29646,54 +28530,6 @@
     </video:video>
   </url>
   <url>
-    <loc>https://www.mydonkey.in/browse/rQXkQudtvRfTHYTiYY8x</loc>
-    <lastmod>2026-09-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w500/5rhTDKUhPYvpdQIijFIs5VoWsON.jpg</image:loc>
-      <image:title>Watch The Odyssey (2026) Free Online - My Donkey Movies</image:title>
-      <image:caption>Stream The Odyssey in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
-    </image:image>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w1280/twiVn9oFXOVR0uoYgawyEBlnFu8.jpg</image:loc>
-      <image:title>The Odyssey HD Wallpaper &amp; Backdrop - My Donkey</image:title>
-      <image:caption>High definition backdrop for The Odyssey on My Donkey streaming platform.</image:caption>
-    </image:image>
-    <video:video>
-      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/twiVn9oFXOVR0uoYgawyEBlnFu8.jpg</video:thumbnail_loc>
-      <video:title>Watch The Odyssey (2026) Online Free | My Donkey</video:title>
-      <video:description>Stream The Odyssey (2026) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Odysseus, the legendary King of Ithaca, embarks on a long and perilous journey home following the Trojan War. Throughout his voyage, he is forced to confront the whims of gods, mythological monsters, and trials that stretch both his cunning and his humanity to the breaking point.</video:description>
-      <video:publication_date>2026-07-15</video:publication_date>
-      <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/AyIZ9tiiN8I</video:player_loc>
-      <video:category>Adventure Movies</video:category>
-      <video:family_friendly>yes</video:family_friendly>
-      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
-      <video:platform relationship="allow">web mobile tv</video:platform>
-      <video:tag>donkey</video:tag>
-      <video:tag>my donkey</video:tag>
-      <video:tag>watch free movies</video:tag>
-      <video:tag>online free movies</video:tag>
-      <video:tag>free movies</video:tag>
-      <video:tag>hd streaming</video:tag>
-      <video:tag>movies</video:tag>
-      <video:tag>full movie online</video:tag>
-      <video:tag>english movies</video:tag>
-      <video:tag>hollywood movies</video:tag>
-      <video:tag>the odyssey</video:tag>
-      <video:tag>watch the odyssey</video:tag>
-      <video:tag>adventure</video:tag>
-      <video:tag>adventure movies</video:tag>
-      <video:tag>action</video:tag>
-      <video:tag>action movies</video:tag>
-      <video:tag>fantasy</video:tag>
-      <video:tag>fantasy movies</video:tag>
-      <video:tag>matt damon</video:tag>
-      <video:tag>tom holland</video:tag>
-      <video:tag>anne hathaway</video:tag>
-    </video:video>
-  </url>
-  <url>
     <loc>https://www.mydonkey.in/browse/rWEgn3nATlf7A7v9LKN4</loc>
     <lastmod>2026-09-04</lastmod>
     <changefreq>weekly</changefreq>
@@ -29838,7 +28674,7 @@
     </video:video>
   </url>
   <url>
-    <loc>https://www.mydonkey.in/browse/rcX7adIQzYSNeOawdz9A</loc>
+    <loc>https://www.mydonkey.in/browse/tmdb_597089</loc>
     <lastmod>2026-09-05</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
@@ -29857,8 +28693,8 @@
       <video:title>Watch Article 15 (2019) Online Free | My Donkey</video:title>
       <video:description>Stream Article 15 (2019) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. A young IPS officer’s new posting in rural India has him confronting caste disparities and uncomfortable truths in the face of a gruesome crime. When three girls go missing in the fictional village of Lalgaon, two of them are found dead and there is no trace of the third one. Where is she and who is responsible for this heinous act?</video:description>
       <video:publication_date>2019-05-28</video:publication_date>
-      <video:player_loc allow_embed="yes">https://proxy.garageband.rocks/embed/movie/tt10324144</video:player_loc>
-      <video:category>Drama Movies</video:category>
+      <video:player_loc allow_embed="yes">https://proxy.garageband.rocks/embed/movie/597089</video:player_loc>
+      <video:category>Crime Movies</video:category>
       <video:family_friendly>yes</video:family_friendly>
       <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
       <video:platform relationship="allow">web mobile tv</video:platform>
@@ -29874,6 +28710,8 @@
       <video:tag>hollywood movies</video:tag>
       <video:tag>article 15</video:tag>
       <video:tag>watch article 15</video:tag>
+      <video:tag>crime</video:tag>
+      <video:tag>crime movies</video:tag>
       <video:tag>drama</video:tag>
       <video:tag>drama movies</video:tag>
       <video:tag>thriller</video:tag>
@@ -29884,26 +28722,26 @@
     </video:video>
   </url>
   <url>
-    <loc>https://www.mydonkey.in/browse/reU850zHxPfP0qjVs8zl</loc>
-    <lastmod>2026-07-07</lastmod>
+    <loc>https://www.mydonkey.in/browse/uSjJ0ZjJCvl5X6IYlnx0</loc>
+    <lastmod>2026-09-04</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
     <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w500/3uHL1EmsO0rRJ5e3M4JQWpx4Cnb.jpg</image:loc>
+      <image:loc>https://image.tmdb.org/t/p/w500/hm4ou83RwLVwNj3HsmQuqC1qkWy.jpg</image:loc>
       <image:title>Watch Satluj (2026) Free Online - My Donkey Movies</image:title>
       <image:caption>Stream Satluj in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
     </image:image>
     <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w1280/pzLzvBBmEa3rSvaF0i3DBMPOF7u.jpg</image:loc>
+      <image:loc>https://image.tmdb.org/t/p/w1280/h7VptulPVCJUIvWCE2HzXdHljkj.jpg</image:loc>
       <image:title>Satluj HD Wallpaper &amp; Backdrop - My Donkey</image:title>
       <image:caption>High definition backdrop for Satluj on My Donkey streaming platform.</image:caption>
     </image:image>
     <video:video>
-      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/pzLzvBBmEa3rSvaF0i3DBMPOF7u.jpg</video:thumbnail_loc>
+      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/h7VptulPVCJUIvWCE2HzXdHljkj.jpg</video:thumbnail_loc>
       <video:title>Watch Satluj (2026) Online Free | My Donkey</video:title>
-      <video:description>Stream Satluj (2026) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Triggered by the search for his missing aunt, Punjab human rights activist Jaswant Singh launches a dangerous investigation in his attempts at uncovering the conspiracy behind thousands of disappearances and extrajudicial killings.</video:description>
+      <video:description>Stream Satluj (2026) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Triggered by the search for his missing aunt, human rights activist Jaswant Singh Khalra takes on a broken system in a courageous fight to uncover the conspiracy behind thousands of disappearances and extrajudicial killings during the nadir of Punjab’s period of insurgency.</video:description>
       <video:publication_date>2026-07-03</video:publication_date>
-      <video:player_loc allow_embed="yes">https://www.playimdb.com/title/tt43641251/</video:player_loc>
+      <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/WtL3YbjUJN8</video:player_loc>
       <video:category>Drama Movies</video:category>
       <video:family_friendly>yes</video:family_friendly>
       <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
@@ -29922,6 +28760,11 @@
       <video:tag>watch satluj</video:tag>
       <video:tag>drama</video:tag>
       <video:tag>drama movies</video:tag>
+      <video:tag>history</video:tag>
+      <video:tag>history movies</video:tag>
+      <video:tag>diljit dosanjh</video:tag>
+      <video:tag>arjun rampal</video:tag>
+      <video:tag>suvinder vicky</video:tag>
     </video:video>
   </url>
   <url>
@@ -30865,99 +29708,6 @@
     </video:video>
   </url>
   <url>
-    <loc>https://www.mydonkey.in/browse/tmdb_1291608</loc>
-    <lastmod>2026-09-07</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w500/8FHOtUpNIk5ZPEay2N2EY5lrxkv.jpg</image:loc>
-      <image:title>Watch Dhurandhar (2025) Free Online - My Donkey Movies</image:title>
-      <image:caption>Stream Dhurandhar in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
-    </image:image>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w1280/4DfxcN4w0FuYZHQ3JAHzpHWia1U.jpg</image:loc>
-      <image:title>Dhurandhar HD Wallpaper &amp; Backdrop - My Donkey</image:title>
-      <image:caption>High definition backdrop for Dhurandhar on My Donkey streaming platform.</image:caption>
-    </image:image>
-    <video:video>
-      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/4DfxcN4w0FuYZHQ3JAHzpHWia1U.jpg</video:thumbnail_loc>
-      <video:title>Watch Dhurandhar (2025) Online Free | My Donkey</video:title>
-      <video:description>Stream Dhurandhar (2025) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. In the early 2000s, an undercover operative infiltrates Karachi&apos;s underworld, breaking into its inner circle to dismantle a violent nexus from within.</video:description>
-      <video:publication_date>2025-12-05</video:publication_date>
-      <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/BKOVzHcjEIo</video:player_loc>
-      <video:category>Action Movies</video:category>
-      <video:family_friendly>yes</video:family_friendly>
-      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
-      <video:platform relationship="allow">web mobile tv</video:platform>
-      <video:tag>donkey</video:tag>
-      <video:tag>my donkey</video:tag>
-      <video:tag>watch free movies</video:tag>
-      <video:tag>online free movies</video:tag>
-      <video:tag>free movies</video:tag>
-      <video:tag>hd streaming</video:tag>
-      <video:tag>movies</video:tag>
-      <video:tag>full movie online</video:tag>
-      <video:tag>hindi movies</video:tag>
-      <video:tag>bollywood movies</video:tag>
-      <video:tag>dhurandhar</video:tag>
-      <video:tag>watch dhurandhar</video:tag>
-      <video:tag>action</video:tag>
-      <video:tag>action movies</video:tag>
-      <video:tag>drama</video:tag>
-      <video:tag>drama movies</video:tag>
-      <video:tag>thriller</video:tag>
-      <video:tag>thriller movies</video:tag>
-    </video:video>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/browse/tmdb_597089</loc>
-    <lastmod>2026-09-05</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w500/puyn1J1NOTG7P2dYxpOIl1583yf.jpg</image:loc>
-      <image:title>Watch Article 15 (2019) Free Online - My Donkey Movies</image:title>
-      <image:caption>Stream Article 15 in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
-    </image:image>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w1280/wN5e6gMVBTEihohzFkuGyZGbDOw.jpg</image:loc>
-      <image:title>Article 15 HD Wallpaper &amp; Backdrop - My Donkey</image:title>
-      <image:caption>High definition backdrop for Article 15 on My Donkey streaming platform.</image:caption>
-    </image:image>
-    <video:video>
-      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/wN5e6gMVBTEihohzFkuGyZGbDOw.jpg</video:thumbnail_loc>
-      <video:title>Watch Article 15 (2019) Online Free | My Donkey</video:title>
-      <video:description>Stream Article 15 (2019) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. A young IPS officer’s new posting in rural India has him confronting caste disparities and uncomfortable truths in the face of a gruesome crime. When three girls go missing in the fictional village of Lalgaon, two of them are found dead and there is no trace of the third one. Where is she and who is responsible for this heinous act?</video:description>
-      <video:publication_date>2019-05-28</video:publication_date>
-      <video:player_loc allow_embed="yes">https://proxy.garageband.rocks/embed/movie/597089</video:player_loc>
-      <video:category>Crime Movies</video:category>
-      <video:family_friendly>yes</video:family_friendly>
-      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
-      <video:platform relationship="allow">web mobile tv</video:platform>
-      <video:tag>donkey</video:tag>
-      <video:tag>my donkey</video:tag>
-      <video:tag>watch free movies</video:tag>
-      <video:tag>online free movies</video:tag>
-      <video:tag>free movies</video:tag>
-      <video:tag>hd streaming</video:tag>
-      <video:tag>movies</video:tag>
-      <video:tag>full movie online</video:tag>
-      <video:tag>english movies</video:tag>
-      <video:tag>hollywood movies</video:tag>
-      <video:tag>article 15</video:tag>
-      <video:tag>watch article 15</video:tag>
-      <video:tag>crime</video:tag>
-      <video:tag>crime movies</video:tag>
-      <video:tag>drama</video:tag>
-      <video:tag>drama movies</video:tag>
-      <video:tag>thriller</video:tag>
-      <video:tag>thriller movies</video:tag>
-      <video:tag>ayushmann khurrana</video:tag>
-      <video:tag>isha talwar</video:tag>
-      <video:tag>sayani gupta</video:tag>
-    </video:video>
-  </url>
-  <url>
     <loc>https://www.mydonkey.in/browse/tnLCWX9Vl8r1GesycuE8</loc>
     <lastmod>2026-09-04</lastmod>
     <changefreq>weekly</changefreq>
@@ -31278,52 +30028,6 @@
       <video:tag>rani mukerji</video:tag>
       <video:tag>vishal jethwa</video:tag>
       <video:tag>rajesh sharma</video:tag>
-    </video:video>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/browse/uSjJ0ZjJCvl5X6IYlnx0</loc>
-    <lastmod>2026-09-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w500/hm4ou83RwLVwNj3HsmQuqC1qkWy.jpg</image:loc>
-      <image:title>Watch Satluj (2026) Free Online - My Donkey Movies</image:title>
-      <image:caption>Stream Satluj in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
-    </image:image>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w1280/h7VptulPVCJUIvWCE2HzXdHljkj.jpg</image:loc>
-      <image:title>Satluj HD Wallpaper &amp; Backdrop - My Donkey</image:title>
-      <image:caption>High definition backdrop for Satluj on My Donkey streaming platform.</image:caption>
-    </image:image>
-    <video:video>
-      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/h7VptulPVCJUIvWCE2HzXdHljkj.jpg</video:thumbnail_loc>
-      <video:title>Watch Satluj (2026) Online Free | My Donkey</video:title>
-      <video:description>Stream Satluj (2026) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Triggered by the search for his missing aunt, human rights activist Jaswant Singh Khalra takes on a broken system in a courageous fight to uncover the conspiracy behind thousands of disappearances and extrajudicial killings during the nadir of Punjab’s period of insurgency.</video:description>
-      <video:publication_date>2026-07-03</video:publication_date>
-      <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/WtL3YbjUJN8</video:player_loc>
-      <video:category>Drama Movies</video:category>
-      <video:family_friendly>yes</video:family_friendly>
-      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
-      <video:platform relationship="allow">web mobile tv</video:platform>
-      <video:tag>donkey</video:tag>
-      <video:tag>my donkey</video:tag>
-      <video:tag>watch free movies</video:tag>
-      <video:tag>online free movies</video:tag>
-      <video:tag>free movies</video:tag>
-      <video:tag>hd streaming</video:tag>
-      <video:tag>movies</video:tag>
-      <video:tag>full movie online</video:tag>
-      <video:tag>english movies</video:tag>
-      <video:tag>hollywood movies</video:tag>
-      <video:tag>satluj</video:tag>
-      <video:tag>watch satluj</video:tag>
-      <video:tag>drama</video:tag>
-      <video:tag>drama movies</video:tag>
-      <video:tag>history</video:tag>
-      <video:tag>history movies</video:tag>
-      <video:tag>diljit dosanjh</video:tag>
-      <video:tag>arjun rampal</video:tag>
-      <video:tag>suvinder vicky</video:tag>
     </video:video>
   </url>
   <url>
@@ -32469,51 +31173,6 @@
       <video:tag>urassaya sperbund</video:tag>
       <video:tag>prin suparat</video:tag>
       <video:tag>jarinporn joonkiat</video:tag>
-    </video:video>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/browse/webjfuc9dnwbQuhxK2Mc</loc>
-    <lastmod>2026-09-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w500/pbV2eLnKSIm1epSZt473UYfqaeZ.jpg</image:loc>
-      <image:title>Watch Hannibal (2013) Free Online - My Donkey Movies</image:title>
-      <image:caption>Stream Hannibal in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
-    </image:image>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w1280/vlG182ZY2WMzD5bjFZNnhyvv5V4.jpg</image:loc>
-      <image:title>Hannibal HD Wallpaper &amp; Backdrop - My Donkey</image:title>
-      <image:caption>High definition backdrop for Hannibal on My Donkey streaming platform.</image:caption>
-    </image:image>
-    <video:video>
-      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/vlG182ZY2WMzD5bjFZNnhyvv5V4.jpg</video:thumbnail_loc>
-      <video:title>Watch Hannibal (2013) Online Free | My Donkey</video:title>
-      <video:description>Stream Hannibal (2013) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Both a gift and a curse, Graham has the extraordinary ability to think like his prey—he sees what they see, feels what they feel. But while Graham is pursuing an especially troubling, cannibalistic murderer, Special Agent Jack Crawford teams him with a highly respected psychiatrist – a man with a taste for the criminal minded – Dr. Hannibal Lecter.</video:description>
-      <video:publication_date>2013-04-04</video:publication_date>
-      <video:player_loc allow_embed="yes" autoplay="ap=1">https://www.youtube.com/embed/RuiklpUQ-p4</video:player_loc>
-      <video:category>TV Shows</video:category>
-      <video:family_friendly>yes</video:family_friendly>
-      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
-      <video:platform relationship="allow">web mobile tv</video:platform>
-      <video:tag>donkey</video:tag>
-      <video:tag>my donkey</video:tag>
-      <video:tag>watch free movies</video:tag>
-      <video:tag>online free movies</video:tag>
-      <video:tag>free movies</video:tag>
-      <video:tag>hd streaming</video:tag>
-      <video:tag>tv shows</video:tag>
-      <video:tag>web series</video:tag>
-      <video:tag>watch series online</video:tag>
-      <video:tag>english movies</video:tag>
-      <video:tag>hollywood movies</video:tag>
-      <video:tag>hannibal</video:tag>
-      <video:tag>watch hannibal</video:tag>
-      <video:tag>drama</video:tag>
-      <video:tag>drama movies</video:tag>
-      <video:tag>mads mikkelsen</video:tag>
-      <video:tag>hugh dancy</video:tag>
-      <video:tag>laurence fishburne</video:tag>
     </video:video>
   </url>
   <url>
@@ -34008,53 +32667,6 @@
       <video:tag>zhao lusi</video:tag>
       <video:tag>chen zheyuan</video:tag>
       <video:tag>victor ma</video:tag>
-    </video:video>
-  </url>
-  <url>
-    <loc>https://www.mydonkey.in/browse/zoWLKdhnujfBEeBdbSf9</loc>
-    <lastmod>2026-09-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w500/1VWVTX4NRsfpo5MUdVVGMpU0XYl.jpg</image:loc>
-      <image:title>Watch Friends with Benefits (2011) Free Online - My Donkey Movies</image:title>
-      <image:caption>Stream Friends with Benefits in HD on My Donkey. Free movies, TV shows, and anime streaming.</image:caption>
-    </image:image>
-    <image:image>
-      <image:loc>https://image.tmdb.org/t/p/w1280/q38iwBEFZtwOHazJC77zcAMqLJP.jpg</image:loc>
-      <image:title>Friends with Benefits HD Wallpaper &amp; Backdrop - My Donkey</image:title>
-      <image:caption>High definition backdrop for Friends with Benefits on My Donkey streaming platform.</image:caption>
-    </image:image>
-    <video:video>
-      <video:thumbnail_loc>https://image.tmdb.org/t/p/w1280/q38iwBEFZtwOHazJC77zcAMqLJP.jpg</video:thumbnail_loc>
-      <video:title>Watch Friends with Benefits (2011) Online Free | My Donkey</video:title>
-      <video:description>Stream Friends with Benefits (2011) online free in HD on My Donkey. Watch full movies, TV shows, anime, and Marvel movies without subscription. Revolving around a group of twentysomething singles as they navigate the difficult, sometimes rewarding, often confusing world of dating. Loyal and devoted to one another, these friends are never too busy to help a member of the group who might be in need. In fact, their companionship often extends into a more intimate setting - the bedroom.</video:description>
-      <video:publication_date>2011-08-05</video:publication_date>
-      <video:player_loc allow_embed="yes">https://proxy.garageband.rocks/embed/tv/tt1604113</video:player_loc>
-      <video:category>TV Shows</video:category>
-      <video:family_friendly>yes</video:family_friendly>
-      <video:uploader info="https://www.mydonkey.in">My Donkey</video:uploader>
-      <video:platform relationship="allow">web mobile tv</video:platform>
-      <video:tag>donkey</video:tag>
-      <video:tag>my donkey</video:tag>
-      <video:tag>watch free movies</video:tag>
-      <video:tag>online free movies</video:tag>
-      <video:tag>free movies</video:tag>
-      <video:tag>hd streaming</video:tag>
-      <video:tag>tv shows</video:tag>
-      <video:tag>web series</video:tag>
-      <video:tag>watch series online</video:tag>
-      <video:tag>english movies</video:tag>
-      <video:tag>hollywood movies</video:tag>
-      <video:tag>friends with benefits</video:tag>
-      <video:tag>watch friends with benefits</video:tag>
-      <video:tag>drama</video:tag>
-      <video:tag>drama movies</video:tag>
-      <video:tag>comedy</video:tag>
-      <video:tag>comedy movies</video:tag>
-      <video:tag>ryan hansen</video:tag>
-      <video:tag>danneel ackles</video:tag>
-      <video:tag>zach cregger</video:tag>
     </video:video>
   </url>
   <url>

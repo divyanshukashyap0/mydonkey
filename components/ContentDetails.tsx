@@ -6,6 +6,7 @@ import ContentRail from './ContentRail';
 import SongsSection from './SongsSection';
 
 import { buildEmbedUrl } from '../utils/embedUrl';
+import { saveContentTitle, setWebpageTitle } from '../utils/titleManager';
 
 interface ContentDetailsProps {
     content: Content;
@@ -17,18 +18,57 @@ interface ContentDetailsProps {
 const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent, onClose, onPlay, onDetails }) => {
     const { currentProfile, toggleWatchlist, likedContent, toggleLike, currentUser, content: allContent, deleteContent, settings, fetchContentById } = useStore();
     const [content, setContent] = useState<Content>(initialContent);
+    const fetchedDocIdsRef = useRef<Set<string>>(new Set());
 
+    // Synchronize content state cleanly without resetting loaded cast/seasons/metadata
     useEffect(() => {
-        setContent(initialContent);
-        if (initialContent.id && !initialContent.id.startsWith('tmdb_') && !initialContent.id.startsWith('imdb_') && fetchContentById) {
-            const needsFullDoc = initialContent.type === 'tv' && (!initialContent.seasons || initialContent.seasons.length === 0);
-            if (needsFullDoc) {
-                fetchContentById(initialContent.id).then(full => {
-                    if (full) setContent(full);
+        const contentId = initialContent?.id;
+        if (!contentId) return;
+
+        setContent(prev => {
+            // Different title/item opened
+            if (!prev || prev.id !== contentId) {
+                return initialContent;
+            }
+            // Same item: merge to preserve already hydrated cast, director, creators, seasons, etc.
+            return {
+                ...initialContent,
+                ...prev,
+                cast: (prev.cast && prev.cast.length > 0) ? prev.cast : initialContent.cast,
+                director: prev.director || initialContent.director,
+                creators: (prev.creators && prev.creators.length > 0) ? prev.creators : initialContent.creators,
+                seasons: (prev.seasons && prev.seasons.length > 0) ? prev.seasons : initialContent.seasons,
+                overview: prev.overview || initialContent.overview,
+                videoUrl: prev.videoUrl || initialContent.videoUrl,
+            };
+        });
+
+        // Hydrate full doc if missing seasons (for TV) or missing cast
+        if (!contentId.startsWith('tmdb_') && !contentId.startsWith('imdb_') && fetchContentById) {
+            const needsFullDoc = (initialContent.type === 'tv' && (!initialContent.seasons || initialContent.seasons.length === 0)) ||
+                                 (!initialContent.cast || initialContent.cast.length === 0);
+
+            if (needsFullDoc && !fetchedDocIdsRef.current.has(contentId)) {
+                fetchedDocIdsRef.current.add(contentId);
+                fetchContentById(contentId).then(full => {
+                    if (full && full.id === contentId) {
+                        setContent(prev => {
+                            if (!prev || prev.id !== contentId) return prev;
+                            return {
+                                ...prev,
+                                ...full,
+                                cast: (full.cast && full.cast.length > 0) ? full.cast : prev.cast,
+                                director: full.director || prev.director,
+                                creators: (full.creators && full.creators.length > 0) ? full.creators : prev.creators,
+                                seasons: (full.seasons && full.seasons.length > 0) ? full.seasons : prev.seasons,
+                                overview: full.overview || prev.overview,
+                            };
+                        });
+                    }
                 }).catch(() => {});
             }
         }
-    }, [initialContent, fetchContentById]);
+    }, [initialContent.id, fetchContentById]);
 
     const isAdmin = currentUser?.role === 'admin';
     const isAdded = currentProfile?.myList?.includes(content.id) ?? false;
@@ -82,14 +122,16 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
 
     // Dynamically update document title to content name when viewing content page
     useEffect(() => {
-        const prevTitle = document.title;
         if (content?.title) {
-            document.title = `${content.title} | My Donkey`;
+            setWebpageTitle(content.title);
+            if (content.id) saveContentTitle(content.id, content.title);
         }
         return () => {
-            document.title = prevTitle;
+            if (!window.location.pathname.startsWith('/browse/') && !window.location.pathname.startsWith('/watch/')) {
+                document.title = 'My Donkey | Watch Free Movies, TV Shows, Anime & Marvel Movies Online in HD';
+            }
         };
-    }, [content?.title]);
+    }, [content?.title, content?.id]);
 
     // Prevent background scrolling while full-screen content page is open
     useEffect(() => {
@@ -188,7 +230,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
     };
 
     const handleShareContent = async () => {
-        const shareUrl = `${window.location.origin}/browse/${content.id}`;
+        const shareUrl = `${window.location.origin}/browse/${content.id}?title=${encodeURIComponent(content.title || '')}`;
         const titleText = content.title || 'Movie';
         const year = content.release_date?.split('-')[0] || '';
         const descText = content.overview ? `${content.overview.slice(0, 110)}...` : 'Watch in HD for free on My Donkey';
@@ -318,28 +360,44 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
             {/* Full Screen Page Content Container */}
             <div className="relative w-full h-full bg-[#121212] overflow-hidden flex flex-col">
 
-                {/* --- Mobile: Full Screen Layout (Single Frame) --- */}
-                <div ref={mobileScrollRef} className="md:hidden relative h-full w-full flex flex-col overflow-y-auto no-scrollbar scroll-smooth bg-[#121212]">
-                    {/* Full Height Background Image */}
-                    <div className="absolute top-0 left-0 right-0 z-0 h-[52vh]">
-                        <img
-                            src={content.poster_path || content.backdrop_path || '/logo.png'}
-                            className={`w-full h-full ${(content.poster_path || content.backdrop_path) ? 'object-cover' : 'object-contain p-12 bg-black/80'}`}
-                            alt={content.title}
-                            onError={(e) => {
-                                const t = e.currentTarget;
-                                if (!t.src.endsWith('/logo.png')) {
-                                    t.src = '/logo.png';
-                                    t.className = "w-full h-full object-contain p-12 bg-black/80";
-                                }
-                            }}
-                        />
-                        {/* Stronger Gradient for readability */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-[#121212]/80 to-transparent" />
-                    </div>
+                {/* Full Screen Ambient / Backdrop Image across entire page */}
+                <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden select-none">
+                    {/* Desktop background (prefers backdrop_path) - Crystal clear image */}
+                    <img
+                        src={content.backdrop_path || content.poster_path || '/logo.png'}
+                        className={`hidden md:block w-full h-full ${(content.backdrop_path || content.poster_path) ? 'object-cover object-top' : 'object-contain p-16 bg-black/80'}`}
+                        alt={content.title}
+                        onError={(e) => {
+                            const t = e.currentTarget;
+                            if (!t.src.endsWith('/logo.png')) {
+                                t.src = '/logo.png';
+                                t.className = "hidden md:block w-full h-full object-contain p-16 bg-black/80";
+                            }
+                        }}
+                    />
 
+                    {/* Mobile background (prefers poster_path) - Crystal clear image */}
+                    <img
+                        src={content.poster_path || content.backdrop_path || '/logo.png'}
+                        className={`md:hidden w-full h-full ${(content.poster_path || content.backdrop_path) ? 'object-cover object-top' : 'object-contain p-12 bg-black/80'}`}
+                        alt={content.title}
+                        onError={(e) => {
+                            const t = e.currentTarget;
+                            if (!t.src.endsWith('/logo.png')) {
+                                t.src = '/logo.png';
+                                t.className = "md:hidden w-full h-full object-contain p-12 bg-black/80";
+                            }
+                        }}
+                    />
+
+                    {/* ONLY bottom part of the image is blackish: smooth gradient transitioning to solid #121212 */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#121212] from-5% via-[#121212]/90 via-35% to-transparent" />
+                </div>
+
+                {/* --- Mobile: Full Screen Layout (Single Frame) --- */}
+                <div ref={mobileScrollRef} className="md:hidden relative z-10 h-full w-full flex flex-col overflow-y-auto no-scrollbar scroll-smooth bg-transparent">
                     {/* Content Overlay - Anchored to Bottom */}
-                    <div className="relative z-10 mt-[36vh] p-5 pb-12 flex flex-col gap-4 bg-gradient-to-t from-[#121212] via-[#121212] to-[#121212]">
+                    <div className="relative z-10 mt-[34vh] p-5 pb-12 flex flex-col gap-4 bg-transparent">
                         {/* Title & Metadata */}
                         <div>
                             <h2 className="text-3xl font-black mb-2 text-white leading-tight drop-shadow-xl">{content.title}</h2>
@@ -377,12 +435,14 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                             {isPlayable ? (
                                 <button
                                     onClick={() => { onPlay(content, 'movie'); }}
-                                    className="bg-white text-black py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-gray-200 active:scale-95 transition"
+                                    className="bg-white text-black py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-gray-200 transition active:scale-95 shadow-lg"
                                 >
-                                    <Play size={18} fill="black" /> Play {content.type === 'tv' ? 'Series' : ''}
+                                    <Play size={18} fill="black" /> Play {content.type === 'tv' ? 'Series' : 'Now'}
                                 </button>
                             ) : (
-                                <button className="bg-white/20 text-white/50 py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 cursor-not-allowed">
+                                <button
+                                    className="bg-white/20 text-white/50 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 cursor-not-allowed"
+                                >
                                     {content.comingSoon ? 'Coming Soon' : 'Not Available'}
                                 </button>
                             )}
@@ -390,52 +450,51 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                             {content.youtubeId && (
                                 <button
                                     onClick={() => { onPlay(content, 'trailer'); }}
-                                    className="bg-white/10 backdrop-blur-md text-white border border-white/20 py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition"
+                                    className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition active:scale-95 ${!(isPlayable && isSingleVideoType) ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-800/80 hover:bg-gray-800 text-white'}`}
                                 >
-                                    <Play size={18} /> Trailer
+                                    <Play size={18} fill={(isPlayable && isSingleVideoType) ? "white" : "black"} /> {(isPlayable && isSingleVideoType) ? 'Trailer' : 'Play Trailer'}
                                 </button>
                             )}
                         </div>
 
-                        {/* Secondary Actions */}
-                        <div className="flex items-center justify-between gap-4 mt-1 px-2">
-                            <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-90 transition" onClick={() => toggleWatchlist(content.id)}>
-                                {isAdded ? <Check size={20} className="text-green-400" /> : <Plus size={20} className="text-white" />}
-                                <span className="text-[10px] text-gray-400">My List</span>
-                            </div>
-                            <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-90 transition" onClick={() => toggleLike(content.id)}>
-                                <ThumbsUp size={20} className={isLiked ? "text-red-500 fill-red-500" : "text-white"} />
-                                <span className="text-[10px] text-gray-400">{isLiked ? "Liked" : "Rate"}</span>
-                            </div>
-                            <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-90 transition" onClick={handleShareContent}>
-                                <Share2 size={20} className="text-white" />
-                                <span className="text-[10px] text-gray-400">Share</span>
-                            </div>
-                            <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-90 transition" onClick={() => handleDownload(content)}>
-                                <Download size={20} className={content.allowDownload ? "text-white" : "text-gray-600"} />
-                                <span className="text-[10px] text-gray-400">Download</span>
-                            </div>
-                        </div>
+                        {/* Secondary Actions (List, Like, Share, Download) */}
+                        <div className="flex items-center justify-around py-2 border-y border-white/10 mt-1">
+                            <button
+                                onClick={() => toggleWatchlist(content.id)}
+                                className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition"
+                            >
+                                {isAdded ? <Check size={20} className="text-green-400" /> : <Plus size={20} />}
+                                <span className="text-[10px]">My List</span>
+                            </button>
 
-                        {/* Admin Action Bar (Mobile) */}
-                        {isAdmin && (
-                            <div className="mt-4 p-3 bg-red-950/40 border border-red-500/30 rounded-xl flex items-center justify-between gap-3">
-                                <div className="min-w-0">
-                                    <div className="text-xs font-bold text-red-400 flex items-center gap-1.5">
-                                        <span>Admin Control</span>
-                                        {content.addedBy && (
-                                            <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[9px] px-1.5 py-0.2 rounded font-medium">
-                                                User Added
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="text-[10px] text-gray-400 truncate">
-                                        {content.addedBy?.email ? `Added by: ${content.addedBy.name || content.addedBy.email}` : 'Remove content & explicit images'}
-                                    </div>
-                                </div>
+                            <button
+                                onClick={() => toggleLike(content.id)}
+                                className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition"
+                            >
+                                <ThumbsUp size={20} className={isLiked ? "fill-white text-white" : ""} />
+                                <span className="text-[10px]">{isLiked ? 'Liked' : 'Rate'}</span>
+                            </button>
+
+                            <button
+                                onClick={handleShareContent}
+                                className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition"
+                            >
+                                <Share2 size={20} />
+                                <span className="text-[10px]">Share</span>
+                            </button>
+
+                            <button
+                                onClick={() => handleDownload(content)}
+                                className={`flex flex-col items-center gap-1 transition ${content.allowDownload ? 'text-gray-400 hover:text-white' : 'text-gray-600 cursor-not-allowed'}`}
+                            >
+                                <Download size={20} />
+                                <span className="text-[10px]">Download</span>
+                            </button>
+
+                            {isAdmin && (
                                 <button
                                     onClick={async () => {
-                                        if (window.confirm(`Admin: Remove "${content.title}" from the platform?\n\nThis will immediately remove this content and its images from Recently Added by Users and the catalog.`)) {
+                                        if (window.confirm(`Admin: Remove "${content.title}" from platform?\n\nThis will immediately remove this content and its images from Recently Added by Users and the catalog.`)) {
                                             try {
                                                 await deleteContent(content.id);
                                                 handleClose();
@@ -444,122 +503,140 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                                             }
                                         }
                                     }}
-                                    className="flex-shrink-0 flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition active:scale-95 shadow"
+                                    className="flex flex-col items-center gap-1 text-red-500 hover:text-red-400 transition"
                                 >
-                                    <Trash2 size={13} /> Remove
+                                    <Trash2 size={20} />
+                                    <span className="text-[10px]">Delete</span>
                                 </button>
+                            )}
+                        </div>
+
+                        {/* Cast & Genres Information */}
+                        {(content.cast || content.director || content.creators || content.genres) && (
+                            <div className="text-xs text-gray-400 space-y-1.5 mt-2">
+                                {content.cast && content.cast.length > 0 && (
+                                    <p><span className="text-gray-500">Cast: </span>{content.cast.join(', ')}</p>
+                                )}
+                                {content.director && (
+                                    <p><span className="text-gray-500">Director: </span>{content.director}</p>
+                                )}
+                                {content.creators && content.creators.length > 0 && (
+                                    <p><span className="text-gray-500">Creators: </span>{content.creators.join(', ')}</p>
+                                )}
+                                {content.genres && content.genres.length > 0 && (
+                                    <p><span className="text-gray-500">Genres: </span>{content.genres.join(', ')}</p>
+                                )}
                             </div>
                         )}
 
                         {/* Songs Tab (Mobile) */}
-                        <div className="mt-4 pb-8">
+                        <div className="mt-4 pt-4 border-t border-white/10">
                             <SongsSection movieName={content.title} contentType={content.type} />
                         </div>
 
-
+                        {/* Related Content (Mobile) */}
+                        {relatedContent.length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-white/10">
+                                <ContentRail
+                                    title="More Like This"
+                                    items={relatedContent}
+                                    onDetails={(item) => {
+                                        if (onDetails) onDetails(item);
+                                        mobileScrollRef.current?.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+                                        desktopScrollRef.current?.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+                                    }}
+                                />
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 {/* --- Desktop: Full Screen Cinematic Layout --- */}
-                <div ref={desktopScrollRef} className="hidden md:flex flex-col h-full w-full bg-[#121212] overflow-y-auto no-scrollbar scroll-smooth">
-                    <div className="relative h-[65vh] min-h-[500px] max-h-[750px] w-full flex-shrink-0">
-                        <img
-                            src={content.backdrop_path || content.poster_path || '/logo.png'}
-                            className={`w-full h-full ${(content.backdrop_path || content.poster_path) ? 'object-cover' : 'object-contain p-16 bg-black/80'}`}
-                            alt={content.title}
-                            onError={(e) => {
-                                const t = e.currentTarget;
-                                if (!t.src.endsWith('/logo.png')) {
-                                    t.src = '/logo.png';
-                                    t.className = "w-full h-full object-contain p-16 bg-black/80";
-                                }
-                            }}
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-[#121212]/30 to-transparent" />
+                <div ref={desktopScrollRef} className="hidden md:flex flex-col h-full w-full bg-transparent overflow-y-auto no-scrollbar scroll-smooth relative z-10">
+                    {/* Hero Section: Title & Actions positioned over background thumbnail */}
+                    <div className="relative pt-[32vh] md:pt-[36vh] pb-6 px-8 md:px-14 w-full flex-shrink-0">
+                        <div className="max-w-7xl mx-auto w-full">
+                            <h2 className="text-4xl md:text-6xl font-black mb-6 drop-shadow-2xl text-white">{content.title}</h2>
 
-                        <div className="absolute bottom-0 left-0 w-full p-8 md:p-14 bg-gradient-to-t from-[#121212] via-[#121212]/80 to-transparent">
-                            <div className="max-w-7xl mx-auto w-full">
-                                <h2 className="text-4xl md:text-6xl font-black mb-6 drop-shadow-2xl">{content.title}</h2>
-
-                                <div className="flex flex-wrap items-center gap-4">
-                                    {isPlayable ? (
-                                        <button
-                                            onClick={() => { onPlay(content, 'movie'); }}
-                                            className="bg-white text-black px-8 py-3.5 rounded-xl font-bold text-lg flex items-center gap-2 hover:bg-gray-200 transition-all hover:scale-105 active:scale-95 shadow-2xl"
-                                        >
-                                            <Play size={24} fill="black" /> Play {content.type === 'tv' ? 'Series' : 'Now'}
-                                        </button>
-                                    ) : (
-                                        // Only show Coming Soon if truly coming soon, otherwise Not Available
-                                        <button
-                                            className="bg-white/20 text-white/50 px-8 py-3.5 rounded-xl font-bold text-lg flex items-center gap-2 cursor-not-allowed"
-                                        >
-                                            {content.comingSoon ? 'Coming Soon' : 'Not Available'}
-                                        </button>
-                                    )}
-
-                                    {content.youtubeId && (
-                                        <button
-                                            onClick={() => { onPlay(content, 'trailer'); }}
-                                            className={`px-8 py-3.5 rounded-xl font-bold text-lg flex items-center gap-2 transition-all hover:scale-105 active:scale-95 shadow-xl ${!(isPlayable && isSingleVideoType) ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-600/60 hover:bg-gray-600 text-white backdrop-blur-md'}`}
-                                        >
-                                            <Play size={24} fill={(isPlayable && isSingleVideoType) ? "white" : "black"} /> {(isPlayable && isSingleVideoType) ? 'Trailer' : 'Play Trailer'}
-                                        </button>
-                                    )}
-
+                            <div className="flex flex-wrap items-center gap-4">
+                                {isPlayable ? (
                                     <button
-                                        onClick={() => toggleWatchlist(content.id)}
-                                        className="bg-gray-600/40 backdrop-blur-md p-3.5 rounded-full border border-white/20 hover:border-white transition hover:scale-105 active:scale-95 group"
-                                        title="My List"
+                                        onClick={() => { onPlay(content, 'movie'); }}
+                                        className="bg-white text-black px-8 py-3.5 rounded-xl font-bold text-lg flex items-center gap-2 hover:bg-gray-200 transition-all hover:scale-105 active:scale-95 shadow-2xl"
                                     >
-                                        {isAdded ? <Check size={24} className="text-green-400" /> : <Plus size={24} />}
+                                        <Play size={24} fill="black" /> Play {content.type === 'tv' ? 'Series' : 'Now'}
                                     </button>
+                                ) : (
+                                    // Only show Coming Soon if truly coming soon, otherwise Not Available
                                     <button
-                                        onClick={() => toggleLike(content.id)}
-                                        className={`p-3.5 rounded-full border transition hover:scale-105 active:scale-95 ${isLiked ? 'bg-white/20 border-white text-white' : 'bg-gray-600/40 backdrop-blur-md border-white/20 hover:border-white text-white'}`}
-                                        title={isLiked ? "Liked" : "Rate"}
+                                        className="bg-white/20 text-white/50 px-8 py-3.5 rounded-xl font-bold text-lg flex items-center gap-2 cursor-not-allowed"
                                     >
-                                        <ThumbsUp size={24} className={isLiked ? "fill-white text-white" : "text-white"} />
+                                        {content.comingSoon ? 'Coming Soon' : 'Not Available'}
                                     </button>
-                                    <button
-                                        onClick={handleShareContent}
-                                        className="bg-gray-600/40 backdrop-blur-md p-3.5 rounded-full border border-white/20 hover:border-white transition hover:scale-105 active:scale-95"
-                                        title="Share"
-                                    >
-                                        <Share2 size={24} />
-                                    </button>
-                                    <button
-                                        onClick={() => handleDownload(content)}
-                                        className={`backdrop-blur-md p-3.5 rounded-full border transition hover:scale-105 active:scale-95 ${content.allowDownload ? 'bg-gray-600/40 border-white/20 hover:border-white' : 'bg-gray-800/40 border-gray-700 cursor-not-allowed'}`}
-                                        title="Download"
-                                    >
-                                        <Download size={24} className={content.allowDownload ? 'text-white' : 'text-gray-600'} />
-                                    </button>
+                                )}
 
-                                    {isAdmin && (
-                                        <button
-                                            onClick={async () => {
-                                                if (window.confirm(`Admin: Remove "${content.title}" from platform?\n\nThis will immediately remove this content and its images from Recently Added by Users and the catalog.`)) {
-                                                    try {
-                                                        await deleteContent(content.id);
-                                                        handleClose();
-                                                    } catch (err: any) {
-                                                        alert(`Delete failed: ${err.message || err}`);
-                                                    }
+                                {content.youtubeId && (
+                                    <button
+                                        onClick={() => { onPlay(content, 'trailer'); }}
+                                        className={`px-8 py-3.5 rounded-xl font-bold text-lg flex items-center gap-2 transition-all hover:scale-105 active:scale-95 shadow-xl ${!(isPlayable && isSingleVideoType) ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-600/60 hover:bg-gray-600 text-white backdrop-blur-md'}`}
+                                    >
+                                        <Play size={24} fill={(isPlayable && isSingleVideoType) ? "white" : "black"} /> {(isPlayable && isSingleVideoType) ? 'Trailer' : 'Play Trailer'}
+                                    </button>
+                                )}
+
+                                <button
+                                    onClick={() => toggleWatchlist(content.id)}
+                                    className="bg-gray-600/40 backdrop-blur-md p-3.5 rounded-full border border-white/20 hover:border-white transition hover:scale-105 active:scale-95 group"
+                                    title="My List"
+                                >
+                                    {isAdded ? <Check size={24} className="text-green-400" /> : <Plus size={24} />}
+                                </button>
+                                <button
+                                    onClick={() => toggleLike(content.id)}
+                                    className={`p-3.5 rounded-full border transition hover:scale-105 active:scale-95 ${isLiked ? 'bg-white/20 border-white text-white' : 'bg-gray-600/40 backdrop-blur-md border-white/20 hover:border-white text-white'}`}
+                                    title={isLiked ? "Liked" : "Rate"}
+                                >
+                                    <ThumbsUp size={24} className={isLiked ? "fill-white text-white" : "text-white"} />
+                                </button>
+                                <button
+                                    onClick={handleShareContent}
+                                    className="bg-gray-600/40 backdrop-blur-md p-3.5 rounded-full border border-white/20 hover:border-white transition hover:scale-105 active:scale-95"
+                                    title="Share"
+                                >
+                                    <Share2 size={24} />
+                                </button>
+                                <button
+                                    onClick={() => handleDownload(content)}
+                                    className={`backdrop-blur-md p-3.5 rounded-full border transition hover:scale-105 active:scale-95 ${content.allowDownload ? 'bg-gray-600/40 border-white/20 hover:border-white' : 'bg-gray-800/40 border-gray-700 cursor-not-allowed'}`}
+                                    title="Download"
+                                >
+                                    <Download size={24} className={content.allowDownload ? 'text-white' : 'text-gray-600'} />
+                                </button>
+
+                                {isAdmin && (
+                                    <button
+                                        onClick={async () => {
+                                            if (window.confirm(`Admin: Remove "${content.title}" from platform?\n\nThis will immediately remove this content and its images from Recently Added by Users and the catalog.`)) {
+                                                try {
+                                                    await deleteContent(content.id);
+                                                    handleClose();
+                                                } catch (err: any) {
+                                                    alert(`Delete failed: ${err.message || err}`);
                                                 }
-                                            }}
-                                            className="bg-red-600/20 hover:bg-red-600 border border-red-500/40 hover:border-red-500 text-red-400 hover:text-white px-5 py-3 rounded-full font-bold text-sm flex items-center gap-2 transition ml-auto active:scale-95 shadow-lg"
-                                            title="Admin: Remove content from platform"
-                                        >
-                                            <Trash2 size={20} /> Remove (Admin)
-                                        </button>
-                                    )}
-                                </div>
+                                            }
+                                        }}
+                                        className="bg-red-600/20 hover:bg-red-600 border border-red-500/40 hover:border-red-500 text-red-400 hover:text-white px-5 py-3 rounded-full font-bold text-sm flex items-center gap-2 transition ml-auto active:scale-95 shadow-lg"
+                                        title="Admin: Remove content from platform"
+                                    >
+                                        <Trash2 size={20} /> Remove (Admin)
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
 
-                    <div className="p-8 md:p-14 flex-1 w-full max-w-7xl mx-auto">
+                    {/* Content Section: Overview, Metadata, Songs, Recommendations */}
+                    <div className="px-8 md:px-14 pb-16 flex-1 w-full max-w-7xl mx-auto">
                         <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-14">
                             <div className="space-y-6">
                                 <div className="flex flex-wrap items-center gap-3 text-lg font-medium">
