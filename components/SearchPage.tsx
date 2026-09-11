@@ -195,10 +195,9 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                 }
                 setMatchingSections(finalMatchingSections);
 
-                // 3. Search Locally (Database Fallback)
+                // 3. Search Locally (Database Fallback) - STRICTLY MATCH CONTENT NAME ONLY
                 const localResults: Partial<Content>[] = (content || []).filter(c =>
-                    (c.title && c.title.toLowerCase().includes(lowerQuery)) ||
-                    (c.overview && c.overview.toLowerCase().includes(lowerQuery))
+                    Boolean(c.title && c.title.toLowerCase().includes(lowerQuery))
                 );
 
                 // 4. Search TMDB
@@ -233,14 +232,38 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                     };
                 });
 
-                // 6. Merge and Deduplicate Results
-                // Combine local matches and TMDB matches
+                // 6. Merge, Deduplicate and Rank Results strictly by Content Name relevance
                 const finalResults = [...mappedTMDB];
                 localResults.forEach(lc => {
-                    // Avoid duplicates if a local item is also in TMDB results
-                    if (!finalResults.find(tr => tr.tmdbId === lc.tmdbId)) {
-                        finalResults.unshift(lc); // Prioritize local library results
+                    const existingIndex = finalResults.findIndex(tr => 
+                        (tr.tmdbId && tr.tmdbId === lc.tmdbId) || 
+                        (tr.title && tr.title.toLowerCase() === lc.title?.toLowerCase())
+                    );
+                    if (existingIndex >= 0) {
+                        // Merge enrichments from local item
+                        finalResults[existingIndex] = { ...finalResults[existingIndex], ...lc };
+                    } else {
+                        finalResults.unshift(lc);
                     }
+                });
+
+                // Rank so exact title matches and starts-with title matches are at the top
+                finalResults.sort((a, b) => {
+                    const aTitle = (a.title || '').toLowerCase().trim();
+                    const bTitle = (b.title || '').toLowerCase().trim();
+                    const aExact = aTitle === lowerQuery;
+                    const bExact = bTitle === lowerQuery;
+                    if (aExact && !bExact) return -1;
+                    if (bExact && !aExact) return 1;
+                    const aStarts = aTitle.startsWith(lowerQuery);
+                    const bStarts = bTitle.startsWith(lowerQuery);
+                    if (aStarts && !bStarts) return -1;
+                    if (bStarts && !aStarts) return 1;
+                    const aIncludes = aTitle.includes(lowerQuery);
+                    const bIncludes = bTitle.includes(lowerQuery);
+                    if (aIncludes && !bIncludes) return -1;
+                    if (bIncludes && !aIncludes) return 1;
+                    return 0;
                 });
 
                 setResults(finalResults);

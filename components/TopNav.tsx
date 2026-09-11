@@ -101,12 +101,10 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
             try {
                 const lower = val.toLowerCase().trim();
 
-                // 1. Local catalog search (instant)
+                // 1. Local catalog search (instant) - strictly match content name (title)
                 const localMatches = (content || []).filter(c =>
-                    (c.title && c.title.toLowerCase().includes(lower)) ||
-                    (c.genres && c.genres.some(g => g.toLowerCase().includes(lower))) ||
-                    (c.overview && c.overview.toLowerCase().includes(lower))
-                ).slice(0, 8);
+                    Boolean(c.title && c.title.toLowerCase().includes(lower))
+                );
 
                 // 2. TMDB Multi Search
                 let tmdbResults: any[] = [];
@@ -143,9 +141,34 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                 // 4. Combine & Deduplicate (prioritize local matches)
                 const combined: Partial<Content>[] = [...localMatches];
                 mappedTMDB.forEach(t => {
-                    if (!combined.some(c => (c.tmdbId && c.tmdbId === t.tmdbId) || (c.title && c.title.toLowerCase() === t.title?.toLowerCase()))) {
+                    const existingIndex = combined.findIndex(c => 
+                        (c.tmdbId && c.tmdbId === t.tmdbId) || 
+                        (c.title && c.title.toLowerCase() === t.title?.toLowerCase())
+                    );
+                    if (existingIndex >= 0) {
+                        combined[existingIndex] = { ...t, ...combined[existingIndex] };
+                    } else {
                         combined.push(t);
                     }
+                });
+
+                // Rank results strictly by title relevance to what user typed
+                combined.sort((a, b) => {
+                    const aTitle = (a.title || '').toLowerCase().trim();
+                    const bTitle = (b.title || '').toLowerCase().trim();
+                    const aExact = aTitle === lower;
+                    const bExact = bTitle === lower;
+                    if (aExact && !bExact) return -1;
+                    if (bExact && !aExact) return 1;
+                    const aStarts = aTitle.startsWith(lower);
+                    const bStarts = bTitle.startsWith(lower);
+                    if (aStarts && !bStarts) return -1;
+                    if (bStarts && !aStarts) return 1;
+                    const aIncludes = aTitle.includes(lower);
+                    const bIncludes = bTitle.includes(lower);
+                    if (aIncludes && !bIncludes) return -1;
+                    if (bIncludes && !aIncludes) return 1;
+                    return 0;
                 });
 
                 setSearchResults(combined.slice(0, 8));

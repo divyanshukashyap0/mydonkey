@@ -224,9 +224,10 @@ ${posterImage && posterImage !== image ? `
   }
   </script>
 
-  <!-- Redirect non-bot visitors directly to the SPA app -->
+  <!-- Redirect human visitors directly to the SPA app (including in-app browsers like WhatsApp, FB, Telegram) -->
   <script>
-    if (!/bot|crawler|spider|facebook|whatsapp|telegram|discord|slack|preview|twitter|applebot|bingbot|googlebot/i.test(navigator.userAgent)) {
+    const isBot = /bot|crawler|spider|facebookexternalhit|Facebot|TelegramBot|Twitterbot|Slackbot|Discordbot|preview|applebot|bingbot|googlebot/i.test(navigator.userAgent);
+    if (!isBot) {
       window.location.replace("${safe(targetAppUrl)}");
     }
   </script>

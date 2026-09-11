@@ -51,11 +51,12 @@ import {
     extractTMDBTrailer,
     fetchCuratedHeroContent,
     fetchTMDBTrailer,
-    INDIAN_LANGUAGES
+    INDIAN_LANGUAGES,
+    searchTMDBMulti
 } from './services/tmdbService';
 import { FALLBACK_CATALOG } from './services/fallbackCatalog';
 import { saveContentTitle, setWebpageTitle, resolveContentTitleInstant } from './utils/titleManager';
-import { SlidersHorizontal } from 'lucide-react';
+import { SlidersHorizontal, Loader2 } from 'lucide-react';
 import { Content, ContinueWatchingItem, Section } from './types';
 import { StoreProvider, PERMANENT_ADMINS } from './context/StoreContext';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, Link } from 'react-router-dom';
@@ -102,8 +103,25 @@ const MainLayout = () => {
     viewingContentRef.current = viewingContent;
     const playingContentRef = useRef<Content | null>(null);
     playingContentRef.current = playingContent;
+    const [isResolvingModalContent, setIsResolvingModalContent] = useState<boolean>(false);
     const [showUnlockModal, setShowUnlockModal] = useState(false);
     const [showGenreModal, setShowGenreModal] = useState(false);
+
+    // Stable refs to prevent unmounting or aborting deep link fetches on auth state updates
+    const rawContentRef = useRef(rawContent);
+    rawContentRef.current = rawContent;
+    const contentRef = useRef(content);
+    contentRef.current = content;
+    const settingsRef = useRef(settings);
+    settingsRef.current = settings;
+    const currentProfileRef = useRef(currentProfile);
+    currentProfileRef.current = currentProfile;
+    const isAuthenticatedRef = useRef(isAuthenticated);
+    isAuthenticatedRef.current = isAuthenticated;
+    const fetchContentByIdRef = useRef(fetchContentById);
+    fetchContentByIdRef.current = fetchContentById;
+
+    const activeContentIdRef = useRef<string | null>(null);
 
     // --- Anime Intro State ---
     const [showAnimeIntro, setShowAnimeIntro] = useState(false);
@@ -197,350 +215,448 @@ const MainLayout = () => {
     // Deep Link Handler (e.g. /browse/content_123 or /watch/content_123)
     useEffect(() => {
         let isCancelled = false;
+        const currentPath = location.pathname;
 
-        if (location.pathname.startsWith('/browse/')) {
-            const contentId = location.pathname.split('/')[2];
+        if (currentPath.startsWith('/browse/')) {
+            const rawId = currentPath.split('/')[2];
+            const contentId = rawId ? decodeURIComponent(rawId).trim() : '';
+            activeContentIdRef.current = contentId;
             const stateItem = (location.state as any)?.item;
 
             // Instant title resolution for deep link before any network calls
-            const earlyTitle = stateItem?.title || resolveContentTitleInstant(location.pathname, location.search, location.state, rawContent || content);
+            const earlyTitle = stateItem?.title || resolveContentTitleInstant(location.pathname, location.search, location.state, rawContentRef.current || contentRef.current);
             if (earlyTitle) {
                 setWebpageTitle(earlyTitle);
             }
 
             if (contentId) {
-                let item = stateItem || rawContent.find(c => c.id === contentId);
+                // If already viewing this item, don't restart
+                if (viewingContentRef.current?.id === contentId || (viewingContentRef.current?.tmdbId && `tmdb_${viewingContentRef.current.tmdbId}` === contentId)) {
+                    setIsResolvingModalContent(false);
+                    return;
+                }
+
+                // 1. Instant Synchronous Search in memory catalogs
+                const findInMemory = (idToFind: string): Content | undefined => {
+                    const pool = [...(rawContentRef.current || []), ...(contentRef.current || []), ...FALLBACK_CATALOG];
+                    const cleanTarget = idToFind.toLowerCase();
+                    return pool.find(c => {
+                        if (!c) return false;
+                        if (c.id && c.id.toLowerCase() === cleanTarget) return true;
+                        if (c.tmdbId && (`tmdb_${c.tmdbId}`.toLowerCase() === cleanTarget || String(c.tmdbId) === cleanTarget)) return true;
+                        if (c.imdbId && c.imdbId.toLowerCase() === cleanTarget) return true;
+                        return false;
+                    });
+                };
+
+                let item = stateItem || findInMemory(contentId);
 
                 if (item) {
-                    // Check for Exclusive access via URL
-                    if (item.isExclusive && !currentProfile?.unlockedContent?.includes('global_unlock')) {
+                    setIsResolvingModalContent(false);
+                    if (item.isExclusive && !currentProfileRef.current?.unlockedContent?.includes('global_unlock')) {
                         navigate('/exclusive', { replace: true });
                         return;
                     }
                     if (isCancelled || !window.location.pathname.startsWith('/browse/')) return;
-                    if (viewingContentRef.current?.id !== item.id) {
-                        setViewingContent(item);
-                    }
+                    setViewingContent(item);
                     if (item.title) {
                         setWebpageTitle(item.title);
                         saveContentTitle(item.id, item.title);
                     }
-                } else if (contentId.startsWith('tmdb_')) {
-                    const currentViewing = viewingContentRef.current;
-                    const isAlreadyViewing = currentViewing && (
-                        currentViewing.id === contentId ||
-                        `tmdb_${currentViewing.tmdbId}` === contentId
-                    );
-                    if (isAlreadyViewing) {
-                        return;
-                    }
-                    const rawId = parseInt(contentId.replace('tmdb_', ''));
-                    if (!isNaN(rawId)) {
-                        const hintType = (stateItem?.type as 'movie' | 'tv') || (location.search.includes('type=tv') ? 'tv' : undefined);
-                        const fetchResolved = async () => {
+                    return;
+                }
+
+                // 2. Asynchronous Resolution
+                setIsResolvingModalContent(true);
+
+                const resolveAsync = async () => {
+                    let resolved: Content | null = null;
+                    const isTmdb = contentId.startsWith('tmdb_') || /^\d+$/.test(contentId);
+                    const isImdb = contentId.startsWith('imdb_') || /^tt\d+$/i.test(contentId);
+
+                    // A. TMDB direct numeric lookup
+                    if (isTmdb) {
+                        const numericId = parseInt(contentId.replace('tmdb_', ''), 10);
+                        if (!isNaN(numericId)) {
+                            const hintType = (stateItem?.type as 'movie' | 'tv') || (location.search.includes('type=tv') ? 'tv' : undefined);
                             let detail: any = null;
                             let resolvedType: 'movie' | 'tv' = hintType || 'movie';
                             if (hintType === 'tv') {
-                                try { detail = await fetchTMDBDetails(rawId, 'tv'); } catch (_) { }
-                                if (!detail) { try { detail = await fetchTMDBDetails(rawId, 'movie'); resolvedType = 'movie'; } catch (_) { } }
+                                try { detail = await fetchTMDBDetails(numericId, 'tv'); } catch (_) { }
+                                if (!detail) { try { detail = await fetchTMDBDetails(numericId, 'movie'); resolvedType = 'movie'; } catch (_) { } }
                             } else {
-                                try { detail = await fetchTMDBDetails(rawId, 'movie'); } catch (_) { }
-                                if (!detail) { try { detail = await fetchTMDBDetails(rawId, 'tv'); resolvedType = 'tv'; } catch (_) { } }
+                                try { detail = await fetchTMDBDetails(numericId, 'movie'); } catch (_) { }
+                                if (!detail) { try { detail = await fetchTMDBDetails(numericId, 'tv'); resolvedType = 'tv'; } catch (_) { } }
                             }
-                            if (!detail) throw new Error(`TMDB ID ${rawId} not found`);
+                            if (detail) {
+                                const trailerUrl = extractTMDBTrailer(detail);
+                                const imdbId = detail.external_ids?.imdb_id || (detail as any).imdb_id || '';
+                                const effectiveType: 'movie' | 'tv' = (detail.name || detail.media_type === 'tv' || resolvedType === 'tv') ? 'tv' : 'movie';
+                                const streamId = imdbId || String(detail.id);
 
-                            const trailerUrl = extractTMDBTrailer(detail);
-                            const imdbId = detail.external_ids?.imdb_id || (detail as any).imdb_id || '';
-                            const effectiveType: 'movie' | 'tv' = (detail.name || detail.media_type === 'tv' || resolvedType === 'tv') ? 'tv' : 'movie';
-                            const streamId = imdbId || String(detail.id);
-
-                            const resolved: Content = {
-                                id: `tmdb_${detail.id}`,
-                                title: detail.title || detail.name || 'Untitled',
-                                type: effectiveType,
-                                imdbId: imdbId || undefined,
-                                genres: mapTMDBGenres(detail.genres?.map((g: any) => g.id) || []),
-                                poster_path: detail.poster_path ? tmdbPosterUrl(detail.poster_path) : '',
-                                backdrop_path: detail.backdrop_path ? tmdbBackdropUrl(detail.backdrop_path) : '',
-                                overview: detail.overview || '',
-                                release_date: detail.release_date || detail.first_air_date || '',
-                                year: (detail.release_date || detail.first_air_date) ? parseInt((detail.release_date || detail.first_air_date)!.split('-')[0]) : new Date().getFullYear(),
-                                rating: detail.vote_average || 0,
-                                vote_average: detail.vote_average || 0,
-                                youtubeId: trailerUrl || '',
-                                videoUrl: buildEmbedUrl(streamId, effectiveType, settings),
-                                tmdbId: detail.id,
-                                allowPlayback: true,
-                                isPublished: true,
-                                cast: detail.credits?.cast ? detail.credits.cast.slice(0, 12).map((c: any) => c.name) : undefined,
-                                director: detail.credits?.crew?.find((c: any) => c.job === 'Director')?.name || undefined,
-                                creators: detail.created_by?.map((c: any) => c.name) || undefined,
-                                createdAt: new Date().toISOString()
-                            };
-                            if (isCancelled || !window.location.pathname.startsWith('/browse/')) return;
-                            setViewingContent(resolved);
-                            if (resolved.title) {
-                                setWebpageTitle(resolved.title);
-                                saveContentTitle(resolved.id, resolved.title);
+                                resolved = {
+                                    id: `tmdb_${detail.id}`,
+                                    title: detail.title || detail.name || 'Untitled',
+                                    type: effectiveType,
+                                    imdbId: imdbId || undefined,
+                                    genres: mapTMDBGenres(detail.genres?.map((g: any) => g.id) || []),
+                                    poster_path: detail.poster_path ? tmdbPosterUrl(detail.poster_path) : '',
+                                    backdrop_path: detail.backdrop_path ? tmdbBackdropUrl(detail.backdrop_path) : '',
+                                    overview: detail.overview || '',
+                                    release_date: detail.release_date || detail.first_air_date || '',
+                                    year: (detail.release_date || detail.first_air_date) ? parseInt((detail.release_date || detail.first_air_date)!.split('-')[0]) : new Date().getFullYear(),
+                                    rating: detail.vote_average || 0,
+                                    vote_average: detail.vote_average || 0,
+                                    youtubeId: trailerUrl || '',
+                                    videoUrl: buildEmbedUrl(streamId, effectiveType, settingsRef.current),
+                                    tmdbId: detail.id,
+                                    allowPlayback: true,
+                                    isPublished: true,
+                                    cast: detail.credits?.cast ? detail.credits.cast.slice(0, 12).map((c: any) => c.name) : undefined,
+                                    director: detail.credits?.crew?.find((c: any) => c.job === 'Director')?.name || undefined,
+                                    creators: detail.created_by?.map((c: any) => c.name) || undefined,
+                                    createdAt: new Date().toISOString()
+                                };
                             }
-                        };
-
-                        fetchResolved().catch(() => {
-                            if (isCancelled || !window.location.pathname.startsWith('/browse/')) return;
-                            const from = (location.state as any)?.from || lastNonModalUrlRef.current;
-                            navigate(from || '/', { replace: true });
-                        });
-                    }
-                } else if (fetchContentById) {
-                    // Document is not in local memory, asynchronously fetch from Firestore
-                    fetchContentById(contentId).then(fetched => {
-                        if (isCancelled || !window.location.pathname.startsWith('/browse/')) return;
-                        if (fetched) {
-                            if (fetched.isExclusive && !currentProfile?.unlockedContent?.includes('global_unlock')) {
-                                navigate('/exclusive', { replace: true });
-                                return;
-                            }
-                            setViewingContent(fetched);
-                            if (fetched.title) {
-                                setWebpageTitle(fetched.title);
-                                saveContentTitle(fetched.id, fetched.title);
-                            }
-                        } else {
-                            console.warn(`Deep link content not found: ${contentId}`);
-                            const from = (location.state as any)?.from || lastNonModalUrlRef.current;
-                            navigate(from || '/', { replace: true });
                         }
-                    }).catch(() => {
-                        if (isCancelled || !window.location.pathname.startsWith('/browse/')) return;
+                    }
+
+                    // B. IMDb ID lookup via TMDB Find API
+                    if (!resolved && isImdb) {
+                        const cleanImdb = contentId.replace('imdb_', '');
+                        try {
+                            const detail = await findByIMDbId(cleanImdb);
+                            if (detail) {
+                                const resolvedType: 'movie' | 'tv' = detail.name ? 'tv' : 'movie';
+                                const trailerUrl = extractTMDBTrailer(detail);
+                                resolved = {
+                                    id: `tmdb_${detail.id}`,
+                                    title: detail.title || detail.name || 'Untitled',
+                                    type: resolvedType,
+                                    imdbId: cleanImdb,
+                                    genres: mapTMDBGenres(detail.genres?.map((g: any) => g.id) || []),
+                                    poster_path: detail.poster_path ? tmdbPosterUrl(detail.poster_path) : '',
+                                    backdrop_path: detail.backdrop_path ? tmdbBackdropUrl(detail.backdrop_path) : '',
+                                    overview: detail.overview || '',
+                                    release_date: detail.release_date || detail.first_air_date || '',
+                                    year: (detail.release_date || detail.first_air_date) ? parseInt((detail.release_date || detail.first_air_date)!.split('-')[0]) : new Date().getFullYear(),
+                                    rating: detail.vote_average || 0,
+                                    vote_average: detail.vote_average || 0,
+                                    youtubeId: trailerUrl || '',
+                                    videoUrl: buildEmbedUrl(cleanImdb, resolvedType, settingsRef.current),
+                                    tmdbId: detail.id,
+                                    allowPlayback: true,
+                                    isPublished: true,
+                                    createdAt: new Date().toISOString()
+                                };
+                            }
+                        } catch (_) {}
+                    }
+
+                    // C. Firestore lookup via fetchContentById
+                    if (!resolved && fetchContentByIdRef.current) {
+                        try {
+                            resolved = await fetchContentByIdRef.current(contentId);
+                        } catch (_) {}
+                    }
+
+                    // D. Fallback search by title if available in URL or cache
+                    if (!resolved && earlyTitle) {
+                        const titleMatch = findInMemory(earlyTitle) ||
+                            (contentRef.current || []).find(c => c.title?.toLowerCase() === earlyTitle.toLowerCase());
+                        if (titleMatch) {
+                            resolved = titleMatch;
+                        } else {
+                            try {
+                                const searchRes = await searchTMDBMulti(earlyTitle);
+                                if (searchRes && searchRes.length > 0) {
+                                    const top = searchRes[0];
+                                    const full = await fetchTMDBDetails(top.id, top.media_type === 'tv' ? 'tv' : 'movie').catch(() => null);
+                                    if (full) {
+                                        const trailer = extractTMDBTrailer(full);
+                                        const imdb = full.external_ids?.imdb_id || (full as any).imdb_id || '';
+                                        const effType: 'movie' | 'tv' = (full.name || full.media_type === 'tv') ? 'tv' : 'movie';
+                                        resolved = {
+                                            id: `tmdb_${full.id}`,
+                                            title: full.title || full.name || earlyTitle,
+                                            type: effType,
+                                            imdbId: imdb || undefined,
+                                            genres: mapTMDBGenres(full.genres?.map((g: any) => g.id) || []),
+                                            poster_path: full.poster_path ? tmdbPosterUrl(full.poster_path) : '',
+                                            backdrop_path: full.backdrop_path ? tmdbBackdropUrl(full.backdrop_path) : '',
+                                            overview: full.overview || '',
+                                            release_date: full.release_date || full.first_air_date || '',
+                                            youtubeId: trailer || '',
+                                            videoUrl: buildEmbedUrl(imdb || String(full.id), effType, settingsRef.current),
+                                            tmdbId: full.id,
+                                            allowPlayback: true,
+                                            isPublished: true,
+                                            createdAt: new Date().toISOString()
+                                        };
+                                    }
+                                }
+                            } catch (_) {}
+                        }
+                    }
+
+                    if (isCancelled || activeContentIdRef.current !== contentId || !window.location.pathname.startsWith('/browse/')) {
+                        return;
+                    }
+
+                    if (resolved) {
+                        if (resolved.isExclusive && !currentProfileRef.current?.unlockedContent?.includes('global_unlock')) {
+                            navigate('/exclusive', { replace: true });
+                            return;
+                        }
+                        setViewingContent(resolved);
+                        if (resolved.title) {
+                            setWebpageTitle(resolved.title);
+                            saveContentTitle(resolved.id, resolved.title);
+                        }
+                    } else {
+                        console.warn(`Deep link content not found across catalog, TMDB & Firestore: ${contentId}`);
                         const from = (location.state as any)?.from || lastNonModalUrlRef.current;
                         navigate(from || '/', { replace: true });
-                    });
-                } else {
-                    const from = (location.state as any)?.from || lastNonModalUrlRef.current;
-                    navigate(from || '/', { replace: true });
-                }
+                    }
+                };
+
+                resolveAsync().finally(() => {
+                    if (!isCancelled && activeContentIdRef.current === contentId) {
+                        setIsResolvingModalContent(false);
+                    }
+                });
             }
         } else {
-            // URL cleared, ensure modal closes
+            // URL is not browse, clear modal if open
             if (viewingContentRef.current) {
                 setViewingContent(null);
             }
+            if (!currentPath.startsWith('/watch/')) {
+                setIsResolvingModalContent(false);
+            }
         }
 
-        if (location.pathname.startsWith('/watch/')) {
-            const contentId = location.pathname.split('/')[2];
+        if (currentPath.startsWith('/watch/')) {
+            const rawWatchId = currentPath.split('/')[2];
+            const contentId = rawWatchId ? decodeURIComponent(rawWatchId).trim() : '';
+            activeContentIdRef.current = contentId;
             const searchParams = new URLSearchParams(location.search);
-            const mode = searchParams.get('mode') as 'trailer' | 'movie' || 'movie';
+            const mode = (searchParams.get('mode') as 'trailer' | 'movie') || 'movie';
             const stateItem = (location.state as any)?.item;
 
             // Instant title resolution for watch deep link before any network calls
-            const earlyTitle = stateItem?.title || resolveContentTitleInstant(location.pathname, location.search, location.state, rawContent || content);
+            const earlyTitle = stateItem?.title || resolveContentTitleInstant(location.pathname, location.search, location.state, rawContentRef.current || contentRef.current);
             if (earlyTitle) {
                 setWebpageTitle(earlyTitle);
             }
 
-            // Wait for authentication
-            if (!isLoading) {
-                if (contentId) {
-                    let item = stateItem || rawContent.find(c => c.id === contentId);
+            if (contentId) {
+                // If already playing this ID and mode, avoid resetting
+                const cur = playingContentRef.current;
+                if (cur && (cur.id === contentId || `tmdb_${cur.tmdbId}` === contentId || String(cur.tmdbId) === contentId) && cur.playMode === mode) {
+                    setIsResolvingModalContent(false);
+                    return;
+                }
 
-                    if (!item) {
-                        for (const show of rawContent) {
-                            if (show.type === 'tv' && show.seasons) {
-                                for (const season of show.seasons) {
-                                    const episode = season.episodes.find(e => e.id === contentId);
-                                    if (episode) {
-                                        item = {
-                                            ...show,
-                                            id: episode.id,
-                                            title: `${show.title} - ${season.title} | ${episode.title}`,
-                                            movieDriveId: episode.driveId,
-                                            movieYoutubeId: episode.youtubeId,
-                                            videoUrl: episode.videoUrl,
-                                            duration: episode.duration
-                                        };
-                                        break;
-                                    }
+                // 1. Instant check in memory
+                const findInMemory = (idToFind: string): Content | undefined => {
+                    const pool = [...(rawContentRef.current || []), ...(contentRef.current || []), ...FALLBACK_CATALOG];
+                    const cleanTarget = idToFind.toLowerCase();
+                    for (const c of pool) {
+                        if (!c) continue;
+                        if (c.id && c.id.toLowerCase() === cleanTarget) return c;
+                        if (c.tmdbId && (`tmdb_${c.tmdbId}`.toLowerCase() === cleanTarget || String(c.tmdbId) === cleanTarget)) return c;
+                        if (c.imdbId && c.imdbId.toLowerCase() === cleanTarget) return c;
+                        // Check episodes in TV shows
+                        if (c.type === 'tv' && c.seasons) {
+                            for (const season of c.seasons) {
+                                const ep = season.episodes?.find(e => e.id === idToFind);
+                                if (ep) {
+                                    return {
+                                        ...c,
+                                        id: ep.id,
+                                        title: `${c.title} - ${season.title} | ${ep.title}`,
+                                        movieDriveId: ep.driveId,
+                                        movieYoutubeId: ep.youtubeId,
+                                        videoUrl: ep.videoUrl,
+                                        duration: ep.duration
+                                    };
                                 }
                             }
-                            if (item) break;
+                        }
+                    }
+                    return undefined;
+                };
+
+                const applyPlayable = (itemToPlay: Content) => {
+                    const embedBaseHost = (settingsRef.current?.embedProxyBaseUrl || 'https://proxy.garageband.rocks').replace(/^https?:\/\//, '').replace(/\/+$/, '');
+                    const imdbId = itemToPlay.imdbId ||
+                        (typeof itemToPlay.id === 'string' && itemToPlay.id.startsWith('imdb_') ? itemToPlay.id.replace('imdb_', '') : null) ||
+                        (itemToPlay.videoUrl ? itemToPlay.videoUrl.match(/(tt\d+)/i)?.[1] : null) ||
+                        (typeof itemToPlay.id === 'string' && /^tt\d+$/i.test(itemToPlay.id.trim()) ? itemToPlay.id.trim() : null);
+                    const tmdbNumId = itemToPlay.tmdbId || (typeof itemToPlay.id === 'string' && itemToPlay.id.startsWith('tmdb_') ? itemToPlay.id.replace('tmdb_', '') : null);
+                    const itemDriveId = extractDriveId(itemToPlay.movieDriveId || itemToPlay.videoUrl || (itemToPlay as any).driveId || '');
+                    const itemHasDrive = Boolean(itemDriveId);
+                    const isEmbed = !itemHasDrive && ((itemToPlay.videoUrl && (itemToPlay.videoUrl.includes('proxy.garageband.rocks') || (embedBaseHost && itemToPlay.videoUrl.includes(embedBaseHost)) || itemToPlay.videoUrl.includes('/embed/'))) || !!imdbId || !!tmdbNumId);
+                    const effectiveStreamId = imdbId || tmdbNumId;
+
+                    let playableItem = { ...itemToPlay };
+                    if (itemHasDrive) {
+                        playableItem.movieDriveId = itemDriveId;
+                        if (isExternalEmbedUrl(playableItem.videoUrl, embedBaseHost)) {
+                            playableItem.videoUrl = '';
+                        }
+                    } else if (isEmbed && (effectiveStreamId || itemToPlay.videoUrl)) {
+                        const existingType = itemToPlay.videoUrl ? parseEmbedContentType(itemToPlay.videoUrl) : null;
+                        const streamUrl = effectiveStreamId ? buildEmbedUrl(effectiveStreamId, existingType || itemToPlay.type || 'movie', settingsRef.current) : itemToPlay.videoUrl;
+                        if (streamUrl) {
+                            playableItem.videoUrl = streamUrl;
                         }
                     }
 
-                    if (!item && !contentId.startsWith('tmdb_') && !contentId.startsWith('imdb_') && fetchContentById) {
-                        fetchContentById(contentId).then(fetched => {
-                            if (fetched && !isCancelled && window.location.pathname.startsWith('/watch/')) {
-                                setPlayingContent({ ...fetched, playMode: mode });
-                                if (fetched.title) {
-                                    setWebpageTitle(fetched.title);
-                                    saveContentTitle(fetched.id, fetched.title);
-                                }
-                            }
-                        }).catch(() => { });
+                    if (mode === 'movie' && !isAuthenticatedRef.current && settingsRef.current?.guestAccessEnabled === false) {
+                        navigate('/login');
+                        return;
                     }
 
-                    if (item) {
-                        const embedBaseHost = (settings?.embedProxyBaseUrl || 'https://proxy.garageband.rocks').replace(/^https?:\/\//, '').replace(/\/+$/, '');
+                    if (mode === 'movie' && playableItem.isExclusive && !currentProfileRef.current?.unlockedContent?.includes('global_unlock')) {
+                        navigate('/exclusive', { replace: true });
+                        return;
+                    }
 
-                        const imdbId = item.imdbId ||
-                            (typeof item.id === 'string' && item.id.startsWith('imdb_') ? item.id.replace('imdb_', '') : null) ||
-                            (item.videoUrl ? item.videoUrl.match(/(tt\d+)/i)?.[1] : null) ||
-                            (typeof item.id === 'string' && /^tt\d+$/i.test(item.id.trim()) ? item.id.trim() : null);
+                    if (isCancelled || !window.location.pathname.startsWith('/watch/')) return;
+                    setPlayingContent({ ...playableItem, playMode: mode });
+                    if (playableItem.title) {
+                        setWebpageTitle(playableItem.title);
+                        saveContentTitle(playableItem.id, playableItem.title);
+                    }
+                    if (mode === 'movie') {
+                        incrementViews(playableItem.id).catch(() => {});
+                    }
+                };
 
-                        const tmdbNumId = item.tmdbId || (typeof item.id === 'string' && item.id.startsWith('tmdb_') ? item.id.replace('tmdb_', '') : null);
+                let item = stateItem || findInMemory(contentId);
+                if (item) {
+                    setIsResolvingModalContent(false);
+                    applyPlayable(item);
+                    return;
+                }
 
-                        const itemDriveId = extractDriveId(item.movieDriveId || item.videoUrl || (item as any).driveId || '');
-                        const itemHasDrive = Boolean(itemDriveId);
+                // 2. Asynchronous Watch Resolution
+                setIsResolvingModalContent(true);
 
-                        const isEmbed = !itemHasDrive && ((item.videoUrl && (item.videoUrl.includes('proxy.garageband.rocks') || (embedBaseHost && item.videoUrl.includes(embedBaseHost)) || item.videoUrl.includes('/embed/'))) || !!imdbId || !!tmdbNumId);
+                const resolveWatchAsync = async () => {
+                    let resolved: Content | null = null;
+                    const isImdb = /^tt\d+$/i.test(contentId) || contentId.startsWith('imdb_');
+                    const isTmdb = contentId.startsWith('tmdb_') || /^\d+$/.test(contentId);
 
-                        const effectiveStreamId = imdbId || tmdbNumId;
-
-                        let playableItem = { ...item };
-                        if (itemHasDrive) {
-                            playableItem.movieDriveId = itemDriveId;
-                            if (isExternalEmbedUrl(playableItem.videoUrl, embedBaseHost)) {
-                                playableItem.videoUrl = '';
+                    if (isImdb) {
+                        const cleanImdb = contentId.replace('imdb_', '');
+                        try {
+                            const detail = await findByIMDbId(cleanImdb);
+                            if (detail) {
+                                const resolvedType: 'movie' | 'tv' = detail.name ? 'tv' : 'movie';
+                                const trailerUrl = extractTMDBTrailer(detail);
+                                resolved = {
+                                    id: `tmdb_${detail.id}`,
+                                    title: detail.title || detail.name || 'Untitled',
+                                    type: resolvedType,
+                                    imdbId: cleanImdb,
+                                    genres: mapTMDBGenres(detail.genres?.map((g: any) => g.id) || []),
+                                    poster_path: detail.poster_path ? tmdbPosterUrl(detail.poster_path) : '',
+                                    backdrop_path: detail.backdrop_path ? tmdbBackdropUrl(detail.backdrop_path) : '',
+                                    overview: detail.overview || '',
+                                    release_date: detail.release_date || detail.first_air_date || '',
+                                    year: (detail.release_date || detail.first_air_date) ? parseInt((detail.release_date || detail.first_air_date)!.split('-')[0]) : new Date().getFullYear(),
+                                    rating: detail.vote_average || 0,
+                                    vote_average: detail.vote_average || 0,
+                                    youtubeId: trailerUrl || '',
+                                    videoUrl: buildEmbedUrl(cleanImdb, resolvedType, settingsRef.current),
+                                    tmdbId: detail.id,
+                                    allowPlayback: true,
+                                    isPublished: true,
+                                    createdAt: new Date().toISOString()
+                                };
                             }
-                        } else if (isEmbed && (effectiveStreamId || item.videoUrl)) {
-                            const existingType = item.videoUrl ? parseEmbedContentType(item.videoUrl) : null;
-                            const streamUrl = effectiveStreamId ? buildEmbedUrl(effectiveStreamId, existingType || item.type || 'movie', settings) : item.videoUrl;
-                            if (streamUrl) {
-                                playableItem.videoUrl = streamUrl;
-                            }
-                        }
-
-                        // Authenticate if required (trailers don't need auth, movies do)
-                        if (mode === 'movie' && !isAuthenticated) {
-                            navigate('/login');
-                            return;
-                        }
-
-                        // Check for Exclusive Content
-                        if (mode === 'movie' && playableItem.isExclusive && !currentProfile?.unlockedContent?.includes('global_unlock')) {
-                            navigate('/exclusive', { replace: true });
-                            return;
-                        }
-                        if (!playingContentRef.current || playingContentRef.current.id !== playableItem.id || playingContentRef.current.playMode !== mode) {
-                            if (isCancelled || !window.location.pathname.startsWith('/watch/')) return;
-                            setPlayingContent({ ...playableItem, playMode: mode });
-                            if (playableItem.title) {
-                                setWebpageTitle(playableItem.title);
-                                saveContentTitle(playableItem.id, playableItem.title);
-                            }
-                            // Increment views when main movie starts
-                            if (mode === 'movie') {
-                                incrementViews(playableItem.id).catch(() => { });
-                            }
-                        }
-                    } else if (contentId && (contentId.startsWith('tmdb_') || /^\d+$/.test(contentId) || /^tt\d+$/i.test(contentId))) {
-                        const currentPlaying = playingContentRef.current;
-                        const isAlreadyPlaying = currentPlaying && (
-                            currentPlaying.id === contentId ||
-                            `tmdb_${currentPlaying.tmdbId}` === contentId ||
-                            String(currentPlaying.tmdbId) === contentId
-                        ) && currentPlaying.playMode === mode;
-
-                        if (isAlreadyPlaying) {
-                            return;
-                        }
-
-                        // Dynamically resolve TMDB or IMDb ID on /watch/:id deep link
-                        const isImdb = /^tt\d+$/i.test(contentId);
-                        const fetchResolved = async () => {
+                        } catch (_) {}
+                    } else if (isTmdb) {
+                        const rawTmdbId = parseInt(contentId.replace('tmdb_', ''), 10);
+                        if (!isNaN(rawTmdbId)) {
                             let detail: any = null;
                             let resolvedType: 'movie' | 'tv' = 'movie';
-                            let rawTmdbId = 0;
-                            let imdbId = '';
-                            if (isImdb) {
-                                imdbId = contentId;
-                                detail = await findByIMDbId(contentId);
-                                if (detail) {
-                                    rawTmdbId = detail.id;
-                                    resolvedType = detail.title ? 'movie' : 'tv';
-                                }
-                            } else {
-                                rawTmdbId = parseInt(contentId.replace('tmdb_', ''), 10);
-                                try {
-                                    detail = await fetchTMDBDetails(rawTmdbId, 'movie');
-                                } catch (_) {
-                                    if (!detail) { try { detail = await fetchTMDBDetails(rawTmdbId, 'tv'); resolvedType = 'tv'; } catch (_) { } }
-                                }
-                                if (detail) {
-                                    imdbId = detail.external_ids?.imdb_id || (detail as any).imdb_id || '';
-                                    resolvedType = (detail.name || detail.media_type === 'tv' || resolvedType === 'tv') ? 'tv' : 'movie';
-                                }
+                            try {
+                                detail = await fetchTMDBDetails(rawTmdbId, 'movie');
+                            } catch (_) {
+                                if (!detail) { try { detail = await fetchTMDBDetails(rawTmdbId, 'tv'); resolvedType = 'tv'; } catch (_) {} }
                             }
-                            if (!detail) throw new Error(`Content ID ${contentId} not found`);
+                            if (detail) {
+                                const imdbId = detail.external_ids?.imdb_id || (detail as any).imdb_id || '';
+                                resolvedType = (detail.name || detail.media_type === 'tv' || resolvedType === 'tv') ? 'tv' : 'movie';
+                                const trailerUrl = extractTMDBTrailer(detail);
+                                const streamId = imdbId || String(rawTmdbId);
+                                resolved = {
+                                    id: `tmdb_${detail.id}`,
+                                    title: detail.title || detail.name || 'Untitled',
+                                    type: resolvedType,
+                                    imdbId: imdbId || undefined,
+                                    genres: mapTMDBGenres(detail.genres?.map((g: any) => g.id) || []),
+                                    poster_path: detail.poster_path ? tmdbPosterUrl(detail.poster_path) : '',
+                                    backdrop_path: detail.backdrop_path ? tmdbBackdropUrl(detail.backdrop_path) : '',
+                                    overview: detail.overview || '',
+                                    release_date: detail.release_date || detail.first_air_date || '',
+                                    year: (detail.release_date || detail.first_air_date) ? parseInt((detail.release_date || detail.first_air_date)!.split('-')[0]) : new Date().getFullYear(),
+                                    rating: detail.vote_average || 0,
+                                    vote_average: detail.vote_average || 0,
+                                    youtubeId: trailerUrl || '',
+                                    videoUrl: buildEmbedUrl(streamId, resolvedType, settingsRef.current),
+                                    tmdbId: detail.id,
+                                    allowPlayback: true,
+                                    isPublished: true,
+                                    createdAt: new Date().toISOString()
+                                };
+                            }
+                        }
+                    }
 
-                            const trailerUrl = extractTMDBTrailer(detail);
-                            const streamId = imdbId || (rawTmdbId ? String(rawTmdbId) : '');
+                    if (!resolved && fetchContentByIdRef.current) {
+                        try {
+                            resolved = await fetchContentByIdRef.current(contentId);
+                        } catch (_) {}
+                    }
 
-                            const resolved: Content = {
-                                id: `tmdb_${detail.id}`,
-                                title: detail.title || detail.name || 'Untitled',
-                                type: resolvedType,
-                                imdbId: imdbId || undefined,
-                                genres: mapTMDBGenres(detail.genres?.map((g: any) => g.id) || []),
-                                poster_path: detail.poster_path ? tmdbPosterUrl(detail.poster_path) : '',
-                                backdrop_path: detail.backdrop_path ? tmdbBackdropUrl(detail.backdrop_path) : '',
-                                overview: detail.overview || '',
-                                release_date: detail.release_date || detail.first_air_date || '',
-                                year: (detail.release_date || detail.first_air_date) ? parseInt((detail.release_date || detail.first_air_date)!.split('-')[0]) : new Date().getFullYear(),
-                                rating: detail.vote_average || 0,
-                                vote_average: detail.vote_average || 0,
-                                youtubeId: trailerUrl || '',
-                                videoUrl: buildEmbedUrl(streamId, resolvedType, settings),
-                                tmdbId: detail.id,
-                                allowPlayback: true,
-                                isPublished: true,
-                                createdAt: new Date().toISOString()
-                            };
-                            if (isCancelled || !window.location.pathname.startsWith('/watch/')) return;
-                            setPlayingContent({ ...resolved, playMode: mode });
-                            if (resolved.title) {
-                                setWebpageTitle(resolved.title);
-                                saveContentTitle(resolved.id, resolved.title);
-                            }
-                            if (mode === 'movie') {
-                                incrementViews(resolved.id).catch(() => { });
-                            }
-                        };
-                        fetchResolved().catch(() => {
-                            if (isCancelled || !window.location.pathname.startsWith('/watch/')) return;
-                            if (!playingContent) {
-                                const from = (location.state as any)?.from || lastNonModalUrlRef.current;
-                                navigate(from || '/', { replace: true });
-                            }
-                        });
+                    if (isCancelled || activeContentIdRef.current !== contentId || !window.location.pathname.startsWith('/watch/')) {
                         return;
+                    }
+
+                    if (resolved) {
+                        applyPlayable(resolved);
                     } else {
-                        // Optional: Handle episodes correctly if deep linking directly to episode ID
-                        // For now, if ID not in main content list, redirect
                         console.warn(`Watch deep link content not found: ${contentId}`);
-                        // PROTECTION: Never redirect if we are already playing or have state
-                        if (playingContent?.id === contentId || !!playingContent || stateItem || (location.state as any)?.item) return;
-                        const from = (location.state as any)?.from || lastNonModalUrlRef.current;
-                        navigate(from || '/', { replace: true });
-                        return;
-                    }
-                } else {
-                    if (!playingContent) {
+                        if (playingContentRef.current?.id === contentId || !!playingContentRef.current || stateItem) return;
                         const from = (location.state as any)?.from || lastNonModalUrlRef.current;
                         navigate(from || '/', { replace: true });
                     }
-                }
+                };
+
+                resolveWatchAsync().finally(() => {
+                    if (!isCancelled && activeContentIdRef.current === contentId) {
+                        setIsResolvingModalContent(false);
+                    }
+                });
             }
         } else {
             if (playingContentRef.current) {
                 setPlayingContent(null);
+            }
+            if (!currentPath.startsWith('/browse/')) {
+                setIsResolvingModalContent(false);
             }
         }
 
         return () => {
             isCancelled = true;
         };
-    }, [location.pathname, location.search, rawContent, isLoading, isAuthenticated, currentProfile]);
+    }, [location.pathname, location.search]);
 
     // Synchronously clean up player and modals when navigating away from their routes or on browser back/forward
     useEffect(() => {
@@ -1890,8 +2006,8 @@ const MainLayout = () => {
         return <Navigate to="/login" replace />;
     }
 
-    // Force Profile Selection if logged in but no profile selected
-    if (isAuthenticated && !currentProfile) {
+    // Force Profile Selection if logged in but no profile selected (unless opening a deep linked content modal)
+    if (isAuthenticated && !currentProfile && !isModalRoute) {
         return (
             <ProfileSelection />
         );
@@ -1919,7 +2035,13 @@ const MainLayout = () => {
             <Footer onNavigate={handleNavigate} />
             <MobileNav activeTab={activeTab} setTab={handleTabChange} currentProfile={currentProfile} />
 
-
+            {/* Deep link resolving modal loader */}
+            {isModalRoute && (isResolvingModalContent || (location.pathname.startsWith('/browse/') && !viewingContent) || (location.pathname.startsWith('/watch/') && !playingContent)) && (
+                <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md transition-opacity">
+                    <Loader2 className="w-12 h-12 text-brand-red animate-spin mb-4" />
+                    <p className="text-white/80 text-base font-medium animate-pulse">Loading content...</p>
+                </div>
+            )}
 
             {viewingContent && location.pathname.startsWith('/browse/') && (
                 <ContentDetails

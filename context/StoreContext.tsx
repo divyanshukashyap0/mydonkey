@@ -223,12 +223,75 @@ export function sanitizeSections(rawSections: Section[]): Section[] {
 
 export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [fbUser, setFbUser] = useState<FirebaseUser | null>(null);
-    const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
-    const [currentProfile, setCurrentProfile] = useState<Profile | null>(null);
-    const [userProfiles, setUserProfiles] = useState<Profile[]>([]);
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [currentUser, setCurrentUser] = useState<AppUser | null>(() => {
+        try {
+            const cached = localStorage.getItem('cachedUser');
+            return cached ? JSON.parse(cached) : null;
+        } catch {
+            return null;
+        }
+    });
+    const [currentProfile, setCurrentProfile] = useState<Profile | null>(() => {
+        try {
+            const cached = localStorage.getItem('cachedProfile');
+            return cached ? JSON.parse(cached) : null;
+        } catch {
+            return null;
+        }
+    });
+    const [userProfiles, setUserProfiles] = useState<Profile[]>(() => {
+        try {
+            const cached = localStorage.getItem('cachedUserProfiles');
+            return cached ? JSON.parse(cached) : [];
+        } catch {
+            return [];
+        }
+    });
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+        try {
+            return Boolean(localStorage.getItem('cachedUser'));
+        } catch {
+            return false;
+        }
+    });
     const [isLoading, setIsLoading] = useState(true);
     const firebaseDataReceivedRef = useRef(false);
+
+    // Helpers to atomically update state and localStorage
+    const setAndPersistUser = (user: AppUser | null) => {
+        setCurrentUser(user);
+        try {
+            if (user) {
+                localStorage.setItem('cachedUser', JSON.stringify(user));
+            } else {
+                localStorage.removeItem('cachedUser');
+            }
+        } catch {}
+    };
+
+    const setAndPersistProfile = (profile: Profile | null) => {
+        setCurrentProfile(profile);
+        try {
+            if (profile) {
+                localStorage.setItem('cachedProfile', JSON.stringify(profile));
+                localStorage.setItem('selectedProfileId', profile.id);
+            } else {
+                localStorage.removeItem('cachedProfile');
+                localStorage.removeItem('selectedProfileId');
+            }
+        } catch {}
+    };
+
+    const setAndPersistUserProfiles = (profiles: Profile[]) => {
+        setUserProfiles(profiles);
+        try {
+            if (profiles && profiles.length > 0) {
+                localStorage.setItem('cachedUserProfiles', JSON.stringify(profiles));
+            } else {
+                localStorage.removeItem('cachedUserProfiles');
+            }
+        } catch {}
+    };
 
     const [content, setContent] = useState<Content[]>(FALLBACK_CATALOG);
     // Load cached settings/plans if available
@@ -457,8 +520,30 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                         lastLoginAt: new Date().toISOString(),
                         isGuest
                     };
-                    setCurrentUser(tempUser);
+                    setAndPersistUser(tempUser);
                     setIsAuthenticated(true);
+
+                    // Optimistic profile: Ensure a profile is active immediately so ProfileSelection or Logged-out state never flashes
+                    if (!currentProfile) {
+                        try {
+                            const cachedProf = localStorage.getItem('cachedProfile');
+                            if (cachedProf) {
+                                setCurrentProfile(JSON.parse(cachedProf));
+                            } else {
+                                const optimisticProfile: Profile = {
+                                    id: isGuest ? 'guest' : 'main',
+                                    name: isGuest ? 'Guest' : (firebaseUser.displayName || userEmail.split('@')[0] || 'Me'),
+                                    avatarUrl: isGuest
+                                        ? 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png'
+                                        : '/Mydonkey%20user.jpg',
+                                    isKids: false,
+                                    myList: []
+                                };
+                                setAndPersistProfile(optimisticProfile);
+                                setAndPersistUserProfiles([optimisticProfile]);
+                            }
+                        } catch {}
+                    }
 
                     const userRef = doc(db, 'users', firebaseUser.uid);
                     const userSnap = await withTimeout(getDoc(userRef), 5000);
@@ -494,8 +579,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                             myList: []
                         };
                         await withTimeout(setDoc(doc(db, 'users', firebaseUser.uid, 'profiles', profileId), defaultProfile), 5000).catch(() => {});
-                        setCurrentProfile(defaultProfile); // Set immediately for guests
-                        setCurrentUser(newAppUser);
+                        setAndPersistProfile(defaultProfile);
+                        setAndPersistUserProfiles([defaultProfile]);
+                        setAndPersistUser(newAppUser);
                     } else {
                         // Backfill name if missing for existing users
                         const userData = userSnap.data() as AppUser;
@@ -532,34 +618,30 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                             localStorage.setItem('tokenVersion', userData.tokenVersion.toString());
                         }
 
-                        setCurrentUser(userData);
+                        setAndPersistUser(userData);
 
                         // If guest, auto-select profile
                         if (isGuest) {
                             try {
                                 const profilesSnap = await withTimeout(getDocs(collection(db, 'users', firebaseUser.uid, 'profiles')), 5000);
                                 if (!profilesSnap.empty) {
-                                    setCurrentProfile(profilesSnap.docs[0].data() as Profile);
+                                    const guestProf = profilesSnap.docs[0].data() as Profile;
+                                    setAndPersistProfile(guestProf);
+                                    setAndPersistUserProfiles(profilesSnap.docs.map(d => d.data() as Profile));
                                 }
                             } catch { }
                         }
                     }
-
-                    // setIsAuthenticated(true); // Already set optimistically
                 } else {
-                    setCurrentUser(null);
-                    setCurrentProfile(null);
-                    setUserProfiles([]);
+                    setAndPersistUser(null);
+                    setAndPersistProfile(null);
+                    setAndPersistUserProfiles([]);
                     setIsAuthenticated(false);
                 }
             } catch (error) {
                 console.warn("[Auth] Firebase took >5s or failed. Assuming database quota exceeded and running fallback state:", error);
 
-                // CRITICAL FIX: If we have a firebaseUser but DB failed, 
-                // we should STILL treat them as authenticated to avoid login loops.
-                // We'll just have incomplete data until a retry or reload happens.
                 if (firebaseUser) {
-                    // Create a temporary fallback user object so the app doesn't crash
                     const fallbackUser: AppUser = {
                         uid: firebaseUser.uid,
                         email: firebaseUser.email || '',
@@ -569,7 +651,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                         status: 'active',
                         lastLoginAt: new Date().toISOString()
                     };
-                    setCurrentUser(fallbackUser);
+                    setAndPersistUser(fallbackUser);
                     const fallbackProfile: Profile = {
                         id: 'main',
                         name: firebaseUser.displayName || 'User',
@@ -577,11 +659,14 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                         isKids: false,
                         myList: []
                     };
-                    setCurrentProfile(fallbackProfile);
-                    setUserProfiles([fallbackProfile]);
+                    setAndPersistProfile(fallbackProfile);
+                    setAndPersistUserProfiles([fallbackProfile]);
                     setIsAuthenticated(true);
                     handleQuotaExceededRef.current();
                 } else {
+                    setAndPersistUser(null);
+                    setAndPersistProfile(null);
+                    setAndPersistUserProfiles([]);
                     setIsAuthenticated(false);
                 }
             } finally {
@@ -836,25 +921,22 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
         const unsubProfiles = onSnapshot(collection(db, 'users', fbUser.uid, 'profiles'), (snap) => {
             const profiles = snap.docs.map(d => ({ id: d.id, ...d.data() } as Profile));
-            setUserProfiles(profiles);
+            setAndPersistUserProfiles(profiles);
 
             if (currentProfile) {
                 const updated = profiles.find(p => p.id === currentProfile.id);
                 if (updated) {
-                    setCurrentProfile(updated);
+                    setAndPersistProfile(updated);
                 } else if (profiles.length > 0) {
-                    setCurrentProfile(profiles[0]);
-                    localStorage.setItem('selectedProfileId', profiles[0].id);
+                    setAndPersistProfile(profiles[0]);
                 } else {
-                    setCurrentProfile(null);
-                    localStorage.removeItem('selectedProfileId');
+                    setAndPersistProfile(null);
                 }
             } else if (profiles.length > 0) {
                 const savedId = localStorage.getItem('selectedProfileId');
                 const matched = savedId ? profiles.find(p => p.id === savedId) : null;
                 const active = matched || profiles[0];
-                setCurrentProfile(active);
-                localStorage.setItem('selectedProfileId', active.id);
+                setAndPersistProfile(active);
             }
         }, (error) => {
             if (error?.code === 'resource-exhausted' || error?.message?.toLowerCase().includes('quota')) {
@@ -868,8 +950,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     isKids: false,
                     myList: []
                 };
-                setCurrentProfile(fallbackProfile);
-                setUserProfiles([fallbackProfile]);
+                setAndPersistProfile(fallbackProfile);
+                setAndPersistUserProfiles([fallbackProfile]);
             }
         });
 
@@ -960,13 +1042,25 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
 
     const logout = async () => {
-        if (fbUser && !fbUser.isAnonymous) {
-            await updateDoc(doc(db, 'users', fbUser.uid), { lastLogoutAt: new Date().toISOString() });
-        }
-        await signOut(auth);
-        setCurrentProfile(null);
-        localStorage.removeItem('selectedProfileId');
-        // window.location.reload(); // Removed to prevent full page refresh
+        try {
+            if (fbUser && !fbUser.isAnonymous) {
+                await updateDoc(doc(db, 'users', fbUser.uid), { lastLogoutAt: new Date().toISOString() }).catch(() => {});
+            }
+        } catch {}
+        try {
+            await signOut(auth);
+        } catch {}
+        setAndPersistUser(null);
+        setAndPersistProfile(null);
+        setAndPersistUserProfiles([]);
+        setIsAuthenticated(false);
+        try {
+            localStorage.removeItem('cachedUser');
+            localStorage.removeItem('cachedProfile');
+            localStorage.removeItem('cachedUserProfiles');
+            localStorage.removeItem('selectedProfileId');
+            localStorage.removeItem('tokenVersion');
+        } catch {}
     };
 
     const publishCatalog = async () => {
@@ -1009,37 +1103,55 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     const fetchContentById = useCallback(async (id: string): Promise<Content | null> => {
         if (!id) return null;
+        const cleanId = id.trim();
 
         // 1. Check in-memory cache of fully fetched docs
-        const cached = fetchedContentDocsRef.current.get(id);
+        const cached = fetchedContentDocsRef.current.get(cleanId);
         if (cached) return cached;
 
         // 2. Return existing in-flight promise if already being fetched
-        if (inFlightDocFetchesRef.current.has(id)) {
-            return inFlightDocFetchesRef.current.get(id)!;
+        if (inFlightDocFetchesRef.current.has(cleanId)) {
+            return inFlightDocFetchesRef.current.get(cleanId)!;
         }
 
-        const existing = content.find(c => c.id === id);
-        // If already in memory with full details/seasons (if applicable), return it
-        if (existing && ((existing.type === 'movie' && (existing.cast?.length || 0) > 0) || (existing.seasons && existing.seasons.length > 0))) {
-            fetchedContentDocsRef.current.set(id, existing);
+        // 3. Check memory content (match id, tmdbId, or imdbId)
+        const existing = content.find(c => c.id === cleanId || (c.tmdbId && (`tmdb_${c.tmdbId}` === cleanId || String(c.tmdbId) === cleanId)) || (c.imdbId && c.imdbId.toLowerCase() === cleanId.toLowerCase()));
+        if (existing && ((existing.type === 'movie' && (existing.cast?.length || 0) > 0) || (existing.seasons && existing.seasons.length > 0) || existing.videoUrl)) {
+            fetchedContentDocsRef.current.set(cleanId, existing);
             return existing;
+        }
+
+        // 4. Check instant fallback catalog
+        const fallbackMatch = FALLBACK_CATALOG.find(c => c.id === cleanId || (c.tmdbId && (`tmdb_${c.tmdbId}` === cleanId || String(c.tmdbId) === cleanId)) || (c.imdbId && c.imdbId.toLowerCase() === cleanId.toLowerCase()));
+        if (fallbackMatch) {
+            fetchedContentDocsRef.current.set(cleanId, fallbackMatch);
+            return fallbackMatch;
         }
 
         const fetchPromise = (async () => {
             try {
-                const docSnap = await withTimeout(getDoc(doc(db, 'content', id)), 5000);
+                // 5. Check IndexedDB cachedContent before Firestore network
+                const idbItems = await idbGet<Content[]>('cachedContent').catch(() => null);
+                if (idbItems && Array.isArray(idbItems)) {
+                    const idbMatch = idbItems.find(c => c.id === cleanId || (c.tmdbId && (`tmdb_${c.tmdbId}` === cleanId || String(c.tmdbId) === cleanId)) || (c.imdbId && c.imdbId.toLowerCase() === cleanId.toLowerCase()));
+                    if (idbMatch) {
+                        fetchedContentDocsRef.current.set(cleanId, idbMatch);
+                        return idbMatch;
+                    }
+                }
+
+                // 6. Firestore lookup
+                const docSnap = await withTimeout(getDoc(doc(db, 'content', cleanId)), 5000);
                 if (docSnap.exists()) {
                     const fullItem = { ...docSnap.data(), id: docSnap.id } as Content;
                     if (fullItem.title) {
                         saveContentTitle(fullItem.id, fullItem.title);
                     }
-                    fetchedContentDocsRef.current.set(id, fullItem);
+                    fetchedContentDocsRef.current.set(cleanId, fullItem);
                     setContent(prev => {
-                        const idx = prev.findIndex(c => c.id === id);
+                        const idx = prev.findIndex(c => c.id === cleanId);
                         if (idx > -1) {
                             const curr = prev[idx];
-                            // Avoid unnecessary state reference churn if seasons and cast are identical
                             const seasonsSame = (curr.seasons?.length || 0) === (fullItem.seasons?.length || 0);
                             const castSame = (curr.cast?.length || 0) === (fullItem.cast?.length || 0);
                             if (seasonsSame && castSame && curr.videoUrl === fullItem.videoUrl) {
@@ -1054,20 +1166,19 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     return fullItem;
                 }
             } catch (e) {
-                console.warn("[Content Fetch] Firebase took >5s or failed for doc:", id, e);
-                handleQuotaExceeded();
+                console.warn("[Content Fetch] Firebase took >5s or failed for doc:", cleanId, e);
             } finally {
-                inFlightDocFetchesRef.current.delete(id);
+                inFlightDocFetchesRef.current.delete(cleanId);
             }
             if (existing) {
-                fetchedContentDocsRef.current.set(id, existing);
+                fetchedContentDocsRef.current.set(cleanId, existing);
             }
             return existing || null;
         })();
 
-        inFlightDocFetchesRef.current.set(id, fetchPromise);
+        inFlightDocFetchesRef.current.set(cleanId, fetchPromise);
         return fetchPromise;
-    }, [content, handleQuotaExceeded]);
+    }, [content]);
 
     const addContent = async (item: Content) => {
         await setDoc(doc(db, 'content', item.id), item);
@@ -1118,22 +1229,19 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     const switchProfile = (profileOrId: string | null | Profile) => {
         if (!profileOrId) {
-            setCurrentProfile(null);
-            localStorage.removeItem('selectedProfileId');
+            setAndPersistProfile(null);
             return;
         }
 
         if (typeof profileOrId === 'object') {
-            setCurrentProfile(profileOrId);
-            localStorage.setItem('selectedProfileId', profileOrId.id);
+            setAndPersistProfile(profileOrId);
             return;
         }
 
         const profileId = profileOrId;
         const profile = userProfiles.find(p => p.id === profileId);
         if (profile) {
-            setCurrentProfile(profile);
-            localStorage.setItem('selectedProfileId', profileId);
+            setAndPersistProfile(profile);
         }
     };
 
