@@ -2030,12 +2030,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                 {isMuted ? <VolumeX size={14} className="text-red-500" /> : <Volume2 size={14} />}
                                 <span>{isMuted ? 'Unmute' : 'Mute'}</span>
                             </button>
-                            <button
-                                onClick={toggleFullscreen}
-                                className="flex items-center gap-2 text-gray-300 hover:text-white text-xs bg-white/10 hover:bg-white/15 px-3.5 py-2 rounded-full transition cursor-pointer active:scale-95 shadow-sm"
-                            >
-                                <Maximize size={14} /> <span>Fullscreen</span>
-                            </button>
+                            {!isDriveVideo && (
+                                <button
+                                    onClick={toggleFullscreen}
+                                    className="flex items-center gap-2 text-gray-300 hover:text-white text-xs bg-white/10 hover:bg-white/15 px-3.5 py-2 rounded-full transition cursor-pointer active:scale-95 shadow-sm"
+                                >
+                                    <Maximize size={14} /> <span>Fullscreen</span>
+                                </button>
+                            )}
                         </div>
                     </div>
                 </>

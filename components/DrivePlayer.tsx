@@ -107,21 +107,7 @@ const DrivePlayer: React.FC<DrivePlayerProps> = ({ driveId, title = 'Video Conte
                     </div>
                 )}
 
-                {/* Stuck-loading warning — bottom-left toast, never covers the video on mobile */}
-                {showWarning && (
-                    <div className="absolute bottom-4 left-3 right-3 md:left-4 md:right-auto md:max-w-xs z-40 bg-[#E50914]/90 text-white px-4 py-3 rounded-xl text-sm font-medium shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom-4 fade-in ring-1 ring-white/20 relative pr-10">
-                        <button
-                            onClick={() => setShowWarning(false)}
-                            className="absolute top-2 right-2 p-1 bg-black/20 hover:bg-black/40 rounded-full text-white/80 hover:text-white transition-colors"
-                        >
-                            <X size={14} />
-                        </button>
-                        <p className="font-bold text-sm mb-0.5">Video stuck loading?</p>
-                        <p className="text-white/90 text-xs leading-relaxed">
-                            Your browser's <strong className="text-white">Tracking Prevention</strong> (or Adblocker) might be blocking the player.
-                        </p>
-                    </div>
-                )}
+
             </div>
 
             <style>{`
