@@ -23,17 +23,35 @@ const ExclusiveContentManager = () => {
         return list;
     }, [allContent, search, filterType]);
 
-    // Make Exclusive: 1-click toggle on
+    // Make Exclusive: prompt for optional code or keep global
     const handleMakeExclusive = async (item: Content) => {
+        const optionalCode = prompt(`Make "${item.title}" Exclusive:\nEnter an optional secret access code (or leave empty for Global Code only):`, item.accessCode || '');
+        if (optionalCode === null) return; // cancelled
         setSaving(item.id);
         try {
-            await updateContent(item.id, { isExclusive: true, accessCode: '' } as any);
+            await updateContent(item.id, { isExclusive: true, accessCode: optionalCode.trim().toUpperCase() } as any);
         } catch (e) {
             alert('Failed to make exclusive: ' + e);
         } finally {
             setSaving(null);
         }
     };
+
+    // Set or edit specific access code
+    const handleSetAccessCode = async (item: Content) => {
+        const currentCode = item.accessCode || '';
+        const newCode = prompt(`Set Secret Access Code for "${item.title}":\n(Leave blank to use Global Code only)`, currentCode);
+        if (newCode === null) return; // cancelled
+        setSaving(item.id);
+        try {
+            await updateContent(item.id, { isExclusive: true, accessCode: newCode.trim().toUpperCase() } as any);
+        } catch (e) {
+            alert('Failed to update code: ' + e);
+        } finally {
+            setSaving(null);
+        }
+    };
+
     // Make Free: clear both isExclusive and accessCode
     const handleMakeFree = async (item: Content) => {
         setSaving(item.id);
@@ -173,13 +191,24 @@ const ExclusiveContentManager = () => {
                             {/* Action Buttons */}
                             <div className="flex items-center gap-2 flex-shrink-0">
                                 {isExclusive ? (
-                                    <button
-                                        onClick={() => handleMakeFree(item)}
-                                        disabled={isSavingThis}
-                                        className="px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20 disabled:opacity-50"
-                                    >
-                                        {isSavingThis ? <span className="animate-pulse">Saving...</span> : <><Unlock size={14} /> Make Free</>}
-                                    </button>
+                                    <>
+                                        <button
+                                            onClick={() => handleSetAccessCode(item)}
+                                            disabled={isSavingThis}
+                                            className="px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border border-yellow-500/20 disabled:opacity-50"
+                                            title="Set or update custom access code"
+                                        >
+                                            <KeyRound size={13} />
+                                            {item.accessCode ? 'Edit Code' : 'Set Code'}
+                                        </button>
+                                        <button
+                                            onClick={() => handleMakeFree(item)}
+                                            disabled={isSavingThis}
+                                            className="px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20 disabled:opacity-50"
+                                        >
+                                            {isSavingThis ? <span className="animate-pulse">Saving...</span> : <><Unlock size={14} /> Make Free</>}
+                                        </button>
+                                    </>
                                 ) : (
                                     <button
                                         onClick={() => handleMakeExclusive(item)}

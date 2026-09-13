@@ -196,7 +196,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
         if (content.videoUrl && isExternalEmbedUrl(content.videoUrl, settings?.embedProxyBaseUrl)) {
             content.videoUrl = '';
         }
-    } else if (isTmdbOrImdb && !content.videoUrl) {
+    } else if (isTmdbOrImdb && !content.videoUrl && !content.isManual) {
         const streamId = content.imdbId || (content.tmdbId ? String(content.tmdbId) : (typeof content.id === 'string' ? content.id.replace(/^(tmdb_|imdb_)/, '') : ''));
         if (streamId) {
             content.videoUrl = buildEmbedUrl(streamId, content.type || 'movie', settings);

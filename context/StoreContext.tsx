@@ -1582,26 +1582,47 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const unlockContent = async (code: string): Promise<{ success: boolean; contentId?: string; message: string }> => {
         if (!fbUser || !currentProfile) return { success: false, message: 'Please sign in first.' };
 
-        if (!settings.globalExclusiveCode) {
-            return { success: false, message: 'No exclusive content available right now.' };
+        const trimmed = (code || '').trim();
+        if (!trimmed) return { success: false, message: 'Please enter an access code.' };
+
+        // 1. Check Global Exclusive Code
+        if (settings.globalExclusiveCode && trimmed.toLowerCase() === settings.globalExclusiveCode.trim().toLowerCase()) {
+            if (currentProfile.unlockedContent?.includes('global_unlock')) {
+                return { success: true, message: 'Exclusive library is already unlocked!' };
+            }
+
+            const newUnlockedList = [...(currentProfile.unlockedContent || []), 'global_unlock'];
+            await updateDoc(doc(db, 'users', fbUser.uid, 'profiles', currentProfile.id), {
+                unlockedContent: newUnlockedList
+            });
+
+            setCurrentProfile({ ...currentProfile, unlockedContent: newUnlockedList });
+            return { success: true, message: `Access Granted. Exclusive library unlocked!` };
         }
 
-        if (code !== settings.globalExclusiveCode) {
-            return { success: false, message: 'Invalid Access Code.' };
+        // 2. Check Specific Item Access Code across catalog
+        const matchingItem = content.find(item =>
+            item &&
+            item.isExclusive &&
+            item.accessCode &&
+            item.accessCode.trim().toLowerCase() === trimmed.toLowerCase()
+        );
+
+        if (matchingItem) {
+            if (currentProfile.unlockedContent?.includes(matchingItem.id) || currentProfile.unlockedContent?.includes('global_unlock')) {
+                return { success: true, contentId: matchingItem.id, message: `"${matchingItem.title}" is already unlocked!` };
+            }
+
+            const newUnlockedList = [...(currentProfile.unlockedContent || []), matchingItem.id];
+            await updateDoc(doc(db, 'users', fbUser.uid, 'profiles', currentProfile.id), {
+                unlockedContent: newUnlockedList
+            });
+
+            setCurrentProfile({ ...currentProfile, unlockedContent: newUnlockedList });
+            return { success: true, contentId: matchingItem.id, message: `Access Granted to "${matchingItem.title}"!` };
         }
 
-        if (currentProfile.unlockedContent?.includes('global_unlock')) {
-            return { success: true, message: 'Exclusive content already unlocked!' };
-        }
-
-        const newUnlockedList = [...(currentProfile.unlockedContent || []), 'global_unlock'];
-        await updateDoc(doc(db, 'users', fbUser.uid, 'profiles', currentProfile.id), {
-            unlockedContent: newUnlockedList
-        });
-
-        setCurrentProfile({ ...currentProfile, unlockedContent: newUnlockedList });
-
-        return { success: true, message: `Access Granted. Exclusive content unlocked!` };
+        return { success: false, message: 'Invalid Access Code.' };
     };
 
     // Standard Content: Strictly NO exclusive items for anyone (filtered at this layer)

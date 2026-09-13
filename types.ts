@@ -33,6 +33,7 @@ export interface Content {
   playMode?: 'trailer' | 'movie';
   accessCode?: string; // Private content requiring code
   isExclusive?: boolean; // Requires password to watch (stays hidden unless auth'd)
+  isManual?: boolean; // 100% manual content (no external player link automation)
   seasons?: Season[];
   rating?: string; // Censor rating e.g. U/A 16+
   year?: number;

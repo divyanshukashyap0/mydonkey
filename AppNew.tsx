@@ -30,7 +30,7 @@ import ScrollToTop from './components/ScrollToTop';
 import ProfileSelection from './components/ProfileSelection';
 import FontLoader from './components/FontLoader';
 import Loader from './components/Loader';
-import { buildEmbedUrl, parseEmbedContentType, extractDriveId, hasDriveSource, isExternalEmbedUrl } from './utils/embedUrl';
+import { buildEmbedUrl, parseEmbedContentType, extractDriveId, hasDriveSource, isExternalEmbedUrl, isDirectVideoUrl } from './utils/embedUrl';
 import Pagination from './components/Pagination';
 import GenrePreferenceModal from './components/GenrePreferenceModal';
 import PersonalizeBanner from './components/PersonalizeBanner';
@@ -253,7 +253,8 @@ const MainLayout = () => {
 
                 if (item) {
                     setIsResolvingModalContent(false);
-                    if (item.isExclusive && !currentProfileRef.current?.unlockedContent?.includes('global_unlock')) {
+                    const hasUnlocked = currentProfileRef.current?.unlockedContent?.includes('global_unlock') || currentProfileRef.current?.unlockedContent?.includes(item.id);
+                    if (item.isExclusive && !hasUnlocked) {
                         navigate('/exclusive', { replace: true });
                         return;
                     }
@@ -404,7 +405,8 @@ const MainLayout = () => {
                     }
 
                     if (resolved) {
-                        if (resolved.isExclusive && !currentProfileRef.current?.unlockedContent?.includes('global_unlock')) {
+                        const hasUnlocked = currentProfileRef.current?.unlockedContent?.includes('global_unlock') || currentProfileRef.current?.unlockedContent?.includes(resolved.id);
+                        if (resolved.isExclusive && !hasUnlocked) {
                             navigate('/exclusive', { replace: true });
                             return;
                         }
@@ -497,7 +499,8 @@ const MainLayout = () => {
                     const tmdbNumId = itemToPlay.tmdbId || (typeof itemToPlay.id === 'string' && itemToPlay.id.startsWith('tmdb_') ? itemToPlay.id.replace('tmdb_', '') : null);
                     const itemDriveId = extractDriveId(itemToPlay.movieDriveId || itemToPlay.videoUrl || (itemToPlay as any).driveId || '');
                     const itemHasDrive = Boolean(itemDriveId);
-                    const isEmbed = !itemHasDrive && ((itemToPlay.videoUrl && (itemToPlay.videoUrl.includes('proxy.garageband.rocks') || (embedBaseHost && itemToPlay.videoUrl.includes(embedBaseHost)) || itemToPlay.videoUrl.includes('/embed/'))) || !!imdbId || !!tmdbNumId);
+                    const hasDirectVideo = isDirectVideoUrl(itemToPlay.videoUrl) || (!!itemToPlay.videoUrl && !isExternalEmbedUrl(itemToPlay.videoUrl, embedBaseHost));
+                    const isEmbed = !itemHasDrive && !hasDirectVideo && ((itemToPlay.videoUrl && (itemToPlay.videoUrl.includes('proxy.garageband.rocks') || (embedBaseHost && itemToPlay.videoUrl.includes(embedBaseHost)) || itemToPlay.videoUrl.includes('/embed/'))) || !!imdbId || !!tmdbNumId);
                     const effectiveStreamId = imdbId || tmdbNumId;
 
                     let playableItem = { ...itemToPlay };
@@ -506,11 +509,20 @@ const MainLayout = () => {
                         if (isExternalEmbedUrl(playableItem.videoUrl, embedBaseHost)) {
                             playableItem.videoUrl = '';
                         }
+                    } else if (hasDirectVideo) {
+                        playableItem.videoUrl = itemToPlay.videoUrl;
                     } else if (isEmbed && (effectiveStreamId || itemToPlay.videoUrl)) {
-                        const existingType = itemToPlay.videoUrl ? parseEmbedContentType(itemToPlay.videoUrl) : null;
-                        const streamUrl = effectiveStreamId ? buildEmbedUrl(effectiveStreamId, existingType || itemToPlay.type || 'movie', settingsRef.current) : itemToPlay.videoUrl;
-                        if (streamUrl) {
-                            playableItem.videoUrl = streamUrl;
+                        if (itemToPlay.isManual) {
+                            // Suppress automated external embed for 100% manual content
+                            if (itemToPlay.videoUrl && !isExternalEmbedUrl(itemToPlay.videoUrl, embedBaseHost)) {
+                                playableItem.videoUrl = itemToPlay.videoUrl;
+                            }
+                        } else {
+                            const existingType = itemToPlay.videoUrl ? parseEmbedContentType(itemToPlay.videoUrl) : null;
+                            const streamUrl = effectiveStreamId ? buildEmbedUrl(effectiveStreamId, existingType || itemToPlay.type || 'movie', settingsRef.current) : itemToPlay.videoUrl;
+                            if (streamUrl) {
+                                playableItem.videoUrl = streamUrl;
+                            }
                         }
                     }
 
@@ -519,7 +531,8 @@ const MainLayout = () => {
                         return;
                     }
 
-                    if (mode === 'movie' && playableItem.isExclusive && !currentProfileRef.current?.unlockedContent?.includes('global_unlock')) {
+                    const hasUnlockedMovie = currentProfileRef.current?.unlockedContent?.includes('global_unlock') || currentProfileRef.current?.unlockedContent?.includes(playableItem.id);
+                    if (mode === 'movie' && playableItem.isExclusive && !hasUnlockedMovie) {
                         navigate('/exclusive', { replace: true });
                         return;
                     }
@@ -1056,7 +1069,8 @@ const MainLayout = () => {
         const itemDriveId = extractDriveId(item.movieDriveId || item.videoUrl || (item as any).driveId || '');
         const itemHasDrive = Boolean(itemDriveId);
 
-        const isEmbed = !itemHasDrive && ((item.videoUrl && (item.videoUrl.includes('proxy.garageband.rocks') || (embedBaseHost && item.videoUrl.includes(embedBaseHost)) || item.videoUrl.includes('/embed/'))) || !!imdbId || !!tmdbNumId);
+        const hasDirectVideo = isDirectVideoUrl(item.videoUrl) || (!!item.videoUrl && !isExternalEmbedUrl(item.videoUrl, embedBaseHost));
+        const isEmbed = !itemHasDrive && !hasDirectVideo && ((item.videoUrl && (item.videoUrl.includes('proxy.garageband.rocks') || (embedBaseHost && item.videoUrl.includes(embedBaseHost)) || item.videoUrl.includes('/embed/'))) || !!imdbId || !!tmdbNumId);
 
         const effectiveStreamId = imdbId || tmdbNumId;
 
@@ -1066,11 +1080,20 @@ const MainLayout = () => {
             if (isExternalEmbedUrl(playableItem.videoUrl, embedBaseHost)) {
                 playableItem.videoUrl = '';
             }
+        } else if (hasDirectVideo) {
+            playableItem.videoUrl = item.videoUrl;
         } else if (isEmbed && (effectiveStreamId || item.videoUrl)) {
-            const existingType = item.videoUrl ? parseEmbedContentType(item.videoUrl) : null;
-            const streamUrl = effectiveStreamId ? buildEmbedUrl(effectiveStreamId, existingType || item.type || 'movie', settings) : item.videoUrl;
-            if (streamUrl) {
-                playableItem.videoUrl = streamUrl;
+            if (item.isManual) {
+                // Suppress automated external embed for 100% manual content
+                if (item.videoUrl && !isExternalEmbedUrl(item.videoUrl, embedBaseHost)) {
+                    playableItem.videoUrl = item.videoUrl;
+                }
+            } else {
+                const existingType = item.videoUrl ? parseEmbedContentType(item.videoUrl) : null;
+                const streamUrl = effectiveStreamId ? buildEmbedUrl(effectiveStreamId, existingType || item.type || 'movie', settings) : item.videoUrl;
+                if (streamUrl) {
+                    playableItem.videoUrl = streamUrl;
+                }
             }
         }
 

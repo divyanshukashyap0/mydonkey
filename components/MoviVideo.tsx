@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { MoviEngine } from '../player/MoviEngine';
 import { soundBooster } from '../player/SoundBooster';
+import { getPlayableStreamUrl } from '../utils/embedUrl';
 
 export interface MoviVideoProps {
     src?: string;
@@ -101,7 +102,8 @@ export const MoviVideo = forwardRef<any, MoviVideoProps>(({
                 });
             }
 
-            await engineRef.current.load({ type: 'url', url }, canvasRef.current);
+            const playableUrl = getPlayableStreamUrl(url);
+            await engineRef.current.load({ type: 'url', url: playableUrl }, canvasRef.current);
             
             if (activeRef.current && engineRef.current) {
                 engineRef.current.setVolume(volumeRef.current);

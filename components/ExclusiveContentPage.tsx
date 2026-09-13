@@ -21,14 +21,24 @@ const ExclusiveContentPage: React.FC<ExclusiveContentPageProps> = ({ onDetails }
     const [error, setError] = useState('');
 
     const isUnlocked = useMemo(() => {
-        return currentProfile?.unlockedContent?.includes('global_unlock');
+        return Boolean(
+            currentProfile?.unlockedContent?.includes('global_unlock') ||
+            (currentProfile?.unlockedContent && currentProfile.unlockedContent.length > 0)
+        );
     }, [currentProfile?.unlockedContent]);
 
+    const accessibleContent = useMemo(() => {
+        const isGlobal = currentProfile?.unlockedContent?.includes('global_unlock');
+        if (isGlobal) return exclusiveContent;
+        const unlocked = new Set(currentProfile?.unlockedContent || []);
+        return exclusiveContent.filter(c => unlocked.has(c.id));
+    }, [exclusiveContent, currentProfile?.unlockedContent]);
+
     const filteredContent = useMemo(() => {
-        if (!searchQuery.trim()) return exclusiveContent;
+        if (!searchQuery.trim()) return accessibleContent;
         const q = searchQuery.toLowerCase();
-        return exclusiveContent.filter(c => c.title.toLowerCase().includes(q));
-    }, [exclusiveContent, searchQuery]);
+        return accessibleContent.filter(c => c.title.toLowerCase().includes(q));
+    }, [accessibleContent, searchQuery]);
 
     const paginatedContent = useMemo(() => {
         const start = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -47,6 +57,11 @@ const ExclusiveContentPage: React.FC<ExclusiveContentPageProps> = ({ onDetails }
             const result = await unlockContent(unlockCode);
             if (!result.success) {
                 setError(result.message);
+            } else if (result.contentId) {
+                const target = exclusiveContent.find(c => c.id === result.contentId);
+                if (target) {
+                    onDetails(target);
+                }
             }
         } catch (err) {
             setError('Failed to verify code. Please try again.');

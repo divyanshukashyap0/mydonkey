@@ -8,7 +8,7 @@ import ContentLoader from './ContentLoader';
 import { useStore } from '../context/StoreContext';
 import { logUserActivity, incrementWatchTime } from '../utils/activityLogger';
 import { MoviVideo } from './MoviVideo';
-import { buildEmbedUrl, parseEmbedContentType, extractDriveId, isExternalEmbedUrl } from '../utils/embedUrl';
+import { buildEmbedUrl, parseEmbedContentType, extractDriveId, isExternalEmbedUrl, isDirectVideoUrl, getPlayableStreamUrl } from '../utils/embedUrl';
 import { soundBooster } from '../player/SoundBooster';
 import { useAdShield } from '../utils/useAdShield';
 import { fetchTMDBDetails, fetchTMDBSeason } from '../services/tmdbService';
@@ -463,14 +463,21 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         const eNum = currentEpisode?.episodeNumber || (urlSeasonEp?.episode || 1);
         if (currentEpisode?.videoUrl && !getDriveId(currentEpisode.videoUrl)) {
             directVideoUrl = currentEpisode.videoUrl;
-        } else if (extractedImdbId) {
+        } else if (extractedImdbId && !content.isManual) {
+            // Suppress automated external embed link for 100% manual content
             directVideoUrl = buildEmbedUrl(extractedImdbId, 'tv', settings, sNum, eNum);
         } else if (content.videoUrl && !getDriveId(content.videoUrl)) {
             directVideoUrl = content.videoUrl;
         }
     } else if (overrideUrl && !overrideDriveId && !overrideYoutubeId) {
-        directVideoUrl = overrideUrl;
-    } else if (extractedImdbId && !finalDriveId && !finalYoutubeId) {
+        // If 100% manual content, strictly reject external embed URLs
+        if (content.isManual && isExternalEmbedUrl(overrideUrl, embedBaseHost)) {
+            directVideoUrl = null;
+        } else {
+            directVideoUrl = overrideUrl;
+        }
+    } else if (extractedImdbId && !finalDriveId && !finalYoutubeId && !content.isManual) {
+        // Suppress automated external embed link for 100% manual content
         directVideoUrl = buildEmbedUrl(extractedImdbId, 'movie', settings);
     } else {
         directVideoUrl = null;
@@ -479,32 +486,17 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const isHls = directVideoUrl ? directVideoUrl.split('?')[0].toLowerCase().includes('.m3u8') : false;
     const isNativeVideo = useMemo(() => {
         if (!directVideoUrl) return false;
-        const urlWithoutQuery = directVideoUrl.split('?')[0].toLowerCase();
-
-        // Standard video extensions
-        const hasExtension = ['.mp4', '.webm', '.mkv', '.ogg', '.mov', '.avi', '.ts', '.flv'].some(ext =>
-            urlWithoutQuery.endsWith(ext)
-        );
-        if (hasExtension) return true;
-
-        // Check if extension is present in the path
-        const hasExtensionAnywhere = ['.mp4', '.webm', '.mkv', '.ogg', '.mov', '.avi', '.ts', '.flv'].some(ext =>
-            urlWithoutQuery.includes(ext)
-        );
-        if (hasExtensionAnywhere) return true;
-
-        // Cloudflare R2 buckets (often host raw video files like MKV/MP4 without file extensions in the pathname)
-        if (directVideoUrl.toLowerCase().includes('.r2.dev')) return true;
-
-        return false;
+        return isDirectVideoUrl(directVideoUrl);
     }, [directVideoUrl]);
     const isEmbedPlayer = directVideoUrl ? (
-        directVideoUrl.includes('proxy.garageband.rocks') ||
-        (embedBaseHost && directVideoUrl.includes(embedBaseHost)) ||
-        directVideoUrl.includes('imdb.com') ||
-        /tt\d+/.test(directVideoUrl)
+        !isNativeVideo && !isHls && (
+            directVideoUrl.includes('proxy.garageband.rocks') ||
+            (embedBaseHost && directVideoUrl.includes(embedBaseHost)) ||
+            directVideoUrl.includes('imdb.com') ||
+            /tt\d+/.test(directVideoUrl)
+        )
     ) : false;
-    const isDirectIframeEmbed = (directVideoUrl && !isHls && !isNativeVideo) || isEmbedPlayer;
+    const isDirectIframeEmbed = Boolean(directVideoUrl && !isHls && !isNativeVideo);
 
     const useDirect = Boolean(directVideoUrl && (isHls || isNativeVideo || isDirectIframeEmbed));
     const useDrive = Boolean(finalDriveId && !useDirect);
@@ -1766,6 +1758,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         // Extract IMDb ID (e.g., tt1234567, /title/tt1234567/, /embed/movie/tt1234567)
         const imdbMatch = trimmed.match(/(tt\d+)/);
 
+        // If content is 100% manual, bypass all external embed transformations
+        if (content.isManual) {
+            return url;
+        }
+
         // Check if it's an IMDb-related URL or raw IMDb ID
         if (trimmed.includes('imdb.com') || /^tt\d+$/.test(trimmed)) {
             if (imdbMatch) {
@@ -1854,6 +1851,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                     ref={videoRef}
                                     className="w-full h-full object-contain"
                                     playsInline
+                                    autoPlay={playing}
                                     onClick={() => setPlaying(!playing)}
                                     src={directVideoUrl}
                                     onLoadedMetadata={handleLoadedMetadata}

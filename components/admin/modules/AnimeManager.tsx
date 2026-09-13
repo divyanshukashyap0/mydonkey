@@ -4,7 +4,7 @@ import { useStore } from '../../../context/StoreContext';
 import { Content, Season, Episode } from '../../../types';
 import { doc, setDoc, deleteDoc, updateDoc, collection, addDoc, deleteField, writeBatch } from 'firebase/firestore';
 import { db } from '../../../firebase';
-import { extractDriveId, isExternalEmbedUrl } from '../../../utils/embedUrl';
+import { extractDriveId, isExternalEmbedUrl, isDirectVideoUrl } from '../../../utils/embedUrl';
 
 const MOVIE_GENRES = ["Action", "Adventure", "Comedy", "Drama", "Horror", "Sci-Fi", "Thriller", "Romance", "Documentary", "Animation"];
 const TV_GENRES = ["Drama", "Comedy", "Reality", "Action", "Sci-Fi", "Documentary", "Kids", "Mystery"];
@@ -401,9 +401,11 @@ const AnimeManager = () => {
                                 <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none"
                                     value={formData.movieDriveId || formData.movieYoutubeId || ''}
                                     onChange={e => {
-                                        const val = e.target.value;
+                                        const val = e.target.value.trim();
                                         if (extractYoutubeId(val).length === 11) {
                                             setFormData({ ...formData, movieYoutubeId: val, movieDriveId: '' });
+                                        } else if (isDirectVideoUrl(val)) {
+                                            setFormData({ ...formData, videoUrl: val, movieDriveId: '', movieYoutubeId: '' });
                                         } else {
                                             const driveId = extractDriveId(val);
                                             const cleanVideoUrl = (driveId && isExternalEmbedUrl(formData.videoUrl, settings?.embedProxyBaseUrl))
@@ -412,7 +414,7 @@ const AnimeManager = () => {
                                             setFormData({ ...formData, movieDriveId: val, movieYoutubeId: '', videoUrl: cleanVideoUrl });
                                         }
                                     }}
-                                    placeholder="Paste Drive Link or YouTube Link" />
+                                    placeholder="Paste Drive Link, YouTube Link, or R2 Video URL" />
 
                                 <label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2 mt-4">Player Video URL (Optional)</label>
                                 <div className="text-[10px] text-gray-400 mb-1">Overrides the Movie Source for playback only. Useful if you want the download link to be different from the player.</div>
@@ -444,8 +446,14 @@ const AnimeManager = () => {
                                 </div>
                                 {(formData.movieDriveId && extractDriveId(formData.movieDriveId)) ? (
                                     <iframe className="w-full h-full rounded" src={`https://drive.google.com/file/d/${extractDriveId(formData.movieDriveId)}/preview`} title="Preview" allowFullScreen />
-                                ) : formData.videoUrl ? (
+                                ) : (formData.videoUrl && !isDirectVideoUrl(formData.videoUrl)) ? (
                                     <iframe className="w-full h-full rounded" src={formData.videoUrl} title="Preview" allowFullScreen />
+                                ) : formData.videoUrl ? (
+                                    <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-900/90 rounded text-emerald-400 font-mono text-xs p-4 text-center border border-emerald-500/20">
+                                        <div className="font-bold mb-1">Direct Video Source Configured</div>
+                                        <div className="text-[11px] text-gray-400 truncate max-w-[90%]">{formData.videoUrl}</div>
+                                        <div className="text-[10px] text-gray-500 mt-2">Ready to play via MoviPlayer (MKV / HEVC / MP4 / HLS supported)</div>
+                                    </div>
                                 ) : (
                                     <iframe className="w-full h-full rounded" src={`https://www.youtube.com/embed/${extractYoutubeId(formData.movieYoutubeId || formData.youtubeId || '')}`} title="Preview" allowFullScreen />
                                 )}

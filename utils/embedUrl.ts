@@ -128,10 +128,55 @@ export const hasDriveSource = (item?: { movieDriveId?: string; videoUrl?: string
 export const isExternalEmbedUrl = (url?: string, embedBaseHost?: string): boolean => {
     if (!url) return false;
     const lower = url.toLowerCase();
+    if (lower.includes('/api/stream')) return false;
+    if (lower.includes('.r2.dev') || lower.includes('.cloudflarestorage.com')) return false;
     if (lower.includes('proxy.garageband.rocks')) return true;
     if (embedBaseHost && lower.includes(embedBaseHost.toLowerCase())) return true;
     if (lower.includes('/embed/movie/') || lower.includes('/embed/tv/')) return true;
     if (lower.includes('imdb.com')) return true;
     return false;
 };
+
+/**
+ * Checks whether a URL is a direct video link (MP4, MKV, WebM, HLS, or Cloudflare R2 bucket).
+ */
+export const isDirectVideoUrl = (url?: string): boolean => {
+    if (!url) return false;
+    const trimmed = url.trim();
+    if (!trimmed) return false;
+    const lower = trimmed.toLowerCase();
+    const urlWithoutQuery = lower.split('?')[0];
+
+    // Standard video extensions
+    const videoExtensions = ['.mp4', '.webm', '.mkv', '.ogg', '.mov', '.avi', '.ts', '.flv', '.m3u8'];
+    if (videoExtensions.some(ext => urlWithoutQuery.endsWith(ext) || urlWithoutQuery.includes(ext))) {
+        return true;
+    }
+
+    // Cloudflare R2 or direct storage buckets
+    if (lower.includes('.r2.dev') || lower.includes('.cloudflarestorage.com') || lower.includes('/api/stream')) {
+        return true;
+    }
+
+    return false;
+};
+
+/**
+ * Resolves a video source URL to ensure it is playable in-browser.
+ * URLs on Cloudflare R2 that lack CORS headers are wrapped in the /api/stream proxy.
+ */
+export const getPlayableStreamUrl = (url?: string): string => {
+    if (!url) return '';
+    const trimmed = url.trim();
+    if (!trimmed) return '';
+    if (trimmed.includes('/api/stream')) return trimmed;
+
+    const lower = trimmed.toLowerCase();
+    if (lower.includes('.r2.dev') || lower.includes('.cloudflarestorage.com')) {
+        return `/api/stream?url=${encodeURIComponent(trimmed)}`;
+    }
+
+    return trimmed;
+};
+
 

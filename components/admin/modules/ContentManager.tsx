@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { Plus, Edit, Trash2, Youtube, HardDrive, Star, Check, X, ChevronDown, ChevronRight, Play, Lock, Search, Filter, MoreVertical, Archive, Sparkles, Loader2, Film, Tv, Link2, RefreshCcw } from 'lucide-react';
+import { Plus, Edit, Trash2, Youtube, HardDrive, Star, Check, X, ChevronDown, ChevronRight, Play, Lock, Search, Filter, MoreVertical, Archive, Sparkles, Loader2, Film, Tv, Link2, RefreshCcw, KeyRound, FileText } from 'lucide-react';
 import { useStore } from '../../../context/StoreContext';
 import { Content, Season, Episode } from '../../../types';
 import { doc, setDoc, deleteDoc, updateDoc, collection, addDoc, deleteField, writeBatch, getDocs } from 'firebase/firestore';
@@ -10,7 +10,7 @@ import {
     TMDBSearchResult, fetchTMDBSeason, tmdbStillUrl, extractTMDBTrailer,
     fetchTMDBEpisode, extractTMDBEpisodeVideo
 } from '../../../services/tmdbService';
-import { buildEmbedUrl, parseEmbedContentType, switchEmbedContentType, extractDriveId, isExternalEmbedUrl } from '../../../utils/embedUrl';
+import { buildEmbedUrl, parseEmbedContentType, switchEmbedContentType, extractDriveId, isExternalEmbedUrl, isDirectVideoUrl } from '../../../utils/embedUrl';
 
 const MOVIE_GENRES = ["Action", "Adventure", "Comedy", "Drama", "Horror", "Sci-Fi", "Thriller", "Romance", "Documentary", "Animation"];
 const TV_GENRES = ["Drama", "Comedy", "Reality", "Action", "Sci-Fi", "Documentary", "Kids", "Mystery"];
@@ -23,7 +23,7 @@ const ContentManager = () => {
     const [isPublishing, setIsPublishing] = useState(false);
 
     // Filters & Search
-    const [filterType, setFilterType] = useState<'ALL' | 'movie' | 'tv' | 'userAdded'>('ALL');
+    const [filterType, setFilterType] = useState<'ALL' | 'movie' | 'tv' | 'manual' | 'exclusive' | 'userAdded'>('ALL');
     const [filterStatus, setFilterStatus] = useState<'ALL' | 'published' | 'draft'>('ALL');
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -47,7 +47,7 @@ const ContentManager = () => {
     const [expandedEpisodeId, setExpandedEpisodeId] = useState<string | null>(null);
 
     // Reset Form
-    const resetForm = (type: 'movie' | 'tv' = 'movie') => {
+    const resetForm = (type: 'movie' | 'tv' = 'movie', isManual: boolean = false) => {
         setFormData({
             type,
             genres: [],
@@ -59,7 +59,10 @@ const ContentManager = () => {
             duration: '',
             rating: 'U/A 13+',
             resolution: 'HD',
-            seasons: []
+            seasons: [],
+            isManual,
+            isExclusive: false,
+            accessCode: ''
         });
         setIsEditing(true);
         setExpandedSeasonId(null);
@@ -310,10 +313,14 @@ const ContentManager = () => {
             if (resolvedDriveId && isExternalEmbedUrl(finalVideoUrl, settings?.embedProxyBaseUrl)) {
                 finalVideoUrl = '';
             }
+            // For 100% manual content: strictly reject any external player embed links
+            if (formData.isManual && isExternalEmbedUrl(finalVideoUrl, settings?.embedProxyBaseUrl)) {
+                finalVideoUrl = '';
+            }
 
             const finalData: Content = {
                 id,
-                tmdbId: Number(formData.tmdbId) || undefined,
+                tmdbId: formData.isManual ? undefined : (Number(formData.tmdbId) || undefined),
                 imdbId: formData.imdbId || '',
                 title: formData.title,
                 overview: formData.overview || '',
@@ -341,14 +348,17 @@ const ContentManager = () => {
                 duration: formData.duration,
                 rating: formData.rating || 'U/A 13+',
                 resolution: formData.resolution || 'HD',
-                accessCode: formData.accessCode || undefined,
+                isManual: Boolean(formData.isManual),
+                isExclusive: Boolean(formData.isExclusive),
+                accessCode: formData.isExclusive ? (formData.accessCode?.trim().toUpperCase() || undefined) : undefined,
                 // Sanitize Seasons/Episodes
                 seasons: formData.type === 'tv' ? (formData.seasons || []).map(s => ({
                     ...s,
                     trailerYoutubeId: extractYoutubeId(s.trailerYoutubeId || ''),
                     episodes: s.episodes.map(e => ({
                         ...e,
-                        driveId: extractDriveId(e.driveId || '')
+                        driveId: extractDriveId(e.driveId || ''),
+                        videoUrl: (formData.isManual && isExternalEmbedUrl(e.videoUrl, settings?.embedProxyBaseUrl)) ? '' : (e.videoUrl || '')
                     }))
                 })) : []
             };
@@ -503,6 +513,10 @@ const ContentManager = () => {
             // Type Filter
             if (filterType === 'userAdded') {
                 if (!item.addedBy) return false;
+            } else if (filterType === 'manual') {
+                if (!item.isManual) return false;
+            } else if (filterType === 'exclusive') {
+                if (!item.isExclusive) return false;
             } else if (filterType !== 'ALL' && item.type !== filterType) {
                 return false;
             }
@@ -539,99 +553,162 @@ const ContentManager = () => {
                     <button onClick={() => setIsEditing(false)} className="p-2 hover:bg-white/10 rounded"><X /></button>
                 </div>
 
-                {/* TMDB Auto-Fetch Panel */}
-                <div className="mb-6 bg-gradient-to-r from-blue-950/40 to-purple-950/30 border border-blue-500/20 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                        <Sparkles size={16} className="text-blue-400" />
-                        <span className="text-sm font-bold text-blue-300">Auto-fill from TMDB</span>
-                        <span className="text-[10px] text-gray-500">
-                            {import.meta.env.VITE_TMDB_API_KEY ? '' : '⚠ Add VITE_TMDB_API_KEY to .env'}
-                        </span>
+                {/* Mode Selector: 100% Manual vs Automated TMDB */}
+                <div className="mb-6 p-4 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/5 border-white/10">
+                    <div className="flex items-center gap-3">
+                        <div className={`p-2.5 rounded-xl ${formData.isManual ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'}`}>
+                            {formData.isManual ? <FileText size={20} /> : <Sparkles size={20} />}
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <span className="font-bold text-white text-base">
+                                    {formData.isManual ? '100% Manual Content Mode' : 'Standard Content (TMDB Enabled)'}
+                                </span>
+                                <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${formData.isManual ? 'bg-amber-500/20 text-amber-300' : 'bg-blue-500/20 text-blue-300'}`}>
+                                    {formData.isManual ? '100% Manual' : 'Automated Mode'}
+                                </span>
+                            </div>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                                {formData.isManual
+                                    ? 'Direct media only (Drive / MP4 / HLS / R2 / YouTube). All external player embed links are strictly disabled.'
+                                    : 'Auto-fill metadata from TMDB and enable embed proxy playback links.'}
+                            </p>
+                        </div>
                     </div>
-                    <div className="flex gap-2" ref={tmdbSearchRef}>
+
+                    <label className="flex items-center gap-3 cursor-pointer select-none bg-black/40 px-4 py-2 rounded-lg border border-white/10 hover:border-white/20 transition">
                         <input
-                            className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 placeholder:text-gray-600 transition"
-                            placeholder={`Search ${formData.type === 'tv' ? 'TV show' : 'movie'} title on TMDB...`}
-                            value={tmdbQuery}
-                            autoComplete="off"
-                            autoCorrect="off"
-                            spellCheck="false"
-                            onChange={e => { setTmdbQuery(e.target.value); setTmdbFilled(false); }}
-                            onKeyDown={e => e.key === 'Enter' && handleTMDBSearch()}
+                            type="checkbox"
+                            checked={!!formData.isManual}
+                            onChange={(e) => {
+                                const checked = e.target.checked;
+                                setFormData(prev => ({
+                                    ...prev,
+                                    isManual: checked,
+                                    // If switching to manual, clear any external embed URL
+                                    videoUrl: checked && isExternalEmbedUrl(prev.videoUrl, settings?.embedProxyBaseUrl) ? '' : prev.videoUrl
+                                }));
+                            }}
+                            className="w-4 h-4 rounded text-amber-500 bg-black border-white/20 focus:ring-amber-500"
                         />
+                        <span className="text-xs font-bold text-gray-200 whitespace-nowrap">
+                            100% Manual Mode
+                        </span>
+                    </label>
+                </div>
+
+                {/* TMDB Auto-Fetch Panel (Only shown in non-manual mode) */}
+                {!formData.isManual ? (
+                    <div className="mb-6 bg-gradient-to-r from-blue-950/40 to-purple-950/30 border border-blue-500/20 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                            <Sparkles size={16} className="text-blue-400" />
+                            <span className="text-sm font-bold text-blue-300">Auto-fill from TMDB</span>
+                            <span className="text-[10px] text-gray-500">
+                                {import.meta.env.VITE_TMDB_API_KEY ? '' : '⚠ Add VITE_TMDB_API_KEY to .env'}
+                            </span>
+                        </div>
+                        <div className="flex gap-2" ref={tmdbSearchRef}>
+                            <input
+                                className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 placeholder:text-gray-600 transition"
+                                placeholder={`Search ${formData.type === 'tv' ? 'TV show' : 'movie'} title on TMDB...`}
+                                value={tmdbQuery}
+                                autoComplete="off"
+                                autoCorrect="off"
+                                spellCheck="false"
+                                onChange={e => { setTmdbQuery(e.target.value); setTmdbFilled(false); }}
+                                onKeyDown={e => e.key === 'Enter' && handleTMDBSearch()}
+                            />
+                            <button
+                                onClick={handleTMDBSearch}
+                                disabled={tmdbLoading || !tmdbQuery.trim()}
+                                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-bold transition shadow-lg shadow-blue-900/30"
+                            >
+                                {tmdbLoading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
+                                {tmdbLoading ? 'Searching…' : 'Search'}
+                            </button>
+                        </div>
+                        <div className="flex items-center gap-4 mt-2 mb-3">
+                            <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer hover:text-white transition group">
+                                <input
+                                    type="checkbox"
+                                    checked={skipEpisodeVideos}
+                                    onChange={(e) => setSkipEpisodeVideos(e.target.checked)}
+                                    className="rounded border-white/10 bg-black text-blue-600 focus:ring-blue-500"
+                                />
+                                Skip Episode Videos (Faster Autofill)
+                            </label>
+                        </div>
+                        {/* Error */}
+                        {tmdbError && (
+                            <p className="text-xs text-red-400 mt-2 flex items-center gap-1"><X size={12} />{tmdbError}</p>
+                        )}
+
+                        {/* Results Dropdown */}
+                        {tmdbResults.length > 0 && (
+                            <div className="mt-3 space-y-2 max-h-72 overflow-y-auto pr-1">
+                                {tmdbResults.map(result => (
+                                    <div
+                                        key={result.id}
+                                        className="flex items-center gap-3 bg-black/40 hover:bg-white/5 border border-white/5 hover:border-blue-500/30 rounded-lg p-2.5 transition group cursor-pointer"
+                                    >
+                                        {/* Poster thumbnail */}
+                                        <div className="w-10 h-14 rounded overflow-hidden flex-shrink-0 bg-white/10">
+                                            <img
+                                                src={result.poster_path ? `https://image.tmdb.org/t/p/w92${result.poster_path}` : '/logo.png'}
+                                                alt={result.title || result.name}
+                                                className={`w-full h-full ${result.poster_path ? 'object-cover' : 'object-contain p-1'}`}
+                                                onError={(e) => {
+                                                    const t = e.currentTarget;
+                                                    if (!t.src.endsWith('/logo.png')) {
+                                                        t.src = '/logo.png';
+                                                        t.className = "w-full h-full object-contain p-1";
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+
+                                        {/* Info */}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="font-bold text-sm text-white truncate">{result.title || result.name}</div>
+                                            <div className="text-[11px] text-gray-400">
+                                                {(result.release_date || result.first_air_date || '').slice(0, 4)}
+                                                {result.vote_average > 0 && (
+                                                    <span className="ml-2 text-yellow-400">★ {result.vote_average.toFixed(1)}</span>
+                                                )}
+                                            </div>
+                                            <div className="text-[11px] text-gray-600 line-clamp-1">{result.overview}</div>
+                                        </div>
+
+                                        {/* Use This Button */}
+                                        <button
+                                            onClick={() => handleTMDBAutofill(result)}
+                                            className="flex-shrink-0 text-xs font-bold bg-blue-600/80 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg transition opacity-80 group-hover:opacity-100"
+                                        >
+                                            Use This
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="mb-6 bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <FileText size={18} className="text-amber-400 flex-shrink-0" />
+                            <div>
+                                <div className="text-sm font-bold text-amber-300">100% Manual Mode Active</div>
+                                <div className="text-xs text-gray-400">TMDB auto-fill and external player link automation are disabled. Enter all information and direct media sources manually below.</div>
+                            </div>
+                        </div>
                         <button
-                            onClick={handleTMDBSearch}
-                            disabled={tmdbLoading || !tmdbQuery.trim()}
-                            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-bold transition shadow-lg shadow-blue-900/30"
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, isManual: false }))}
+                            className="text-xs text-amber-400 hover:text-amber-300 underline ml-4 flex-shrink-0 font-medium"
                         >
-                            {tmdbLoading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
-                            {tmdbLoading ? 'Searching…' : 'Search'}
+                            Switch to Automated TMDB
                         </button>
                     </div>
-                    <div className="flex items-center gap-4 mt-2 mb-3">
-                        <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer hover:text-white transition group">
-                            <input
-                                type="checkbox"
-                                checked={skipEpisodeVideos}
-                                onChange={(e) => setSkipEpisodeVideos(e.target.checked)}
-                                className="rounded border-white/10 bg-black text-blue-600 focus:ring-blue-500"
-                            />
-                            Skip Episode Videos (Faster Autofill)
-                        </label>
-                    </div>
-                    {/* Error */}
-                    {tmdbError && (
-                        <p className="text-xs text-red-400 mt-2 flex items-center gap-1"><X size={12} />{tmdbError}</p>
-                    )}
-
-                    {/* Results Dropdown */}
-                    {tmdbResults.length > 0 && (
-                        <div className="mt-3 space-y-2 max-h-72 overflow-y-auto pr-1">
-                            {tmdbResults.map(result => (
-                                <div
-                                    key={result.id}
-                                    className="flex items-center gap-3 bg-black/40 hover:bg-white/5 border border-white/5 hover:border-blue-500/30 rounded-lg p-2.5 transition group cursor-pointer"
-                                >
-                                    {/* Poster thumbnail */}
-                                    <div className="w-10 h-14 rounded overflow-hidden flex-shrink-0 bg-white/10">
-                                        <img
-                                            src={result.poster_path ? `https://image.tmdb.org/t/p/w92${result.poster_path}` : '/logo.png'}
-                                            alt={result.title || result.name}
-                                            className={`w-full h-full ${result.poster_path ? 'object-cover' : 'object-contain p-1'}`}
-                                            onError={(e) => {
-                                                const t = e.currentTarget;
-                                                if (!t.src.endsWith('/logo.png')) {
-                                                    t.src = '/logo.png';
-                                                    t.className = "w-full h-full object-contain p-1";
-                                                }
-                                            }}
-                                        />
-                                    </div>
-
-                                    {/* Info */}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="font-bold text-sm text-white truncate">{result.title || result.name}</div>
-                                        <div className="text-[11px] text-gray-400">
-                                            {(result.release_date || result.first_air_date || '').slice(0, 4)}
-                                            {result.vote_average > 0 && (
-                                                <span className="ml-2 text-yellow-400">★ {result.vote_average.toFixed(1)}</span>
-                                            )}
-                                        </div>
-                                        <div className="text-[11px] text-gray-600 line-clamp-1">{result.overview}</div>
-                                    </div>
-
-                                    {/* Use This Button */}
-                                    <button
-                                        onClick={() => handleTMDBAutofill(result)}
-                                        className="flex-shrink-0 text-xs font-bold bg-blue-600/80 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg transition opacity-80 group-hover:opacity-100"
-                                    >
-                                        Use This
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4">
@@ -788,9 +865,11 @@ const ContentManager = () => {
                                 <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none"
                                     value={formData.movieDriveId || formData.movieYoutubeId || ''}
                                     onChange={e => {
-                                        const val = e.target.value;
+                                        const val = e.target.value.trim();
                                         if (extractYoutubeId(val).length === 11) {
                                             setFormData({ ...formData, movieYoutubeId: val, movieDriveId: '' });
+                                        } else if (isDirectVideoUrl(val)) {
+                                            setFormData({ ...formData, videoUrl: val, movieDriveId: '', movieYoutubeId: '' });
                                         } else {
                                             const driveId = extractDriveId(val);
                                             const cleanVideoUrl = (driveId && isExternalEmbedUrl(formData.videoUrl, settings?.embedProxyBaseUrl))
@@ -799,16 +878,16 @@ const ContentManager = () => {
                                             setFormData({ ...formData, movieDriveId: val, movieYoutubeId: '', videoUrl: cleanVideoUrl });
                                         }
                                     }}
-                                    placeholder="Paste Drive Link or YouTube Link" />
+                                    placeholder="Paste Drive Link, YouTube Link, or R2 Video URL" />
                             </div>
                         )}
 
                         <div>
                             <div className="flex items-center justify-between mt-4 mb-1">
                                 <label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2">
-                                    <Link2 size={13} className="text-brand-red" /> Player Video URL (Optional)
+                                    <Link2 size={13} className="text-brand-red" /> {formData.isManual ? 'Direct Video URL (MP4 / HLS / R2)' : 'Player Video URL (Optional)'}
                                 </label>
-                                {formData.imdbId && (
+                                {!formData.isManual && formData.imdbId && (
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -823,7 +902,9 @@ const ContentManager = () => {
                                 )}
                             </div>
                             <div className="text-[10px] text-gray-400 mb-2">
-                                Overrides the primary source for playback. Direct MP4/HLS, or proxy embed URL (e.g. proxy.garageband.rocks).
+                                {formData.isManual
+                                    ? '100% Manual Mode: Paste direct video link (MP4, MKV, HLS .m3u8, or Cloudflare R2). Automated external embed proxy links are disabled.'
+                                    : 'Overrides the primary source for playback. Direct MP4/HLS, or proxy embed URL (e.g. proxy.garageband.rocks).'}
                             </div>
                             <input
                                 className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none font-mono text-sm focus:border-brand-red transition"
@@ -839,88 +920,93 @@ const ContentManager = () => {
                                             movieYoutubeId: '',
                                             videoUrl: ''
                                         });
+                                    } else if (formData.isManual && isExternalEmbedUrl(extractedVal, settings?.embedProxyBaseUrl)) {
+                                        alert("Notice: In 100% manual mode, external embed links are not used. Please enter a direct video link, Google Drive link, or YouTube link.");
+                                        setFormData({ ...formData, videoUrl: '' });
                                     } else {
                                         setFormData({ ...formData, videoUrl: extractedVal });
                                     }
                                 }}
-                                placeholder="https://proxy.garageband.rocks/embed/movie/tt1234567"
+                                placeholder={formData.isManual ? "https://storage.example.com/video.mp4 or .m3u8" : "https://proxy.garageband.rocks/embed/movie/tt1234567"}
                             />
 
-                            {/* Embed Proxy Content Type Quick Switcher */}
-                            <div className="mt-2.5 p-2.5 bg-white/5 rounded-lg border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                <div className="text-[11px] text-gray-400 flex items-center gap-1.5 font-medium">
-                                    <span>Embed Content Type:</span>
-                                    {(() => {
-                                        const currentDetected = parseEmbedContentType(formData.videoUrl || '');
-                                        return currentDetected ? (
-                                            <span className="font-mono text-brand-red bg-red-950/40 border border-red-800/40 px-1.5 py-0.5 rounded text-[10px] font-bold">
-                                                /embed/{currentDetected}/
-                                            </span>
-                                        ) : (
-                                            <span className="text-gray-500 text-[10px]">None</span>
-                                        );
-                                    })()}
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const movieType = settings.embedMovieType || 'movie';
-                                            if (formData.videoUrl) {
-                                                setFormData({ ...formData, videoUrl: switchEmbedContentType(formData.videoUrl, movieType, settings) });
-                                            } else if (formData.imdbId) {
-                                                setFormData({ ...formData, videoUrl: buildEmbedUrl(formData.imdbId, 'movie', settings) });
-                                            }
-                                        }}
-                                        className={`px-2 py-1 rounded text-[11px] font-semibold flex items-center gap-1 transition ${
-                                            parseEmbedContentType(formData.videoUrl || '') === (settings.embedMovieType || 'movie')
-                                                ? 'bg-blue-600 text-white shadow'
-                                                : 'bg-black/50 hover:bg-white/10 text-gray-300 border border-white/10'
-                                        }`}
-                                        title="Switch URL to Movie (/embed/movie/)"
-                                    >
-                                        <Film size={12} /> Movie
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const tvType = settings.embedTvType || 'tv';
-                                            if (formData.videoUrl) {
-                                                setFormData({ ...formData, videoUrl: switchEmbedContentType(formData.videoUrl, tvType, settings) });
-                                            } else if (formData.imdbId) {
-                                                setFormData({ ...formData, videoUrl: buildEmbedUrl(formData.imdbId, 'tv', settings) });
-                                            }
-                                        }}
-                                        className={`px-2 py-1 rounded text-[11px] font-semibold flex items-center gap-1 transition ${
-                                            parseEmbedContentType(formData.videoUrl || '') === (settings.embedTvType || 'tv')
-                                                ? 'bg-purple-600 text-white shadow'
-                                                : 'bg-black/50 hover:bg-white/10 text-gray-300 border border-white/10'
-                                        }`}
-                                        title="Switch URL to TV (/embed/tv/)"
-                                    >
-                                        <Tv size={12} /> TV Series
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const customType = prompt("Enter embed content type (e.g. series, movie, tv, anime):", parseEmbedContentType(formData.videoUrl || '') || 'series');
-                                            if (customType && customType.trim()) {
+                            {/* Embed Proxy Content Type Quick Switcher (Only shown when NOT in 100% manual mode) */}
+                            {!formData.isManual && (
+                                <div className="mt-2.5 p-2.5 bg-white/5 rounded-lg border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <div className="text-[11px] text-gray-400 flex items-center gap-1.5 font-medium">
+                                        <span>Embed Content Type:</span>
+                                        {(() => {
+                                            const currentDetected = parseEmbedContentType(formData.videoUrl || '');
+                                            return currentDetected ? (
+                                                <span className="font-mono text-brand-red bg-red-950/40 border border-red-800/40 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                                                    /embed/{currentDetected}/
+                                                </span>
+                                            ) : (
+                                                <span className="text-gray-500 text-[10px]">None</span>
+                                            );
+                                        })()}
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const movieType = settings.embedMovieType || 'movie';
                                                 if (formData.videoUrl) {
-                                                    setFormData({ ...formData, videoUrl: switchEmbedContentType(formData.videoUrl, customType.trim(), settings) });
+                                                    setFormData({ ...formData, videoUrl: switchEmbedContentType(formData.videoUrl, movieType, settings) });
                                                 } else if (formData.imdbId) {
-                                                    setFormData({ ...formData, videoUrl: buildEmbedUrl(formData.imdbId, customType.trim(), settings) });
+                                                    setFormData({ ...formData, videoUrl: buildEmbedUrl(formData.imdbId, 'movie', settings) });
                                                 }
-                                            }
-                                        }}
-                                        className="px-2 py-1 rounded text-[11px] font-semibold bg-black/50 hover:bg-white/10 text-gray-400 border border-white/10 transition"
-                                        title="Enter custom embed content type path"
-                                    >
-                                        Custom...
-                                    </button>
+                                            }}
+                                            className={`px-2 py-1 rounded text-[11px] font-semibold flex items-center gap-1 transition ${
+                                                parseEmbedContentType(formData.videoUrl || '') === (settings.embedMovieType || 'movie')
+                                                    ? 'bg-blue-600 text-white shadow'
+                                                    : 'bg-black/50 hover:bg-white/10 text-gray-300 border border-white/10'
+                                            }`}
+                                            title="Switch URL to Movie (/embed/movie/)"
+                                        >
+                                            <Film size={12} /> Movie
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const tvType = settings.embedTvType || 'tv';
+                                                if (formData.videoUrl) {
+                                                    setFormData({ ...formData, videoUrl: switchEmbedContentType(formData.videoUrl, tvType, settings) });
+                                                } else if (formData.imdbId) {
+                                                    setFormData({ ...formData, videoUrl: buildEmbedUrl(formData.imdbId, 'tv', settings) });
+                                                }
+                                            }}
+                                            className={`px-2 py-1 rounded text-[11px] font-semibold flex items-center gap-1 transition ${
+                                                parseEmbedContentType(formData.videoUrl || '') === (settings.embedTvType || 'tv')
+                                                    ? 'bg-purple-600 text-white shadow'
+                                                    : 'bg-black/50 hover:bg-white/10 text-gray-300 border border-white/10'
+                                            }`}
+                                            title="Switch URL to TV (/embed/tv/)"
+                                        >
+                                            <Tv size={12} /> TV Series
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const customType = prompt("Enter embed content type (e.g. series, movie, tv, anime):", parseEmbedContentType(formData.videoUrl || '') || 'series');
+                                                if (customType && customType.trim()) {
+                                                    if (formData.videoUrl) {
+                                                        setFormData({ ...formData, videoUrl: switchEmbedContentType(formData.videoUrl, customType.trim(), settings) });
+                                                    } else if (formData.imdbId) {
+                                                        setFormData({ ...formData, videoUrl: buildEmbedUrl(formData.imdbId, customType.trim(), settings) });
+                                                    }
+                                                }
+                                            }}
+                                            className="px-2 py-1 rounded text-[11px] font-semibold bg-black/50 hover:bg-white/10 text-gray-400 border border-white/10 transition"
+                                            title="Enter custom embed content type path"
+                                        >
+                                            Custom...
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
 
                         {/* Video Preview */}
@@ -931,8 +1017,14 @@ const ContentManager = () => {
                                 </div>
                                 {(formData.movieDriveId && extractDriveId(formData.movieDriveId)) ? (
                                     <iframe className="w-full h-full rounded" src={`https://drive.google.com/file/d/${extractDriveId(formData.movieDriveId)}/preview`} title="Preview" allowFullScreen />
-                                ) : formData.videoUrl ? (
+                                ) : (formData.videoUrl && !isDirectVideoUrl(formData.videoUrl)) ? (
                                     <iframe className="w-full h-full rounded" src={formData.videoUrl} title="Preview" allowFullScreen />
+                                ) : formData.videoUrl ? (
+                                    <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-900/90 rounded text-emerald-400 font-mono text-xs p-4 text-center border border-emerald-500/20">
+                                        <div className="font-bold mb-1">Direct Video Source Configured</div>
+                                        <div className="text-[11px] text-gray-400 truncate max-w-[90%]">{formData.videoUrl}</div>
+                                        <div className="text-[10px] text-gray-500 mt-2">Ready to play via MoviPlayer (MKV / HEVC / MP4 / HLS supported)</div>
+                                    </div>
                                 ) : (
                                     <iframe className="w-full h-full rounded" src={`https://www.youtube.com/embed/${extractYoutubeId(formData.movieYoutubeId || formData.youtubeId || '')}`} title="Preview" allowFullScreen />
                                 )}
@@ -1015,6 +1107,82 @@ const ContentManager = () => {
                                 className={`flex-1 py-2 rounded font-bold border ${formData.comingSoon ? 'bg-blue-600/20 text-blue-400 border-blue-600' : 'bg-gray-800 text-gray-400 border-gray-600'}`}>
                                 {formData.comingSoon ? 'Coming Soon' : 'Released'}
                             </button>
+                        </div>
+
+                        {/* Exclusive Content & Access Code Setting */}
+                        <div className="mt-4 bg-gradient-to-r from-red-950/20 via-black/40 to-black/40 border border-white/10 rounded-xl p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2.5">
+                                    <div className={`p-2 rounded-lg ${formData.isExclusive ? 'bg-brand-red/20 text-brand-red border border-brand-red/30' : 'bg-white/5 text-gray-400'}`}>
+                                        <Lock size={16} />
+                                    </div>
+                                    <div>
+                                        <div className="text-sm font-bold text-white flex items-center gap-2">
+                                            Exclusive Content
+                                            {formData.isExclusive ? (
+                                                <span className="text-[10px] bg-brand-red/20 text-brand-red px-2 py-0.5 rounded font-extrabold border border-brand-red/30 flex items-center gap-1">
+                                                    LOCKED 🔒
+                                                </span>
+                                            ) : (
+                                                <span className="text-[10px] bg-green-500/10 text-green-400 px-2 py-0.5 rounded font-medium border border-green-500/20">
+                                                    Free Access
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="text-xs text-gray-400">
+                                            Require secret password/code to unlock and watch this title
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, isExclusive: !formData.isExclusive })}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 border ${
+                                        formData.isExclusive
+                                            ? 'bg-brand-red text-white border-brand-red shadow-lg shadow-brand-red/20'
+                                            : 'bg-white/5 text-gray-300 border-white/10 hover:bg-white/10'
+                                    }`}
+                                >
+                                    <Lock size={12} />
+                                    {formData.isExclusive ? 'Exclusive Enabled' : 'Make Exclusive'}
+                                </button>
+                            </div>
+
+                            {formData.isExclusive && (
+                                <div className="pt-3 border-t border-white/10 space-y-2 animate-in fade-in slide-in-from-top-1">
+                                    <label className="text-xs text-gray-300 uppercase font-bold flex items-center justify-between">
+                                        <span className="flex items-center gap-1.5">
+                                            <KeyRound size={13} className="text-yellow-400" /> Exclusive Access Code
+                                        </span>
+                                        <span className="text-[10px] text-gray-500 font-normal lowercase">
+                                            leave blank to use system global code
+                                        </span>
+                                    </label>
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            value={formData.accessCode || ''}
+                                            onChange={e => setFormData({ ...formData, accessCode: e.target.value.toUpperCase() })}
+                                            placeholder="e.g. VIP2026, SECRETCODE"
+                                            className="w-full bg-black/60 border border-white/15 rounded-lg pl-3 pr-24 py-2 text-sm font-mono tracking-widest uppercase outline-none focus:border-brand-red text-white transition placeholder:normal-case placeholder:tracking-normal placeholder:font-sans placeholder:text-gray-600"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const randomCode = 'EXCL-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+                                                setFormData({ ...formData, accessCode: randomCode });
+                                            }}
+                                            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] font-bold bg-white/10 hover:bg-white/20 text-gray-300 px-2 py-1 rounded transition"
+                                        >
+                                            Generate
+                                        </button>
+                                    </div>
+                                    <p className="text-[11px] text-gray-400 leading-relaxed">
+                                        Users can unlock this title by entering this specific code or the Global Exclusive Code configured in Settings.
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1181,17 +1349,19 @@ const ContentManager = () => {
                                                                 {/* Smart Episode Source Input */}
                                                                 <div className="flex flex-col gap-1 w-full relative group">
                                                                     <input
-                                                                        value={ep.driveId || ep.youtubeId || ''}
+                                                                        value={ep.videoUrl || ep.driveId || ep.youtubeId || ''}
                                                                         onChange={e => {
-                                                                            const val = e.target.value;
+                                                                            const val = e.target.value.trim();
                                                                             if (extractYoutubeId(val).length === 11) {
-                                                                                updateEpisode(season.id, ep.id, { youtubeId: val, driveId: '' });
+                                                                                updateEpisode(season.id, ep.id, { youtubeId: val, driveId: '', videoUrl: '' });
+                                                                            } else if (isDirectVideoUrl(val)) {
+                                                                                updateEpisode(season.id, ep.id, { videoUrl: val, driveId: '', youtubeId: '' });
                                                                             } else {
                                                                                 updateEpisode(season.id, ep.id, { driveId: val, youtubeId: '' });
                                                                             }
                                                                         }}
                                                                         className="bg-black/50 border border-white/10 rounded p-1.5 text-sm font-mono placeholder:text-gray-600 w-full"
-                                                                        placeholder="Source (Drive/YT)"
+                                                                        placeholder="Source (Drive/R2/YT)"
                                                                     />
                                                                     {/* Hidden input that appears on hover/focus for Player URL */}
                                                                     <input
@@ -1334,6 +1504,9 @@ const ContentManager = () => {
                             {isSyncing ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
                             {isSyncing ? `Syncing ${syncProgress}%` : 'Sync TMDB Data'}
                         </button>
+                        <button onClick={() => resetForm('movie', true)} className="bg-amber-600 px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-amber-700 transition shadow-lg shadow-amber-900/20 text-white text-sm">
+                            <FileText size={18} /> Add 100% Manual Content
+                        </button>
                         <button onClick={() => resetForm('movie')} className="bg-blue-600 px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-700 transition">
                             <Plus size={18} /> Add Movie
                         </button>
@@ -1370,6 +1543,8 @@ const ContentManager = () => {
                             className="bg-black/50 pl-3 pr-8 py-2 rounded border border-white/10 outline-none appearance-none cursor-pointer hover:bg-white/5"
                         >
                             <option value="ALL">All Content</option>
+                            <option value="manual">100% Manual Content</option>
+                            <option value="exclusive">Exclusive (Locked) Only</option>
                             <option value="userAdded">Recently Added by Users</option>
                             <option value="movie">Movies Only</option>
                             <option value="tv">TV Shows Only</option>
@@ -1444,6 +1619,16 @@ const ContentManager = () => {
                                         ⭐ HERO
                                     </span>
                                 )}
+                                {item.isManual && (
+                                    <span className="px-2 py-0.5 rounded bg-amber-500/90 text-black text-[10px] font-black uppercase shadow-lg">
+                                        MANUAL
+                                    </span>
+                                )}
+                                {item.isExclusive && (
+                                    <span className="px-2 py-0.5 rounded bg-brand-red text-white text-[10px] font-black uppercase shadow-lg flex items-center gap-0.5">
+                                        <Lock size={9} /> EXCL
+                                    </span>
+                                )}
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${item.isPublished
                                     ? 'bg-green-500 text-white'
                                     : 'bg-gray-600 text-gray-300'
@@ -1484,7 +1669,15 @@ const ContentManager = () => {
                                 <span className="uppercase">{item.type}</span>
                                 <span>•</span>
                                 <span>{item.release_date?.split('-')[0] || '2026'}</span>
+                                {item.isManual && (
+                                    <span className="text-amber-400 font-bold">• Manual</span>
+                                )}
                             </div>
+                            {item.isExclusive && item.accessCode && (
+                                <div className="text-[10px] text-yellow-400 font-mono font-bold truncate flex items-center gap-1 pt-0.5">
+                                    <KeyRound size={10} /> {item.accessCode}
+                                </div>
+                            )}
                         </div>
                     </div>
                 ))}
