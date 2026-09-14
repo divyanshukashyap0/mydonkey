@@ -38,13 +38,13 @@ const DrivePlayer: React.FC<DrivePlayerProps> = ({ driveId, title = 'Video Conte
         setShowWarning(false);
     }, [driveId]);
 
-    // Show troubleshooting prompt if loading takes longer than 8 seconds (e.g. CSP blocked or stuck on Drive spinner)
+    // Show troubleshooting prompt if loading takes longer than 3.5 seconds (e.g. CSP blocked or stuck on Drive spinner)
     useEffect(() => {
         let timer: ReturnType<typeof setTimeout>;
         if (loading && !error) {
             timer = setTimeout(() => {
                 setShowWarning(true);
-            }, 8000);
+            }, 3500);
         }
         return () => {
             if (timer) clearTimeout(timer);
@@ -55,7 +55,7 @@ const DrivePlayer: React.FC<DrivePlayerProps> = ({ driveId, title = 'Video Conte
         setTimeout(() => {
             setLoading(false);
             onLoad?.();
-        }, 2000);
+        }, 1500);
     };
 
     return (
@@ -98,32 +98,35 @@ const DrivePlayer: React.FC<DrivePlayerProps> = ({ driveId, title = 'Video Conte
 
                         {/* Fallback helper if Drive frame is blocked by CSP or slow to load */}
                         {showWarning && (
-                            <div className="mt-6 max-w-md p-4 rounded-xl bg-zinc-900/90 border border-yellow-500/30 text-left animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                <div className="flex items-start gap-2.5 mb-3">
-                                    <AlertCircle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
+                            <div className="mt-6 max-w-lg p-4 rounded-xl bg-zinc-900/95 border border-yellow-500/40 text-left animate-in fade-in slide-in-from-bottom-2 duration-300 shadow-2xl">
+                                <div className="flex items-start gap-3 mb-3">
+                                    <AlertCircle className="w-5 h-5 text-yellow-400 shrink-0 mt-0.5" />
                                     <div>
-                                        <p className="text-xs text-yellow-200 font-semibold">Video taking longer than expected?</p>
-                                        <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">
-                                            If Google Drive blocks embedded playback, the file may be set to Restricted access, or browser Tracking Prevention blocked Google cookies.
+                                        <p className="text-sm text-yellow-200 font-bold">Google Drive Stream Blocked by Security Policy (CSP)?</p>
+                                        <p className="text-xs text-gray-300 mt-1 leading-relaxed">
+                                            Google Drive prevents embedded iframe playback if this file is set to <strong>Restricted</strong> (requires Google login) or if browser privacy blocks third-party framing.
+                                        </p>
+                                        <p className="text-[11px] text-amber-300/80 mt-1 font-mono">
+                                            Fix: In Google Drive &gt; Share &gt; Change to <strong>"Anyone with the link (Viewer)"</strong>.
                                         </p>
                                     </div>
                                 </div>
-                                <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-white/10">
+                                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-white/10">
                                     {directViewUrl && (
                                         <a
                                             href={directViewUrl}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-lg transition"
+                                            className="flex items-center gap-1.5 px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition shadow-lg shadow-red-900/30"
                                         >
-                                            <ExternalLink size={13} /> Open in Google Drive
+                                            <ExternalLink size={13} /> Open in Google Drive (Direct)
                                         </a>
                                     )}
                                     {directDownloadUrl && (
                                         <a
                                             href={directDownloadUrl}
                                             download
-                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-lg transition"
+                                            className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-lg transition"
                                         >
                                             <Download size={13} /> Direct Download
                                         </a>
@@ -132,7 +135,7 @@ const DrivePlayer: React.FC<DrivePlayerProps> = ({ driveId, title = 'Video Conte
                                         onClick={() => setLoading(false)}
                                         className="text-[11px] text-gray-400 hover:text-white px-2 py-1 transition ml-auto"
                                     >
-                                        Dismiss Overlay
+                                        Dismiss
                                     </button>
                                 </div>
                             </div>

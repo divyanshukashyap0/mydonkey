@@ -236,7 +236,7 @@ ${posterImage && posterImage !== image ? `
 <body style="background:#0a0a0a;color:#fff;font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;box-sizing:border-box;text-align:center;">
   <div style="max-width:440px;background:#141414;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:24px;box-shadow:0 12px 36px rgba(0,0,0,0.8);">
     <img src="${safe(image)}" alt="${safe(title)}" style="width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:12px;margin-bottom:16px;" />
-    <h2 style="margin:0 0 10px 0;font-size:20px;font-weight:bold;line-height:1.3;">${safe(title)}</h2>
+    <h1 style="margin:0 0 10px 0;font-size:20px;font-weight:bold;line-height:1.3;">${safe(title)}</h1>
     <p style="color:#aaa;font-size:13px;line-height:1.5;margin:0 0 20px 0;">${safe(description)}</p>
     <a href="${safe(targetAppUrl)}" style="display:block;background:#e50914;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:bold;font-size:15px;box-shadow:0 4px 14px rgba(229,9,20,0.4);">Watch Free on My Donkey</a>
   </div>

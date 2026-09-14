@@ -14,7 +14,8 @@ const HeroSkeleton: React.FC = () => {
             <div className="absolute bottom-0 left-0 right-0 z-40 px-6 md:px-12 lg:px-16 pb-6 md:pb-12">
                 <div className="max-w-2xl space-y-4">
                     {/* Title Placeholder */}
-                    <div className="h-10 md:h-16 bg-gray-800 rounded w-3/4 mb-4" />
+                    <h1 className="sr-only">My Donkey - Watch Free Movies, TV Shows &amp; Anime in HD</h1>
+                    <div className="h-10 md:h-16 bg-gray-800 rounded w-3/4 mb-4" aria-hidden="true" />
 
                     {/* Metadata Placeholder */}
                     <div className="flex gap-4">

@@ -18,6 +18,8 @@ const TV_GENRES = ["Drama", "Comedy", "Reality", "Action", "Sci-Fi", "Documentar
 const ContentManager = () => {
     const { content, rawContent, settings, updateSettings, publishCatalog } = useStore();
     const [isEditing, setIsEditing] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
     const [syncProgress, setSyncProgress] = useState(0);
     const [isPublishing, setIsPublishing] = useState(false);
@@ -51,7 +53,7 @@ const ContentManager = () => {
         setFormData({
             type,
             genres: [],
-            isPublished: false,
+            isPublished: true,
             allowDownload: true,
             allowPlayback: true,
             comingSoon: false,
@@ -65,6 +67,7 @@ const ContentManager = () => {
             accessCode: ''
         });
         setIsEditing(true);
+        setSaveError(null);
         setExpandedSeasonId(null);
         setExpandedEpisodeId(null);
         setTmdbQuery('');
@@ -298,18 +301,25 @@ const ContentManager = () => {
 
 
     const handleSave = async () => {
-        if (!formData.title || !formData.poster_path) {
-            alert("Title and Poster are required");
+        setSaveError(null);
+        const trimmedTitle = formData.title?.trim();
+        if (!trimmedTitle) {
+            setSaveError("Title is required to save content.");
             return;
         }
 
+        setIsSaving(true);
         try {
             const id = formData.id || `content_${Date.now()}`;
             const now = new Date().toISOString();
 
+            // Default fallback image if poster is not provided so saving is never blocked by a missing image
+            const finalPoster = (formData.poster_path?.trim() || formData.backdrop_path?.trim() || formData.poster_path_mobile?.trim() || '/logo.png');
+            const finalBackdrop = (formData.backdrop_path?.trim() || formData.poster_path?.trim() || formData.backdrop_path_mobile?.trim() || finalPoster);
+
             // Clean Data
             const resolvedDriveId = formData.type === 'movie' ? extractDriveId(formData.movieDriveId || formData.videoUrl || '') : undefined;
-            let finalVideoUrl = formData.videoUrl || '';
+            let finalVideoUrl = formData.videoUrl?.trim() || '';
             if (resolvedDriveId && isExternalEmbedUrl(finalVideoUrl, settings?.embedProxyBaseUrl)) {
                 finalVideoUrl = '';
             }
@@ -321,41 +331,41 @@ const ContentManager = () => {
             const finalData: Content = {
                 id,
                 tmdbId: formData.isManual ? undefined : (Number(formData.tmdbId) || undefined),
-                imdbId: formData.imdbId || '',
-                title: formData.title,
-                overview: formData.overview || '',
-                poster_path: formData.poster_path,
-                poster_path_mobile: formData.poster_path_mobile || undefined,
-                backdrop_path: formData.backdrop_path || formData.poster_path,
-                backdrop_path_mobile: formData.backdrop_path_mobile || undefined,
+                imdbId: formData.imdbId?.trim() || '',
+                title: trimmedTitle,
+                overview: formData.overview?.trim() || '',
+                poster_path: finalPoster,
+                poster_path_mobile: formData.poster_path_mobile?.trim() || undefined,
+                backdrop_path: finalBackdrop,
+                backdrop_path_mobile: formData.backdrop_path_mobile?.trim() || undefined,
                 youtubeId: extractYoutubeId(formData.youtubeId || ''),
-                movieDriveId: resolvedDriveId,
-                movieYoutubeId: formData.type === 'movie' ? extractYoutubeId(formData.movieYoutubeId || '') : undefined,
+                movieDriveId: resolvedDriveId || undefined,
+                movieYoutubeId: formData.type === 'movie' ? (extractYoutubeId(formData.movieYoutubeId || '') || undefined) : undefined,
                 videoUrl: finalVideoUrl,
                 type: formData.type || 'movie',
                 genres: formData.genres || [],
                 release_date: formData.release_date || now.split('T')[0],
                 vote_average: Number(formData.vote_average) || 0,
-                isPublished: formData.isPublished || false,
+                isPublished: formData.isPublished ?? true,
                 allowDownload: formData.allowDownload ?? true,
                 allowPlayback: formData.allowPlayback ?? true,
-                cast: typeof formData.cast === 'string' ? (formData.cast as string).split(',').map(s => s.trim()) : (formData.cast || []),
-                tags: typeof formData.tags === 'string' ? (formData.tags as string).split(',').map(s => s.trim()) : (formData.tags || []),
+                cast: typeof formData.cast === 'string' ? (formData.cast as string).split(',').map(s => s.trim()).filter(Boolean) : (formData.cast || []),
+                tags: typeof formData.tags === 'string' ? (formData.tags as string).split(',').map(s => s.trim()).filter(Boolean) : (formData.tags || []),
                 comingSoon: formData.comingSoon || false,
                 createdAt: formData.createdAt || now,
                 featured: formData.featured || false,
 
-                duration: formData.duration,
+                duration: formData.duration || '',
                 rating: formData.rating || 'U/A 13+',
                 resolution: formData.resolution || 'HD',
                 isManual: Boolean(formData.isManual),
                 isExclusive: Boolean(formData.isExclusive),
                 accessCode: formData.isExclusive ? (formData.accessCode?.trim().toUpperCase() || undefined) : undefined,
-                // Sanitize Seasons/Episodes
+                // Sanitize Seasons/Episodes safely (guard against undefined episodes)
                 seasons: formData.type === 'tv' ? (formData.seasons || []).map(s => ({
                     ...s,
                     trailerYoutubeId: extractYoutubeId(s.trailerYoutubeId || ''),
-                    episodes: s.episodes.map(e => ({
+                    episodes: (s.episodes || []).map(e => ({
                         ...e,
                         driveId: extractDriveId(e.driveId || ''),
                         videoUrl: (formData.isManual && isExternalEmbedUrl(e.videoUrl, settings?.embedProxyBaseUrl)) ? '' : (e.videoUrl || '')
@@ -367,17 +377,18 @@ const ContentManager = () => {
             const dataToSave = JSON.parse(JSON.stringify(finalData));
             await setDoc(doc(db, 'content', id), dataToSave);
 
-
-
-            alert("Content saved successfully!");
             setIsEditing(false);
             setFormData({});
             
             // Background publish catalog
-            publishCatalog();
+            publishCatalog().catch(err => console.warn("Catalog publish error:", err));
         } catch (e: any) {
-            console.error(e);
-            alert("Error saving content: " + e.message);
+            console.error("Error saving content:", e);
+            const msg = e?.message || "Failed to save content. Please check database permissions.";
+            setSaveError(msg);
+            alert("Error saving content: " + msg);
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -540,7 +551,7 @@ const ContentManager = () => {
         return (
             <div className="bg-[#141414] p-6 rounded-xl border border-white/5 animate-in fade-in max-h-[90vh] overflow-y-auto">
                 {/* Form Header */}
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex justify-between items-center mb-4">
                     <h2 className="text-2xl font-bold flex items-center gap-2">
                         {formData.id ? 'Edit Content' : 'Add New Content'}
                         <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded text-gray-500 font-mono">v1.2</span>
@@ -550,8 +561,32 @@ const ContentManager = () => {
                             </span>
                         )}
                     </h2>
-                    <button onClick={() => setIsEditing(false)} className="p-2 hover:bg-white/10 rounded"><X /></button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            disabled={isSaving}
+                            onClick={handleSave}
+                            className="px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold flex items-center gap-1.5 text-sm shadow-lg shadow-red-900/30 transition"
+                        >
+                            {isSaving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+                            {isSaving ? 'Saving...' : 'Save Content'}
+                        </button>
+                        <button onClick={() => setIsEditing(false)} className="p-2 hover:bg-white/10 rounded text-gray-400 hover:text-white transition"><X size={18} /></button>
+                    </div>
                 </div>
+
+                {/* Inline Save Error Banner */}
+                {saveError && (
+                    <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-xl flex items-center justify-between gap-2 text-red-300 text-sm font-medium animate-in fade-in">
+                        <div className="flex items-center gap-2">
+                            <span className="text-red-400 font-bold">⚠ Error:</span>
+                            <span>{saveError}</span>
+                        </div>
+                        <button type="button" onClick={() => setSaveError(null)} className="text-red-400 hover:text-white p-1">
+                            <X size={14} />
+                        </button>
+                    </div>
+                )}
 
                 {/* Mode Selector: 100% Manual vs Automated TMDB */}
                 <div className="mb-6 p-4 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/5 border-white/10">
@@ -713,13 +748,22 @@ const ContentManager = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4">
                         <div>
-                            <label className="text-xs text-gray-500 uppercase font-bold">Title</label>
-                            <input className="w-full bg-black/50 border border-white/10 rounded p-2 outline-none focus:border-red-600"
+                            <label className="text-xs text-gray-500 uppercase font-bold flex items-center justify-between">
+                                <span>Title <span className="text-red-500">*</span></span>
+                                {!formData.title?.trim() && saveError && (
+                                    <span className="text-[11px] text-red-400 normal-case font-medium">Title is required</span>
+                                )}
+                            </label>
+                            <input
+                                className={`w-full bg-black/50 border rounded p-2 outline-none transition ${!formData.title?.trim() && saveError ? 'border-red-500 ring-1 ring-red-500' : 'border-white/10 focus:border-red-600'}`}
+                                placeholder="e.g. Inception, Stranger Things"
                                 value={formData.title || ''}
                                 onChange={e => {
                                     setFormData({ ...formData, title: e.target.value });
+                                    if (saveError) setSaveError(null);
                                     setTmdbQuery(e.target.value); // Keep TMDB search in sync
-                                }} />
+                                }}
+                            />
                         </div>
                         <div>
                             <label className="text-xs text-gray-500 uppercase font-bold">Overview</label>
@@ -879,6 +923,12 @@ const ContentManager = () => {
                                         }
                                     }}
                                     placeholder="Paste Drive Link, YouTube Link, or R2 Video URL" />
+                                {extractDriveId(formData.movieDriveId) && (
+                                    <div className="mt-2 p-2.5 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-[11px] text-yellow-300/90 leading-relaxed flex items-start gap-2">
+                                        <span className="font-bold shrink-0">💡 Drive Sharing:</span>
+                                        <span>Make sure the file in Google Drive has General access set to <strong>"Anyone with the link (Viewer)"</strong>. Restricted access causes Google to block embedded playback.</span>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -1011,12 +1061,27 @@ const ContentManager = () => {
 
                         {/* Video Preview */}
                         {(extractYoutubeId(formData.youtubeId || '').length === 11 || (formData.movieYoutubeId && extractYoutubeId(formData.movieYoutubeId).length === 11) || (formData.movieDriveId && extractDriveId(formData.movieDriveId)) || formData.videoUrl) && (
-                            <div className="mt-4 bg-black/50 rounded-lg p-2 border border-white/10 h-40 overflow-hidden relative">
+                            <div className="mt-4 bg-black/50 rounded-lg p-2 border border-white/10 min-h-36 overflow-hidden relative">
                                 <div className="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded text-xs text-white z-10">
                                     {(formData.movieDriveId && extractDriveId(formData.movieDriveId)) ? 'Drive Source' : formData.videoUrl ? 'Direct Video URL' : formData.movieYoutubeId ? 'YouTube Movie' : 'Trailer'}
                                 </div>
                                 {(formData.movieDriveId && extractDriveId(formData.movieDriveId)) ? (
-                                    <iframe className="w-full h-full rounded" src={`https://drive.google.com/file/d/${extractDriveId(formData.movieDriveId)}/preview`} title="Preview" allowFullScreen />
+                                    <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-900/90 rounded text-yellow-400 font-mono text-xs p-4 text-center border border-yellow-500/20">
+                                        <div className="font-bold mb-1 flex items-center gap-1.5">
+                                            <HardDrive size={15} /> Google Drive File Configured
+                                        </div>
+                                        <div className="text-[11px] text-gray-400 truncate max-w-[90%] font-mono">
+                                            ID: {extractDriveId(formData.movieDriveId)}
+                                        </div>
+                                        <a
+                                            href={`https://drive.google.com/file/d/${extractDriveId(formData.movieDriveId)}/view`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 rounded text-xs font-sans font-semibold transition"
+                                        >
+                                            <Link2 size={12} /> Test Link in Google Drive
+                                        </a>
+                                    </div>
                                 ) : (formData.videoUrl && !isDirectVideoUrl(formData.videoUrl)) ? (
                                     <iframe className="w-full h-full rounded" src={formData.videoUrl} title="Preview" allowFullScreen />
                                 ) : formData.videoUrl ? (
@@ -1459,9 +1524,28 @@ const ContentManager = () => {
                     )
                 }
 
-                <div className="flex justify-end gap-4 mt-8 border-t border-white/10 pt-4">
-                    <button onClick={() => setIsEditing(false)} className="px-6 py-2 rounded text-gray-400 font-bold hover:text-white">Cancel</button>
-                    <button onClick={handleSave} className="px-6 py-2 rounded bg-red-600 text-white font-bold hover:bg-red-700">Save Content</button>
+                <div className="flex flex-col sm:flex-row justify-end items-center gap-4 mt-8 border-t border-white/10 pt-4">
+                    {saveError && (
+                        <div className="text-xs text-red-400 font-medium flex items-center gap-1 mr-auto">
+                            <span>⚠ {saveError}</span>
+                        </div>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => setIsEditing(false)}
+                        className="px-6 py-2 rounded text-gray-400 font-bold hover:text-white transition"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        disabled={isSaving}
+                        onClick={handleSave}
+                        className="px-6 py-2 rounded bg-red-600 text-white font-bold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition shadow-lg shadow-red-900/30"
+                    >
+                        {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                        {isSaving ? 'Saving Content...' : 'Save Content'}
+                    </button>
                 </div>
             </div >
         );

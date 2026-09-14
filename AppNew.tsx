@@ -199,7 +199,7 @@ const MainLayout = () => {
             }
         } else {
             const tabTitles: Record<string, string> = {
-                home: 'My Donkey | Watch Free Movies, TV Shows, Anime & Marvel Movies Online in HD',
+                home: 'My Donkey | Watch Free Movies, TV Shows & Anime in HD',
                 movies: 'Movies — Stream HD & 4K Movies | My Donkey',
                 tv: 'TV Shows & Web Series | My Donkey',
                 anime: 'Anime — Watch Trending & Classic Anime | My Donkey',
@@ -208,7 +208,7 @@ const MainLayout = () => {
                 mylist: 'My List | My Donkey',
                 search: 'Search Movies & Shows | My Donkey',
             };
-            document.title = tabTitles[activeTab] || 'My Donkey | Watch Free Movies, TV Shows, Anime & Marvel Movies Online in HD';
+            document.title = tabTitles[activeTab] || 'My Donkey | Watch Free Movies, TV Shows & Anime in HD';
         }
     }, [viewingContent?.title, playingContent?.title, location.pathname, location.search, location.state, activeTab, rawContent, content]);
 

@@ -1795,7 +1795,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         }
         return () => {
             if (!window.location.pathname.startsWith('/browse/') && !window.location.pathname.startsWith('/watch/')) {
-                document.title = 'My Donkey | Watch Free Movies, TV Shows, Anime & Marvel Movies Online in HD';
+                document.title = 'My Donkey | Watch Free Movies, TV Shows & Anime in HD';
             }
         };
     }, [content?.title, content?.id]);

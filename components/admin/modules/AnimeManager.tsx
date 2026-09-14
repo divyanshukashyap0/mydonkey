@@ -120,8 +120,9 @@ const AnimeManager = () => {
 
 
     const handleSave = async () => {
-        if (!formData.title || !formData.poster_path) {
-            alert("Title and Poster are required");
+        const trimmedTitle = formData.title?.trim();
+        if (!trimmedTitle) {
+            alert("Title is required");
             return;
         }
 
@@ -129,50 +130,54 @@ const AnimeManager = () => {
             const id = formData.id || `content_${Date.now()}`;
             const now = new Date().toISOString();
 
+            // Default fallback image if poster is not provided
+            const finalPoster = (formData.poster_path?.trim() || formData.backdrop_path?.trim() || formData.poster_path_mobile?.trim() || '/logo.png');
+            const finalBackdrop = (formData.backdrop_path?.trim() || formData.poster_path?.trim() || formData.backdrop_path_mobile?.trim() || finalPoster);
+
             // Ensure "Anime" tag is always present
             const finalGenres = [...(formData.genres || [])];
             if (!finalGenres.includes('Anime')) finalGenres.push('Anime');
 
             // Clean Data
             const resolvedDriveId = formData.type === 'movie' ? extractDriveId(formData.movieDriveId || formData.videoUrl || '') : undefined;
-            let finalVideoUrl = formData.videoUrl || '';
+            let finalVideoUrl = formData.videoUrl?.trim() || '';
             if (resolvedDriveId && isExternalEmbedUrl(finalVideoUrl, settings?.embedProxyBaseUrl)) {
                 finalVideoUrl = '';
             }
 
             const finalData: Content = {
                 id,
-                title: formData.title,
-                overview: formData.overview || '',
-                poster_path: formData.poster_path,
-                poster_path_mobile: formData.poster_path_mobile || undefined,
-                backdrop_path: formData.backdrop_path || formData.poster_path,
-                backdrop_path_mobile: formData.backdrop_path_mobile || undefined,
+                title: trimmedTitle,
+                overview: formData.overview?.trim() || '',
+                poster_path: finalPoster,
+                poster_path_mobile: formData.poster_path_mobile?.trim() || undefined,
+                backdrop_path: finalBackdrop,
+                backdrop_path_mobile: formData.backdrop_path_mobile?.trim() || undefined,
                 youtubeId: extractYoutubeId(formData.youtubeId || ''),
-                movieDriveId: resolvedDriveId,
-                movieYoutubeId: formData.type === 'movie' ? extractYoutubeId(formData.movieYoutubeId || '') : undefined,
+                movieDriveId: resolvedDriveId || undefined,
+                movieYoutubeId: formData.type === 'movie' ? (extractYoutubeId(formData.movieYoutubeId || '') || undefined) : undefined,
                 videoUrl: finalVideoUrl,
                 type: formData.type || 'movie',
                 genres: finalGenres,
                 release_date: formData.release_date || now.split('T')[0],
                 vote_average: Number(formData.vote_average) || 0,
-                isPublished: formData.isPublished || false,
+                isPublished: formData.isPublished ?? true,
                 allowDownload: formData.allowDownload ?? true,
                 allowPlayback: formData.allowPlayback ?? true,
-                cast: typeof formData.cast === 'string' ? (formData.cast as string).split(',').map(s => s.trim()) : (formData.cast || []),
-                tags: typeof formData.tags === 'string' ? (formData.tags as string).split(',').map(s => s.trim()) : (formData.tags || []),
+                cast: typeof formData.cast === 'string' ? (formData.cast as string).split(',').map(s => s.trim()).filter(Boolean) : (formData.cast || []),
+                tags: typeof formData.tags === 'string' ? (formData.tags as string).split(',').map(s => s.trim()).filter(Boolean) : (formData.tags || []),
                 comingSoon: formData.comingSoon || false,
                 createdAt: formData.createdAt || now,
                 featured: formData.featured || false,
 
-                duration: formData.duration,
+                duration: formData.duration || '',
                 rating: formData.rating || 'U/A 13+',
                 resolution: formData.resolution || 'HD',
-                // Sanitize Seasons/Episodes
+                // Sanitize Seasons/Episodes safely
                 seasons: formData.type === 'tv' ? (formData.seasons || []).map(s => ({
                     ...s,
                     trailerYoutubeId: extractYoutubeId(s.trailerYoutubeId || ''),
-                    episodes: s.episodes.map(e => ({
+                    episodes: (s.episodes || []).map(e => ({
                         ...e,
                         driveId: extractDriveId(e.driveId || '')
                     }))

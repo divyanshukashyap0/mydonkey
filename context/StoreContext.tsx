@@ -55,6 +55,7 @@ import {
     increment,
     writeBatch,
     disableNetwork,
+    enableNetwork,
 } from 'firebase/firestore';
 import { idbGet, idbSet } from '../utils/idbCache';
 import { FALLBACK_CATALOG, FALLBACK_SECTIONS, fetchDynamicFallbackContent, buildDynamicSections } from '../services/fallbackCatalog';
@@ -371,18 +372,21 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         return healed;
     }, []);
 
-    const handleQuotaExceeded = useCallback(() => {
+    const handleQuotaExceeded = useCallback((forceDisableNetwork: boolean = false) => {
         setIsQuotaExceeded(true);
         setIsLoading(false);
-        try {
-            sessionStorage.setItem('firebase_quota_exceeded', 'true');
-        } catch (e) { }
-        console.warn("[Quota Fallback] Database quota exceeded or timed out. Website seamlessly serving curated Indian, Marvel, and Anime content.");
-
-        // Immediately shut down Firestore network to stop backoff loops, quota errors, and backend overloading
-        try {
-            disableNetwork(db).catch(() => {});
-        } catch (e) { }
+        if (forceDisableNetwork) {
+            try {
+                sessionStorage.setItem('firebase_quota_exceeded', 'true');
+            } catch (e) { }
+            // Only shut down Firestore network if actual quota was exhausted (resource-exhausted error)
+            try {
+                disableNetwork(db).catch(() => {});
+            } catch (e) { }
+            console.warn("[Quota Fallback] Database quota strictly exceeded. Offline fallback active.");
+        } else {
+            console.warn("[Quota Fallback] Network delayed or database initial sync in progress. Seamlessly serving cached/curated titles.");
+        }
 
         setContent(prev => {
             const healed = healAndMergeCatalog(prev && prev.length > 0 ? prev : FALLBACK_CATALOG);
@@ -410,13 +414,11 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const handleQuotaExceededRef = useRef(handleQuotaExceeded);
     handleQuotaExceededRef.current = handleQuotaExceeded;
 
-    // If quota was already exceeded this session, disable network upfront to stop background Firestore retry spam
+    // Re-enable network if needed so admin operations and background sync can proceed
     useEffect(() => {
-        if (sessionStorage.getItem('firebase_quota_exceeded') === 'true') {
-            try {
-                disableNetwork(db).catch(() => {});
-            } catch (e) { }
-        }
+        try {
+            enableNetwork(db).catch(() => {});
+        } catch (e) { }
     }, []);
 
     // --- Theme Application ---
@@ -1760,17 +1762,17 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         likedContent
     ]);
 
-    // Master 5-Second Strict Deadline for Firebase:
-    // Website takes at most 5 seconds to get data from Firebase.
-    // If it fails or times out, the system assumes database quota is exceeded and runs on fallback state seamlessly without user knowing.
+    // Master Non-blocking Deadline for Initial Fallback:
+    // If initial Firebase response takes > 8s on slow connections, serve cached/curated fallback
+    // while keeping Firestore network alive so admin operations and background sync succeed.
     useEffect(() => {
         const quotaTimeoutTimer = setTimeout(() => {
             if (!firebaseDataReceivedRef.current) {
-                console.warn("[Quota Fallback] Firebase took > 5s to respond. Assuming database quota is exceeded. Running on fallback state seamlessly without user knowing.");
-                handleQuotaExceededRef.current();
+                console.warn("[Quota Fallback] Initial database response delayed on slow network. Serving cached/curated content seamlessly while database connects in background.");
+                handleQuotaExceededRef.current(false);
             }
             setIsLoading(false);
-        }, 5000);
+        }, 8000);
         return () => clearTimeout(quotaTimeoutTimer);
     }, []);
 

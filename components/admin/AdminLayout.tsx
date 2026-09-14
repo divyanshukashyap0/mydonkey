@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Film, Users, Settings, Home, LogOut,
   Tags, CreditCard, Calendar, MessageSquare, ChevronDown, ChevronRight, Menu, X, FileText, Database, Lock, Megaphone
@@ -22,9 +23,16 @@ import ContributionsManager from './modules/ContributionsManager';
 // --- Types ---
 type ModuleType = 'content' | 'anime' | 'home' | 'coming_soon' | 'requests' | 'plans' | 'users' | 'settings' | 'pages' | 'appearance' | 'export' | 'exclusive' | 'contributions';
 
+interface SidebarItem {
+  id: ModuleType;
+  path: string;
+  label: string;
+  icon: any;
+}
+
 interface SidebarGroup {
   title: string;
-  items: { id: ModuleType; label: string; icon: any }[];
+  items: SidebarItem[];
 }
 
 // --- Configuration ---
@@ -32,37 +40,103 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
   {
     title: 'Content Management',
     items: [
-      { id: 'content', label: 'Content Library', icon: Film },
-      { id: 'anime', label: 'Anime Library', icon: Film },
-      { id: 'exclusive', label: 'Exclusive Content', icon: Lock },
-      { id: 'home', label: 'Sections & Layout', icon: Home },
-      { id: 'pages', label: 'Pages & Footer', icon: FileText },
-      { id: 'coming_soon', label: 'Upcoming Releases', icon: Calendar },
-      { id: 'contributions', label: 'User Contributions', icon: Megaphone },
+      { id: 'content', path: 'content', label: 'Content Library', icon: Film },
+      { id: 'anime', path: 'anime', label: 'Anime Library', icon: Film },
+      { id: 'exclusive', path: 'exclusive', label: 'Exclusive Content', icon: Lock },
+      { id: 'home', path: 'sections', label: 'Sections & Layout', icon: Home },
+      { id: 'pages', path: 'pages', label: 'Pages & Footer', icon: FileText },
+      { id: 'coming_soon', path: 'upcoming', label: 'Upcoming Releases', icon: Calendar },
+      { id: 'contributions', path: 'contributions', label: 'User Contributions', icon: Megaphone },
     ]
   },
   {
     title: 'Business',
     items: [
-      { id: 'users', label: 'User Management', icon: Users },
-      { id: 'plans', label: 'Subscription Plans', icon: CreditCard },
+      { id: 'users', path: 'users', label: 'User Management', icon: Users },
+      { id: 'plans', path: 'plans', label: 'Subscription Plans', icon: CreditCard },
     ]
   },
   {
     title: 'System',
     items: [
-      { id: 'appearance', label: 'Appearance & Theme', icon: Tags },
-      { id: 'settings', label: 'Settings', icon: Settings },
-      { id: 'export', label: 'Import / Export', icon: Database },
+      { id: 'appearance', path: 'appearance', label: 'Appearance & Theme', icon: Tags },
+      { id: 'settings', path: 'settings', label: 'Settings', icon: Settings },
+      { id: 'export', path: 'export', label: 'Import / Export', icon: Database },
     ]
   }
 ];
 
+const resolveModuleFromPath = (pathname: string): ModuleType => {
+  const clean = pathname.replace(/^\/admin\/?/, '').split('/')[0].toLowerCase().trim();
+
+  switch (clean) {
+    case 'anime':
+      return 'anime';
+    case 'exclusive':
+      return 'exclusive';
+    case 'sections':
+    case 'layout':
+    case 'home':
+      return 'home';
+    case 'pages':
+    case 'footer':
+      return 'pages';
+    case 'upcoming':
+    case 'coming_soon':
+    case 'coming-soon':
+    case 'releases':
+      return 'coming_soon';
+    case 'contributions':
+    case 'user-contributions':
+      return 'contributions';
+    case 'users':
+    case 'user-management':
+      return 'users';
+    case 'plans':
+    case 'subscriptions':
+    case 'subscription-plans':
+      return 'plans';
+    case 'appearance':
+    case 'theme':
+      return 'appearance';
+    case 'settings':
+    case 'config':
+      return 'settings';
+    case 'export':
+    case 'import':
+    case 'import-export':
+      return 'export';
+    case 'content':
+    case '':
+    default:
+      return 'content';
+  }
+};
+
 export default function AdminLayout({ onExit }: { onExit: () => void }) {
-  const [activeModule, setActiveModule] = useState<ModuleType>('content');
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const activeModule = useMemo(() => resolveModuleFromPath(location.pathname), [location.pathname]);
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<string[]>(['Content Management', 'Business', 'System']);
   const [showExitModal, setShowExitModal] = useState(false);
+
+  // If path is exactly '/admin' or '/admin/', replace with canonical '/admin/content'
+  useEffect(() => {
+    if (location.pathname === '/admin' || location.pathname === '/admin/') {
+      navigate('/admin/content', { replace: true });
+    }
+  }, [location.pathname, navigate]);
+
+  // Update webpage document title dynamically based on active admin page
+  useEffect(() => {
+    const group = SIDEBAR_GROUPS.find(g => g.items.some(i => i.id === activeModule));
+    const item = group?.items.find(i => i.id === activeModule);
+    if (item) {
+      document.title = `${item.label} • Consigliere Mode | MyDonkey`;
+    }
+  }, [activeModule]);
 
   const toggleGroup = (title: string) => {
     setExpandedGroups(prev =>
@@ -124,7 +198,10 @@ export default function AdminLayout({ onExit }: { onExit: () => void }) {
                   {group.items.map((item) => (
                     <button
                       key={item.id}
-                      onClick={() => { setActiveModule(item.id); setSidebarOpen(false); }}
+                      onClick={() => {
+                        navigate(`/admin/${item.path}`);
+                        setSidebarOpen(false);
+                      }}
                       className={`w-full flex items-center gap-3 px-3 py-2 rounded-md transition-all text-sm font-medium ${activeModule === item.id
                         ? 'bg-brand-red text-white shadow-lg shadow-brand-red/20'
                         : 'text-gray-400 hover:bg-white/5 hover:text-white'
