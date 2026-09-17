@@ -55,7 +55,11 @@ export default async function handler(req, res) {
 
   const host = req.headers?.['x-forwarded-host'] || req.headers?.host || 'www.mydonkey.in';
   const protocol = req.headers?.['x-forwarded-proto'] || 'https';
+  if (!pageType || pageType === '$1' || (pageType !== 'browse' && pageType !== 'watch')) {
+    pageType = 'browse';
+  }
   const targetAppUrl = `${protocol}://${host}/${pageType}/${contentId || ''}`;
+  const canonicalUrl = `${protocol}://${host}/browse/${contentId || ''}`;
 
   if (contentId) {
     try {
@@ -179,14 +183,14 @@ export default async function handler(req, res) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${safe(title)}</title>
   <meta name="description" content="${safe(description)}" />
-  <link rel="canonical" href="${safe(targetAppUrl)}" />
+  <link rel="canonical" href="${safe(canonicalUrl)}" />
 
   <!-- Open Graph / WhatsApp / Facebook / Telegram / Discord / Messenger -->
   <meta property="og:site_name" content="My Donkey" />
   <meta property="og:type" content="${isVideo ? 'video.movie' : 'website'}" />
   <meta property="og:title" content="${safe(title)}" />
   <meta property="og:description" content="${safe(description)}" />
-  <meta property="og:url" content="${safe(targetAppUrl)}" />
+  <meta property="og:url" content="${safe(canonicalUrl)}" />
 
   <!-- High Quality Thumbnail for Chatbox Previews (WhatsApp, Telegram, Discord, iMessage) -->
   <meta property="og:image" content="${safe(image)}" />
@@ -220,7 +224,7 @@ ${posterImage && posterImage !== image ? `
     "name": "${safe(title)}",
     "image": "${safe(image)}",
     "description": "${safe(description)}",
-    "url": "${safe(targetAppUrl)}"
+    "url": "${safe(canonicalUrl)}"
   }
   </script>
 
@@ -231,7 +235,6 @@ ${posterImage && posterImage !== image ? `
       window.location.replace("${safe(targetAppUrl)}");
     }
   </script>
-  <noscript><meta http-equiv="refresh" content="0; url=${safe(targetAppUrl)}" /></noscript>
 </head>
 <body style="background:#0a0a0a;color:#fff;font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;box-sizing:border-box;text-align:center;">
   <div style="max-width:440px;background:#141414;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:24px;box-shadow:0 12px 36px rgba(0,0,0,0.8);">
