@@ -30,6 +30,7 @@
   "exclude": [
     "node_modules",
     "dist",
-    "movi-player-main"
+    "movi-player-main",
+    "scratch"
   ]
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ExternalLink, Loader2, X, Download, AlertCircle, RefreshCw } from 'lucide-react';
+import { ExternalLink, Loader2, X, AlertCircle, RefreshCw } from 'lucide-react';
 import { extractDriveId } from '../utils/embedUrl';
 
 interface DrivePlayerProps {
@@ -27,9 +27,7 @@ const DrivePlayer: React.FC<DrivePlayerProps> = ({ driveId, title = 'Video Conte
     const directViewUrl = cleanId
         ? `https://drive.google.com/file/d/${cleanId}/view`
         : driveId;
-    const directDownloadUrl = cleanId
-        ? `https://drive.google.com/uc?id=${cleanId}&export=download`
-        : '';
+
 
     // Reset states when driveId changes
     useEffect(() => {
@@ -122,15 +120,6 @@ const DrivePlayer: React.FC<DrivePlayerProps> = ({ driveId, title = 'Video Conte
                                             <ExternalLink size={13} /> Open in Google Drive (Direct)
                                         </a>
                                     )}
-                                    {directDownloadUrl && (
-                                        <a
-                                            href={directDownloadUrl}
-                                            download
-                                            className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-lg transition"
-                                        >
-                                            <Download size={13} /> Direct Download
-                                        </a>
-                                    )}
                                     <button
                                         onClick={() => setLoading(false)}
                                         className="text-[11px] text-gray-400 hover:text-white px-2 py-1 transition ml-auto"
@@ -172,15 +161,6 @@ const DrivePlayer: React.FC<DrivePlayerProps> = ({ driveId, title = 'Video Conte
                                     className="flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white text-sm font-semibold rounded-lg transition"
                                 >
                                     <ExternalLink size={15} /> Open in Google Drive
-                                </a>
-                            )}
-                            {directDownloadUrl && (
-                                <a
-                                    href={directDownloadUrl}
-                                    download
-                                    className="flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white text-sm font-semibold rounded-lg transition"
-                                >
-                                    <Download size={15} /> Direct Download
                                 </a>
                             )}
                         </div>

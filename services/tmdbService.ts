@@ -117,42 +117,45 @@ export interface TMDBSeasonDetail {
     };
 }
 
-/** Helper to call TMDB via server-side proxy or direct fallback */
+const TMDB_BYPASS_BASE = 'https://api.tmdb.org/3';
+
+/** Helper to call TMDB via server-side proxy or dual direct fallback endpoints (api.themoviedb.org & api.tmdb.org) */
 async function callTMDB(path: string, params: Record<string, any> = {}) {
     const searchParams = new URLSearchParams(params);
     const proxyUrl = `/api/tmdb?path=${encodeURIComponent(path)}&${searchParams.toString()}`;
-    
+
+    // 1. Try server-side proxy
     try {
         const res = await fetch(proxyUrl);
         if (res.ok) {
             const data = await res.json();
             return data;
         }
-        
-        // If proxy fails, try direct call if we have a client-side key
-        if (API_KEY) {
-            try {
-                const directUrl = `${TMDB_BASE}${path}?api_key=${API_KEY}&${searchParams.toString()}`;
-                const directRes = await fetch(directUrl);
-                if (directRes.ok) return await directRes.json();
-            } catch {
-                // Direct call also unreachable
-            }
-        }
-        return { results: [] };
-    } catch (err: any) {
-        // Final fallback to direct if proxy fetch itself fails (e.g., network error)
-        if (API_KEY) {
-            try {
-                const directUrl = `${TMDB_BASE}${path}?api_key=${API_KEY}&${searchParams.toString()}`;
-                const directRes = await fetch(directUrl);
-                if (directRes.ok) return await directRes.json();
-            } catch {
-                // Direct call also unreachable
-            }
-        }
-        return { results: [] };
+    } catch {
+        // Proxy unreachable, fallback to direct endpoints below
     }
+
+    // 2. Try primary direct endpoint (api.themoviedb.org)
+    if (API_KEY) {
+        try {
+            const directUrl = `${TMDB_BASE}${path}?api_key=${API_KEY}&${searchParams.toString()}`;
+            const directRes = await fetch(directUrl);
+            if (directRes.ok) return await directRes.json();
+        } catch {
+            // Primary direct endpoint blocked or timed out
+        }
+
+        // 3. Try alternate bypass endpoint (api.tmdb.org) from Aethoflix
+        try {
+            const bypassUrl = `${TMDB_BYPASS_BASE}${path}?api_key=${API_KEY}&${searchParams.toString()}`;
+            const bypassRes = await fetch(bypassUrl);
+            if (bypassRes.ok) return await bypassRes.json();
+        } catch {
+            // Bypass endpoint also unreachable
+        }
+    }
+
+    return { results: [] };
 }
 
 export async function fetchTMDBEpisode(

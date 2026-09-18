@@ -1,0 +1,1044 @@
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import {
+  Armchair,
+  ArrowLeft,
+  ArrowRight,
+  BellRing,
+  Check,
+  ChevronDown,
+  Film,
+  Grid2X2,
+  LoaderCircle,
+  Maximize,
+  Minimize,
+  Monitor,
+  Mouse,
+  Pause,
+  PersonStanding,
+  Play,
+  RotateCcw,
+  Users,
+  Volume2,
+  VolumeX,
+  X,
+  Tv,
+  Wifi,
+  RefreshCw,
+} from 'lucide-react';
+import CinemaScene from './components/CinemaScene';
+import TheatreControls from './components/TheatreControls';
+import ExperiencePanels, { type Panel } from './components/ExperiencePanels';
+import Joystick from './components/Joystick';
+import { PlayerAvatar } from './components/PlayerProfilePanel';
+import { formatTime, SeekBar } from './components/ScreenPlayerPanel';
+import type { CatalogTitle, ServerKey } from './catalog/types';
+import type { CinemaEngine } from './cinema/CinemaEngine';
+import { makeEmbed, readServerPreferences, serversFor, serverName } from './catalog/servers';
+import { getTitleById, resolveTmdbTitle } from './catalog/tmdb';
+import { INITIAL_SNAPSHOT, type CinemaSnapshot, type MediaSelection, type PlayerProfile, type Quality } from './cinema/types';
+import type { LayoutValidation } from './cinema/world';
+import { useWatchParty } from './watch-party/useWatchParty';
+import { cleanProfile, loadProfile, saveProfile } from './watch-party/profile';
+import { Content } from '../../types';
+import { useStore } from '../../context/StoreContext';
+import { setTheatreTitle } from '../../utils/titleManager';
+import './styles/experience.css';
+
+interface TheatreViewProps {
+  content?: Content | null;
+  streamUrl?: string;
+  season?: number;
+  episode?: number;
+  server?: ServerKey;
+  onExit?: () => void;
+}
+
+function initialQuality(): Quality {
+  try {
+    const saved = localStorage.getItem('mydonkey-theatre-quality');
+    if (saved === 'auto' || saved === 'high' || saved === 'performance') return saved;
+  } catch {}
+  return 'performance';
+}
+
+function initialMotion() {
+  try {
+    const saved = localStorage.getItem('mydonkey-theatre-motion');
+    if (saved !== null) return saved === 'true';
+  } catch {}
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+export const TheatreView: React.FC<TheatreViewProps> = ({
+  content: propContent,
+  streamUrl: propStreamUrl,
+  season: propSeason = 1,
+  episode: propEpisode = 1,
+  server: propServer,
+  onExit,
+}) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const { currentProfile, currentUser } = useStore();
+
+  const content = propContent || (location.state as { content?: Content })?.content || null;
+
+  const engine = useRef<CinemaEngine | null>(null);
+  const pendingSeat = useRef<string | null>(null);
+  const pendingAutoPlay = useRef<{
+    title: CatalogTitle;
+    season: number;
+    episode: number;
+    server: ServerKey;
+    streamUrl?: string;
+  } | null>(null);
+
+  const [snapshot, setSnapshot] = useState<CinemaSnapshot>(INITIAL_SNAPSHOT);
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState('');
+  const [panel, setPanel] = useState<Panel>(() => (searchParams.has('party') ? 'party' : null));
+  const [catalogReturn, setCatalogReturn] = useState<Panel | null>(null);
+  const [catalogTitle, setCatalogTitle] = useState<CatalogTitle | null>(null);
+  const [hudVisible, setHudVisible] = useState(true);
+  const [movieHint, setMovieHint] = useState(false);
+  const hudTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [profile, setProfile] = useState<PlayerProfile>(() => {
+    const saved = loadProfile();
+    if (currentProfile?.name) {
+      return { ...saved, name: currentProfile.name };
+    }
+    return saved;
+  });
+
+  const [quality, setQuality] = useState<Quality>(initialQuality);
+  const [reducedMotion, setReducedMotion] = useState(initialMotion);
+  const [refreshTarget, setRefreshTarget] = useState(() => {
+    try {
+      return localStorage.getItem('mydonkey-theatre-high-refresh') === 'on';
+    } catch {
+      return false;
+    }
+  });
+  const [waitersOn, setWaitersOn] = useState(true);
+  const [validation, setValidation] = useState<LayoutValidation | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [toast, setToast] = useState('');
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const movieMode = snapshot.mode === 'seated' || snapshot.mode === 'sitting';
+  const transitioning = snapshot.mode === 'sitting' || snapshot.mode === 'standing';
+
+  const notify = useCallback((message: string) => {
+    setToast(message);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(''), 5200);
+  }, []);
+
+  const watchParty = useWatchParty({ engine, ready, profile, notify });
+  const inParty = watchParty.state.status === 'connected';
+  const canControlPlayback = !inParty || watchParty.state.room?.hostId === watchParty.state.selfId;
+
+  const executePendingPlay = useCallback(() => {
+    if (!pendingAutoPlay.current || !engine.current) return;
+    const pending = pendingAutoPlay.current;
+    pendingAutoPlay.current = null;
+
+    try {
+      if (pending.streamUrl && (pending.streamUrl.endsWith('.mp4') || pending.streamUrl.endsWith('.m3u8') || pending.streamUrl.includes('drive.google.com'))) {
+        // Direct video or direct stream
+        const media: MediaSelection = {
+          id: `direct-${Date.now()}`,
+          kind: 'url',
+          title: pending.title.title,
+          url: pending.streamUrl,
+        };
+        void engine.current.loadMedia(media, true);
+      } else {
+        const selection = {
+          server: pending.server,
+          anime: pending.title.anime,
+          season: pending.season,
+          episode: pending.episode,
+          animeId: null,
+          animeEpisode: pending.episode,
+          animeEdition: '',
+          preferences: readServerPreferences(pending.server),
+        };
+        const media = makeEmbed(pending.title, selection);
+        void engine.current.loadMedia(media, true);
+      }
+
+      setTimeout(() => {
+        engine.current?.takeSeat('B3');
+      }, 550);
+
+      notify(`Playing “${pending.title.title}” on the 3D cinema screen.`);
+    } catch (err) {
+      console.warn('Failed to autoplay media:', err);
+    }
+  }, [notify]);
+
+  // Handle incoming movie/show prop or location state from mydonkey
+  useEffect(() => {
+    if (!content) return;
+
+    const isAnime = Boolean(content.genres?.some(g => g.toLowerCase().includes('anime')));
+    const serverKey: ServerKey = propServer || 'nxsha';
+    const stream = propStreamUrl || content.videoUrl;
+    const controller = new AbortController();
+
+    const targetId = content.tmdbId || content.id;
+    resolveTmdbTitle(targetId, content.type === 'tv' ? 'tv' : 'movie', content.title, 'standard', controller.signal)
+      .then((resolved) => {
+        if (controller.signal.aborted) return;
+        const tmdbIdNum = resolved?.id
+          || Number(content.tmdbId)
+          || Number(String(content.id).replace(/^(tmdb_|imdb_)/, ''))
+          || 1;
+
+        const titleObj: CatalogTitle = resolved || {
+          id: tmdbIdNum,
+          mediaType: content.type === 'tv' ? 'tv' : 'movie',
+          title: content.title || 'Untitled',
+          originalTitle: content.title || 'Untitled',
+          overview: content.overview || '',
+          posterPath: content.poster_path || null,
+          backdropPath: content.backdrop_path || null,
+          year: String(content.year || ''),
+          rating: Number(content.vote_average || content.rating || 0),
+          anime: isAnime,
+        };
+
+        setCatalogTitle(titleObj);
+
+        pendingAutoPlay.current = {
+          title: titleObj,
+          season: propSeason,
+          episode: propEpisode,
+          server: serverKey,
+          streamUrl: stream,
+        };
+
+        if (ready && engine.current) {
+          executePendingPlay();
+        }
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) console.warn('TMDB title resolution error:', err);
+      });
+
+    return () => controller.abort();
+  }, [content, propStreamUrl, propSeason, propEpisode, propServer, ready, executePendingPlay]);
+
+  // Deep-link query parameters (?id=...&type=...)
+  useEffect(() => {
+    if (content) return; // Prop / state takes precedence
+
+    const type = (searchParams.get('type') === 'tv' ? 'tv' : 'movie') as 'movie' | 'tv';
+    const idParam = searchParams.get('id');
+    const titleParam = searchParams.get('title') || '';
+    const directUrl = searchParams.get('url');
+
+    if (directUrl) {
+      if (ready && engine.current) {
+        engine.current.loadMedia({
+          id: `url-${Date.now()}`,
+          kind: 'url',
+          title: titleParam || 'My Screening',
+          url: directUrl,
+        }, true);
+      }
+      return;
+    }
+
+    if (!idParam) return;
+
+    const season = Math.max(1, Number(searchParams.get('s')) || 1);
+    const episode = Math.max(1, Number(searchParams.get('e')) || 1);
+    const srvIndex = Number(searchParams.get('srv'));
+    const controller = new AbortController();
+
+    resolveTmdbTitle(idParam, type, titleParam, 'standard', controller.signal)
+      .then((title) => {
+        if (controller.signal.aborted || !title) return;
+        setCatalogTitle(title);
+        const options = serversFor(title.anime);
+        const serverKey =
+          (Number.isInteger(srvIndex) && options[srvIndex] ? options[srvIndex].key : 'nxsha') ??
+          'nxsha';
+
+        pendingAutoPlay.current = {
+          title,
+          season,
+          episode,
+          server: serverKey,
+        };
+
+        if (ready && engine.current) {
+          executePendingPlay();
+        }
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) console.warn('Deep-link title lookup failed:', err);
+      });
+
+    return () => controller.abort();
+  }, [searchParams, ready, content, executePendingPlay]);
+
+  // Keep document title synced with active 3D content
+  useEffect(() => {
+    const rawTitle =
+      (snapshot.embed?.title && snapshot.embed.title !== 'Afterlight' ? snapshot.embed.title : null) ||
+      (snapshot.filmTitle && snapshot.filmTitle !== 'Afterlight' ? snapshot.filmTitle : null) ||
+      catalogTitle?.title ||
+      content?.title ||
+      searchParams.get('title');
+
+    setTheatreTitle(rawTitle);
+  }, [catalogTitle?.title, snapshot.embed?.title, snapshot.filmTitle, content?.title, searchParams]);
+
+  // ── Auto-Fallback Server Switcher for 3D Theatre ──────────────────────────
+  const triedTheatreServers = useRef<Set<ServerKey>>(new Set());
+  const [switchingServer, setSwitchingServer] = useState(false);
+  const theatreWatchdogTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear tried servers when media changes
+  useEffect(() => {
+    triedTheatreServers.current.clear();
+  }, [snapshot.embed?.catalog.id]);
+
+  const switchToNextTheatreServer = useCallback((reason?: string) => {
+    if (!engine.current || !snapshot.embed || switchingServer) return;
+    const currentEmbed = snapshot.embed;
+    const currentServer = currentEmbed.selection.server;
+    triedTheatreServers.current.add(currentServer);
+
+    const isAnime = Boolean(currentEmbed.selection.anime || currentEmbed.catalog.anime);
+    const allServers = serversFor(isAnime);
+    const nextServer = allServers.find((s) => !triedTheatreServers.current.has(s.key));
+
+    if (!nextServer) {
+      notify(`All servers have been tried. Settle in or open Screen Controls to select.`);
+      triedTheatreServers.current.clear();
+      return;
+    }
+
+    const curName = serverName(currentServer);
+    notify(`${curName} ${reason || 'is not playing'}. Switching to ${nextServer.name}…`);
+    setSwitchingServer(true);
+
+    try {
+      const nextSelection = {
+        ...currentEmbed.selection,
+        server: nextServer.key,
+        preferences: readServerPreferences(nextServer.key),
+      };
+      const nextMedia = makeEmbed(currentEmbed.catalog, nextSelection);
+      void engine.current.loadMedia(nextMedia, true);
+    } catch (e) {
+      console.warn('Failed to switch theatre server:', e);
+    } finally {
+      setTimeout(() => setSwitchingServer(false), 2000);
+    }
+  }, [snapshot.embed, switchingServer, notify]);
+
+  // Reactive fallback on providerStatus ('slow' or 'error')
+  useEffect(() => {
+    if (!snapshot.embed || switchingServer) return;
+    if (snapshot.providerStatus === 'slow') {
+      switchToNextTheatreServer('is taking too long');
+    } else if (snapshot.providerStatus === 'error') {
+      switchToNextTheatreServer('failed to load');
+    }
+  }, [snapshot.providerStatus, snapshot.embed, switchingServer, switchToNextTheatreServer]);
+
+  // Watchdog: If provider takes >10s to open and isn't playing, auto-try next server
+  useEffect(() => {
+    if (!snapshot.embed || switchingServer) return;
+    if (snapshot.providerStatus === 'opening') {
+      if (theatreWatchdogTimer.current) clearTimeout(theatreWatchdogTimer.current);
+      theatreWatchdogTimer.current = setTimeout(() => {
+        if (snapshot.providerStatus === 'opening') {
+          switchToNextTheatreServer('is not responding');
+        }
+      }, 10000);
+    } else {
+      if (theatreWatchdogTimer.current) clearTimeout(theatreWatchdogTimer.current);
+    }
+    return () => {
+      if (theatreWatchdogTimer.current) clearTimeout(theatreWatchdogTimer.current);
+    };
+  }, [snapshot.providerStatus, snapshot.embed, switchingServer, switchToNextTheatreServer]);
+
+  const onEngine = useCallback((instance: CinemaEngine | null) => {
+    engine.current = instance;
+    if (instance) {
+      instance.setQuality(quality);
+      instance.setReducedMotion(reducedMotion);
+      instance.setInputEnabled(panel === null);
+      instance.setProfile(profile);
+      instance.setServiceVisible(waitersOn);
+    }
+  }, [quality, reducedMotion, panel, profile, waitersOn]);
+
+  const onSnapshot = useCallback((next: CinemaSnapshot) => {
+    setSnapshot(next);
+    watchParty.receiveSnapshot(next);
+    if (next.mode === 'explore' && pendingSeat.current) {
+      const id = pendingSeat.current;
+      pendingSeat.current = null;
+      queueMicrotask(() => engine.current?.takeSeat(id));
+    }
+  }, [watchParty]);
+
+  useEffect(() => {
+    engine.current?.setQuality(quality);
+    try {
+      localStorage.setItem('mydonkey-theatre-quality', quality);
+    } catch {}
+  }, [quality]);
+
+  useEffect(() => {
+    engine.current?.setReducedMotion(reducedMotion);
+    try {
+      localStorage.setItem('mydonkey-theatre-motion', String(reducedMotion));
+    } catch {}
+  }, [reducedMotion]);
+
+  useEffect(() => {
+    engine.current?.setRefreshTarget(refreshTarget);
+    try {
+      localStorage.setItem('mydonkey-theatre-high-refresh', refreshTarget ? 'on' : 'off');
+    } catch {}
+  }, [refreshTarget]);
+
+  useEffect(() => {
+    engine.current?.setInputEnabled(panel === null);
+  }, [panel]);
+
+  const revealHud = useCallback(() => {
+    if (!movieMode) return;
+    setHudVisible(true);
+    if (hudTimer.current) clearTimeout(hudTimer.current);
+    hudTimer.current = setTimeout(() => setHudVisible(false), 6500);
+  }, [movieMode]);
+
+  useEffect(() => {
+    if (movieMode) {
+      setHudVisible(false);
+      setMovieHint(true);
+      const hintTimer = setTimeout(() => setMovieHint(false), 7000);
+      return () => clearTimeout(hintTimer);
+    }
+    setHudVisible(true);
+    setMovieHint(false);
+  }, [movieMode]);
+
+  useEffect(() => {
+    let lastX = -1;
+    let lastY = -1;
+    const onPointer = (e: PointerEvent) => {
+      if (lastX >= 0) {
+        const dist = Math.hypot(e.clientX - lastX, e.clientY - lastY);
+        if (dist < 4) return;
+      }
+      lastX = e.clientX;
+      lastY = e.clientY;
+      if (movieMode) revealHud();
+      engine.current?.reportActivity();
+    };
+    const onKeyOrWheel = () => {
+      if (movieMode) revealHud();
+      engine.current?.reportActivity();
+    };
+    window.addEventListener('pointerdown', onKeyOrWheel, { passive: true });
+    window.addEventListener('pointermove', onPointer, { passive: true });
+    window.addEventListener('keydown', onKeyOrWheel, { passive: true });
+    window.addEventListener('wheel', onKeyOrWheel, { passive: true });
+    return () => {
+      window.removeEventListener('pointerdown', onKeyOrWheel);
+      window.removeEventListener('pointermove', onPointer);
+      window.removeEventListener('keydown', onKeyOrWheel);
+      window.removeEventListener('wheel', onKeyOrWheel);
+    };
+  }, [movieMode, revealHud]);
+
+  const toggleWaiters = useCallback(() => {
+    setWaitersOn((v) => {
+      const next = !v;
+      engine.current?.setServiceVisible(next);
+      return next;
+    });
+  }, []);
+
+  const updateProfile = useCallback((val: PlayerProfile) => {
+    const next = cleanProfile(val);
+    setProfile(next);
+    saveProfile(next);
+    notify('Player updated. Make yourself comfortable.');
+  }, [notify]);
+
+  const toggleFullscreen = useCallback(async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else if (document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch {
+      notify('Fullscreen not supported in this window.');
+    }
+  }, [notify]);
+
+  useEffect(() => {
+    const onFsChange = () => setFullscreen(Boolean(document.fullscreenElement));
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || /INPUT|TEXTAREA|SELECT/.test((e.target as HTMLElement)?.tagName) || panel) return;
+      if (e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        void toggleFullscreen();
+      }
+      if (e.key === '?') {
+        e.preventDefault();
+        setPanel('controls');
+      }
+    };
+    document.addEventListener('fullscreenchange', onFsChange);
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFsChange);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [panel, toggleFullscreen]);
+
+  const reset = () => {
+    pendingSeat.current = null;
+    engine.current?.resetView();
+    setPanel(null);
+  };
+
+  const chooseSeat = (id: string) => {
+    setPanel(null);
+    if (snapshot.mode === 'seated') {
+      if (snapshot.seatId === id) return;
+      pendingSeat.current = id;
+      engine.current?.stand();
+    } else {
+      engine.current?.takeSeat(id);
+    }
+  };
+
+  const primaryAction = () => {
+    if (snapshot.mode === 'seated') engine.current?.stand();
+    else if (snapshot.mode === 'walking') engine.current?.cancelWalk();
+    else if (snapshot.mode === 'explore') engine.current?.takeSeat();
+  };
+
+  const handleExit = () => {
+    if (onExit) {
+      onExit();
+    } else if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/');
+    }
+  };
+
+  const nearSeat = Boolean(snapshot.nearbySeatId && !snapshot.overview);
+  const showSitStand = movieMode || snapshot.mode === 'walking' || snapshot.mode === 'standing' || Boolean(snapshot.reservingSeat) || nearSeat;
+  let actionLabel = nearSeat ? `Sit ${snapshot.nearbySeatId}` : 'Sit';
+  if (snapshot.mode === 'walking') actionLabel = 'Cancel';
+  if (snapshot.mode === 'sitting') actionLabel = 'Sit';
+  if (snapshot.mode === 'seated') actionLabel = 'Stand';
+  if (snapshot.mode === 'standing') actionLabel = 'Stand';
+  if (snapshot.reservingSeat) actionLabel = 'Wait';
+
+  return (
+    <div className="theatre-viewport fixed inset-0 z-[500] bg-[#0c0e0f] text-[#e8e5df] overflow-hidden select-none">
+      <div
+        className={`app-shell ${ready ? 'is-ready' : ''} ${movieMode ? 'movie-session' : ''} ${
+          movieMode && !hudVisible ? 'hud-hidden' : ''
+        } ${reducedMotion ? 'reduced-motion' : ''}`}
+        inert={panel ? true : undefined}
+      >
+        {/* Header Bar */}
+        <header className="site-header">
+          <div className="header-left">
+            <button
+              className="back-to-site"
+              onClick={handleExit}
+              title="Exit 3D Theatre"
+              aria-label="Exit 3D Theatre"
+            >
+              <ArrowLeft size={15} />
+              <span>Exit Theatre</span>
+            </button>
+            <div className="nav-divider" />
+            <button className="brand" onClick={reset} aria-label="MY DONKEY 3D Theatre">
+              <img src="/logo.png" alt="MY DONKEY" className="h-7 w-auto object-contain" />
+              <span className="brand-name">
+                3D VIRTUAL CINEMA
+              </span>
+            </button>
+          </div>
+
+          <nav className="main-nav hidden md:flex" aria-label="Experience navigation">
+            <button className="nav-link is-active" onClick={() => setPanel(null)}>
+              Auditorium
+            </button>
+            <button className="nav-link" onClick={() => setPanel('experience')}>
+              About Cinema
+            </button>
+          </nav>
+
+          <div className="header-right">
+            <button
+              className={`watch-party-button ${inParty ? 'is-connected' : ''}`}
+              onClick={() => setPanel('party')}
+              title="Watch Party: shared screening & chat"
+            >
+              <Users size={15} strokeWidth={1.5} />
+              <span>Watch Party</span>
+              {inParty && <span className="party-button-count">{watchParty.state.members.length}/10</span>}
+            </button>
+
+            <button
+              className="profile-button"
+              onClick={() => setPanel('player')}
+              aria-label={`Customize player, ${profile.name}`}
+              title="Your Player Avatar"
+            >
+              <PlayerAvatar profile={profile} />
+            </button>
+          </div>
+        </header>
+
+        {/* 3D Auditorium Canvas Stage */}
+        <main className="cinema-stage relative flex-1" aria-label="3D Cinema Auditorium">
+          <Suspense fallback={null}>
+            <CinemaScene
+              onEngine={onEngine}
+              onUpdate={onSnapshot}
+              onReady={() => {
+                setReady(true);
+                executePendingPlay();
+              }}
+              onMessage={notify}
+              onError={setError}
+              onValidation={setValidation}
+            />
+          </Suspense>
+
+          <div className="stage-top-shade" aria-hidden="true" />
+          <div className="stage-bottom-shade" aria-hidden="true" />
+          <div className="stage-vignette" aria-hidden="true" />
+
+          {/* Floating Controls HUD */}
+          <TheatreControls
+            engine={engine.current}
+            snapshot={snapshot}
+            movieMode={movieMode}
+            hudVisible={hudVisible}
+            waitersOn={waitersOn}
+            quality={quality}
+            onToggleWaiters={toggleWaiters}
+            onQuality={setQuality}
+            onNotify={notify}
+          />
+
+          {/* Scene Introduction */}
+          <div className={`scene-intro ${!snapshot.overview ? 'is-hidden' : ''}`}>
+            <span className="eyebrow">
+              <span className="intro-line" />
+              PREMIUM 3D AUDITORIUM
+            </span>
+            <h1>
+              Welcome to the Theatre<span>.</span>
+            </h1>
+            <p>Pick a recliner, call concessions, or wander around. The big screen is yours.</p>
+          </div>
+
+          {/* On-Stage Walk / Sit Controls */}
+          <div className="scene-controls">
+            <div className="desktop-controls">
+              {movieMode ? (
+                <>
+                  <span className="control-hint">
+                    <kbd>E</kbd>
+                    <span>Stand up anytime</span>
+                  </span>
+                  <span className="control-hint">
+                    {snapshot.embed ? (
+                      <>
+                        <Mouse size={16} />
+                        <span>Use screen controls</span>
+                      </>
+                    ) : (
+                      <>
+                        <kbd className="wide-key">Space</kbd>
+                        <span>Play / pause</span>
+                      </>
+                    )}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="control-hint">
+                    <span className="key-group">
+                      <kbd>W</kbd>
+                      <kbd>A</kbd>
+                      <kbd>S</kbd>
+                      <kbd>D</kbd>
+                    </span>
+                    <span>Walk</span>
+                  </span>
+                  <span className="control-hint look-control">
+                    <Mouse size={16} strokeWidth={1.4} />
+                    <span>Drag to look</span>
+                  </span>
+                  <span className="control-hint interact-control">
+                    <kbd>E</kbd>
+                    <span>Sit / Stand</span>
+                  </span>
+                </>
+              )}
+            </div>
+
+            {/* Mobile Touch Joystick */}
+            {!movieMode && !transitioning && ready && (
+              <Joystick onMove={(x, y) => engine.current?.setJoystick(x, y)} />
+            )}
+
+            {/* Seat Action & Service Bell */}
+            <div className="seat-action">
+              <div className="seat-action-buttons">
+                {(movieMode || snapshot.eatingProgress !== null) && (
+                  <button
+                    className={`service-bell-button ${snapshot.eatingProgress !== null ? 'is-eating' : ''}`}
+                    onClick={() => engine.current?.ringBell()}
+                    disabled={!ready || !!error || snapshot.servicePhase !== 'idle' || snapshot.eatingProgress !== null}
+                    title={
+                      snapshot.eatingProgress !== null
+                        ? snapshot.foodName
+                        : snapshot.servicePhase !== 'idle'
+                        ? 'Server on the way'
+                        : 'Ring for Waiter Service'
+                    }
+                    aria-label="Ring for Waiter"
+                  >
+                    {snapshot.eatingProgress !== null ? (
+                      <LoaderCircle className="spin" size={15} />
+                    ) : (
+                      <BellRing size={16} strokeWidth={1.5} />
+                    )}
+                  </button>
+                )}
+
+                {showSitStand && (
+                  <button
+                    className={`primary-button take-seat-button ${
+                      snapshot.mode === 'seated' ? 'stand-button' : ''
+                    }`}
+                    onClick={primaryAction}
+                    disabled={!ready || !!error || transitioning || Boolean(snapshot.reservingSeat)}
+                    title={actionLabel}
+                    aria-label={actionLabel}
+                  >
+                    {transitioning || snapshot.mode === 'walking' || snapshot.reservingSeat ? (
+                      <LoaderCircle className="spin" size={16} />
+                    ) : snapshot.mode === 'seated' || snapshot.mode === 'standing' ? (
+                      <PersonStanding size={18} />
+                    ) : (
+                      <Armchair size={17} strokeWidth={1.65} />
+                    )}
+                  </button>
+                )}
+
+                <button
+                  className="seat-map-button"
+                  onClick={() => setPanel('seats')}
+                  disabled={!ready || !!error}
+                  aria-label="Open 2D Seat Map"
+                  title="Choose Recliner Seat"
+                >
+                  <Grid2X2 size={16} strokeWidth={1.5} />
+                </button>
+
+                <button
+                  className="change-server-button"
+                  onClick={() => setPanel('screen')}
+                  disabled={!ready || !!error}
+                  aria-label="Change Streaming Server"
+                  title="Change Server"
+                >
+                  <Wifi size={16} strokeWidth={1.5} />
+                </button>
+
+                {snapshot.embed && (
+                  <button
+                    className="change-server-button"
+                    onClick={() => switchToNextTheatreServer('requested next server')}
+                    disabled={!ready || !!error || switchingServer}
+                    aria-label="Try Next Server"
+                    title="Try Next Server if buffering or not playing"
+                  >
+                    <RefreshCw size={15} strokeWidth={1.5} className={switchingServer ? 'spin text-amber-400' : 'text-amber-400'} />
+                  </button>
+                )}
+              </div>
+
+              {snapshot.eatingProgress !== null && (
+                <span className="service-progress" aria-hidden="true">
+                  <i style={{ width: `${Math.round(snapshot.eatingProgress * 100)}%` }} />
+                </span>
+              )}
+
+              <span className="seat-action-caption">
+                {movieMode
+                  ? `Seat ${snapshot.seatId || 'Recliner'}. Enjoy the screening.`
+                  : snapshot.mode === 'walking'
+                  ? 'Moving to seat...'
+                  : snapshot.mode === 'standing'
+                  ? 'Auditorium is yours to explore.'
+                  : 'Settle into any recliner.'}
+              </span>
+            </div>
+
+            <button
+              className="reset-view"
+              onClick={reset}
+              disabled={!ready || !!error}
+              title="Return to the rear entrance"
+            >
+              <RotateCcw size={14} strokeWidth={1.5} />
+              <span>Reset view</span>
+            </button>
+            <span className="mobile-look-hint">Drag room to look around</span>
+          </div>
+
+          {/* Loading Screen */}
+          {!error && (
+            <div className={`cinema-loading ${ready ? 'is-loaded' : ''}`} aria-hidden={ready} role="status">
+              <img src="/logo.png" alt="" className="h-12 w-auto mb-6 animate-pulse" />
+              <span className="loading-overline">INITIALIZING 3D PROJECTION</span>
+              <h2>Preparing your private cinema.</h2>
+              <span className="loading-track">
+                <i />
+              </span>
+            </div>
+          )}
+
+          {/* Error Screen */}
+          {error && (
+            <div className="cinema-error" role="alert">
+              <Monitor size={35} strokeWidth={1} />
+              <h2>Cinema Unavailable</h2>
+              <p>{error}</p>
+              <button className="primary-button" onClick={() => window.location.reload()}>
+                Try again <RotateCcw size={16} />
+              </button>
+            </div>
+          )}
+
+          {movieMode && movieHint && !hudVisible && (
+            <span className="movie-tap-hint" role="status">
+              Tap anywhere for controls · Press E to stand
+            </span>
+          )}
+        </main>
+
+        {/* Bottom Playback Bar */}
+        <footer className="playback-bar">
+          {snapshot.duration > 0 && (
+            <div className="footer-film-timeline">
+              <SeekBar
+                compact
+                snapshot={snapshot}
+                disabled={!canControlPlayback || snapshot.loading}
+                onSeek={(time) => engine.current?.seek(time)}
+              />
+            </div>
+          )}
+
+          <div className="now-playing">
+            <button
+              className="playback-toggle"
+              onClick={() => (snapshot.embed ? setPanel('screen') : engine.current?.togglePlayback())}
+              disabled={!ready || !!error || snapshot.loading || (!snapshot.embed && !canControlPlayback && !snapshot.autoplayBlocked)}
+              aria-label={snapshot.playing ? 'Pause' : 'Play'}
+            >
+              {snapshot.embed ? (
+                <Monitor size={14} />
+              ) : snapshot.playing && !snapshot.autoplayBlocked ? (
+                <Pause size={14} fill="currentColor" />
+              ) : (
+                <Play size={14} fill="currentColor" />
+              )}
+            </button>
+
+            <button
+              className="film-button"
+              onClick={() => setPanel('screen')}
+              disabled={!ready || !!error}
+              aria-label={`Screen player, ${snapshot.filmTitle}`}
+            >
+              <span className="footer-eyebrow">
+                {snapshot.loading
+                  ? 'PREPARING SCREEN'
+                  : snapshot.embed
+                  ? 'STREAMING PROVIDER'
+                  : inParty
+                  ? 'SHARED SCREEN'
+                  : 'NOW SCREENING'}
+              </span>
+              <span className="film-meta">
+                <strong>{snapshot.filmTitle}</strong>
+                <span className="film-kind">
+                  {snapshot.embed
+                    ? 'Provider Stream'
+                    : snapshot.mediaKind === 'file'
+                    ? 'Local Video'
+                    : snapshot.mediaKind === 'url'
+                    ? 'Direct Video'
+                    : 'Ambient Scene'}
+                </span>
+                <ChevronDown size={12} />
+              </span>
+            </button>
+          </div>
+
+          {inParty ? (
+            <button className="footer-center party-footer-presence" onClick={() => setPanel('party')}>
+              <Users size={14} />
+              <span>{watchParty.state.members.length} in watch party</span>
+              <span className="footer-local-label">ONLINE</span>
+            </button>
+          ) : snapshot.duration > 0 ? (
+            <button className="footer-center footer-timecode" onClick={() => setPanel('screen')}>
+              <span>
+                {formatTime(snapshot.currentTime)}
+                <span> / {formatTime(snapshot.duration)}</span>
+              </span>
+              <span>
+                Open controls <ArrowRight size={11} />
+              </span>
+            </button>
+          ) : (
+            <div className="footer-center">
+              <Film size={13} strokeWidth={1.3} />
+              <span>3D Virtual Cinema · Settle into your seat</span>
+            </div>
+          )}
+
+          <div className="experience-tools">
+            {movieMode && (
+              <button
+                className="waiters-toggle tool-button"
+                onClick={toggleWaiters}
+                aria-pressed={waitersOn}
+                title={waitersOn ? 'Hide waiters' : 'Show waiters'}
+              >
+                <BellRing size={15} strokeWidth={1.5} />
+                <span>Waiters {waitersOn ? 'on' : 'off'}</span>
+              </button>
+            )}
+
+            <span className="tool-divider" />
+
+            <button
+              className="sound-button tool-button"
+              onClick={() => (snapshot.embed ? setPanel('screen') : engine.current?.toggleMute())}
+              disabled={!ready || !!error}
+              aria-label={snapshot.muted ? 'Unmute' : 'Mute'}
+            >
+              {snapshot.embed || !snapshot.muted ? (
+                <Volume2 size={16} strokeWidth={1.5} />
+              ) : (
+                <VolumeX size={16} strokeWidth={1.5} />
+              )}
+              <span>{snapshot.embed ? 'Sound' : snapshot.muted ? 'Sound Off' : 'Sound On'}</span>
+            </button>
+
+            <span className="tool-divider" />
+
+            <button
+              className="quality-button tool-button"
+              onClick={() => setPanel('settings')}
+              title="Graphics Quality & Settings"
+            >
+              <Monitor size={15} strokeWidth={1.5} />
+              <span>{quality === 'auto' ? 'Adaptive' : quality === 'high' ? 'Ultra' : 'Performance'}</span>
+              <span className="fps-counter">
+                <i />
+                {snapshot.fps || '--'} <span>FPS</span>
+                {snapshot.highRefresh && <b>120Hz</b>}
+              </span>
+            </button>
+
+            <span className="tool-divider" />
+
+            <button
+              className="icon-button fullscreen-button"
+              onClick={() => void toggleFullscreen()}
+              aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+              title={fullscreen ? 'Exit fullscreen (F)' : 'Fullscreen (F)'}
+            >
+              {fullscreen ? <Minimize size={17} strokeWidth={1.5} /> : <Maximize size={17} strokeWidth={1.5} />}
+            </button>
+          </div>
+        </footer>
+      </div>
+
+      {/* Experience Dialog Panels */}
+      {panel && (
+        <ExperiencePanels
+          panel={panel}
+          onClose={() => setPanel(null)}
+          snapshot={snapshot}
+          onChooseSeat={chooseSeat}
+          quality={quality}
+          onQuality={setQuality}
+          reducedMotion={reducedMotion}
+          onReducedMotion={setReducedMotion}
+          refreshTarget={refreshTarget}
+          onRefreshTarget={setRefreshTarget}
+          validation={validation}
+          onReset={reset}
+          engine={engine.current}
+          party={watchParty}
+          profile={profile}
+          onProfile={updateProfile}
+          onOpenPanel={setPanel}
+          onOpenCatalog={() => {
+            setCatalogReturn('party');
+            setPanel('catalog');
+          }}
+          onCloseCatalog={() => {
+            const back = catalogReturn;
+            setCatalogReturn(null);
+            setPanel(back);
+          }}
+          initialCatalogTitle={catalogTitle}
+          cinemaReady={ready && !error}
+          currentContent={content}
+        />
+      )}
+
+      {/* Notification Toast */}
+      {toast && (
+        <div className="notification-toast" role="status" key={toast}>
+          <Check size={16} />
+          <span>{toast}</span>
+          <button aria-label="Dismiss message" onClick={() => setToast('')}>
+            <X size={15} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default TheatreView;

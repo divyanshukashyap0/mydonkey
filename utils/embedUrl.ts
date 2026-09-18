@@ -131,6 +131,19 @@ export const isExternalEmbedUrl = (url?: string, embedBaseHost?: string): boolea
     if (lower.includes('/api/stream')) return false;
     if (lower.includes('.r2.dev') || lower.includes('.cloudflarestorage.com')) return false;
     if (lower.includes('proxy.garageband.rocks')) return true;
+    if (
+        lower.includes('vidstuck.xyz') ||
+        lower.includes('zxcstream.xyz') ||
+        lower.includes('bingr.one') ||
+        lower.includes('nxsha.space') ||
+        lower.includes('vidlink.pro') ||
+        lower.includes('vidnest.fun') ||
+        lower.includes('megaplay.buzz') ||
+        lower.includes('4animo.xyz') ||
+        lower.includes('zokoanime.video')
+    ) {
+        return true;
+    }
     if (embedBaseHost && lower.includes(embedBaseHost.toLowerCase())) return true;
     if (lower.includes('/embed/movie/') || lower.includes('/embed/tv/')) return true;
     if (lower.includes('imdb.com')) return true;
@@ -179,4 +192,202 @@ export const getPlayableStreamUrl = (url?: string): string => {
     return trimmed;
 };
 
+// ── Multi-Server Content Access (Ported & Enhanced from Aethoflix) ────────────
 
+export type StreamServerKey =
+    | 'vidstuck'
+    | 'nxsha'
+    | 'bingr'
+    | 'zxc'
+    | 'vidlink'
+    | 'vidnest'
+    | 'megaplay'
+    | 'recloud'
+    | 'zokoanime'
+    | 'default';
+
+export interface StreamServerOption {
+    key: StreamServerKey;
+    name: string;
+    tag: string;
+    description: string;
+    isAnime?: boolean;
+    supports4K?: boolean;
+    hasSubtitles?: boolean;
+}
+
+export const STREAM_SERVERS: StreamServerOption[] = [
+    { key: 'nxsha', name: 'Nxsha', tag: 'HD + Subs', description: 'High definition with multilingual subtitles', hasSubtitles: true },
+    { key: 'vidstuck', name: 'VidStuck', tag: 'Fast 1080p', description: 'Ultra-fast bufferless streaming' },
+    { key: 'bingr', name: 'Bingr', tag: '4K Ultra', description: 'Crystal-clear 4K / UHD resolution', supports4K: true },
+    { key: 'zxc', name: 'ZXC', tag: 'Instant', description: 'Low-latency direct player' },
+    { key: 'vidlink', name: 'VidLink', tag: 'Multi-CDN', description: 'Redundant high-availability CDN' },
+    { key: 'vidnest', name: 'VidNest', tag: 'Alt HD', description: 'Reliable secondary mirror' },
+    { key: 'megaplay', name: 'MegaPlay', tag: 'Anime Fast', description: 'Dedicated high-speed anime server', isAnime: true },
+    { key: 'recloud', name: 'ReCloud', tag: 'Anime HD', description: 'Multi-audio Japanese & English dubs', isAnime: true },
+    { key: 'zokoanime', name: 'Zokoanime', tag: 'Anime Sub/Dub', description: 'Extensive anime catalog with audio switcher', isAnime: true },
+    { key: 'default', name: 'Default Proxy', tag: 'GarageBand', description: 'Legacy streaming fallback' },
+];
+
+export const STANDARD_SERVER_FALLBACK_ORDER: StreamServerKey[] = [
+    'nxsha',
+    'vidstuck',
+    'bingr',
+    'zxc',
+    'vidlink',
+    'vidnest',
+    'default'
+];
+
+export const ANIME_SERVER_FALLBACK_ORDER: StreamServerKey[] = [
+    'nxsha',
+    'megaplay',
+    'recloud',
+    'zokoanime',
+    'vidstuck',
+    'default'
+];
+
+export interface ServerEmbedOptions {
+    season?: number;
+    episode?: number;
+    audioTrack?: 'sub' | 'dub';
+    recloudSource?: 'hd-1' | 'hd-2';
+    animeId?: number | null;
+    animeMalId?: number | null;
+    settings?: Partial<SiteSettings>;
+}
+
+/**
+ * Builds an embed URL for a chosen server key.
+ * Accepts either a numeric TMDB ID or IMDb ID (tt...) or content ID.
+ */
+export const buildServerEmbedUrl = (
+    id: string | number,
+    type: 'movie' | 'tv' | string = 'movie',
+    serverKey: StreamServerKey = 'nxsha',
+    options: ServerEmbedOptions = {}
+): string => {
+    const rawId = String(id || '').trim();
+    if (!rawId) return '';
+
+    const cleanNumeric = rawId.replace(/^(tmdb_|imdb_)/, '');
+    const numId = parseInt(cleanNumeric, 10);
+    const hasNum = !isNaN(numId) && numId > 0;
+    const imdbId = rawId.startsWith('tt') ? rawId : (rawId.startsWith('imdb_') ? rawId.replace('imdb_', '') : '');
+
+    const s = Math.max(1, options.season || 1);
+    const e = Math.max(1, options.episode || 1);
+    const audio = options.audioTrack || 'sub';
+    const source = options.recloudSource || 'hd-1';
+
+    // 1. Anime dedicated servers
+    if (serverKey === 'zokoanime') {
+        const mal = options.animeMalId;
+        const ani = options.animeId || (hasNum ? numId : null);
+        if (mal) return `https://zokoanime.video/stream/mal/${mal}/${e}/${audio}?color=ffffff`;
+        if (ani) return `https://zokoanime.video/stream/anilist/${ani}/${e}/${audio}?color=ffffff`;
+    }
+    if (serverKey === 'megaplay') {
+        const ani = options.animeId || (hasNum ? numId : null);
+        if (ani) return `https://megaplay.buzz/stream/ani/${ani}/${e}/${audio}`;
+    }
+    if (serverKey === 'recloud') {
+        const ani = options.animeId || (hasNum ? numId : null);
+        if (ani) return `https://cdn.4animo.xyz/embed/${source}/ani/${ani}/${e}/${audio}?k=1`;
+    }
+
+    // 2. Standard multi-servers (Use TMDB numeric ID if available, otherwise raw or IMDb ID)
+    const targetId = hasNum ? numId : (imdbId || rawId);
+
+    switch (serverKey) {
+        case 'vidstuck':
+            // VidStuck backend expects numeric TMDB ID. If only IMDb ID is available, gracefully route to VidLink which supports IMDb directly
+            if (typeof targetId === 'string' && targetId.startsWith('tt')) {
+                return type === 'tv'
+                    ? `https://vidlink.pro/tv/${targetId}/${s}/${e}?autoplay=true`
+                    : `https://vidlink.pro/movie/${targetId}?autoplay=true`;
+            }
+            return type === 'tv'
+                ? `https://vidstuck.xyz/embed/tv/${targetId}/${s}/${e}?color=ffffff`
+                : `https://vidstuck.xyz/embed/movie/${targetId}?color=ffffff`;
+
+        case 'nxsha':
+            return type === 'tv'
+                ? `https://nxsha.space/embed/tv/${targetId}/${s}/${e}?autoplay=true`
+                : `https://nxsha.space/embed/movie/${targetId}?autoplay=true`;
+
+        case 'bingr':
+            return type === 'tv'
+                ? `https://bingr.one/watch/tv/${targetId}/${s}/${e}`
+                : `https://bingr.one/watch/movie/${targetId}`;
+
+        case 'zxc':
+            return type === 'tv'
+                ? `https://zxcstream.xyz/player/tv/${targetId}?season=${s}&episode=${e}`
+                : `https://zxcstream.xyz/player/movie/${targetId}`;
+
+        case 'vidlink':
+            return type === 'tv'
+                ? `https://vidlink.pro/tv/${targetId}/${s}/${e}?autoplay=true`
+                : `https://vidlink.pro/movie/${targetId}?autoplay=true`;
+
+        case 'vidnest':
+            return type === 'tv'
+                ? `https://vidnest.fun/tv/${targetId}/${s}/${e}`
+                : `https://vidnest.fun/movie/${targetId}`;
+
+        case 'default':
+        default:
+            return buildEmbedUrl(imdbId || targetId, type, options.settings, s, e);
+    }
+};
+
+/**
+ * Returns the next available server in the fallback chain that hasn't failed yet.
+ */
+export const getNextFallbackServer = (
+    currentServer: StreamServerKey,
+    isAnime: boolean,
+    failedServers: Set<StreamServerKey>
+): StreamServerKey | null => {
+    const list = isAnime ? ANIME_SERVER_FALLBACK_ORDER : STANDARD_SERVER_FALLBACK_ORDER;
+    for (const server of list) {
+        if (server !== currentServer && !failedServers.has(server)) {
+            return server;
+        }
+    }
+    return null;
+};
+
+/**
+ * Generates direct high-speed download links (from Aethoflix hub resolvers).
+ */
+export const getMovieDownloadUrl = (
+    id: number | string,
+    type: 'movie' | 'tv' = 'movie',
+    season = 1,
+    episode = 1
+): string => {
+    const cleanId = String(id).replace(/^(tmdb_|imdb_)/, '');
+    return type === 'movie'
+        ? `https://nxsha.space/dl/movie/${cleanId}`
+        : `https://nxsha.space/dl/tv/${cleanId}/${season}/${episode}`;
+};
+
+export const getAnimeDownloadUrl = (
+    anilistId: number | null,
+    episode = 1,
+    audio: 'sub' | 'dub' = 'sub',
+    malId?: number | null
+): string | null => {
+    const ep = Math.max(1, Math.floor(episode));
+    const track = audio === 'dub' ? 'dub' : 'sub';
+    if (Number.isInteger(malId) && malId && malId > 0) {
+        return `https://zokoanime.video/download/mal/${malId}/${ep}/${track}`;
+    }
+    if (Number.isInteger(anilistId) && anilistId && anilistId > 0) {
+        return `https://zokoanime.video/download/anilist/${anilistId}/${ep}/${track}`;
+    }
+    return null;
+};

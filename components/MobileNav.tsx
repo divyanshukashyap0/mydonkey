@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Search, Download, PlayCircle, Sparkles, Lock } from 'lucide-react';
+import { Home, Search, Download, PlayCircle, Sparkles, Lock, Armchair } from 'lucide-react';
 
 interface MobileNavProps {
     activeTab: string;
@@ -14,6 +14,11 @@ const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setTab, currentProfile
                 <button onClick={() => setTab('home')} className={`flex flex-col items-center gap-1 transition-colors min-w-[3.5rem] ${activeTab === 'home' ? 'text-white' : 'text-gray-400 hover:text-gray-200'}`}>
                     <Home size={20} strokeWidth={activeTab === 'home' ? 3 : 2} />
                     <span className="text-[10px] font-medium">Home</span>
+                </button>
+
+                <button onClick={() => setTab('theatre')} className={`flex flex-col items-center gap-1 transition-colors min-w-[3.5rem] ${activeTab === 'theatre' ? 'text-amber-400' : 'text-gray-400 hover:text-amber-300'}`}>
+                    <Armchair size={20} strokeWidth={activeTab === 'theatre' ? 3 : 2} className={activeTab === 'theatre' ? 'text-amber-400 animate-pulse' : 'text-amber-500'} />
+                    <span className="text-[10px] font-semibold text-amber-400">3D Cinema</span>
                 </button>
 
                 <button onClick={() => setTab('anime')} className={`flex flex-col items-center gap-1 transition-colors min-w-[3.5rem] ${activeTab === 'anime' ? 'text-white' : 'text-gray-400 hover:text-gray-200'}`}>

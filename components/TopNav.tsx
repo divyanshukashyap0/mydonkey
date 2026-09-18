@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Search, Menu, X, User, LogOut, Settings, LayoutDashboard, ChevronRight, ChevronDown, Smartphone, Download, Loader2, Star, Play, Film } from 'lucide-react';
+import { Search, Menu, X, User, LogOut, Settings, LayoutDashboard, ChevronRight, ChevronDown, Smartphone, Download, Loader2, Star, Play, Film, Armchair } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { searchTMDBMulti, tmdbPosterUrl, tmdbBackdropUrl, mapTMDBGenres } from '../services/tmdbService';
 import { buildEmbedUrl } from '../utils/embedUrl';
@@ -30,7 +30,7 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
     const searchInputRef = useRef<HTMLInputElement>(null);
     const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    const { logout, currentUser, currentProfile, userProfiles, switchProfile, isInstallable, installPwa, content, settings } = useStore();
+    const { logout, currentUser, isInstallable, installPwa, content, settings } = useStore();
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -298,6 +298,7 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                             { id: 'movies', label: 'Movies' },
                             { id: 'categories', label: 'Categories' },
                             { id: 'anime', label: 'Anime' },
+                            { id: 'theatre', label: '3D Theatre' },
                             { id: 'my-list', label: 'My List' },
                         ].map(item => (
                             <button
@@ -306,6 +307,8 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                                 className={`text-sm font-bold transition-all duration-300 relative px-5 py-2 rounded-full overflow-hidden group
                                     ${item.id === 'exclusive'
                                         ? `bg-gradient-to-r from-brand-red via-orange-500 to-brand-red bg-[length:200%_auto] animate-shimmer text-white italic tracking-wide shadow-[0_0_20px_rgba(229,9,20,0.6)] hover:shadow-[0_0_30px_rgba(229,9,20,0.8)] hover:scale-110 border border-white/20`
+                                        : item.id === 'theatre'
+                                        ? `bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 bg-[length:200%_auto] text-black font-extrabold tracking-wide shadow-[0_0_20px_rgba(245,158,11,0.5)] hover:shadow-[0_0_30px_rgba(245,158,11,0.8)] hover:scale-110 border border-yellow-200/60`
                                         : item.id === 'anime'
                                         ? `bg-gradient-to-r from-violet-600 via-pink-500 to-violet-600 bg-[length:200%_auto] animate-shimmer text-white italic tracking-wide shadow-[0_0_20px_rgba(168,85,247,0.6)] hover:shadow-[0_0_30px_rgba(236,72,153,0.8)] hover:scale-110 border border-white/20`
                                         : `${activeTab === item.id
@@ -314,7 +317,10 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                                     }
                                 `}
                             >
-                                <span className="relative z-10">{item.label}</span>
+                                <span className="relative z-10 flex items-center gap-1.5">
+                                    {item.id === 'theatre' && <Armchair size={15} className="text-black inline-block" />}
+                                    {item.label}
+                                </span>
                                 {item.id === 'anime' && (
                                     <div className="absolute inset-0 bg-white/20 group-hover:bg-white/30 transition-colors duration-300" />
                                 )}
@@ -503,9 +509,9 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                                     title="Go to Account & Settings"
                                 >
                                     <img
-                                        src={currentProfile?.avatarUrl || "/Mydonkey%20user.jpg"}
+                                        src={currentUser?.avatarUrl || "/Mydonkey%20user.jpg"}
                                         className="w-8 h-8 rounded border-2 border-transparent group-hover:border-white transition object-cover shadow-sm"
-                                        alt={currentProfile?.name || "Profile"}
+                                        alt={currentUser?.name || "Account"}
                                     />
                                 </button>
                                 <button
@@ -520,7 +526,7 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                                 {isProfileMenuOpen && (
                                     <div className="absolute top-12 right-0 w-56 bg-cinema-black/95 backdrop-blur-xl border border-white/10 rounded-lg shadow-2xl py-2 animate-in slide-in-from-top-2">
                                         <div className="px-4 py-3 border-b border-white/10 mb-2">
-                                            <div className="font-bold text-sm truncate text-white">{currentProfile?.name}</div>
+                                            <div className="font-bold text-sm truncate text-white">{currentUser?.name || currentUser?.email?.split('@')[0]}</div>
                                             <div className="text-[10px] text-gray-500 truncate">{currentUser?.email}</div>
                                         </div>
 
@@ -530,16 +536,6 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                                             </button>
                                         )}
 
-                                        {userProfiles.length > 1 && (
-                                            <div className="py-2 border-b border-white/10">
-                                                {userProfiles.filter(p => p.id !== currentProfile?.id).map(profile => (
-                                                    <button key={profile.id} onClick={() => switchProfile(profile.id)} className="w-full flex items-center gap-3 px-4 py-2 text-sm hover:bg-white/10 transition opacity-80 hover:opacity-100">
-                                                        <img src={profile.avatarUrl || "/Mydonkey%20user.jpg"} className="w-6 h-6 rounded object-cover" />
-                                                        <span className="text-gray-300">{profile.name}</span>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
 
                                         <button onClick={() => handleNavClick('account')} className="w-full flex items-center gap-3 px-4 py-2 text-sm hover:bg-white/10 transition text-gray-300 hover:text-white">
                                             <User size={18} /> Account
@@ -595,6 +591,7 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                                     { id: 'tv', label: 'TV Shows' },
                                     { id: 'categories', label: 'Categories' },
                                     { id: 'anime', label: 'Anime' },
+                                    { id: 'theatre', label: '3D Theatre' },
                                     { id: 'search', label: 'Search' },
                                     { id: 'my-list', label: 'My List' }, // Note: My List will trigger login catch in AppNew
                                 ].map(item => (

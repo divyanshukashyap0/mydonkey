@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Play, Plus, X, ThumbsUp, Check, Download, Share2, Search, Music2, Trash2, ArrowLeft, Maximize, Minimize } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Play, Plus, X, ThumbsUp, Check, Download, Share2, Search, Music2, Trash2, ArrowLeft, Maximize, Minimize, Armchair } from 'lucide-react';
 import { Content, Season, Episode } from '../types';
 import { useStore } from '../context/StoreContext';
 import ContentRail from './ContentRail';
 import SongsSection from './SongsSection';
 
-import { buildEmbedUrl, hasDriveSource, isExternalEmbedUrl } from '../utils/embedUrl';
+import { buildEmbedUrl, hasDriveSource, isExternalEmbedUrl, getMovieDownloadUrl, getAnimeDownloadUrl } from '../utils/embedUrl';
 import { saveContentTitle, setWebpageTitle } from '../utils/titleManager';
 
 interface ContentDetailsProps {
@@ -16,6 +17,7 @@ interface ContentDetailsProps {
 }
 
 const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent, onClose, onPlay, onDetails }) => {
+    const navigate = useNavigate();
     const { currentProfile, toggleWatchlist, likedContent, toggleLike, currentUser, content: allContent, deleteContent, settings, fetchContentById } = useStore();
     const [content, setContent] = useState<Content>(initialContent);
     const fetchedDocIdsRef = useRef<Set<string>>(new Set());
@@ -230,7 +232,20 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
             a.click();
             document.body.removeChild(a);
         } else {
-            alert('Direct download is not available for this stream. You can watch it directly in the player.');
+            const cid = content.tmdbId || (typeof content.id === 'string' ? content.id.replace(/^(tmdb_|imdb_)/, '') : content.id);
+            const isAnime = Boolean(
+                content.tags?.some(t => t.toLowerCase() === 'anime') ||
+                content.genres?.some(g => g.toLowerCase() === 'anime' || g.toLowerCase() === 'animation')
+            );
+            const dlUrl = isAnime
+                ? getAnimeDownloadUrl(typeof cid === 'number' ? cid : parseInt(cid, 10) || null, 1)
+                : getMovieDownloadUrl(cid, content.type === 'tv' ? 'tv' : 'movie', 1, 1);
+
+            if (dlUrl) {
+                window.open(dlUrl, '_blank', 'noopener,noreferrer');
+            } else {
+                alert('Direct download is not available for this stream. You can watch it directly in the player.');
+            }
         }
     };
 
@@ -435,6 +450,14 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                             )}
                         </div>
 
+                        {/* Server & Stream Availability Badge */}
+                        <div className="flex items-center gap-2 mt-2 mb-1">
+                            <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold flex items-center gap-1.5 shadow-sm">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                9 High-Speed Servers (4K • 1080p • Multi-Sub)
+                            </span>
+                        </div>
+
                         {/* Action Buttons Row */}
                         <div className="grid grid-cols-2 gap-3 mt-1">
                             {isPlayable ? (
@@ -460,6 +483,17 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                                     <Play size={18} fill={(isPlayable && isSingleVideoType) ? "white" : "black"} /> {(isPlayable && isSingleVideoType) ? 'Trailer' : 'Play Trailer'}
                                 </button>
                             )}
+
+                            <button
+                                onClick={() => {
+                                    const cid = content.tmdbId || (typeof content.id === 'string' ? content.id.replace(/^(tmdb_|imdb_)/, '') : content.id);
+                                    navigate(`/theatre?id=${cid}&type=${content.type === 'tv' ? 'tv' : 'movie'}&title=${encodeURIComponent(content.title || '')}`, { state: { content } });
+                                }}
+                                className="col-span-2 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 text-black py-3 rounded-xl font-extrabold text-sm flex items-center justify-center gap-2 hover:opacity-95 transition active:scale-95 shadow-lg border border-yellow-200/50"
+                            >
+                                <Armchair size={19} className="text-black" />
+                                <span>Watch in 3D Theatre</span>
+                            </button>
                         </div>
 
                         {/* Secondary Actions (List, Like, Share, Download) */}
@@ -490,9 +524,10 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
 
                             <button
                                 onClick={() => handleDownload(content)}
-                                className={`flex flex-col items-center gap-1 transition ${content.allowDownload ? 'text-gray-400 hover:text-white' : 'text-gray-600 cursor-not-allowed'}`}
+                                className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition cursor-pointer active:scale-95"
+                                title="Download HD File (Aethoflix Hub)"
                             >
-                                <Download size={20} />
+                                <Download size={20} className="text-blue-400" />
                                 <span className="text-[10px]">Download</span>
                             </button>
 
@@ -561,7 +596,15 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                     {/* Hero Section: Title & Actions positioned over background thumbnail */}
                     <div className="relative pt-[32vh] md:pt-[36vh] pb-6 px-8 md:px-14 w-full flex-shrink-0">
                         <div className="max-w-7xl mx-auto w-full">
-                            <h2 className="text-4xl md:text-6xl font-black mb-6 drop-shadow-2xl text-white">{content.title}</h2>
+                            <h2 className="text-4xl md:text-6xl font-black mb-4 drop-shadow-2xl text-white">{content.title}</h2>
+
+                            {/* Desktop Server & Stream Availability Badge */}
+                            <div className="flex items-center gap-2 mb-6">
+                                <span className="px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-2 shadow-md">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                    9 High-Speed Streaming Servers (Nxsha HD • VidStuck • Bingr 4K • ZXC • MegaPlay Anime)
+                                </span>
+                            </div>
 
                             <div className="flex flex-wrap items-center gap-4">
                                 {isPlayable ? (
@@ -590,6 +633,18 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                                 )}
 
                                 <button
+                                    onClick={() => {
+                                        const cid = content.tmdbId || (typeof content.id === 'string' ? content.id.replace(/^(tmdb_|imdb_)/, '') : content.id);
+                                        navigate(`/theatre?id=${cid}&type=${content.type === 'tv' ? 'tv' : 'movie'}&title=${encodeURIComponent(content.title || '')}`, { state: { content } });
+                                    }}
+                                    className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 text-black px-7 py-3.5 rounded-xl font-extrabold text-lg flex items-center gap-2 hover:opacity-95 transition-all hover:scale-105 active:scale-95 shadow-2xl border border-yellow-200/50 cursor-pointer"
+                                    title="Watch on Big Screen in 3D Virtual Cinema"
+                                >
+                                    <Armchair size={22} className="text-black" />
+                                    <span>3D Theatre</span>
+                                </button>
+
+                                <button
                                     onClick={() => toggleWatchlist(content.id)}
                                     className="bg-gray-600/40 backdrop-blur-md p-3.5 rounded-full border border-white/20 hover:border-white transition hover:scale-105 active:scale-95 group"
                                     title="My List"
@@ -612,10 +667,10 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                                 </button>
                                 <button
                                     onClick={() => handleDownload(content)}
-                                    className={`backdrop-blur-md p-3.5 rounded-full border transition hover:scale-105 active:scale-95 ${content.allowDownload ? 'bg-gray-600/40 border-white/20 hover:border-white' : 'bg-gray-800/40 border-gray-700 cursor-not-allowed'}`}
-                                    title="Download"
+                                    className="bg-gray-600/40 backdrop-blur-md p-3.5 rounded-full border border-white/20 hover:border-white transition hover:scale-105 active:scale-95 cursor-pointer"
+                                    title="High-Speed Download (Aethoflix Hub)"
                                 >
-                                    <Download size={24} className={content.allowDownload ? 'text-white' : 'text-gray-600'} />
+                                    <Download size={24} className="text-blue-400 hover:text-white" />
                                 </button>
 
                                 {isAdmin && (

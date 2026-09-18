@@ -22,12 +22,13 @@ import CommunityHelpChatPage from './components/CommunityHelpChatPage';
 
 import AccountSettings from './components/AccountSettings';
 import AdminLayout from './components/admin/AdminLayout';
+import { TheatreView, TheatreFAB } from './components/theatre';
 import UnlockContentModal from './components/UnlockContentModal';
 import SearchPage from './components/SearchPage';
 import ExclusiveContentPage from './components/ExclusiveContentPage';
 import CategoriesPage from './components/CategoriesPage';
 import ScrollToTop from './components/ScrollToTop';
-import ProfileSelection from './components/ProfileSelection';
+
 import FontLoader from './components/FontLoader';
 import Loader from './components/Loader';
 import { buildEmbedUrl, parseEmbedContentType, extractDriveId, hasDriveSource, isExternalEmbedUrl, isDirectVideoUrl } from './utils/embedUrl';
@@ -55,7 +56,7 @@ import {
     searchTMDBMulti
 } from './services/tmdbService';
 import { FALLBACK_CATALOG } from './services/fallbackCatalog';
-import { saveContentTitle, setWebpageTitle, resolveContentTitleInstant } from './utils/titleManager';
+import { saveContentTitle, setWebpageTitle, setTheatreTitle, resolveContentTitleInstant } from './utils/titleManager';
 import { SlidersHorizontal, Loader2 } from 'lucide-react';
 import { Content, ContinueWatchingItem, Section } from './types';
 import { StoreProvider, PERMANENT_ADMINS } from './context/StoreContext';
@@ -76,6 +77,7 @@ const MainLayout = () => {
 
     let currentTab = (path && path !== 'home') ? decodeURIComponent(path.split('/')[0]) : 'home';
     if (currentTab === 'category') currentTab = 'categories';
+    if (currentTab === 'theater') currentTab = 'theatre';
 
     if (!isModalRoute) {
         lastActiveTabRef.current = currentTab;
@@ -182,6 +184,19 @@ const MainLayout = () => {
     useEffect(() => {
         const isBrowseRoute = location.pathname.startsWith('/browse/');
         const isWatchRoute = location.pathname.startsWith('/watch/');
+        const isTheatreRoute = location.pathname.startsWith('/theatre') || location.pathname.startsWith('/theater') || activeTab === 'theatre' || activeTab === 'theater';
+
+        if (isTheatreRoute) {
+            const theatreContentTitle =
+                (location.state as any)?.content?.title ||
+                (location.state as any)?.item?.title ||
+                resolveContentTitleInstant(location.pathname, location.search, location.state, rawContent || content) ||
+                viewingContent?.title ||
+                playingContent?.title;
+
+            setTheatreTitle(theatreContentTitle);
+            return;
+        }
 
         if (isBrowseRoute || isWatchRoute) {
             // 1. Direct active state in memory
@@ -207,6 +222,8 @@ const MainLayout = () => {
                 categories: 'Browse All Movies & TV Series Categories | My Donkey',
                 mylist: 'My List | My Donkey',
                 search: 'Search Movies & Shows | My Donkey',
+                theatre: '3D - Virtual Cinema  | MyDonkey',
+                theater: '3D - Virtual Cinema  | MyDonkey',
             };
             document.title = tabTitles[activeTab] || 'My Donkey | Watch Free Movies, TV Shows & Anime in HD';
         }
@@ -341,7 +358,7 @@ const MainLayout = () => {
                                     overview: detail.overview || '',
                                     release_date: detail.release_date || detail.first_air_date || '',
                                     year: (detail.release_date || detail.first_air_date) ? parseInt((detail.release_date || detail.first_air_date)!.split('-')[0]) : new Date().getFullYear(),
-                                    rating: detail.vote_average || 0,
+                                    rating: String(detail.vote_average || 0),
                                     vote_average: detail.vote_average || 0,
                                     youtubeId: trailerUrl || '',
                                     videoUrl: buildEmbedUrl(cleanImdb, resolvedType, settingsRef.current),
@@ -387,6 +404,8 @@ const MainLayout = () => {
                                             backdrop_path: full.backdrop_path ? tmdbBackdropUrl(full.backdrop_path) : '',
                                             overview: full.overview || '',
                                             release_date: full.release_date || full.first_air_date || '',
+                                            rating: String(full.vote_average || 0),
+                                            vote_average: full.vote_average || 0,
                                             youtubeId: trailer || '',
                                             videoUrl: buildEmbedUrl(imdb || String(full.id), effType, settingsRef.current),
                                             tmdbId: full.id,
@@ -581,7 +600,7 @@ const MainLayout = () => {
                                     overview: detail.overview || '',
                                     release_date: detail.release_date || detail.first_air_date || '',
                                     year: (detail.release_date || detail.first_air_date) ? parseInt((detail.release_date || detail.first_air_date)!.split('-')[0]) : new Date().getFullYear(),
-                                    rating: detail.vote_average || 0,
+                                    rating: String(detail.vote_average || 0),
                                     vote_average: detail.vote_average || 0,
                                     youtubeId: trailerUrl || '',
                                     videoUrl: buildEmbedUrl(cleanImdb, resolvedType, settingsRef.current),
@@ -1507,6 +1526,10 @@ const MainLayout = () => {
             );
         }
 
+        if (activeTab === 'theatre' || activeTab === 'theater') {
+            return <TheatreView onExit={() => handleTabChange('home')} />;
+        }
+
         if (activeTab === 'home') {
             // Check if admin has explicitly selected hero contents for the main screen
             const configuredHeroIds = (settings.heroContentIds && settings.heroContentIds.length > 0)
@@ -1976,6 +1999,21 @@ const MainLayout = () => {
             return <CategoriesPage onDetails={handleDetails} onPlay={handlePlay} />;
         }
 
+        if (activeTab === 'theatre' || activeTab === 'theater') {
+            return (
+                <TheatreView
+                    onExit={() => {
+                        const prev = lastNonModalUrlRef.current;
+                        if (prev && prev !== '/theatre' && prev !== '/theater') {
+                            navigate(prev);
+                        } else {
+                            handleTabChange('home');
+                        }
+                    }}
+                />
+            );
+        }
+
         if (activeTab === 'account') {
             if (!isAuthenticated) return <Navigate to="/login" state={{ from: '/account' }} replace />;
             return <AccountSettings setActiveTab={handleTabChange} />;
@@ -2029,12 +2067,7 @@ const MainLayout = () => {
         return <Navigate to="/login" replace />;
     }
 
-    // Force Profile Selection if logged in but no profile selected (unless opening a deep linked content modal)
-    if (isAuthenticated && !currentProfile && !isModalRoute) {
-        return (
-            <ProfileSelection />
-        );
-    }
+
 
     return (
         <div className="bg-[#141414] min-h-screen text-white font-sans selection:bg-red-600 selection:text-white">
@@ -2042,21 +2075,27 @@ const MainLayout = () => {
             {/* Anime Intro Overlay */}
             {showAnimeIntro && <AnimeIntro mode={animeIntroMode} onComplete={handleIntroComplete} />}
 
-            <TopNav
-                activeTab={activeTab}
-                setTab={handleTabChange}
-                onSearch={() => handleTabChange('search')}
-                onUnlock={() => setShowUnlockModal(true)}
-                onLoginClick={() => navigate('/login')}
-                onDetails={handleDetails}
-            />
+            {activeTab !== 'theatre' && (
+                <TopNav
+                    activeTab={activeTab}
+                    setTab={handleTabChange}
+                    onSearch={() => handleTabChange('search')}
+                    onUnlock={() => setShowUnlockModal(true)}
+                    onLoginClick={() => navigate('/login')}
+                    onDetails={handleDetails}
+                />
+            )}
 
             <main>
                 {renderContent()}
             </main>
 
-            <Footer onNavigate={handleNavigate} />
-            <MobileNav activeTab={activeTab} setTab={handleTabChange} currentProfile={currentProfile} />
+            {activeTab !== 'theatre' && (
+                <>
+                    <Footer onNavigate={handleNavigate} />
+                    <MobileNav activeTab={activeTab} setTab={handleTabChange} currentProfile={currentProfile} />
+                </>
+            )}
 
             {/* Deep link resolving modal loader */}
             {isModalRoute && (isResolvingModalContent || (location.pathname.startsWith('/browse/') && !viewingContent) || (location.pathname.startsWith('/watch/') && !playingContent)) && (
@@ -2090,6 +2129,10 @@ const MainLayout = () => {
                     isOpen={showGenreModal}
                     onClose={() => setShowGenreModal(false)}
                 />
+            )}
+
+            {activeTab !== 'theatre' && !location.pathname.startsWith('/watch/') && (
+                <TheatreFAB onClick={() => handleTabChange('theatre')} />
             )}
 
         </div>

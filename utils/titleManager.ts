@@ -94,6 +94,18 @@ export function setWebpageTitle(title: string) {
 }
 
 /**
+ * Update document.title for 3D Virtual Cinema
+ */
+export function setTheatreTitle(contentTitle?: string | null) {
+    const formatted = contentTitle && contentTitle.trim() && contentTitle.trim() !== 'Afterlight'
+        ? `3D - ${contentTitle.trim()}  | MyDonkey`
+        : '3D - Virtual Cinema  | MyDonkey';
+    if (document.title !== formatted) {
+        document.title = formatted;
+    }
+}
+
+/**
  * Resolves content title instantly (0ms) from:
  * 1. Navigation state
  * 2. URL search parameters (?title=...)
@@ -111,6 +123,9 @@ export function resolveContentTitleInstant(
     if (locationState?.item?.title) {
         return locationState.item.title;
     }
+    if (locationState?.content?.title) {
+        return locationState.content.title;
+    }
 
     // 2. Direct query parameter ?title=
     if (search) {
@@ -123,7 +138,7 @@ export function resolveContentTitleInstant(
         } catch (_) {}
     }
 
-    // 3. Extract contentId from /browse/:id or /watch/:id
+    // 3. Extract contentId from /browse/:id, /watch/:id, or ?id=
     const parts = pathname.split('/');
     let contentId = '';
     for (let i = 0; i < parts.length; i++) {
@@ -131,6 +146,16 @@ export function resolveContentTitleInstant(
             contentId = parts[i + 1] ? parts[i + 1].split('?')[0].split('#')[0] : '';
             break;
         }
+    }
+
+    if (!contentId && search) {
+        try {
+            const params = new URLSearchParams(search);
+            const queryId = params.get('id');
+            if (queryId) {
+                contentId = queryId;
+            }
+        } catch (_) {}
     }
 
     if (!contentId) return null;

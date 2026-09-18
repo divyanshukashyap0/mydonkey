@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Hls from 'hls.js';
-import { Play, Pause, Volume2, Volume1, VolumeX, Maximize, Settings, SkipForward, ArrowLeft, RotateCcw, RotateCw, Subtitles, Layers, BarChart2, Minimize, Headphones, Check, MessageSquare, Wifi, X, ExternalLink, Scan, Scaling, AlertCircle, RefreshCw, Zap, Sliders, Sparkles, ShieldCheck, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Play, Pause, Volume2, Volume1, VolumeX, Maximize, Settings, SkipForward, ArrowLeft, RotateCcw, RotateCw, Subtitles, Layers, BarChart2, Minimize, Headphones, Check, MessageSquare, Wifi, X, ExternalLink, Scan, Scaling, AlertCircle, RefreshCw, Zap, Sliders, Sparkles, ShieldCheck, ChevronDown, ChevronLeft, ChevronRight, Armchair, Server } from 'lucide-react';
 import { Content, Season, Episode } from '../types';
 import StatsPanel from './StatsPanel';
 import DrivePlayer from './DrivePlayer';
@@ -8,7 +8,20 @@ import ContentLoader from './ContentLoader';
 import { useStore } from '../context/StoreContext';
 import { logUserActivity, incrementWatchTime } from '../utils/activityLogger';
 import { MoviVideo } from './MoviVideo';
-import { buildEmbedUrl, parseEmbedContentType, extractDriveId, isExternalEmbedUrl, isDirectVideoUrl, getPlayableStreamUrl } from '../utils/embedUrl';
+import {
+    buildEmbedUrl,
+    parseEmbedContentType,
+    extractDriveId,
+    isExternalEmbedUrl,
+    isDirectVideoUrl,
+    getPlayableStreamUrl,
+    buildServerEmbedUrl,
+    getNextFallbackServer,
+    STREAM_SERVERS,
+    StreamServerKey,
+    STANDARD_SERVER_FALLBACK_ORDER,
+    ANIME_SERVER_FALLBACK_ORDER
+} from '../utils/embedUrl';
 import { soundBooster } from '../player/SoundBooster';
 import { useAdShield } from '../utils/useAdShield';
 import { fetchTMDBDetails, fetchTMDBSeason } from '../services/tmdbService';
@@ -119,6 +132,58 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         setHasStartedPlaying(true);
         setInitialLoad(false);
     }, []);
+
+    // Multi-Server Content Access & Auto-Fallback State (from Aethoflix)
+    const isAnime = useMemo(() => {
+        return Boolean(
+            content.tags?.some(t => t.toLowerCase() === 'anime') ||
+            content.genres?.some(g => g.toLowerCase() === 'anime' || g.toLowerCase() === 'animation')
+        );
+    }, [content]);
+
+    const [activeServer, setActiveServer] = useState<StreamServerKey>(() => {
+        try {
+            const saved = localStorage.getItem('mydonkey_preferred_server') as StreamServerKey | null;
+            if (saved && STREAM_SERVERS.some(s => s.key === saved)) {
+                return saved;
+            }
+        } catch {}
+        return 'nxsha';
+    });
+
+    const [failedServers, setFailedServers] = useState<Set<StreamServerKey>>(new Set());
+    const [showServerMenu, setShowServerMenu] = useState(false);
+    const [audioTrack, setAudioTrack] = useState<'sub' | 'dub'>('sub');
+
+    const handleServerSwitch = useCallback((serverKey: StreamServerKey) => {
+        setActiveServer(serverKey);
+        setShowServerMenu(false);
+        setInitialLoad(true);
+        setIsMovieLoading(true);
+        try {
+            localStorage.setItem('mydonkey_preferred_server', serverKey);
+        } catch {}
+        const sObj = STREAM_SERVERS.find(s => s.key === serverKey);
+        showOsd(`Switched to ${sObj?.name || 'Server'}`, sObj?.tag, 'zap');
+    }, [showOsd]);
+
+    const handleNextServer = useCallback((reason?: string) => {
+        const next = getNextFallbackServer(activeServer, isAnime, failedServers);
+        const curName = STREAM_SERVERS.find(s => s.key === activeServer)?.name || activeServer;
+        if (next) {
+            setFailedServers(prev => new Set(prev).add(activeServer));
+            const nextName = STREAM_SERVERS.find(s => s.key === next)?.name || 'Next Server';
+            showOsd(`${curName} ${reason || 'is not responding'}. Trying ${nextName}...`, undefined, 'zap');
+            handleServerSwitch(next);
+        } else {
+            setFailedServers(new Set());
+            const list = isAnime ? ANIME_SERVER_FALLBACK_ORDER : STANDARD_SERVER_FALLBACK_ORDER;
+            const fallback = list.find(s => s !== activeServer) || list[0];
+            const fallbackName = STREAM_SERVERS.find(s => s.key === fallback)?.name || 'Server';
+            showOsd(`Retrying with ${fallbackName}...`, undefined, 'zap');
+            handleServerSwitch(fallback);
+        }
+    }, [activeServer, isAnime, failedServers, handleServerSwitch, showOsd]);
 
 
     // Season & Episode State (TV Shows)
@@ -454,34 +519,56 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         }
     }
 
+    const targetContentId = content.tmdbId ||
+        (typeof content.id === 'string' && content.id.startsWith('tmdb_') ? content.id.replace('tmdb_', '') : '') ||
+        extractedImdbId ||
+        content.id;
+
     let directVideoUrl: string | null = null;
     if (finalDriveId) {
         // When admin enters a Drive link, external links (iframe embed) MUST NOT OPEN
         directVideoUrl = null;
+    } else if (overrideUrl && isDirectVideoUrl(overrideUrl)) {
+        // Only lock to overrideUrl if it is an actual direct video file (MP4/HLS/Cloudflare)
+        directVideoUrl = overrideUrl;
     } else if (isTV) {
         const sNum = currentSeason?.seasonNumber || (urlSeasonEp?.season || 1);
         const eNum = currentEpisode?.episodeNumber || (urlSeasonEp?.episode || 1);
-        if (currentEpisode?.videoUrl && !getDriveId(currentEpisode.videoUrl)) {
+        if (currentEpisode?.videoUrl && isDirectVideoUrl(currentEpisode.videoUrl)) {
             directVideoUrl = currentEpisode.videoUrl;
-        } else if (extractedImdbId && !content.isManual) {
-            // Suppress automated external embed link for 100% manual content
-            directVideoUrl = buildEmbedUrl(extractedImdbId, 'tv', settings, sNum, eNum);
-        } else if (content.videoUrl && !getDriveId(content.videoUrl)) {
+        } else if (targetContentId && !content.isManual) {
+            directVideoUrl = buildServerEmbedUrl(targetContentId, 'tv', activeServer, {
+                season: sNum,
+                episode: eNum,
+                audioTrack,
+                settings
+            });
+        } else if (content.videoUrl && isDirectVideoUrl(content.videoUrl)) {
             directVideoUrl = content.videoUrl;
+        } else if (targetContentId) {
+            directVideoUrl = buildServerEmbedUrl(targetContentId, 'tv', activeServer, {
+                season: sNum,
+                episode: eNum,
+                audioTrack,
+                settings
+            });
         }
+    } else if (targetContentId && !finalDriveId && !finalYoutubeId && !content.isManual) {
+        // Movie streaming server selection
+        directVideoUrl = buildServerEmbedUrl(targetContentId, 'movie', activeServer, {
+            audioTrack,
+            settings
+        });
     } else if (overrideUrl && !overrideDriveId && !overrideYoutubeId) {
-        // If 100% manual content, strictly reject external embed URLs
-        if (content.isManual && isExternalEmbedUrl(overrideUrl, embedBaseHost)) {
-            directVideoUrl = null;
-        } else {
-            directVideoUrl = overrideUrl;
-        }
-    } else if (extractedImdbId && !finalDriveId && !finalYoutubeId && !content.isManual) {
-        // Suppress automated external embed link for 100% manual content
-        directVideoUrl = buildEmbedUrl(extractedImdbId, 'movie', settings);
+        directVideoUrl = buildServerEmbedUrl(targetContentId || overrideUrl, 'movie', activeServer, {
+            audioTrack,
+            settings
+        });
     } else {
-        directVideoUrl = null;
+        directVideoUrl = overrideUrl || null;
     }
+
+
 
     const isHls = directVideoUrl ? directVideoUrl.split('?')[0].toLowerCase().includes('.m3u8') : false;
     const isNativeVideo = useMemo(() => {
@@ -506,6 +593,49 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const isDriveVideo = useDrive;
     const isExternalStream = isDirectIframeEmbed && !isDriveVideo;
     // --- End Video Source Logic ---
+
+    // ── Auto-Fallback Watchdog & Error Detector for Normal Player ────────────
+    const serverWatchdogTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Watchdog: If the external embed server is taking >10s to load, auto-try next server
+    useEffect(() => {
+        if (!isExternalStream) return;
+
+        if (serverWatchdogTimer.current) clearTimeout(serverWatchdogTimer.current);
+        serverWatchdogTimer.current = setTimeout(() => {
+            if (isMovieLoading) {
+                handleNextServer('is taking too long or busy');
+            }
+        }, 10000);
+
+        return () => {
+            if (serverWatchdogTimer.current) clearTimeout(serverWatchdogTimer.current);
+        };
+    }, [isExternalStream, isMovieLoading, activeServer, handleNextServer]);
+
+    const handleIframeError = useCallback(() => {
+        handleNextServer('failed to connect');
+    }, [handleNextServer]);
+
+    // Cross-origin message listener: catch provider error reports
+    useEffect(() => {
+        if (!isExternalStream) return;
+        const onMsg = (event: MessageEvent) => {
+            let data = event.data;
+            if (typeof data === 'string') {
+                if (data.length > 5000) return;
+                try { data = JSON.parse(data); } catch { return; }
+            }
+            if (data && typeof data === 'object') {
+                const str = JSON.stringify(data).toLowerCase();
+                if (str.includes('error') || str.includes('fail') || str.includes('not_found') || str.includes('unavailable')) {
+                    handleNextServer('reported an error');
+                }
+            }
+        };
+        window.addEventListener('message', onMsg);
+        return () => window.removeEventListener('message', onMsg);
+    }, [isExternalStream, handleNextServer]);
 
     const isMobile = useMemo(() => {
         return (window.innerWidth <= 768 || window.innerHeight <= 768) && /Mobile|Android|iPhone|iPad/i.test(navigator.userAgent);
@@ -1753,9 +1883,22 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         if (!url) return '';
         const trimmed = url.trim();
 
-        const fallbackType = isTV ? 'tv' : 'movie';
+        // If it is already a direct multi-server URL generated for the active provider, keep it!
+        if (
+            trimmed.includes('vidstuck.xyz') ||
+            trimmed.includes('zxcstream.xyz') ||
+            trimmed.includes('bingr.one') ||
+            trimmed.includes('nxsha.space') ||
+            trimmed.includes('vidlink.pro') ||
+            trimmed.includes('vidnest.fun') ||
+            trimmed.includes('megaplay.buzz') ||
+            trimmed.includes('4animo.xyz') ||
+            trimmed.includes('zokoanime.video')
+        ) {
+            return trimmed;
+        }
 
-        // Extract IMDb ID (e.g., tt1234567, /title/tt1234567/, /embed/movie/tt1234567)
+        const fallbackType = isTV ? 'tv' : 'movie';
         const imdbMatch = trimmed.match(/(tt\d+)/);
 
         // If content is 100% manual, bypass all external embed transformations
@@ -1766,12 +1909,25 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         // Check if it's an IMDb-related URL or raw IMDb ID
         if (trimmed.includes('imdb.com') || /^tt\d+$/.test(trimmed)) {
             if (imdbMatch) {
-                return buildEmbedUrl(imdbMatch[1], fallbackType, settings);
+                return buildServerEmbedUrl(imdbMatch[1], fallbackType, activeServer, {
+                    season: currentSeason?.seasonNumber || 1,
+                    episode: currentEpisode?.episodeNumber || 1,
+                    audioTrack,
+                    settings
+                });
             }
         }
 
         // If it is a proxy.garageband.rocks URL or matches configured embed host
         if (trimmed.includes('proxy.garageband.rocks') || (embedBaseHost && trimmed.includes(embedBaseHost))) {
+            if (activeServer !== 'default' && imdbMatch) {
+                return buildServerEmbedUrl(imdbMatch[1], fallbackType, activeServer, {
+                    season: currentSeason?.seasonNumber || 1,
+                    episode: currentEpisode?.episodeNumber || 1,
+                    audioTrack,
+                    settings
+                });
+            }
             const existingType = parseEmbedContentType(trimmed);
             if (imdbMatch) {
                 const typeToUse = existingType || fallbackType;
@@ -1785,7 +1941,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         return url;
     };
 
-    const finalUrl = useMemo(() => getFinalVideoUrl(directVideoUrl || ''), [directVideoUrl, isTV, settings, embedBaseHost]);
+    const finalUrl = useMemo(() => getFinalVideoUrl(directVideoUrl || ''), [directVideoUrl, isTV, settings, embedBaseHost, activeServer, audioTrack]);
 
     // Dynamically update document title to movie/show name during playback
     useEffect(() => {
@@ -1871,6 +2027,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                         />
                                     )}
                                     <iframe
+                                        key={finalUrl}
                                         ref={embedIframeRef}
                                         className="w-full h-full relative z-[30] border-0"
                                         src={finalUrl}
@@ -1879,6 +2036,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                         referrerPolicy="origin"
                                         title={content.title}
                                         onLoad={handleIframeLoad}
+                                        onError={handleIframeError}
                                     />
                                 </div>
                             ) : null}
@@ -2221,8 +2379,156 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                         </>
                     )}
 
+                    {isExternalStream && (
+                        <>
+                            <div className="h-6 w-px bg-white/20 shrink-0 pointer-events-none"></div>
+                            {/* Streaming Server Switcher */}
+                            <div className="relative">
+                                <button
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowServerMenu(!showServerMenu);
+                                    }}
+                                    className="px-2 md:px-2.5 py-1 md:py-1.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 text-white text-[10px] md:text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all shadow-sm"
+                                    title="Switch Streaming Server"
+                                >
+                                    <Server size={13} className="text-brand-red" />
+                                    <span className="hidden sm:inline">{STREAM_SERVERS.find(s => s.key === activeServer)?.name || 'Server'}</span>
+                                    <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 text-[9px] font-bold border border-emerald-500/30">
+                                        {STREAM_SERVERS.find(s => s.key === activeServer)?.tag || 'Fast'}
+                                    </span>
+                                    <ChevronDown size={11} className="text-gray-400" />
+                                </button>
+
+                                {showServerMenu && (
+                                    <div
+                                        onPointerDown={(e) => e.stopPropagation()}
+                                        className="absolute top-full right-0 mt-2 bg-[#121316]/95 backdrop-blur-2xl border border-white/15 rounded-2xl p-2 min-w-[240px] shadow-[0_20px_50px_rgba(0,0,0,0.8)] z-[500] ring-1 ring-white/10 animate-in fade-in zoom-in-95 duration-150"
+                                    >
+                                        <div className="px-3 py-2 border-b border-white/10 mb-1 flex items-center justify-between">
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">Stream Servers</span>
+                                            <button
+                                                onClick={() => handleNextServer()}
+                                                className="text-[10px] text-brand-red font-bold hover:underline cursor-pointer"
+                                            >
+                                                Next ➔
+                                            </button>
+                                        </div>
+                                        <div className="max-h-60 overflow-y-auto space-y-1 custom-scrollbar p-1">
+                                            {STREAM_SERVERS.filter(s => isAnime || !s.isAnime).map(s => {
+                                                const isSel = activeServer === s.key;
+                                                return (
+                                                    <button
+                                                        key={s.key}
+                                                        onClick={() => handleServerSwitch(s.key)}
+                                                        className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${
+                                                            isSel
+                                                                ? 'bg-brand-red text-white shadow-md shadow-brand-red/30'
+                                                                : 'text-gray-300 hover:text-white hover:bg-white/10'
+                                                        }`}
+                                                    >
+                                                        <div className="flex flex-col">
+                                                            <span className="font-bold">{s.name}</span>
+                                                            <span className={`text-[10px] ${isSel ? 'text-white/80' : 'text-gray-500'}`}>{s.description}</span>
+                                                        </div>
+                                                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
+                                                            isSel ? 'bg-black/30 text-white' : 'bg-white/10 text-emerald-400'
+                                                        }`}>
+                                                            {s.tag}
+                                                        </span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Next Server Fast Switch Button */}
+                            <button
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleNextServer();
+                                }}
+                                className="px-2 py-1 md:py-1.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 text-gray-300 hover:text-white text-[10px] md:text-xs font-semibold flex items-center gap-1 cursor-pointer transition-all"
+                                title="Try Next Server if buffering"
+                            >
+                                <RefreshCw size={12} className="text-amber-400" />
+                                <span className="hidden md:inline">Next Server</span>
+                            </button>
+
+                            {/* Anime Sub/Dub Toggle */}
+                            {isAnime && (
+                                <button
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        const nextTrack = audioTrack === 'sub' ? 'dub' : 'sub';
+                                        setAudioTrack(nextTrack);
+                                        showOsd(`Audio: ${nextTrack.toUpperCase()}`, undefined, 'volume');
+                                    }}
+                                    className="px-2 md:px-2.5 py-1 md:py-1.5 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 active:scale-95 border border-purple-400/40 text-purple-200 text-[10px] md:text-xs font-bold flex items-center gap-1 cursor-pointer transition-all"
+                                    title="Toggle Sub / Dub Audio"
+                                >
+                                    <span>{audioTrack.toUpperCase()}</span>
+                                </button>
+                            )}
+                        </>
+                    )}
+
+                    <div className="h-6 w-px bg-white/20 shrink-0 pointer-events-none"></div>
+                    <button
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            const cid = content.tmdbId || (typeof content.id === 'string' ? content.id.replace(/^(tmdb_|imdb_)/, '') : content.id);
+                            window.location.href = `/theatre?id=${cid}&type=${content.type === 'tv' ? 'tv' : 'movie'}&title=${encodeURIComponent(content.title || '')}&s=${currentSeason?.seasonNumber || 1}&e=${currentEpisode?.episodeNumber || 1}`;
+                        }}
+                        className="px-2.5 md:px-3 py-1 md:py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 text-black text-[10px] md:text-xs font-extrabold flex items-center gap-1.5 cursor-pointer transition-all shadow-md hover:scale-105 active:scale-95 border border-yellow-200/50"
+                        title="Switch to 3D Virtual Cinema"
+                    >
+                        <Armchair size={13} className="text-black" />
+                        <span className="hidden xs:inline">3D Theatre</span>
+                    </button>
+
                 </div>
             </div>
+
+            {/* Quick Floating Server Switcher for Embeds: Always accessible so user can switch if provider is stuck or not playing */}
+            {isExternalStream && (
+                <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[300] select-none pointer-events-auto animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="flex items-center gap-2 bg-black/85 hover:bg-black backdrop-blur-xl border border-white/20 px-3.5 py-1.5 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.8)] ring-1 ring-white/10">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                        <span className="text-xs text-gray-200 font-medium flex items-center gap-1">
+                            Server: <strong className="text-white">{STREAM_SERVERS.find(s => s.key === activeServer)?.name || activeServer}</strong>
+                        </span>
+                        <div className="h-3 w-px bg-white/20 mx-0.5" />
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleNextServer('requested switch');
+                            }}
+                            className="text-xs text-amber-300 hover:text-amber-200 font-bold flex items-center gap-1 hover:underline active:scale-95 transition cursor-pointer"
+                            title="Try next streaming server if busy, slow, or not playing"
+                        >
+                            <RefreshCw size={11} className="text-amber-400" />
+                            <span>Not playing? Try Next</span>
+                        </button>
+                        <div className="h-3 w-px bg-white/20 mx-0.5" />
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowServerMenu(v => !v);
+                            }}
+                            className="text-[10px] text-gray-400 hover:text-white font-medium hover:underline cursor-pointer"
+                        >
+                            All Servers
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Right Down Corner Fullscreen Button (in exact corner, in place of player fullscreen button) */}
             {!isPortrait && (isDirectIframeEmbed || isDriveVideo) && (
@@ -2901,7 +3207,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                     </span>
                                 </div>
                                 <p className="text-gray-400 text-xs font-medium mt-1">
-                                    {content.title} {content.releaseYear ? `• ${content.releaseYear}` : ''}
+                                    {content.title} {(content as any).releaseYear || content.year ? `• ${(content as any).releaseYear || content.year}` : ''}
                                 </p>
                             </div>
                             <button
