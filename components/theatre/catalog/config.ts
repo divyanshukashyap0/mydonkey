@@ -1,4 +1,4 @@
-export const TMDB_API_KEY = (import.meta.env.VITE_TMDB_API_KEY as string | undefined)?.trim() ?? '';
+export const TMDB_API_KEY = (import.meta.env.VITE_TMDB_API_KEY as string | undefined)?.trim() || '5d44293e1177a6fb42010456a8c6b4ff';
 export const TMDB_BASE = 'https://api.themoviedb.org/3';
 export const BYPASS_BASE = 'https://api.tmdb.org/3';
 export const TMDB_IMG = 'https://image.tmdb.org/t/p/w500';

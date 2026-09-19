@@ -602,7 +602,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                             <div className="flex items-center gap-2 mb-6">
                                 <span className="px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-2 shadow-md">
                                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                                    9 High-Speed Streaming Servers (Nxsha HD • VidStuck • Bingr 4K • ZXC • MegaPlay Anime)
+                                    9 High-Speed Streaming Servers (Bingr 4K • Nxsha HD • VidStuck • ZXC • MegaPlay Anime)
                                 </span>
                             </div>
 

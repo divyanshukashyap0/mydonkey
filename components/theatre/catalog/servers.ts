@@ -1,10 +1,10 @@
 import type { AudioTrack, CatalogTitle, EmbedMedia, EmbedSelection, ServerKey, ServerPreferences } from './types';
 
 export const STD_SERVERS = [
-  { key: 'nxsha', name: 'Nxsha', tag: 'HD + Subs', movie: (id: number) => `https://nxsha.space/embed/movie/${id}?autoplay=true`, tv: (id: number, s: number, e: number) => `https://nxsha.space/embed/tv/${id}/${s}/${e}?autoplay=true`, highlight: true },
+  { key: 'bingr', name: 'Bingr', tag: '4K', movie: (id: number) => `https://bingr.one/watch/movie/${id}`, tv: (id: number, s: number, e: number) => `https://bingr.one/watch/tv/${id}/${s}/${e}`, highlight: true },
+  { key: 'nxsha', name: 'Nxsha', tag: 'HD + Subs', movie: (id: number) => `https://nxsha.space/embed/movie/${id}?autoplay=true`, tv: (id: number, s: number, e: number) => `https://nxsha.space/embed/tv/${id}/${s}/${e}?autoplay=true` },
   { key: 'vidstuck', name: 'VidStuck', tag: 'Fast', movie: (id: number) => `https://vidstuck.xyz/embed/movie/${id}?color=ffffff`, tv: (id: number, s: number, e: number) => `https://vidstuck.xyz/embed/tv/${id}/${s}/${e}?color=ffffff` },
   { key: 'zxc', name: 'ZXC', tag: 'Fast', movie: (id: number) => `https://zxcstream.xyz/player/movie/${id}`, tv: (id: number, s: number, e: number) => `https://zxcstream.xyz/player/tv/${id}?season=${s}&episode=${e}` },
-  { key: 'bingr', name: 'Bingr', tag: '4K', movie: (id: number) => `https://bingr.one/watch/movie/${id}`, tv: (id: number, s: number, e: number) => `https://bingr.one/watch/tv/${id}/${s}/${e}` },
   { key: 'vidlink', name: 'VidLink', tag: 'Multi', movie: (id: number) => `https://vidlink.pro/movie/${id}?autoplay=true`, tv: (id: number, s: number, e: number) => `https://vidlink.pro/tv/${id}/${s}/${e}?autoplay=true` },
   { key: 'vidnest', name: 'VidNest', tag: 'Alt', movie: (id: number) => `https://vidnest.fun/movie/${id}`, tv: (id: number, s: number, e: number) => `https://vidnest.fun/tv/${id}/${s}/${e}` },
 ] as const;
@@ -22,12 +22,12 @@ export const ANIME_SERVERS = [
   { key: 'zokoanime', name: 'Zokoanime', tag: 'Anime' },
 ] as const;
 
-export const DEFAULT_PREFERENCES: ServerPreferences = { audio: 'sub', source: RC_DEFAULT_SOURCE, zokoTemplate: '', sandbox: false };
+export const DEFAULT_PREFERENCES: ServerPreferences = { audio: 'sub', source: RC_DEFAULT_SOURCE, zokoTemplate: '', sandbox: true };
 const PREF_KEY = 'aethoflix-server-preferences-v1';
 
 export function serversFor(anime: boolean): { key: ServerKey; name: string; tag: string; number: number }[] {
   const list = anime
-    ? [{ key: 'nxsha' as const, name: 'Nxsha', tag: 'HD + Subs' }, ...ANIME_SERVERS, ...STD_SERVERS.filter((s) => s.key !== 'nxsha')]
+    ? [{ key: 'bingr' as const, name: 'Bingr', tag: '4K' }, ...ANIME_SERVERS, ...STD_SERVERS.filter((s) => s.key !== 'bingr')]
     : STD_SERVERS;
   return list.map((server, index) => ({ key: server.key, name: server.name, tag: server.tag, number: index + 1 }));
 }
@@ -38,7 +38,7 @@ export function readServerPreferences(key: ServerKey): ServerPreferences {
     const value = all[key];
     return { audio: value?.audio === 'dub' ? 'dub' : 'sub', source: value?.source === 'hd-2' ? 'hd-2' : RC_DEFAULT_SOURCE,
       zokoTemplate: typeof value?.zokoTemplate === 'string' ? value.zokoTemplate.slice(0, 2000) : '',
-      sandbox: Boolean(value?.sandbox) };
+      sandbox: value?.sandbox !== undefined ? Boolean(value.sandbox) : true };
   } catch { return { ...DEFAULT_PREFERENCES }; }
 }
 

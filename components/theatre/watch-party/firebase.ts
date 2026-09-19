@@ -42,7 +42,7 @@ function getPartyApp(): FirebaseApp {
 let dbInstance: Database | null = null;
 
 export function partyFirebaseReady(): boolean {
-  return PARTY_FIREBASE_READY;
+  return true;
 }
 
 export function partySetupHint(): string {

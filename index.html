@@ -74,6 +74,17 @@
       // 1. Safe Window.open Interceptor: Allow authentication & trusted popups, block rogue ad popups
       var origOpen = window.open;
       var blockOpen = function(url, target, features) {
+        // When video player or 3D theatre is active, strictly prevent any blank popups or external tabs
+        if (window.__isPlayerActive) {
+          if (url && typeof isSafeDestination === 'function' && isSafeDestination(url)) {
+            if (typeof origOpen === 'function') {
+              return origOpen.apply(window, arguments);
+            }
+          }
+          console.warn('[AdShield] Blocked popup attempt during active playback:', url || 'blank');
+          return null;
+        }
+
         // Firebase Auth opens a blank popup synchronously with window.open("", target, features)
         // or window.open("about:blank", ...), or directly navigates to trusted OAuth endpoints.
         if (!url || url === 'about:blank' || isSafeDestination(url)) {

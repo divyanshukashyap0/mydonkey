@@ -49,7 +49,7 @@ export default function AnimeEditionPicker({ title, edition, onChoose, disabled 
   };
 
   return <div className="anime-edition-picker">
-    <div className="catalog-section-label"><span>ANIME EDITION</span><span className="edition-links"><a href="https://anilist.co/search/anime" target="_blank" rel="noopener noreferrer">Find AniList IDs<ExternalLink size={12} /></a><a href="https://myanimelist.net/topanime.php" target="_blank" rel="noopener noreferrer">Find MAL IDs<ExternalLink size={12} /></a></span></div>
+    <div className="catalog-section-label"><span>ANIME EDITION</span></div>
     {edition ? <div className="matched-edition"><Check size={17} /><div><strong>{edition.title}</strong><span>AniList #{edition.id}{edition.year ? ` / ${edition.year}` : ''}{edition.episodes ? ` / ${edition.episodes} episodes` : ''}</span><span className="matched-edition-links"><a href={`https://anilist.co/anime/${edition.id}`} target="_blank" rel="noopener noreferrer">AniList<ExternalLink size={11} /></a>{edition.malId ? <a href={`https://myanimelist.net/anime/${edition.malId}`} target="_blank" rel="noopener noreferrer">MAL #{edition.malId}<ExternalLink size={11} /></a> : null}</span></div><button className="icon-button" aria-label="Change anime edition" disabled={disabled} onClick={() => onChoose(null)}><X size={16} /></button></div> : <>
       <div className="auto-edition-block">
         <p className="catalog-helper"><strong>No IDs needed.</strong> We already looked this title up on AniList. Pick the matching season below — that is all.</p>

@@ -72,6 +72,7 @@ const DrivePlayer: React.FC<DrivePlayerProps> = ({ driveId, title = 'Video Conte
                         height: 'calc(100% + 40px)',
                     }}
                     src={embedUrl}
+                    sandbox="allow-forms allow-scripts allow-same-origin allow-presentation"
                     allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
                     referrerPolicy="no-referrer"
                     loading="eager"

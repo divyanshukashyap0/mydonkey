@@ -54,6 +54,19 @@ interface FAQItem {
 
 const SUPPORT_CARDS: SupportCard[] = [
     {
+        id: 'theatre-help',
+        title: '3D Virtual Cinema Guide & Help',
+        tagline: '3D auditorium navigation, seating, watch parties & controls',
+        description: 'Complete user guide for the 3D Virtual Cinema auditorium: keyboard/touch walking controls, recliner seating, episode selection, synchronized watch parties, and in-seat concession waiters.',
+        icon: Film,
+        badge: '3D CINEMA',
+        gradient: 'from-amber-500/20 via-yellow-500/10 to-transparent border-amber-500/30 hover:border-amber-400/60',
+        badgeBg: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+        actionType: 'navigate',
+        target: '/theatre-help',
+        tags: ['theatre', 'theater', '3d', 'cinema', 'auditorium', 'seats', 'recliners', 'watch party', 'controls', 'walk', 'virtual']
+    },
+    {
         id: 'sound-enhancements',
         title: 'Sound Enhancements & Booster',
         tagline: 'Up to 400% Web Audio & Iframe Extension Guide',

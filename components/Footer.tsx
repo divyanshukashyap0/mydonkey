@@ -19,6 +19,7 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
       title: 'Support',
       links: [
         { label: 'Help & Support Hub', action: 'support' },
+        { label: '3D Theatre Help & Guide', action: 'theatre-help' },
         { label: 'Community Help Chat', action: 'community-chat' },
         { label: 'Supported Devices', action: 'devices' },
         { label: 'Contact Support Desk', action: 'contact' },

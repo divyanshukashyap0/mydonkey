@@ -7,6 +7,8 @@ import {
   BellRing,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Film,
   Grid2X2,
   LoaderCircle,
@@ -18,9 +20,8 @@ import {
   PersonStanding,
   Play,
   RotateCcw,
+  Smartphone,
   Users,
-  Volume2,
-  VolumeX,
   X,
   Tv,
   Wifi,
@@ -42,6 +43,7 @@ import { useWatchParty } from './watch-party/useWatchParty';
 import { cleanProfile, loadProfile, saveProfile } from './watch-party/profile';
 import { Content } from '../../types';
 import { useStore } from '../../context/StoreContext';
+import { useAdShield } from '../../utils/useAdShield';
 import { setTheatreTitle } from '../../utils/titleManager';
 import './styles/experience.css';
 
@@ -58,7 +60,7 @@ function initialQuality(): Quality {
   try {
     const saved = localStorage.getItem('mydonkey-theatre-quality');
     if (saved === 'auto' || saved === 'high' || saved === 'performance') return saved;
-  } catch {}
+  } catch { }
   return 'performance';
 }
 
@@ -66,7 +68,7 @@ function initialMotion() {
   try {
     const saved = localStorage.getItem('mydonkey-theatre-motion');
     if (saved !== null) return saved === 'true';
-  } catch {}
+  } catch { }
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
@@ -81,9 +83,61 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { currentProfile, currentUser } = useStore();
+  const { currentProfile, currentUser, addToWatchHistory } = useStore();
 
   const content = propContent || (location.state as { content?: Content })?.content || null;
+
+  // AdShield: Suppress external popups and top-level redirects
+  useAdShield({
+    defaultEnabled: true,
+    defaultMode: 'strict',
+    isActive: true,
+  });
+
+  const isMobile = useMemo(() => {
+    return typeof navigator !== 'undefined' && (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || ('ontouchstart' in window && window.innerWidth < 1024));
+  }, []);
+
+  const [isPortrait, setIsPortrait] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(orientation: portrait)').matches : false
+  );
+  const [dismissRotatePrompt, setDismissRotatePrompt] = useState(false);
+
+  // Automatically lock smartphone orientation to landscape when Theatre opens
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const tryLockLandscape = async () => {
+      try {
+        if (screen.orientation && (screen.orientation as any).lock) {
+          await (screen.orientation as any).lock('landscape');
+        }
+      } catch (_) {
+        // Browser may require user gesture or fullscreen first
+      }
+    };
+
+    void tryLockLandscape();
+
+    const mq = window.matchMedia('(orientation: portrait)');
+    const checkOrientation = () => {
+      setIsPortrait(mq.matches);
+    };
+    mq.addEventListener?.('change', checkOrientation);
+    window.addEventListener('resize', checkOrientation);
+    window.addEventListener('orientationchange', checkOrientation);
+
+    return () => {
+      mq.removeEventListener?.('change', checkOrientation);
+      window.removeEventListener('resize', checkOrientation);
+      window.removeEventListener('orientationchange', checkOrientation);
+      try {
+        if (screen.orientation && (screen.orientation as any).unlock) {
+          (screen.orientation as any).unlock();
+        }
+      } catch (_) { }
+    };
+  }, [isMobile]);
 
   const engine = useRef<CinemaEngine | null>(null);
   const pendingSeat = useRef<string | null>(null);
@@ -95,15 +149,51 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
     streamUrl?: string;
   } | null>(null);
 
+  const hasContentOrParty = Boolean(
+    content ||
+    propStreamUrl ||
+    searchParams.get('id') ||
+    searchParams.get('url') ||
+    searchParams.get('streamUrl') ||
+    searchParams.get('title') ||
+    searchParams.has('party')
+  );
+
   const [snapshot, setSnapshot] = useState<CinemaSnapshot>(INITIAL_SNAPSHOT);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
-  const [panel, setPanel] = useState<Panel>(() => (searchParams.has('party') ? 'party' : null));
+  const [panel, setPanel] = useState<Panel>(() => {
+    if (searchParams.has('party')) return 'party';
+    if (!hasContentOrParty) return 'catalog';
+    return null;
+  });
   const [catalogReturn, setCatalogReturn] = useState<Panel | null>(null);
   const [catalogTitle, setCatalogTitle] = useState<CatalogTitle | null>(null);
   const [hudVisible, setHudVisible] = useState(true);
   const [movieHint, setMovieHint] = useState(false);
   const hudTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Auto-hiding Topbar: hides after 3 seconds of inactivity
+  const [topbarVisible, setTopbarVisible] = useState(true);
+  const topbarTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isTopbarHovered = useRef(false);
+
+  const resetTopbarTimer = useCallback(() => {
+    setTopbarVisible(true);
+    if (topbarTimer.current) clearTimeout(topbarTimer.current);
+    if (!isTopbarHovered.current && panel === null) {
+      topbarTimer.current = setTimeout(() => {
+        setTopbarVisible(false);
+      }, 3000);
+    }
+  }, [panel]);
+
+  useEffect(() => {
+    resetTopbarTimer();
+    return () => {
+      if (topbarTimer.current) clearTimeout(topbarTimer.current);
+    };
+  }, [resetTopbarTimer]);
 
   const [profile, setProfile] = useState<PlayerProfile>(() => {
     const saved = loadProfile();
@@ -141,6 +231,39 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
   const inParty = watchParty.state.status === 'connected';
   const canControlPlayback = !inParty || watchParty.state.room?.hostId === watchParty.state.selfId;
 
+  const isSeries = Boolean(
+    snapshot.embed?.catalog.mediaType === 'tv' ||
+    snapshot.embed?.selection.anime ||
+    snapshot.embed?.catalog.anime ||
+    content?.type === 'tv' ||
+    searchParams.get('type') === 'tv' ||
+    (snapshot.embed?.selection && ('season' in snapshot.embed.selection))
+  );
+
+  const currentSeasonNum = snapshot.embed?.selection.season ?? propSeason ?? 1;
+  const currentEpisodeNum = snapshot.embed?.selection.episode ?? propEpisode ?? 1;
+
+  const handleStepEpisode = useCallback(async (delta: number) => {
+    if (!snapshot.embed || !engine.current) return;
+    const currentEp = snapshot.embed.selection.episode || 1;
+    const nextEp = Math.max(1, currentEp + delta);
+    try {
+      const media = makeEmbed(snapshot.embed.catalog, {
+        ...snapshot.embed.selection,
+        episode: nextEp,
+        animeEpisode: nextEp,
+      });
+      if (watchParty.state.status === 'connected') {
+        await watchParty.loadMedia(media);
+      } else {
+        await engine.current.loadMedia(media, true);
+      }
+      notify(`Screening Season ${snapshot.embed.selection.season} • Episode ${nextEp}`);
+    } catch (err) {
+      console.warn('Failed to switch episode:', err);
+    }
+  }, [snapshot.embed, watchParty, notify]);
+
   const executePendingPlay = useCallback(() => {
     if (!pendingAutoPlay.current || !engine.current) return;
     const pending = pendingAutoPlay.current;
@@ -175,18 +298,38 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
         engine.current?.takeSeat('B3');
       }, 550);
 
+      // Record in browser cache watch history
+      if (pending.title) {
+        try {
+          const theatreContent: Content = {
+            id: String(pending.title.id),
+            title: pending.title.title,
+            overview: pending.title.overview || '',
+            poster_path: pending.title.posterPath || '',
+            backdrop_path: pending.title.backdropPath || '',
+            youtubeId: '',
+            type: pending.title.mediaType === 'tv' ? 'tv' : 'movie',
+            genres: pending.title.anime ? ['Anime'] : [],
+            release_date: pending.title.year || '',
+            vote_average: pending.title.rating || 7.5,
+            createdAt: new Date().toISOString()
+          };
+          addToWatchHistory(theatreContent).catch(() => {});
+        } catch (_) {}
+      }
+
       notify(`Playing “${pending.title.title}” on the 3D cinema screen.`);
     } catch (err) {
       console.warn('Failed to autoplay media:', err);
     }
-  }, [notify]);
+  }, [notify, addToWatchHistory]);
 
   // Handle incoming movie/show prop or location state from mydonkey
   useEffect(() => {
     if (!content) return;
 
     const isAnime = Boolean(content.genres?.some(g => g.toLowerCase().includes('anime')));
-    const serverKey: ServerKey = propServer || 'nxsha';
+    const serverKey: ServerKey = propServer || 'bingr';
     const stream = propStreamUrl || content.videoUrl;
     const controller = new AbortController();
 
@@ -267,8 +410,8 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
         setCatalogTitle(title);
         const options = serversFor(title.anime);
         const serverKey =
-          (Number.isInteger(srvIndex) && options[srvIndex] ? options[srvIndex].key : 'nxsha') ??
-          'nxsha';
+          (Number.isInteger(srvIndex) && options[srvIndex] ? options[srvIndex].key : 'bingr') ??
+          'bingr';
 
         pendingAutoPlay.current = {
           title,
@@ -398,21 +541,21 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
     engine.current?.setQuality(quality);
     try {
       localStorage.setItem('mydonkey-theatre-quality', quality);
-    } catch {}
+    } catch { }
   }, [quality]);
 
   useEffect(() => {
     engine.current?.setReducedMotion(reducedMotion);
     try {
       localStorage.setItem('mydonkey-theatre-motion', String(reducedMotion));
-    } catch {}
+    } catch { }
   }, [reducedMotion]);
 
   useEffect(() => {
     engine.current?.setRefreshTarget(refreshTarget);
     try {
       localStorage.setItem('mydonkey-theatre-high-refresh', refreshTarget ? 'on' : 'off');
-    } catch {}
+    } catch { }
   }, [refreshTarget]);
 
   useEffect(() => {
@@ -447,10 +590,12 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
       }
       lastX = e.clientX;
       lastY = e.clientY;
+      resetTopbarTimer();
       if (movieMode) revealHud();
       engine.current?.reportActivity();
     };
     const onKeyOrWheel = () => {
+      resetTopbarTimer();
       if (movieMode) revealHud();
       engine.current?.reportActivity();
     };
@@ -458,13 +603,15 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
     window.addEventListener('pointermove', onPointer, { passive: true });
     window.addEventListener('keydown', onKeyOrWheel, { passive: true });
     window.addEventListener('wheel', onKeyOrWheel, { passive: true });
+    window.addEventListener('touchstart', onKeyOrWheel, { passive: true });
     return () => {
       window.removeEventListener('pointerdown', onKeyOrWheel);
       window.removeEventListener('pointermove', onPointer);
       window.removeEventListener('keydown', onKeyOrWheel);
       window.removeEventListener('wheel', onKeyOrWheel);
+      window.removeEventListener('touchstart', onKeyOrWheel);
     };
-  }, [movieMode, revealHud]);
+  }, [movieMode, revealHud, resetTopbarTimer]);
 
   const toggleWaiters = useCallback(() => {
     setWaitersOn((v) => {
@@ -559,13 +706,31 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
   return (
     <div className="theatre-viewport fixed inset-0 z-[500] bg-[#0c0e0f] text-[#e8e5df] overflow-hidden select-none">
       <div
-        className={`app-shell ${ready ? 'is-ready' : ''} ${movieMode ? 'movie-session' : ''} ${
-          movieMode && !hudVisible ? 'hud-hidden' : ''
-        } ${reducedMotion ? 'reduced-motion' : ''}`}
+        className={`app-shell ${ready ? 'is-ready' : ''} ${movieMode ? 'movie-session' : ''} ${movieMode && !hudVisible ? 'hud-hidden' : ''
+          } ${reducedMotion ? 'reduced-motion' : ''}`}
         inert={panel ? true : undefined}
       >
+        {/* Top edge hover sensor: only active when topbar is hidden */}
+        {!topbarVisible && (
+          <div
+            className="fixed top-0 left-0 right-0 h-4 z-[35] pointer-events-auto"
+            onPointerEnter={resetTopbarTimer}
+          />
+        )}
+
         {/* Header Bar */}
-        <header className="site-header">
+        <header
+          className={`site-header ${!topbarVisible ? 'is-hidden' : ''}`}
+          onMouseEnter={() => {
+            isTopbarHovered.current = true;
+            setTopbarVisible(true);
+            if (topbarTimer.current) clearTimeout(topbarTimer.current);
+          }}
+          onMouseLeave={() => {
+            isTopbarHovered.current = false;
+            resetTopbarTimer();
+          }}
+        >
           <div className="header-left">
             <button
               className="back-to-site"
@@ -586,15 +751,40 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
           </div>
 
           <nav className="main-nav hidden md:flex" aria-label="Experience navigation">
-            <button className="nav-link is-active" onClick={() => setPanel(null)}>
+            <button className={`nav-link ${panel === null ? 'is-active' : ''}`} onClick={() => setPanel(null)}>
               Auditorium
             </button>
-            <button className="nav-link" onClick={() => setPanel('experience')}>
+            <button className={`nav-link ${panel === 'experience' ? 'is-active' : ''}`} onClick={() => setPanel('experience')}>
               About Cinema
             </button>
           </nav>
 
           <div className="header-right">
+            {isSeries && (
+              <button
+                className={`topbar-episodes-btn ${panel === 'episodes' ? 'is-active' : ''}`}
+                onClick={() => setPanel('episodes')}
+                title={`Season ${currentSeasonNum} Episode ${currentEpisodeNum} • Choose Episode`}
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  borderRadius: '999px',
+                  background: panel === 'episodes' ? '#d6bb90' : 'rgba(255,255,255,0.06)',
+                  color: panel === 'episodes' ? '#1a1c1b' : '#f0eae0',
+                  border: panel === 'episodes' ? '1px solid #d6bb90' : '1px solid rgba(255,255,255,0.14)',
+                  cursor: 'pointer',
+                  transition: 'all 180ms ease',
+                }}
+              >
+                <Tv size={13} className={panel === 'episodes' ? 'text-black' : 'text-amber-400'} />
+                <span>S{currentSeasonNum}:E{currentEpisodeNum}</span>
+              </button>
+            )}
+
             <button
               className={`watch-party-button ${inParty ? 'is-connected' : ''}`}
               onClick={() => setPanel('party')}
@@ -724,8 +914,8 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
                       snapshot.eatingProgress !== null
                         ? snapshot.foodName
                         : snapshot.servicePhase !== 'idle'
-                        ? 'Server on the way'
-                        : 'Ring for Waiter Service'
+                          ? 'Server on the way'
+                          : 'Ring for Waiter Service'
                     }
                     aria-label="Ring for Waiter"
                   >
@@ -739,9 +929,8 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
 
                 {showSitStand && (
                   <button
-                    className={`primary-button take-seat-button ${
-                      snapshot.mode === 'seated' ? 'stand-button' : ''
-                    }`}
+                    className={`primary-button take-seat-button ${snapshot.mode === 'seated' ? 'stand-button' : ''
+                      }`}
                     onClick={primaryAction}
                     disabled={!ready || !!error || transitioning || Boolean(snapshot.reservingSeat)}
                     title={actionLabel}
@@ -800,10 +989,10 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
                 {movieMode
                   ? `Seat ${snapshot.seatId || 'Recliner'}. Enjoy the screening.`
                   : snapshot.mode === 'walking'
-                  ? 'Moving to seat...'
-                  : snapshot.mode === 'standing'
-                  ? 'Auditorium is yours to explore.'
-                  : 'Settle into any recliner.'}
+                    ? 'Moving to seat...'
+                    : snapshot.mode === 'standing'
+                      ? 'Auditorium is yours to explore.'
+                      : 'Settle into any recliner.'}
               </span>
             </div>
 
@@ -881,7 +1070,7 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
 
             <button
               className="film-button"
-              onClick={() => setPanel('screen')}
+              onClick={() => (snapshot.embed ? setPanel('screen') : setPanel('catalog'))}
               disabled={!ready || !!error}
               aria-label={`Screen player, ${snapshot.filmTitle}`}
             >
@@ -889,28 +1078,65 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
                 {snapshot.loading
                   ? 'PREPARING SCREEN'
                   : snapshot.embed
-                  ? 'STREAMING PROVIDER'
-                  : inParty
-                  ? 'SHARED SCREEN'
-                  : 'NOW SCREENING'}
+                    ? 'STREAMING PROVIDER'
+                    : inParty
+                      ? 'SHARED SCREEN'
+                      : 'SELECT CONTENT'}
               </span>
               <span className="film-meta">
-                <strong>{snapshot.filmTitle}</strong>
+                <strong>{snapshot.embed ? snapshot.filmTitle : 'Pick a Movie or Series'}</strong>
                 <span className="film-kind">
                   {snapshot.embed
                     ? 'Provider Stream'
                     : snapshot.mediaKind === 'file'
-                    ? 'Local Video'
-                    : snapshot.mediaKind === 'url'
-                    ? 'Direct Video'
-                    : 'Ambient Scene'}
+                      ? 'Local Video'
+                      : snapshot.mediaKind === 'url'
+                        ? 'Direct Video'
+                        : 'Click to choose content'}
                 </span>
                 <ChevronDown size={12} />
               </span>
             </button>
           </div>
 
-          {inParty ? (
+          {isSeries && snapshot.embed ? (
+            <div className="footer-center footer-episodes-stepper">
+              <button
+                type="button"
+                className="footer-ep-step-btn"
+                disabled={currentEpisodeNum <= 1 || snapshot.loading}
+                onClick={() => void handleStepEpisode(-1)}
+                title="Previous Episode"
+                aria-label="Previous Episode"
+              >
+                <ChevronLeft size={14} />
+                <span className="hidden md:inline">Prev</span>
+              </button>
+
+              <button
+                type="button"
+                className="footer-ep-current-btn"
+                onClick={() => setPanel('episodes')}
+                title="Open Episodes & Seasons Menu"
+              >
+                <Tv size={13} className="text-amber-400" />
+                <span>S{currentSeasonNum}:E{currentEpisodeNum}</span>
+                <span className="footer-ep-label hidden sm:inline">Episodes</span>
+              </button>
+
+              <button
+                type="button"
+                className="footer-ep-step-btn"
+                disabled={snapshot.loading}
+                onClick={() => void handleStepEpisode(1)}
+                title="Next Episode"
+                aria-label="Next Episode"
+              >
+                <span className="hidden md:inline">Next</span>
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          ) : inParty ? (
             <button className="footer-center party-footer-presence" onClick={() => setPanel('party')}>
               <Users size={14} />
               <span>{watchParty.state.members.length} in watch party</span>
@@ -926,59 +1152,23 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
                 Open controls <ArrowRight size={11} />
               </span>
             </button>
-          ) : (
-            <div className="footer-center">
-              <Film size={13} strokeWidth={1.3} />
-              <span>3D Virtual Cinema · Settle into your seat</span>
-            </div>
-          )}
+          ) : null}
 
           <div className="experience-tools">
             {movieMode && (
-              <button
-                className="waiters-toggle tool-button"
-                onClick={toggleWaiters}
-                aria-pressed={waitersOn}
-                title={waitersOn ? 'Hide waiters' : 'Show waiters'}
-              >
-                <BellRing size={15} strokeWidth={1.5} />
-                <span>Waiters {waitersOn ? 'on' : 'off'}</span>
-              </button>
+              <>
+                <button
+                  className="waiters-toggle tool-button"
+                  onClick={toggleWaiters}
+                  aria-pressed={waitersOn}
+                  title={waitersOn ? 'Hide waiters' : 'Show waiters'}
+                >
+                  <BellRing size={15} strokeWidth={1.5} />
+                  <span>Waiters {waitersOn ? 'on' : 'off'}</span>
+                </button>
+                <span className="tool-divider" />
+              </>
             )}
-
-            <span className="tool-divider" />
-
-            <button
-              className="sound-button tool-button"
-              onClick={() => (snapshot.embed ? setPanel('screen') : engine.current?.toggleMute())}
-              disabled={!ready || !!error}
-              aria-label={snapshot.muted ? 'Unmute' : 'Mute'}
-            >
-              {snapshot.embed || !snapshot.muted ? (
-                <Volume2 size={16} strokeWidth={1.5} />
-              ) : (
-                <VolumeX size={16} strokeWidth={1.5} />
-              )}
-              <span>{snapshot.embed ? 'Sound' : snapshot.muted ? 'Sound Off' : 'Sound On'}</span>
-            </button>
-
-            <span className="tool-divider" />
-
-            <button
-              className="quality-button tool-button"
-              onClick={() => setPanel('settings')}
-              title="Graphics Quality & Settings"
-            >
-              <Monitor size={15} strokeWidth={1.5} />
-              <span>{quality === 'auto' ? 'Adaptive' : quality === 'high' ? 'Ultra' : 'Performance'}</span>
-              <span className="fps-counter">
-                <i />
-                {snapshot.fps || '--'} <span>FPS</span>
-                {snapshot.highRefresh && <b>120Hz</b>}
-              </span>
-            </button>
-
-            <span className="tool-divider" />
 
             <button
               className="icon-button fullscreen-button"
@@ -1025,6 +1215,48 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
           cinemaReady={ready && !error}
           currentContent={content}
         />
+      )}
+
+      {/* Mobile Landscape Orientation Helper Overlay */}
+      {isMobile && isPortrait && !dismissRotatePrompt && (
+        <div className="fixed inset-0 z-[1000] bg-black/95 backdrop-blur-2xl flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300 select-none">
+          <div className="relative mb-5">
+            <div className="w-16 h-16 rounded-2xl bg-brand-red/10 border border-brand-red/30 flex items-center justify-center text-brand-red shadow-[0_0_35px_rgba(229,9,20,0.35)]">
+              <RotateCcw size={32} className="animate-spin duration-1000" />
+            </div>
+            <Smartphone size={26} className="absolute -top-1 -right-1 text-white animate-pulse" />
+          </div>
+          <h3 className="text-xl md:text-2xl font-black text-white mb-2 tracking-tight">Rotate to Landscape</h3>
+          <p className="text-gray-300 text-xs md:text-sm max-w-xs mb-6 leading-relaxed">
+            The 3D Virtual Cinema is optimized for widescreen landscape view. Please rotate your phone for the best experience.
+          </p>
+          <div className="flex flex-col gap-2.5 w-full max-w-xs">
+            <button
+              onClick={async () => {
+                try {
+                  if (document.documentElement.requestFullscreen) {
+                    await document.documentElement.requestFullscreen();
+                  }
+                } catch (_) { }
+                try {
+                  if (screen.orientation && (screen.orientation as any).lock) {
+                    await (screen.orientation as any).lock('landscape');
+                  }
+                } catch (_) { }
+                setDismissRotatePrompt(true);
+              }}
+              className="bg-brand-red hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl transition-all active:scale-95 shadow-lg flex items-center justify-center gap-2 text-sm cursor-pointer"
+            >
+              <Maximize size={16} /> Enter Landscape Cinema
+            </button>
+            <button
+              onClick={() => setDismissRotatePrompt(true)}
+              className="text-xs text-gray-400 hover:text-white py-2 transition cursor-pointer"
+            >
+              Continue in Portrait
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Notification Toast */}

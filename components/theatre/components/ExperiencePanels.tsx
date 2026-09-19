@@ -34,8 +34,9 @@ import PlayerProfilePanel from './PlayerProfilePanel';
 import WatchPartyPanel from './WatchPartyPanel';
 import ScreenPlayerPanel from './ScreenPlayerPanel';
 import CatalogPanel, { TmdbAttribution } from './CatalogPanel';
+import EpisodesPanel from './EpisodesPanel';
 
-export type Panel = 'seats' | 'controls' | 'experience' | 'settings' | 'screen' | 'party' | 'player' | 'catalog' | null;
+export type Panel = 'seats' | 'controls' | 'experience' | 'settings' | 'screen' | 'party' | 'player' | 'catalog' | 'episodes' | null;
 
 function Dialog({ children, onClose, kind }: { children: ReactNode; onClose: () => void; kind: string }) {
   const panel = useRef<HTMLDivElement>(null);
@@ -57,7 +58,7 @@ function Dialog({ children, onClose, kind }: { children: ReactNode; onClose: () 
   }, [onClose, kind]);
 
   return (
-    <div className={`modal-backdrop ${kind === 'catalog' ? 'catalog-backdrop' : ''}`} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <div className={`modal-backdrop ${kind === 'catalog' || kind === 'episodes' ? 'catalog-backdrop' : ''}`} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <div ref={panel} className={`experience-panel panel-${kind}`} role="dialog" aria-modal="true" aria-labelledby="panel-heading">
         <button className="icon-button panel-close" onClick={onClose} aria-label="Close panel"><X size={19} /></button>
         {children}
@@ -189,7 +190,7 @@ function AboutPanel({
   const rating = details?.rating || currentContent?.vote_average || activeCatalog?.rating || null;
   const runtime = details?.runtime ? `${Math.floor(details.runtime / 60)}h ${details.runtime % 60}m` : currentContent?.duration ? String(currentContent.duration) : null;
   const mediaType = (details?.mediaType || currentContent?.type || activeCatalog?.mediaType || 'movie').toUpperCase();
-  const serverName = snapshot.embed?.selection.server?.toUpperCase() || (snapshot.localFilm ? 'LOCAL' : snapshot.mediaKind === 'url' ? 'DIRECT' : 'NXSHA (AUTO)');
+  const serverName = snapshot.embed?.selection.server?.toUpperCase() || (snapshot.localFilm ? 'LOCAL' : snapshot.mediaKind === 'url' ? 'DIRECT' : 'BINGR (AUTO)');
   const tvSeasonEp = snapshot.embed?.selection.season ? `S${snapshot.embed.selection.season} · E${snapshot.embed.selection.episode}` : null;
 
   const genres = (details?.genres && details.genres.length > 0)
@@ -467,6 +468,16 @@ export default function ExperiencePanels(props: Props) {
     {props.panel === 'settings' && <SettingsPanel {...props} />}
     {props.panel === 'screen' && <ScreenPlayerPanel engine={props.engine} snapshot={props.snapshot} party={props.party} onClose={props.onClose} onSeats={() => props.onOpenPanel('seats')} />}
     {props.panel === 'catalog' && <CatalogPanel engine={props.engine} snapshot={props.snapshot} party={props.party} onFinish={props.onClose} onSeats={() => props.onOpenPanel('seats')} initialTitle={props.initialCatalogTitle} />}
+    {props.panel === 'episodes' && (
+      <EpisodesPanel
+        engine={props.engine}
+        snapshot={props.snapshot}
+        party={props.party}
+        currentContent={props.currentContent}
+        catalogTitle={props.initialCatalogTitle}
+        onClose={props.onClose}
+      />
+    )}
     {props.panel === 'player' && <PlayerProfilePanel profile={props.profile} snapshot={props.snapshot} canFollow={props.cinemaReady} onSave={props.onProfile} onClose={props.onClose} onFollow={() => { props.onClose(); props.engine?.followPlayer(); }} />}
     {props.panel === 'party' && <WatchPartyPanel party={props.party} profile={props.profile} snapshot={props.snapshot} ready={props.cinemaReady} onProfile={props.onProfile} onPlayer={() => props.onOpenPanel('player')} onScreen={() => props.onOpenPanel('screen')} onPickFilm={props.onOpenCatalog} onSeats={() => props.onOpenPanel('seats')} onClose={props.onClose} onStart={() => { if (props.party.start()) { props.onClose(); if (props.snapshot.mode === 'explore') void props.engine?.takeSeat(); } }} />}
     <div className="panel-brand"><span className="tiny-brand-mark" /><span>MY DONKEY</span><span>3D CINEMA</span></div>

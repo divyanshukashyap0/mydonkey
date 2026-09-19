@@ -217,9 +217,9 @@ export interface StreamServerOption {
 }
 
 export const STREAM_SERVERS: StreamServerOption[] = [
+    { key: 'bingr', name: 'Bingr', tag: '4K Ultra', description: 'Crystal-clear 4K / UHD resolution', supports4K: true },
     { key: 'nxsha', name: 'Nxsha', tag: 'HD + Subs', description: 'High definition with multilingual subtitles', hasSubtitles: true },
     { key: 'vidstuck', name: 'VidStuck', tag: 'Fast 1080p', description: 'Ultra-fast bufferless streaming' },
-    { key: 'bingr', name: 'Bingr', tag: '4K Ultra', description: 'Crystal-clear 4K / UHD resolution', supports4K: true },
     { key: 'zxc', name: 'ZXC', tag: 'Instant', description: 'Low-latency direct player' },
     { key: 'vidlink', name: 'VidLink', tag: 'Multi-CDN', description: 'Redundant high-availability CDN' },
     { key: 'vidnest', name: 'VidNest', tag: 'Alt HD', description: 'Reliable secondary mirror' },
@@ -230,9 +230,9 @@ export const STREAM_SERVERS: StreamServerOption[] = [
 ];
 
 export const STANDARD_SERVER_FALLBACK_ORDER: StreamServerKey[] = [
+    'bingr',
     'nxsha',
     'vidstuck',
-    'bingr',
     'zxc',
     'vidlink',
     'vidnest',
@@ -240,6 +240,7 @@ export const STANDARD_SERVER_FALLBACK_ORDER: StreamServerKey[] = [
 ];
 
 export const ANIME_SERVER_FALLBACK_ORDER: StreamServerKey[] = [
+    'bingr',
     'nxsha',
     'megaplay',
     'recloud',
@@ -265,7 +266,7 @@ export interface ServerEmbedOptions {
 export const buildServerEmbedUrl = (
     id: string | number,
     type: 'movie' | 'tv' | string = 'movie',
-    serverKey: StreamServerKey = 'nxsha',
+    serverKey: StreamServerKey = 'bingr',
     options: ServerEmbedOptions = {}
 ): string => {
     const rawId = String(id || '').trim();

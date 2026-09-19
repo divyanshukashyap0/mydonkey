@@ -152,11 +152,11 @@ const ContentRail: React.FC<ContentRailProps> = ({
  
                                     <div className={`relative ${showRanking ? (size === 'mid' ? 'w-24 xs:w-28 sm:w-32 md:w-36' : 'w-36 xs:w-44 sm:w-52 md:w-64') : 'flex-1'} ${layout === 'landscape' ? 'aspect-video' : 'aspect-[2/3]'} group/card rounded-xl overflow-hidden shadow-xl hover:scale-105 transition-transform duration-300 z-20`}>
                                         {layout === 'landscape' ? (
-                                            (item.backdrop_path || item.poster_path) ? (
+                                            (item.backdrop_path || item.poster_path || (item as any).bannerUrl || (item as any).posterUrl || (item as any).thumbnailUrl) ? (
                                                 <picture>
                                                     {item.backdrop_path_mobile && <source media="(max-width: 767px)" srcSet={item.backdrop_path_mobile} />}
                                                     <img 
-                                                        src={item.backdrop_path || item.poster_path} 
+                                                        src={item.backdrop_path || item.poster_path || (item as any).bannerUrl || (item as any).posterUrl || (item as any).thumbnailUrl} 
                                                         className="w-full h-full object-cover aspect-video" 
                                                         alt={item.title || ''} 
                                                         draggable={false} 
@@ -175,9 +175,9 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                                 <img src="/logo.png" className="w-full h-full object-contain p-4 bg-zinc-900 aspect-video" alt={item.title || ''} />
                                             )
                                         ) : (
-                                            (item.poster_path_mobile || item.poster_path) ? (
+                                            (item.poster_path_mobile || item.poster_path || (item as any).posterUrl || (item as any).thumbnailUrl || item.backdrop_path) ? (
                                                 <img
-                                                    src={item.poster_path_mobile || item.poster_path}
+                                                    src={item.poster_path_mobile || item.poster_path || (item as any).posterUrl || (item as any).thumbnailUrl || item.backdrop_path}
                                                     className="w-full h-full object-cover"
                                                     alt={item.title || ''}
                                                     draggable={false}
@@ -194,6 +194,16 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                             ) : (
                                                 <img src="/logo.png" className="w-full h-full object-contain p-4 bg-zinc-900 aspect-[2/3]" alt={item.title || ''} />
                                             )
+                                        )}
+
+                                        {/* Playback progress bar for continue watching */}
+                                        {typeof (item as any).progress === 'number' && (item as any).progress > 0 && (
+                                            <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/70 z-20 overflow-hidden pointer-events-none">
+                                                <div 
+                                                    className="h-full bg-red-600 rounded-r transition-all duration-300 shadow-[0_0_8px_rgba(220,38,38,0.9)]"
+                                                    style={{ width: `${Math.min(100, Math.max(5, (item as any).progress))}%` }}
+                                                />
+                                            </div>
                                         )}
 
                                         {/* Overlay on hover */}

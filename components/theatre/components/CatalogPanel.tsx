@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, ExternalLink, Film, Globe2, LoaderCircle, RotateCcw, Search, Star, X } from 'lucide-react';
 import { BYPASS_BASE, posterUrl, readEndpoint, saveEndpoint, TMDB_BASE, TMDB_LOGO, type TmdbEndpoint } from '../catalog/config';
-import { getEpisodes, getTitleDetails, resolveAnimeIds, searchTitles } from '../catalog/tmdb';
-import type { AnimeEdition, CatalogKind, CatalogPage, CatalogTitle, Episode, TitleDetails } from '../catalog/types';
+import { getEpisodes, getTitleDetails, searchTitles } from '../catalog/tmdb';
+import type { CatalogKind, CatalogPage, CatalogTitle, Episode, TitleDetails } from '../catalog/types';
 import type { CinemaSnapshot } from '../cinema/types';
 import type { CinemaEngine } from '../cinema/CinemaEngine';
 import type { WatchPartyController } from '../watch-party/useWatchParty';
@@ -52,12 +52,6 @@ export default function CatalogPanel({ snapshot, engine, party, onFinish, onSeat
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [myList, setMyList] = useState<CatalogTitle[]>(readMyList);
-  const [suggestedEdition, setSuggestedEdition] = useState<AnimeEdition | null>(null);
-  const [lookupType, setLookupType] = useState<'anilist' | 'mal'>('anilist');
-  const [lookupId, setLookupId] = useState('');
-  const [lookupBusy, setLookupBusy] = useState(false);
-  const [lookupError, setLookupError] = useState('');
-  const [lookupMessage, setLookupMessage] = useState('');
   const searchInput = useRef<HTMLInputElement>(null);
   const canControl = party.state.status !== 'connected' || party.state.room?.hostId === party.state.selfId;
   const inList = (title: CatalogTitle) => myList.some((item) => item.id === title.id && item.mediaType === title.mediaType);
@@ -70,22 +64,6 @@ export default function CatalogPanel({ snapshot, engine, party, onFinish, onSeat
       writeMyList(next);
       return next;
     });
-  };
-
-  const doLookup = async () => {
-    if (lookupBusy || !lookupId.trim()) return;
-    setLookupBusy(true); setLookupError(''); setLookupMessage('');
-    const controller = new AbortController();
-    try {
-      const value = Number(lookupId);
-      const edition = await resolveAnimeIds(lookupType === 'anilist' ? { anilistId: value } : { malId: value }, controller.signal);
-      setSuggestedEdition(edition);
-      setQuery(edition.title);
-      setKind('anime');
-      setPage(1);
-      setLookupMessage(`Matched "${edition.title}" (AniList #${edition.id}${edition.malId ? ` / MAL #${edition.malId}` : ''}). Pick its TMDB entry below and the edition is pre-filled.`);
-    } catch (problem) { setLookupError(problem instanceof Error ? problem.message : 'That ID could not be resolved.'); }
-    finally { setLookupBusy(false); }
   };
 
   useEffect(() => {
@@ -104,20 +82,19 @@ export default function CatalogPanel({ snapshot, engine, party, onFinish, onSeat
   const changeEndpoint = (next: TmdbEndpoint) => { setEndpoint(next); saveEndpoint(next); setPage(1); };
 
   return <>
-    <div className="catalog-panel-header"><div><span className="eyebrow">THE AETHOFLIX COLLECTION</span><h2 id="panel-heading">Find your next great story.</h2></div><span className="catalog-source-label"><Globe2 size={14} />Powered by TMDB</span></div>
+    <div className="catalog-panel-header"><div><span className="eyebrow">MY DONKEY 3D CINEMA</span><h2 id="panel-heading">What would you like to watch?</h2></div><span className="catalog-source-label"><Globe2 size={14} />Powered by TMDB</span></div>
     {!selected ? <>
       <form className="catalog-search" onSubmit={(event) => { event.preventDefault(); setAttempt((value) => value + 1); }}><Search size={20} /><input ref={searchInput} aria-label="Search movies, series, and anime" placeholder="Search movies, series, or anime..." value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} maxLength={160} autoComplete="off" />{query && <button type="button" aria-label="Clear search" onClick={() => { setQuery(''); setPage(1); searchInput.current?.focus(); }}><X size={17} /></button>}<button type="submit" className="search-submit" disabled={busy}>{busy ? <LoaderCircle className="spin" size={17} /> : <ArrowRight size={18} />}</button></form>
-      <div className="id-lookup-block"><div className="id-lookup-form"><select className="catalog-select id-lookup-select" aria-label="ID type" value={lookupType} disabled={lookupBusy} onChange={(event) => setLookupType(event.target.value as 'anilist' | 'mal')}><option value="anilist">AniList ID</option><option value="mal">MAL ID</option></select><input className="cinema-input" type="number" min="1" max="999999999" inputMode="numeric" aria-label="Anime ID to resolve" placeholder={lookupType === 'anilist' ? 'AniList ID' : 'MAL ID'} value={lookupId} onChange={(event) => setLookupId(event.target.value)} disabled={lookupBusy} /><button className="secondary-button" onClick={() => void doLookup()} disabled={lookupBusy || !lookupId.trim()}>{lookupBusy ? <LoaderCircle className="spin" size={15} /> : <Search size={15} />}Resolve</button></div><p className="catalog-helper">An optional shortcut for people who already have an ID. Search by title instead — no IDs needed, and the matched edition is pre-filled automatically.</p>{lookupError && <p className="form-error" role="alert">{lookupError}</p>}{lookupMessage && <p className="lookup-success" role="status">{lookupMessage}</p>}</div>
       <div className="catalog-toolbar"><div className="catalog-tabs" role="group" aria-label="Content category">{([{ key: 'all', label: 'All titles' }, { key: 'movie', label: 'Movies' }, { key: 'tv', label: 'Series' }, { key: 'anime', label: 'Anime' }, { key: 'mylist', label: `My list${myList.length ? ` (${myList.length})` : ''}` }] as const).map((item) => <button key={item.key} aria-pressed={kind === item.key} onClick={() => { setKind(item.key); setPage(1); }}>{item.label}</button>)}</div><span>{kind === 'mylist' ? 'SAVED TITLES' : query ? 'SEARCH RESULTS' : 'POPULAR RIGHT NOW'}</span></div>
       {kind === 'mylist' ? myList.length ? <div className="catalog-grid">{myList.map((title) => <div key={`${title.mediaType}-${title.id}`} className="catalog-result"><button className="catalog-result-open" onClick={() => setSelected(title)}><Poster title={title} /><span className="catalog-result-title">{title.title}</span><span className="catalog-result-meta"><span>{title.year || 'Year TBA'}<i />{title.anime ? 'Anime' : title.mediaType === 'movie' ? 'Movie' : 'Series'}</span>{title.rating > 0 && <span><Star size={11} />{title.rating.toFixed(1)}</span>}</span></button><button className={`list-toggle-button ${inList(title) ? 'is-saved' : ''}`} aria-label={inList(title) ? `Remove ${title.title} from your list` : `Save ${title.title} to your list`} onClick={() => toggleList(title)}><Star size={15} fill={inList(title) ? 'currentColor' : 'none'} /></button></div>)}</div> : <div className="catalog-empty"><Star size={30} /><h3>Your list is empty.</h3><p>Save titles from the collection with the star on any poster, and they will wait for you here — movies, series, and anime together.</p></div> : busy ? <div className="catalog-loading" role="status"><LoaderCircle className="spin" size={28} /><span>{query ? 'Finding your stories...' : 'Opening the collection...'}</span></div> : error ? <div className="catalog-error" role="alert"><Globe2 size={30} /><h3>Let us try another route.</h3><p>{error}</p><div><button className="secondary-button" onClick={() => setAttempt((value) => value + 1)}><RotateCcw size={15} />Retry</button><button className="primary-button" onClick={() => changeEndpoint(endpoint === 'standard' ? 'alternate' : 'standard')}>Try {endpoint === 'standard' ? 'alternate' : 'standard'} endpoint<ArrowRight size={16} /></button></div></div> : results?.results.length ? <div className="catalog-grid">{results.results.map((title) => <div key={`${title.mediaType}-${title.id}`} className="catalog-result"><button className="catalog-result-open" onClick={() => setSelected(title)}><Poster title={title} /><span className="catalog-result-title">{title.title}</span><span className="catalog-result-meta"><span>{title.year || 'Year TBA'}<i />{title.anime ? 'Anime' : title.mediaType === 'movie' ? 'Movie' : 'Series'}</span>{title.rating > 0 && <span><Star size={11} />{title.rating.toFixed(1)}</span>}</span></button><button className={`list-toggle-button ${inList(title) ? 'is-saved' : ''}`} aria-label={inList(title) ? `Remove ${title.title} from your list` : `Save ${title.title} to your list`} onClick={() => toggleList(title)}><Star size={15} fill={inList(title) ? 'currentColor' : 'none'} /></button></div>)}</div> : <div className="catalog-empty"><Search size={30} /><h3>No stories found just yet.</h3><p>Try another title or category.{kind === 'anime' ? ' Anime results use TMDB Japanese-animation metadata.' : ''}</p></div>}
       {!busy && !error && results && results.totalPages > 1 && <div className="catalog-pagination"><button className="secondary-button" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}><ChevronLeft size={16} />Previous</button><span>Page {page} of {results.totalPages}</span><button className="secondary-button" disabled={page >= results.totalPages} onClick={() => setPage((value) => value + 1)}>Next<ChevronRight size={16} /></button></div>}
-    </> : <TitleView key={`${selected.mediaType}-${selected.id}`} title={selected} endpoint={endpoint} snapshot={snapshot} engine={engine} party={party} canControl={canControl} suggestedEdition={suggestedEdition} inList={inList(selected)} onToggleList={() => toggleList(selected)} onBack={() => setSelected(null)} onSeats={onSeats} onFinish={onFinish} />}
+    </> : <TitleView key={`${selected.mediaType}-${selected.id}`} title={selected} endpoint={endpoint} snapshot={snapshot} engine={engine} party={party} canControl={canControl} inList={inList(selected)} onToggleList={() => toggleList(selected)} onBack={() => setSelected(null)} onSeats={onSeats} onFinish={onFinish} />}
     <details className="catalog-connection"><summary><Globe2 size={14} />Metadata connection<span>{endpoint === 'standard' ? 'Standard' : 'Alternate'}</span></summary><div><label className="field-label" htmlFor="tmdb-endpoint">TMDB API ENDPOINT</label><select id="tmdb-endpoint" className="catalog-select" value={endpoint} onChange={(event) => changeEndpoint(event.target.value as TmdbEndpoint)}><option value="standard">Standard: {TMDB_BASE}</option><option value="alternate">Alternate: {BYPASS_BASE}</option></select><p>Use the alternate hostname if your network blocks the standard endpoint. ISP access and alternate-host availability are not guaranteed. This setting only affects metadata search; it never changes your playback server.</p></div></details>
     <TmdbAttribution />
   </>;
 }
 
-function TitleView({ title, endpoint, snapshot, engine, party, canControl, suggestedEdition, inList, onToggleList, onBack, onSeats, onFinish }: { title: CatalogTitle; endpoint: TmdbEndpoint; canControl: boolean; suggestedEdition: AnimeEdition | null; inList: boolean; onToggleList: () => void; onBack: () => void } & Omit<Props, 'onFinish'> & { onFinish: () => void }) {
+function TitleView({ title, endpoint, snapshot, engine, party, canControl, inList, onToggleList, onBack, onSeats, onFinish }: { title: CatalogTitle; endpoint: TmdbEndpoint; canControl: boolean; inList: boolean; onToggleList: () => void; onBack: () => void } & Omit<Props, 'onFinish'> & { onFinish: () => void }) {
   const existing = snapshot.embed?.catalog.id === title.id && snapshot.embed.catalog.mediaType === title.mediaType ? snapshot.embed : null;
   const [details, setDetails] = useState<TitleDetails | null>(null);
   const [season, setSeason] = useState(existing?.selection.season ?? 1);
@@ -161,11 +138,119 @@ function TitleView({ title, endpoint, snapshot, engine, party, canControl, sugge
       <div className="catalog-title-player">
         {busy && <p className="catalog-inline-loading"><LoaderCircle className="spin" size={17} />Loading title details...</p>}
         {error && <div className="form-error" role="alert">{error}<button className="text-button" onClick={() => setAttempt((value) => value + 1)}>Retry details<RotateCcw size={14} /></button></div>}
-        {title.mediaType === 'tv' && <div className="episode-selectors"><label><span className="field-label">SEASON</span><select className="catalog-select" disabled={!details || busy} value={season} onChange={(event) => { setSeason(Number(event.target.value)); setEpisode(1); }}>{details?.seasons.length ? details.seasons.map((item) => <option key={item.number} value={item.number}>{item.name}</option>) : <option value={season}>Season {season}</option>}</select></label><label><span className="field-label">EPISODE</span><select className="catalog-select" disabled={episodesBusy || !episodes.length} value={episode} onChange={(event) => setEpisode(Number(event.target.value))}>{episodes.length ? episodes.map((item) => <option key={item.number} value={item.number}>{item.number}. {item.name}</option>) : <option value={episode}>{episodesBusy ? 'Loading episodes...' : `Episode ${episode}`}</option>}</select></label></div>}
         {episodeError && <p className="form-error" role="alert">{episodeError}<button className="text-button" onClick={() => setAttempt((value) => value + 1)}>Retry episodes<RotateCcw size={14} /></button></p>}
+        {title.mediaType === 'tv' && (
+          <div className="catalog-tv-selectors">
+            {/* Season Selector Tabs */}
+            <div className="catalog-seasons-row">
+              <span className="field-label">SELECT SEASON</span>
+              <div className="catalog-season-pills" role="tablist" aria-label="Seasons">
+                {(details?.seasons?.length ? details.seasons.filter((s) => s.number > 0) : [{ number: season, name: `Season ${season}`, episodeCount: 0 }]).map((s) => (
+                  <button
+                    key={s.number}
+                    type="button"
+                    role="tab"
+                    aria-selected={season === s.number}
+                    className={`catalog-season-pill-btn ${season === s.number ? 'is-active' : ''}`}
+                    disabled={busy}
+                    onClick={() => {
+                      setSeason(s.number);
+                      setEpisode(1);
+                    }}
+                  >
+                    <span>{s.name}</span>
+                    {s.episodeCount > 0 && <small>{s.episodeCount} eps</small>}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Episode Stepper & Pills */}
+            <div className="catalog-episodes-section">
+              <div className="catalog-ep-header-row">
+                <span className="field-label">SELECT EPISODE</span>
+                <div className="catalog-ep-stepper">
+                  <button
+                    type="button"
+                    className="ep-stepper-btn"
+                    disabled={episode <= 1 || episodesBusy}
+                    onClick={() => setEpisode((prev) => Math.max(1, prev - 1))}
+                    title="Previous Episode"
+                  >
+                    <ChevronLeft size={14} />
+                    <span>Prev</span>
+                  </button>
+                  <span className="ep-stepper-current">
+                    Episode {episode}
+                  </span>
+                  <button
+                    type="button"
+                    className="ep-stepper-btn"
+                    disabled={episodesBusy || (episodes.length > 0 && episode >= episodes.length)}
+                    onClick={() => setEpisode((prev) => prev + 1)}
+                    title="Next Episode"
+                  >
+                    <span>Next</span>
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Episode Quick Pills (E1, E2, E3...) */}
+              {episodes.length > 0 && (
+                <div className="catalog-ep-pills-row">
+                  {episodes.map((ep) => (
+                    <button
+                      key={ep.number}
+                      type="button"
+                      className={`catalog-ep-pill ${episode === ep.number ? 'is-active' : ''}`}
+                      onClick={() => setEpisode(ep.number)}
+                      title={ep.name ? `Episode ${ep.number}: ${ep.name}` : `Episode ${ep.number}`}
+                    >
+                      <span>E{ep.number}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Active Episode Name Banner */}
+              {episodes.length > 0 && (
+                <div className="catalog-active-ep-card">
+                  <span className="ep-card-num">E{episode}</span>
+                  <span className="ep-card-title">
+                    {episodes.find((e) => e.number === episode)?.name || `Episode ${episode}`}
+                  </span>
+                </div>
+              )}
+
+              {/* Fallback compact dropdown */}
+              <div className="catalog-ep-dropdown-wrap">
+                <select
+                  className="catalog-select"
+                  disabled={episodesBusy || !episodes.length}
+                  value={episode}
+                  onChange={(event) => setEpisode(Number(event.target.value))}
+                  aria-label="Select Episode from list"
+                >
+                  {episodes.length ? (
+                    episodes.map((item) => (
+                      <option key={item.number} value={item.number}>
+                        Episode {item.number}: {item.name}
+                      </option>
+                    ))
+                  ) : (
+                    <option value={episode}>
+                      {episodesBusy ? 'Loading episodes...' : `Episode ${episode}`}
+                    </option>
+                  )}
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
         {!canControl && <p className="catalog-helper">Your host chooses the shared title and server. You can browse the collection without changing the screening.</p>}
-        <ServerPicker title={details ?? title} season={season} episode={episode} active={snapshot.embed} suggestedEdition={suggestedEdition} disabled={!canControl || snapshot.loading || episodesBusy || (title.mediaType === 'tv' && (!details || !episodes.length))} onLoad={party.loadMedia} />
-        {activeHere && <div className="catalog-current-player"><span className="catalog-section-label"><Check size={14} />CURRENT SCREEN SELECTION</span><ProviderPlayer engine={engine} snapshot={snapshot} /><div className="catalog-watch-actions"><button className="primary-button" onClick={onFinish}>Watch in the cinema<ArrowRight size={15} /></button><button className="text-button" onClick={onSeats}>Choose a seat<ChevronRight size={15} /></button></div></div>}
+        <ServerPicker title={details ?? title} season={season} episode={episode} active={snapshot.embed} disabled={!canControl || snapshot.loading || episodesBusy || (title.mediaType === 'tv' && (!details || !episodes.length))} onLoad={party.loadMedia} />
+        {activeHere && <div className="catalog-current-player"><span className="catalog-section-label"><Check size={14} />CURRENT SCREEN SELECTION</span><ProviderPlayer engine={engine} snapshot={snapshot} /><div className="catalog-watch-actions"><button className="primary-button" onClick={() => { if (snapshot.mode !== 'seated') engine?.takeSeat('B3'); onFinish(); }}>Watch in the cinema<ArrowRight size={15} /></button><button className="text-button" onClick={onSeats}>Choose a seat<ChevronRight size={15} /></button></div></div>}
       </div>
     </div>
   </div>;

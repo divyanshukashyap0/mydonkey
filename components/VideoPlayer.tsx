@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Hls from 'hls.js';
-import { Play, Pause, Volume2, Volume1, VolumeX, Maximize, Settings, SkipForward, ArrowLeft, RotateCcw, RotateCw, Subtitles, Layers, BarChart2, Minimize, Headphones, Check, MessageSquare, Wifi, X, ExternalLink, Scan, Scaling, AlertCircle, RefreshCw, Zap, Sliders, Sparkles, ShieldCheck, ChevronDown, ChevronLeft, ChevronRight, Armchair, Server } from 'lucide-react';
+import { Play, Pause, Volume2, Volume1, VolumeX, Maximize, Settings, SkipForward, ArrowLeft, RotateCcw, RotateCw, Subtitles, Layers, BarChart2, Minimize, Headphones, Check, MessageSquare, Wifi, X, ExternalLink, Scan, Scaling, AlertCircle, RefreshCw, Zap, Sliders, Sparkles, ShieldCheck, ChevronDown, ChevronLeft, ChevronRight, Server } from 'lucide-react';
 import { Content, Season, Episode } from '../types';
 import StatsPanel from './StatsPanel';
 import DrivePlayer from './DrivePlayer';
@@ -60,7 +60,18 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     // Resume Logic
     const isTrailer = content.type === 'trailer' || content.playMode === 'trailer';
-    const savedState = isTrailer ? undefined : currentUser?.continueWatching?.find(i => i.movieId === content.id);
+    const savedState = useMemo(() => {
+        if (isTrailer) return undefined;
+        try {
+            const raw = localStorage.getItem('my_donkey_watch_history');
+            if (raw) {
+                const list = JSON.parse(raw);
+                const found = list.find((i: any) => i.movieId === content.id || (content.imdbId && i.movieId === content.imdbId));
+                if (found) return found;
+            }
+        } catch (_) {}
+        return currentUser?.continueWatching?.find(i => i.movieId === content.id);
+    }, [isTrailer, content.id, content.imdbId, currentUser?.continueWatching]);
     const initialProgress = savedState?.progress || (isTrailer ? 0 : (content.progress || 0));
     const initialDuration = savedState?.duration || 0;
 
@@ -144,11 +155,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const [activeServer, setActiveServer] = useState<StreamServerKey>(() => {
         try {
             const saved = localStorage.getItem('mydonkey_preferred_server') as StreamServerKey | null;
-            if (saved && STREAM_SERVERS.some(s => s.key === saved)) {
+            if (saved && saved !== 'nxsha' && STREAM_SERVERS.some(s => s.key === saved)) {
                 return saved;
             }
-        } catch {}
-        return 'nxsha';
+        } catch { }
+        return 'bingr';
     });
 
     const [failedServers, setFailedServers] = useState<Set<StreamServerKey>>(new Set());
@@ -162,7 +173,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         setIsMovieLoading(true);
         try {
             localStorage.setItem('mydonkey_preferred_server', serverKey);
-        } catch {}
+        } catch { }
         const sObj = STREAM_SERVERS.find(s => s.key === serverKey);
         showOsd(`Switched to ${sObj?.name || 'Server'}`, sObj?.tag, 'zap');
     }, [showOsd]);
@@ -655,23 +666,22 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         return lastShown === new Date().toDateString();
     });
 
-    // Portrait/Landscape detection for mobile embedded-player layout
-    const [isPortrait, setIsPortrait] = useState(() =>
-        isMobile ? window.matchMedia('(orientation: portrait)').matches : false
-    );
 
+
+    // Lock orientation to landscape on mount for mobile, unlock on unmount
     useEffect(() => {
         if (!isMobile) return;
-        const mq = window.matchMedia('(orientation: portrait)');
-        const handler = (e: MediaQueryListEvent) => setIsPortrait(e.matches);
-        mq.addEventListener('change', handler);
-        return () => mq.removeEventListener('change', handler);
-    }, [isMobile]);
+        const lockOrientation = async () => {
+            try {
+                if (screen.orientation && (screen.orientation as any).lock) {
+                    await (screen.orientation as any).lock('landscape');
+                }
+            } catch (_) { }
+        };
+        void lockOrientation();
 
-    // Unlock orientation on unmount (no forced lock — portrait is valid)
-    useEffect(() => {
         return () => {
-            if (isMobile && screen.orientation && (screen.orientation as any).unlock) {
+            if (screen.orientation && (screen.orientation as any).unlock) {
                 try { (screen.orientation as any).unlock(); } catch (_) { }
             }
         };
@@ -928,7 +938,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 seconds > 0 ? 'Forward 5s' : 'Rewind 5s',
                 'zap'
             );
-        } 
+        }
         // 2. YouTube IFrame Player (Only when YouTube is the active visible player)
         else if (!directVideoUrl && !isDriveVideo && playerRef.current && playerRef.current.getCurrentTime) {
             const curr = playerRef.current.getCurrentTime();
@@ -939,7 +949,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 seconds > 0 ? 'Forward 5s' : 'Rewind 5s',
                 'zap'
             );
-        } 
+        }
         // 3. External Link Player (Iframe Embed) - Browser CORS security prevents outer script from manipulating third-party video
         else if (isDirectIframeEmbed) {
             showOsd(
@@ -955,7 +965,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         if ((isHls || isNativeVideo) && videoRef.current) {
             const nextPlaying = !playing;
             setPlaying(nextPlaying);
-            if (nextPlaying) videoRef.current.play().catch(() => {});
+            if (nextPlaying) videoRef.current.play().catch(() => { });
             else videoRef.current.pause();
         } else if (!directVideoUrl && !isDriveVideo && playerRef.current && playerRef.current.playVideo) {
             const nextPlaying = !playing;
@@ -1436,38 +1446,41 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     // 1. Continuous cheap local save (survives browser crashes, 0 network cost)
     useEffect(() => {
-        if (isDriveVideo || isHls || isTrailer) return;
+        if (isTrailer) return;
         if (currentTime > 0 && Math.abs(currentTime - lastLocalSaveTimeRef.current) >= 3) {
             lastLocalSaveTimeRef.current = currentTime;
             try {
                 const raw = localStorage.getItem('my_donkey_watch_history');
                 const list = raw ? JSON.parse(raw) : [];
+                const prevEntry = list.find((i: any) => i.movieId === content.id);
                 const filtered = list.filter((i: any) => i.movieId !== content.id);
                 filtered.unshift({
                     movieId: content.id,
                     progress: progressRef.current,
                     stoppedAt: currentTime,
-                    duration,
-                    lastWatchedAt: new Date().toISOString()
+                    duration: duration || prevEntry?.duration || 7200,
+                    lastWatchedAt: new Date().toISOString(),
+                    content: content
                 });
-                localStorage.setItem('my_donkey_watch_history', JSON.stringify(filtered.slice(0, 30)));
+                localStorage.setItem('my_donkey_watch_history', JSON.stringify(filtered.slice(0, 40)));
+                window.dispatchEvent(new CustomEvent('mydonkey_watch_updated', { detail: { movieId: content.id } }));
             } catch (_) { }
         }
-    }, [currentTime, content.id, duration, isDriveVideo, isHls, isTrailer]);
+    }, [currentTime, content, duration, isTrailer]);
 
-    // Throttled Firestore sync handler
+    // Throttled browser cache sync handler
     const syncProgressToFirestore = useCallback((force = false) => {
         const curr = currentTimeRef.current;
         const dur = durationRef.current;
         const prog = progressRef.current;
-        if (dur > 0 && curr > 5) {
+        if (dur > 0 && curr > 3) {
             const diff = Math.abs(curr - lastSavedProgressTimeRef.current);
-            if (force || diff >= 20) {
+            if (force || diff >= 10) {
                 lastSavedProgressTimeRef.current = curr;
-                updatePlaybackProgress(content.id, prog, curr, dur);
+                updatePlaybackProgress(content.id, prog, curr, dur, content);
             }
         }
-    }, [content.id, updatePlaybackProgress]);
+    }, [content, updatePlaybackProgress]);
 
     // 3. Immediate save on pause
     const prevPlayingRef = useRef(playing);
@@ -1943,6 +1956,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     const finalUrl = useMemo(() => getFinalVideoUrl(directVideoUrl || ''), [directVideoUrl, isTV, settings, embedBaseHost, activeServer, audioTrack]);
 
+    const isBingrServer = useMemo(() => {
+        return activeServer === 'bingr' || (typeof finalUrl === 'string' && finalUrl.includes('bingr.one'));
+    }, [activeServer, finalUrl]);
+
     // Dynamically update document title to movie/show name during playback
     useEffect(() => {
         if (content?.title) {
@@ -1959,11 +1976,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     // Record watch history for stream sources without redirecting away (guarded to once per content ID)
     const hasRecordedWatchHistoryRef = useRef<string | null>(null);
     useEffect(() => {
-        if (finalUrl && content?.id && hasRecordedWatchHistoryRef.current !== content.id) {
+        if (content?.id && !isTrailer && hasRecordedWatchHistoryRef.current !== content.id) {
             hasRecordedWatchHistoryRef.current = content.id;
             addToWatchHistory(content).catch(e => console.error("Error saving watch history:", e));
         }
-    }, [finalUrl, content?.id]);
+    }, [content, isTrailer, addToWatchHistory]);
 
     // Final Main Render
     return (
@@ -1974,7 +1991,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             onMouseMove={resetInactivityTimer}
             onTouchStart={resetInactivityTimer}
             onClick={resetInactivityTimer}
-            className={`fixed inset-0 z-[100] bg-black flex flex-col font-sans select-none no-scrollbar ${isMobile && isPortrait ? 'overflow-y-auto' : 'justify-center items-center overflow-hidden'} ${!showControls && !(isMobile && isPortrait) ? 'cursor-none' : ''}`}
+            className={`fixed inset-0 z-[100] bg-black flex flex-col font-sans select-none no-scrollbar justify-center items-center overflow-hidden ${!showControls ? 'cursor-none' : ''}`}
         >
             {/* On-Screen Display (OSD / HUD) for Volume / Boost Feedback */}
             {osdNotice && (
@@ -1991,8 +2008,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 </div>
             )}
 
-            {/* 1. STABLE VIDEO CONTAINER (Root level, never unmounts) */}
-            <div className={`${isMobile && isPortrait ? 'relative w-full aspect-video' : 'absolute inset-0 z-0'} bg-black overflow-hidden`}>
+            {/* 1. STABLE VIDEO CONTAINER (Root level, covers entire screen) */}
+            <div className="absolute inset-0 z-0 bg-black overflow-hidden">
                 <div className={`w-full h-full relative transition-transform duration-500 ease-in-out ${isZoomed ? 'scale-[1.35]' : 'scale-100'}`}>
                     {/* 1. YouTube Player (Always present to prevent removeChild error) */}
                     <div className={`w-full h-full relative overflow-hidden pointer-events-none ${(!directVideoUrl && !isDriveVideo) ? 'block' : 'hidden'}`}>
@@ -2005,7 +2022,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                             {(isHls || isNativeVideo) ? (
                                 <MoviVideo
                                     ref={videoRef}
-                                    className="w-full h-full object-contain"
+                                    className={`w-full h-full ${isZoomed ? 'object-cover' : (isMobile ? 'object-cover' : 'object-contain')}`}
                                     playsInline
                                     autoPlay={playing}
                                     onClick={() => setPlaying(!playing)}
@@ -2103,106 +2120,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     </div>
                 )}
 
-                {/* Center playback controls (Mobile Portrait) - Small, sleek & unobtrusive */}
-                {isMobile && isPortrait && (
-                    <div
-                        className={`absolute inset-0 z-10 flex items-center justify-center gap-3 pointer-events-none transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-                    >
-                        {/* 5s Previous Button */}
-                        <button
-                            className="relative flex items-center justify-center w-8 h-8 text-white/90 bg-black/60 hover:bg-black/85 backdrop-blur-md p-1.5 rounded-full border border-white/20 active:scale-90 transition pointer-events-auto shadow-md"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                handleSkip(-5);
-                                triggerRipple('left', 5);
-                            }}
-                            title="Rewind 5s"
-                            aria-label="Rewind 5 seconds"
-                        >
-                            <RotateCcw size={15} />
-                            <span className="absolute inset-0 flex items-center justify-center text-[7px] font-black tracking-tighter pointer-events-none mt-0.5">
-                                5
-                            </span>
-                        </button>
 
-                        {/* Play/Pause Button */}
-                        <button
-                            className="flex items-center justify-center w-10 h-10 text-white bg-black/70 hover:bg-black/95 backdrop-blur-md p-2 rounded-full border border-white/25 active:scale-90 transition pointer-events-auto shadow-xl"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                togglePlayState();
-                            }}
-                            title={playing ? "Pause" : "Play"}
-                            aria-label={playing ? "Pause video" : "Play video"}
-                        >
-                            {playing ? <Pause size={18} className="fill-current" /> : <Play size={18} className="fill-current ml-0.5" />}
-                        </button>
-
-                        {/* 5s Next Button */}
-                        <button
-                            className="relative flex items-center justify-center w-8 h-8 text-white/90 bg-black/60 hover:bg-black/85 backdrop-blur-md p-1.5 rounded-full border border-white/20 active:scale-90 transition pointer-events-auto shadow-md"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                handleSkip(5);
-                                triggerRipple('right', 5);
-                            }}
-                            title="Forward 5s"
-                            aria-label="Forward 5 seconds"
-                        >
-                            <RotateCw size={15} />
-                            <span className="absolute inset-0 flex items-center justify-center text-[7px] font-black tracking-tighter pointer-events-none mt-0.5">
-                                5
-                            </span>
-                        </button>
-                    </div>
-                )}
             </div>
 
-            {/* 2. UI LAYERS (Metadata and Overlays) */}
-            {isMobile && isPortrait ? (
-                <>
-
-
-                    {/* Metadata section (scrolled below video) */}
-                    <div className="flex-1 px-4 pt-4 pb-8 space-y-3 bg-[#0f0f0f]">
-                        <h2 className="text-white font-black text-xl leading-tight">{content.title}</h2>
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400">
-                            {content.release_date && <span>{content.release_date.split('-')[0]}</span>}
-                            {content.rating && <span className="border border-white/30 px-1.5 py-0.5 rounded text-[10px]">{content.rating}</span>}
-                            {content.resolution && <span className="border border-white/30 px-1.5 py-0.5 rounded text-[10px] font-black">{content.resolution}</span>}
-                        </div>
-                        {content.overview && <p className="text-gray-300 text-sm leading-relaxed line-clamp-4">{content.overview}</p>}
-
-                        <div className="flex items-center gap-4 pt-1">
-                            <button
-                                onClick={() => {
-                                    const next = !isMuted;
-                                    setIsMuted(next);
-                                    showOsd(next ? 'Muted' : 'Unmuted', undefined, next ? 'mute' : 'volume');
-                                }}
-                                className="flex items-center gap-2 text-gray-300 hover:text-white text-xs bg-white/10 hover:bg-white/15 px-3.5 py-2 rounded-full transition cursor-pointer active:scale-95 shadow-sm"
-                                title={isMuted ? 'Unmute audio' : 'Mute audio'}
-                            >
-                                {isMuted ? <VolumeX size={14} className="text-red-500" /> : <Volume2 size={14} />}
-                                <span>{isMuted ? 'Unmute' : 'Mute'}</span>
-                            </button>
-                            {!isDriveVideo && (
-                                <button
-                                    onClick={toggleFullscreen}
-                                    className="flex items-center gap-2 text-gray-300 hover:text-white text-xs bg-white/10 hover:bg-white/15 px-3.5 py-2 rounded-full transition cursor-pointer active:scale-95 shadow-sm"
-                                >
-                                    <Maximize size={14} /> <span>Fullscreen</span>
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                </>
-            ) : (
-                <>
-                    {/* Landscape/Desktop UI Layers */}
-                    {showContentLoader && !isDriveVideo && !isDirectIframeEmbed && (
-                        <div className="z-[50] w-full h-full relative">
-                            <ContentLoader
+            {/* 2. UI LAYERS (Overlays and Loaders) */}
+            {showContentLoader && !isDriveVideo && !isDirectIframeEmbed && (
+                <div className="z-[50] w-full h-full relative">
+                    <ContentLoader
                                 item={content}
                                 duration={settings?.contentLoaderDuration || 2.5}
                                 durationAction={handleLoaderComplete}
@@ -2267,14 +2191,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     )}
 
 
-                </>
-            )}
 
             {/* Screen Activity Detector: Detects mouse movement and touch across the screen when controls are hidden for native players */}
             {!showControls && !isDirectIframeEmbed && !isDriveVideo && (
                 <div
                     id="vp-activity-detector"
-                    className={`fixed top-0 left-0 right-0 ${isMobile && isPortrait ? 'bottom-1/2' : 'bottom-16 md:bottom-20'} z-[90] bg-transparent select-none cursor-auto`}
+                    className="fixed top-0 left-0 right-0 bottom-16 md:bottom-20 z-[90] bg-transparent select-none cursor-auto"
                     onPointerMove={resetInactivityTimer}
                     onMouseMove={resetInactivityTimer}
                     onMouseEnter={resetInactivityTimer}
@@ -2295,7 +2217,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             )}
 
             {/* Corner Activity Detector for Bottom-Right Fullscreen button */}
-            {!showControls && !isPortrait && (isDirectIframeEmbed || isDriveVideo) && (
+            {!showControls && (isDirectIframeEmbed || isDriveVideo) && (
                 <div
                     className="fixed bottom-0 right-0 w-24 h-24 z-[95] bg-transparent cursor-pointer"
                     onPointerMove={resetInactivityTimer}
@@ -2422,19 +2344,17 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                                     <button
                                                         key={s.key}
                                                         onClick={() => handleServerSwitch(s.key)}
-                                                        className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${
-                                                            isSel
+                                                        className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${isSel
                                                                 ? 'bg-brand-red text-white shadow-md shadow-brand-red/30'
                                                                 : 'text-gray-300 hover:text-white hover:bg-white/10'
-                                                        }`}
+                                                            }`}
                                                     >
                                                         <div className="flex flex-col">
                                                             <span className="font-bold">{s.name}</span>
                                                             <span className={`text-[10px] ${isSel ? 'text-white/80' : 'text-gray-500'}`}>{s.description}</span>
                                                         </div>
-                                                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
-                                                            isSel ? 'bg-black/30 text-white' : 'bg-white/10 text-emerald-400'
-                                                        }`}>
+                                                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${isSel ? 'bg-black/30 text-white' : 'bg-white/10 text-emerald-400'
+                                                            }`}>
                                                             {s.tag}
                                                         </span>
                                                     </button>
@@ -2478,60 +2398,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                         </>
                     )}
 
-                    <div className="h-6 w-px bg-white/20 shrink-0 pointer-events-none"></div>
-                    <button
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            const cid = content.tmdbId || (typeof content.id === 'string' ? content.id.replace(/^(tmdb_|imdb_)/, '') : content.id);
-                            window.location.href = `/theatre?id=${cid}&type=${content.type === 'tv' ? 'tv' : 'movie'}&title=${encodeURIComponent(content.title || '')}&s=${currentSeason?.seasonNumber || 1}&e=${currentEpisode?.episodeNumber || 1}`;
-                        }}
-                        className="px-2.5 md:px-3 py-1 md:py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 text-black text-[10px] md:text-xs font-extrabold flex items-center gap-1.5 cursor-pointer transition-all shadow-md hover:scale-105 active:scale-95 border border-yellow-200/50"
-                        title="Switch to 3D Virtual Cinema"
-                    >
-                        <Armchair size={13} className="text-black" />
-                        <span className="hidden xs:inline">3D Theatre</span>
-                    </button>
+
 
                 </div>
             </div>
 
-            {/* Quick Floating Server Switcher for Embeds: Always accessible so user can switch if provider is stuck or not playing */}
-            {isExternalStream && (
-                <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[300] select-none pointer-events-auto animate-in fade-in slide-in-from-top-2 duration-300">
-                    <div className="flex items-center gap-2 bg-black/85 hover:bg-black backdrop-blur-xl border border-white/20 px-3.5 py-1.5 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.8)] ring-1 ring-white/10">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                        <span className="text-xs text-gray-200 font-medium flex items-center gap-1">
-                            Server: <strong className="text-white">{STREAM_SERVERS.find(s => s.key === activeServer)?.name || activeServer}</strong>
-                        </span>
-                        <div className="h-3 w-px bg-white/20 mx-0.5" />
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                handleNextServer('requested switch');
-                            }}
-                            className="text-xs text-amber-300 hover:text-amber-200 font-bold flex items-center gap-1 hover:underline active:scale-95 transition cursor-pointer"
-                            title="Try next streaming server if busy, slow, or not playing"
-                        >
-                            <RefreshCw size={11} className="text-amber-400" />
-                            <span>Not playing? Try Next</span>
-                        </button>
-                        <div className="h-3 w-px bg-white/20 mx-0.5" />
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setShowServerMenu(v => !v);
-                            }}
-                            className="text-[10px] text-gray-400 hover:text-white font-medium hover:underline cursor-pointer"
-                        >
-                            All Servers
-                        </button>
-                    </div>
-                </div>
-            )}
 
             {/* Right Down Corner Fullscreen Button (in exact corner, in place of player fullscreen button) */}
-            {!isPortrait && (isDirectIframeEmbed || isDriveVideo) && (
+            {(isDirectIframeEmbed || isDriveVideo) && (
                 <div
                     onPointerMove={resetInactivityTimer}
                     onMouseMove={resetInactivityTimer}
@@ -2589,7 +2463,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             )}
 
             {/* Gesture Layer (Landscape/Desktop for native videos ONLY - external iframe players must NOT be blocked) */}
-            {!isPortrait && !isDirectIframeEmbed && !isDriveVideo && (
+            {!isDirectIframeEmbed && !isDriveVideo && (
                 <div
                     className="absolute inset-0 z-[115]"
                     onClick={handleTap}
@@ -2598,7 +2472,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             )}
 
             {/* Centered Playback Controls: YouTube-style Small & Sleek 5s Previous, Play/Pause, 5s Next */}
-            {!isPortrait && !isDirectIframeEmbed && !isDriveVideo && (
+            {!isDirectIframeEmbed && !isDriveVideo && (
                 <div className={`vp-center-controls absolute inset-0 z-[116] pointer-events-none flex flex-row items-center justify-center gap-3 md:gap-5 transition-all duration-300 ${showControls ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}>
                     {/* 5s Previous Button - Small, compact & sleek */}
                     <button
@@ -2652,9 +2526,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 </div>
             )}
 
-            {/* Controls - Floating Glass Bar (Landscape/Desktop only) */}
+            {/* Controls - Floating Glass Bar */}
             {
-                !isDriveVideo && !isDirectIframeEmbed && !showContentLoader && !isPortrait && (
+                !isDriveVideo && !isDirectIframeEmbed && !showContentLoader && (
                     <div className={`absolute left-0 right-0 px-2 md:px-8 transition-all duration-500 pointer-events-none z-[200] ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
                         style={{ bottom: '24px' }}>
 
@@ -3343,9 +3217,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             <div
                 className={`video-watermark absolute z-[999] pointer-events-none select-none transition-all duration-300 drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] ${isFullscreen
                     ? 'top-6 right-6 md:top-8 md:right-10 opacity-35'
-                    : (isMobile && isPortrait
-                        ? 'top-16 right-4 opacity-30'
-                        : 'top-4 right-4 md:top-6 md:right-8 opacity-30')
+                    : 'top-4 right-4 md:top-6 md:right-8 opacity-30'
                     }`}
                 aria-hidden="true"
             >

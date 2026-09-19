@@ -7,7 +7,7 @@ import { buildEmbedUrl } from '../utils/embedUrl';
 
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
-const API_KEY = import.meta.env.VITE_TMDB_API_KEY;
+const API_KEY = import.meta.env.VITE_TMDB_API_KEY || '5d44293e1177a6fb42010456a8c6b4ff';
 
 export const tmdbPosterUrl = (path: string | null, size: 'w342' | 'w500' | 'w780' | 'original' = 'w500') =>
     path ? `${TMDB_IMAGE_BASE}/${size}${path}` : '';

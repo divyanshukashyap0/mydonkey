@@ -300,9 +300,6 @@ export default function ProviderPlayer({ engine, snapshot, party }: { engine: Ci
         <button className="provider-action-btn" onClick={() => engine?.reloadProvider()} title="Reload stream">
           <RotateCcw size={14} /> Reload Stream
         </button>
-        <a className="provider-action-btn" href={embed.url} target="_blank" rel="noopener noreferrer" title="Open provider website directly">
-          Open Provider <ExternalLink size={13} />
-        </a>
         <button className="provider-action-btn icon-only" onClick={() => void openFullscreen()} title="Toggle Fullscreen" aria-label="Fullscreen">
           <Maximize size={16} />
         </button>

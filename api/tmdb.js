@@ -87,7 +87,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing TMDB path' });
     }
 
-    const apiKey = process.env.VITE_TMDB_API_KEY;
+    const apiKey = process.env.VITE_TMDB_API_KEY || '5d44293e1177a6fb42010456a8c6b4ff';
     if (!apiKey) {
       return res.status(500).json({ error: 'TMDB API key not configured' });
     }

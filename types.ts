@@ -195,6 +195,7 @@ export interface ContinueWatchingItem {
   lastWatchedAt: string;
   stoppedAt: number;
   duration: number;
+  content?: Content;
 }
 
 export interface ViewingLog {

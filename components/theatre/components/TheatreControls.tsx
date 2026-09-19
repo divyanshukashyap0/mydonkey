@@ -66,7 +66,7 @@ export default function TheatreControls({ engine, snapshot, movieMode, hudVisibl
         const match = matches[0];
         if (match) { animeId = match.id; animeMalId = match.malId; animeEdition = match.title; }
       }
-      const serverKey = 'nxsha';
+      const serverKey = 'bingr';
       const media = makeEmbed(title, {
         server: serverKey,
         anime: title.anime,

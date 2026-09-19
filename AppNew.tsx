@@ -19,6 +19,7 @@ import SupportHubPage from './components/SupportHubPage';
 import DevicesGuidePage from './components/DevicesGuidePage';
 import ContactDeskPage from './components/ContactDeskPage';
 import CommunityHelpChatPage from './components/CommunityHelpChatPage';
+import TheatreHelpPage from './components/TheatreHelpPage';
 
 import AccountSettings from './components/AccountSettings';
 import AdminLayout from './components/admin/AdminLayout';
@@ -368,14 +369,14 @@ const MainLayout = () => {
                                     createdAt: new Date().toISOString()
                                 };
                             }
-                        } catch (_) {}
+                        } catch (_) { }
                     }
 
                     // C. Firestore lookup via fetchContentById
                     if (!resolved && fetchContentByIdRef.current) {
                         try {
                             resolved = await fetchContentByIdRef.current(contentId);
-                        } catch (_) {}
+                        } catch (_) { }
                     }
 
                     // D. Fallback search by title if available in URL or cache
@@ -415,7 +416,7 @@ const MainLayout = () => {
                                         };
                                     }
                                 }
-                            } catch (_) {}
+                            } catch (_) { }
                         }
                     }
 
@@ -563,7 +564,7 @@ const MainLayout = () => {
                         saveContentTitle(playableItem.id, playableItem.title);
                     }
                     if (mode === 'movie') {
-                        incrementViews(playableItem.id).catch(() => {});
+                        incrementViews(playableItem.id).catch(() => { });
                     }
                 };
 
@@ -610,7 +611,7 @@ const MainLayout = () => {
                                     createdAt: new Date().toISOString()
                                 };
                             }
-                        } catch (_) {}
+                        } catch (_) { }
                     } else if (isTmdb) {
                         const rawTmdbId = parseInt(contentId.replace('tmdb_', ''), 10);
                         if (!isNaN(rawTmdbId)) {
@@ -619,7 +620,7 @@ const MainLayout = () => {
                             try {
                                 detail = await fetchTMDBDetails(rawTmdbId, 'movie');
                             } catch (_) {
-                                if (!detail) { try { detail = await fetchTMDBDetails(rawTmdbId, 'tv'); resolvedType = 'tv'; } catch (_) {} }
+                                if (!detail) { try { detail = await fetchTMDBDetails(rawTmdbId, 'tv'); resolvedType = 'tv'; } catch (_) { } }
                             }
                             if (detail) {
                                 const imdbId = detail.external_ids?.imdb_id || (detail as any).imdb_id || '';
@@ -653,7 +654,7 @@ const MainLayout = () => {
                     if (!resolved && fetchContentByIdRef.current) {
                         try {
                             resolved = await fetchContentByIdRef.current(contentId);
-                        } catch (_) {}
+                        } catch (_) { }
                     }
 
                     if (isCancelled || activeContentIdRef.current !== contentId || !window.location.pathname.startsWith('/watch/')) {
@@ -787,26 +788,32 @@ const MainLayout = () => {
         };
     }, [content]);
 
-    // Continue Watching Items (User Watch History - sorted so last watched show is always in first place)
+    // Reactive browser cache watcher for watch history updates
+    const [watchHistoryVer, setWatchHistoryVer] = useState(0);
+    useEffect(() => {
+        const handleWatchUpdated = () => {
+            setWatchHistoryVer(v => v + 1);
+        };
+        window.addEventListener('mydonkey_watch_updated', handleWatchUpdated);
+        window.addEventListener('storage', handleWatchUpdated);
+        return () => {
+            window.removeEventListener('mydonkey_watch_updated', handleWatchUpdated);
+            window.removeEventListener('storage', handleWatchUpdated);
+        };
+    }, []);
+
+    // Continue Watching Items (Strictly Browser Cache - sorted so last watched show is always in first place)
     const continueWatchingItems = useMemo(() => {
-        const historyMap = new Map<string, { movieId: string; progress: number; lastWatchedAt: number; stoppedAt?: number; duration?: number }>();
+        const historyMap = new Map<string, { 
+            movieId: string; 
+            progress: number; 
+            lastWatchedAt: number; 
+            stoppedAt?: number; 
+            duration?: number;
+            cachedContent?: any;
+        }>();
 
-        // 1. Ingest currentUser continueWatching from Firestore / state
-        if (currentUser?.continueWatching && Array.isArray(currentUser.continueWatching)) {
-            currentUser.continueWatching.forEach(h => {
-                if (!h || !h.movieId) return;
-                const timestamp = h.lastWatchedAt ? new Date(h.lastWatchedAt).getTime() : 0;
-                historyMap.set(h.movieId, {
-                    movieId: h.movieId,
-                    progress: h.progress || 15,
-                    lastWatchedAt: timestamp,
-                    stoppedAt: h.stoppedAt,
-                    duration: h.duration
-                });
-            });
-        }
-
-        // 2. Supplement and merge with local storage (taking the most recent progress & timestamp)
+        // 1. Ingest from browser cache (localStorage)
         try {
             const raw = localStorage.getItem('my_donkey_watch_history');
             if (raw) {
@@ -815,69 +822,106 @@ const MainLayout = () => {
                     localList.forEach((lh: any) => {
                         if (!lh || !lh.movieId) return;
                         const localTimestamp = lh.lastWatchedAt ? new Date(lh.lastWatchedAt).getTime() : 0;
-                        const existing = historyMap.get(lh.movieId);
-                        if (!existing || localTimestamp >= existing.lastWatchedAt) {
-                            historyMap.set(lh.movieId, {
-                                movieId: lh.movieId,
-                                progress: lh.progress || 15,
-                                lastWatchedAt: Math.max(localTimestamp, existing?.lastWatchedAt || 0),
-                                stoppedAt: lh.stoppedAt ?? existing?.stoppedAt,
-                                duration: lh.duration ?? existing?.duration
-                            });
-                        }
+                        historyMap.set(lh.movieId, {
+                            movieId: lh.movieId,
+                            progress: lh.progress || 15,
+                            lastWatchedAt: localTimestamp,
+                            stoppedAt: lh.stoppedAt,
+                            duration: lh.duration,
+                            cachedContent: lh.content || null
+                        });
                     });
                 }
             }
         } catch (e) { }
 
-        // 3. Sort entries strictly by lastWatchedAt DESCENDING (most recently watched first)
+        // 2. Supplement and merge with in-memory currentUser state
+        if (currentUser?.continueWatching && Array.isArray(currentUser.continueWatching)) {
+            currentUser.continueWatching.forEach(h => {
+                if (!h || !h.movieId) return;
+                const timestamp = h.lastWatchedAt ? new Date(h.lastWatchedAt).getTime() : 0;
+                const existing = historyMap.get(h.movieId);
+                if (!existing || timestamp >= existing.lastWatchedAt) {
+                    historyMap.set(h.movieId, {
+                        movieId: h.movieId,
+                        progress: h.progress || 15,
+                        lastWatchedAt: Math.max(timestamp, existing?.lastWatchedAt || 0),
+                        stoppedAt: h.stoppedAt ?? existing?.stoppedAt,
+                        duration: h.duration ?? existing?.duration,
+                        cachedContent: (h as any).content || existing?.cachedContent || null
+                    });
+                }
+            });
+        }
+
+        // 3. Sort entries strictly by lastWatchedAt DESCENDING (most recently watched show strictly first)
         const sortedHistory = Array.from(historyMap.values()).sort((a, b) => b.lastWatchedAt - a.lastWatchedAt);
 
         // 4. Map to Content objects preserving exact descending order
         const items: (Content & { progress?: number })[] = [];
         for (const h of sortedHistory) {
-            const c = content.find(x => x.id === h.movieId || (x.imdbId && x.imdbId === h.movieId));
-            if (c && !items.some(it => it.id === c.id)) {
+            let c: Content | undefined = content.find(x => x.id === h.movieId || (x.imdbId && x.imdbId === h.movieId));
+            if (!c && h.cachedContent) {
+                c = h.cachedContent;
+            }
+            if (!c) {
+                c = {
+                    id: h.movieId,
+                    title: h.movieId,
+                    overview: '',
+                    poster_path: '',
+                    backdrop_path: '',
+                    youtubeId: '',
+                    type: 'movie',
+                    genres: [],
+                    release_date: '',
+                    vote_average: 7.0,
+                    createdAt: new Date(h.lastWatchedAt || Date.now()).toISOString()
+                };
+            }
+
+            if (c && !items.some(it => it.id === c!.id)) {
                 items.push({ ...c, progress: h.progress || 15 });
             }
         }
 
         return items;
-    }, [currentUser?.continueWatching, content]);
+    }, [currentUser?.continueWatching, content, watchHistoryVer]);
 
-    // Combined Watch History (Firestore + LocalStorage fallback, sorted newest first)
+    // Combined Watch History (Strictly Browser Cache + in-memory, sorted newest first)
     const combinedWatchHistory = useMemo(() => {
-        const historyMap = new Map<string, ContinueWatchingItem | { movieId: string; progress?: number; lastWatchedAt?: string }>();
-        if (currentUser?.continueWatching && Array.isArray(currentUser.continueWatching)) {
-            currentUser.continueWatching.forEach(item => {
-                if (item?.movieId) historyMap.set(item.movieId, item);
-            });
-        }
+        const historyMap = new Map<string, ContinueWatchingItem | { movieId: string; progress?: number; lastWatchedAt?: string; content?: any }>();
         try {
             const raw = localStorage.getItem('my_donkey_watch_history');
             if (raw) {
                 const localList = JSON.parse(raw);
                 if (Array.isArray(localList)) {
                     localList.forEach((lh: any) => {
-                        if (lh?.movieId) {
-                            const existing = historyMap.get(lh.movieId);
-                            const localTime = lh.lastWatchedAt ? new Date(lh.lastWatchedAt).getTime() : 0;
-                            const existingTime = existing?.lastWatchedAt ? new Date(existing.lastWatchedAt).getTime() : 0;
-                            if (!existing || localTime >= existingTime) {
-                                historyMap.set(lh.movieId, lh);
-                            }
-                        }
+                        if (lh?.movieId) historyMap.set(lh.movieId, lh);
                     });
                 }
             }
         } catch (e) { }
+
+        if (currentUser?.continueWatching && Array.isArray(currentUser.continueWatching)) {
+            currentUser.continueWatching.forEach(item => {
+                if (item?.movieId) {
+                    const existing = historyMap.get(item.movieId);
+                    const localTime = existing?.lastWatchedAt ? new Date(existing.lastWatchedAt).getTime() : 0;
+                    const itemTime = item.lastWatchedAt ? new Date(item.lastWatchedAt).getTime() : 0;
+                    if (!existing || itemTime >= localTime) {
+                        historyMap.set(item.movieId, item);
+                    }
+                }
+            });
+        }
 
         return Array.from(historyMap.values()).sort((a, b) => {
             const timeA = a.lastWatchedAt ? new Date(a.lastWatchedAt).getTime() : 0;
             const timeB = b.lastWatchedAt ? new Date(b.lastWatchedAt).getTime() : 0;
             return timeB - timeA;
         });
-    }, [currentUser?.continueWatching]);
+    }, [currentUser?.continueWatching, watchHistoryVer]);
 
     // Resolved User Favorite Genres (Profile -> Account -> LocalStorage)
     const userFavoriteGenres = useMemo(() => {
@@ -1156,6 +1200,7 @@ const MainLayout = () => {
         if (isAuthenticated && currentUser) {
             const targetId = playableItem.id || (playableItem.tmdbId ? `tmdb_${playableItem.tmdbId}` : (playableItem.imdbId ? `imdb_${playableItem.imdbId}` : 'player'));
             const fullItem = { ...playableItem, id: targetId, playMode: 'movie' as const };
+            addToWatchHistory(fullItem).catch(() => {});
             const isFromBrowse = location.pathname.startsWith('/browse/');
             setViewingContent(null);
             setPlayingContent(fullItem);
@@ -1285,6 +1330,11 @@ const MainLayout = () => {
 
         if (page === 'community-chat' || page === 'help-chat' || page === 'community-help' || page === 'chat-help' || page === 'Community Help Chat') {
             navigate('/community-chat');
+            return;
+        }
+
+        if (page === 'theatre-help' || page === 'theater-help' || page === '3D Theatre Help & Guide' || page === 'cinema-help') {
+            navigate('/theatre-help');
             return;
         }
 
@@ -1615,30 +1665,7 @@ const MainLayout = () => {
                         <HeroSkeleton />
                     )}
                     <div className="pb-24 bg-[#141414] relative z-10 space-y-3 md:space-y-5">
-                        {/* Original Language Announcement */}
-                        <div className="pt-4 px-4 md:px-12">
-                            <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-brand-red/20 via-brand-red/5 to-transparent border-l-4 border-brand-red p-5 shadow-2xl group hover:from-brand-red/30 transition-all duration-300">
-                                <div className="flex items-center gap-4">
-                                    <div className="hidden sm:flex w-12 h-12 rounded-full bg-brand-red items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
-                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                                        </svg>
-                                    </div>
-                                    <div>
-                                        <h3 className="text-white font-bold text-lg md:text-xl tracking-tight mb-1">
-                                            Authentic Sound Experience
-                                        </h3>
-                                        <p className="text-gray-300 text-sm md:text-base leading-relaxed">
-                                            <span className="text-brand-red font-semibold">Enjoy All content is available in its real language voice.</span>
-                                        </p>
-                                        <p className="text-gray-300 text-sm md:text-base leading-relaxed">
-                                            we suggest to use <Link to="/adblocker" className="text-brand-red underline hover:text-brand-red/80">Adblockers & Mobile DNS</Link> for smooth experience and to enjoy content with better quality.  cause we use links of internet which can contains ads.
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 bg-brand-red/10 rounded-full blur-3xl"></div>
-                            </div>
-                        </div>
+
 
                         {/* Quick Personalize Banner if user hasn't selected favorite genres yet */}
                         {userFavoriteGenres.length === 0 && (
@@ -1999,6 +2026,10 @@ const MainLayout = () => {
             return <CategoriesPage onDetails={handleDetails} onPlay={handlePlay} />;
         }
 
+        if (activeTab === 'theatre-help' || activeTab === 'theater-help') {
+            return <TheatreHelpPage />;
+        }
+
         if (activeTab === 'theatre' || activeTab === 'theater') {
             return (
                 <TheatreView
@@ -2237,6 +2268,9 @@ const AppRoutes = () => {
             <Route path="/help-chat" element={<Navigate to="/community-chat" replace />} />
             <Route path="/community-help" element={<Navigate to="/community-chat" replace />} />
             <Route path="/chat-help" element={<Navigate to="/community-chat" replace />} />
+            <Route path="/theatre-help" element={<TheatreHelpPage />} />
+            <Route path="/theater-help" element={<Navigate to="/theatre-help" replace />} />
+            <Route path="/cinema-help" element={<Navigate to="/theatre-help" replace />} />
             <Route
                 path="/admin/*"
                 element={

@@ -95,7 +95,7 @@ interface StoreContextType {
     addProfile: (name: string, isKids: boolean, avatarUrl: string) => Promise<Profile | void>;
     updateProfile: (profileId: string, updates: Partial<Profile>) => Promise<void>;
     deleteProfile: (profileId: string) => Promise<void>;
-    updatePlaybackProgress: (movieId: string, progress: number, stoppedAt: number, duration: number) => Promise<void>;
+    updatePlaybackProgress: (movieId: string, progress: number, stoppedAt: number, duration: number, contentData?: Partial<Content>) => Promise<void>;
     addToWatchHistory: (contentOrId: Content | string) => Promise<void>;
     updateFavoriteGenres: (genres: string[]) => Promise<void>;
     updateUserEmail: (newEmail: string) => Promise<void>;
@@ -260,6 +260,14 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     // Helpers to atomically update state and localStorage
     const setAndPersistUser = (user: AppUser | null) => {
+        if (user) {
+            try {
+                const raw = localStorage.getItem('my_donkey_watch_history');
+                if (raw) {
+                    user.continueWatching = JSON.parse(raw);
+                }
+            } catch (_) {}
+        }
         setCurrentUser(user);
         try {
             if (user) {
@@ -1219,10 +1227,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
 
     const updateUser = async (updates: Partial<AppUser>) => {
+        // Strip continueWatching: Continue Watching is strictly in browser cache, not database
+        const { continueWatching: _cw, ...dbUpdates } = updates as any;
         setCurrentUser(prev => prev ? ({ ...prev, ...updates }) : null);
-        if (fbUser && !isQuotaExceeded) {
+        if (fbUser && !isQuotaExceeded && Object.keys(dbUpdates).length > 0) {
             try {
-                await updateDoc(doc(db, 'users', fbUser.uid), updates);
+                await updateDoc(doc(db, 'users', fbUser.uid), dbUpdates);
             } catch (err) {
                 console.warn("updateUser Firestore skipped/failed:", err);
             }
@@ -1332,85 +1342,113 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
     };
 
-    const updatePlaybackProgress = async (movieId: string, progress: number, stoppedAt: number, duration: number) => {
-        // 1. Immediately save to local storage (survives crashes, zero cost)
+    const getCachedWatchHistory = (): any[] => {
         try {
             const raw = localStorage.getItem('my_donkey_watch_history');
-            const list = raw ? JSON.parse(raw) : [];
-            const filtered = list.filter((i: any) => i.movieId !== movieId);
-            filtered.unshift({
-                movieId,
-                progress,
-                stoppedAt,
-                duration,
-                lastWatchedAt: new Date().toISOString()
-            });
-            localStorage.setItem('my_donkey_watch_history', JSON.stringify(filtered.slice(0, 30)));
-        } catch (_) {}
+            return raw ? JSON.parse(raw) : [];
+        } catch {
+            return [];
+        }
+    };
 
-        if (!fbUser || !currentUser) return;
-        const history = currentUser.continueWatching || [];
-        const newEntry = {
+    const saveCachedWatchHistory = (list: any[], targetMovieId?: string) => {
+        try {
+            localStorage.setItem('my_donkey_watch_history', JSON.stringify(list.slice(0, 40)));
+            window.dispatchEvent(new CustomEvent('mydonkey_watch_updated', { detail: { movieId: targetMovieId } }));
+        } catch (e) {
+            console.warn("Local watch history update failed:", e);
+        }
+    };
+
+    const updatePlaybackProgress = async (
+        movieId: string,
+        progress: number,
+        stoppedAt: number,
+        duration: number,
+        contentData?: Partial<Content>
+    ) => {
+        if (!movieId) return;
+        const now = new Date().toISOString();
+
+        // 1. Update browser cache (localStorage)
+        const list = getCachedWatchHistory();
+        const prevEntry = list.find((i: any) => i.movieId === movieId);
+        const filtered = list.filter((i: any) => i.movieId !== movieId);
+
+        let snapContent = contentData || prevEntry?.content;
+        if (!snapContent) {
+            const found = content.find(c => c.id === movieId || (c.imdbId && c.imdbId === movieId));
+            if (found) snapContent = found;
+        }
+
+        const newEntry: ContinueWatchingItem = {
+            movieId,
+            progress: Math.max(1, Math.min(100, Math.round(progress))),
+            stoppedAt: Math.round(stoppedAt),
+            duration: Math.round(duration),
+            lastWatchedAt: now,
+            ...(snapContent ? { content: snapContent as Content } : {})
+        };
+
+        // Most recently watched content is strictly first in the list
+        filtered.unshift(newEntry);
+        saveCachedWatchHistory(filtered, movieId);
+
+        // 2. In-memory state only (STRICTLY BROWSER CACHE - NO DATABASE / FIRESTORE WRITE)
+        setCurrentUser(prev => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                continueWatching: filtered
+            };
+        });
+    };
+
+    const addToWatchHistory = async (contentOrId: Content | string) => {
+        if (!contentOrId) return;
+        const movieId = typeof contentOrId === 'string' ? contentOrId : contentOrId.id;
+        if (!movieId) return;
+        const now = new Date().toISOString();
+
+        // Snapshot content object so TMDB / external titles retain poster, title & metadata in browser cache
+        let contentSnapshot: any = typeof contentOrId === 'object' ? contentOrId : null;
+        if (!contentSnapshot) {
+            contentSnapshot = content.find(c => c.id === movieId || (c.imdbId && c.imdbId === movieId)) || null;
+        }
+
+        // 1. Update browser cache (localStorage)
+        const list = getCachedWatchHistory();
+        const prevEntry = list.find((i: any) => i.movieId === movieId);
+        const filtered = list.filter((i: any) => i.movieId !== movieId);
+
+        const progress = prevEntry?.progress ?? 10;
+        const stoppedAt = prevEntry?.stoppedAt ?? 30;
+        const duration = prevEntry?.duration ?? 7200;
+        if (!contentSnapshot && prevEntry?.content) {
+            contentSnapshot = prevEntry.content;
+        }
+
+        const newEntry: ContinueWatchingItem = {
             movieId,
             progress,
             stoppedAt,
             duration,
-            lastWatchedAt: new Date().toISOString()
+            lastWatchedAt: now,
+            ...(contentSnapshot ? { content: contentSnapshot as Content } : {})
         };
-        // Always place the most recently watched show at the front (first place)
-        const updatedHistory = [
-            newEntry,
-            ...history.filter(h => h.movieId !== movieId)
-        ].slice(0, 30);
-        setCurrentUser(prev => prev ? { ...prev, continueWatching: updatedHistory } : null);
-        await updateUser({ continueWatching: updatedHistory });
-    };
 
-    const addToWatchHistory = async (contentOrId: Content | string) => {
-        const movieId = typeof contentOrId === 'string' ? contentOrId : contentOrId.id;
-        const now = new Date().toISOString();
+        // Strictly place last watched content in first position
+        filtered.unshift(newEntry);
+        saveCachedWatchHistory(filtered, movieId);
 
-        // 1. Synchronous localStorage write to survive immediate page redirect
-        try {
-            const raw = localStorage.getItem('my_donkey_watch_history');
-            const list = raw ? JSON.parse(raw) : [];
-            const filtered = list.filter((i: any) => i.movieId !== movieId);
-            filtered.unshift({
-                movieId,
-                progress: 15,
-                stoppedAt: 60,
-                duration: 7200,
-                lastWatchedAt: now
-            });
-            localStorage.setItem('my_donkey_watch_history', JSON.stringify(filtered.slice(0, 30)));
-        } catch (e) {
-            console.warn("Local watch history update failed:", e);
-        }
-
-        // 2. Update currentUser continueWatching in Firestore
-        if (currentUser) {
-            const history = currentUser.continueWatching || [];
-            const newEntry: ContinueWatchingItem = {
-                movieId,
-                progress: 15,
-                stoppedAt: 60,
-                duration: 7200,
-                lastWatchedAt: now
+        // 2. In-memory state only (STRICTLY BROWSER CACHE - NO DATABASE / FIRESTORE WRITE)
+        setCurrentUser(prev => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                continueWatching: filtered
             };
-            // Always place the most recently watched show at the front (first place)
-            const updatedHistory = [
-                newEntry,
-                ...history.filter(h => h.movieId !== movieId)
-            ].slice(0, 30);
-
-            setCurrentUser(prev => prev ? { ...prev, continueWatching: updatedHistory } : null);
-
-            if (fbUser && !isQuotaExceeded) {
-                try {
-                    await updateDoc(doc(db, 'users', fbUser.uid), { continueWatching: updatedHistory });
-                } catch (err) { }
-            }
-        }
+        });
     };
 
     const updateFavoriteGenres = async (genres: string[]) => {

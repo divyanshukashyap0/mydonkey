@@ -141,8 +141,8 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                 // 4. Combine & Deduplicate (prioritize local matches)
                 const combined: Partial<Content>[] = [...localMatches];
                 mappedTMDB.forEach(t => {
-                    const existingIndex = combined.findIndex(c => 
-                        (c.tmdbId && c.tmdbId === t.tmdbId) || 
+                    const existingIndex = combined.findIndex(c =>
+                        (c.tmdbId && c.tmdbId === t.tmdbId) ||
                         (c.title && c.title.toLowerCase() === t.title?.toLowerCase())
                     );
                     if (existingIndex >= 0) {
@@ -280,18 +280,30 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                     <span>{settings.announcementBanner}</span>
                 </aside>
             )}
-            <div className="max-w-[1920px] mx-auto px-4 md:px-12 h-16 md:h-20 flex items-center justify-between">
+            <div className="max-w-[1920px] mx-auto px-3 sm:px-6 md:px-8 xl:px-10 h-16 md:h-20 flex items-center justify-between gap-2 lg:gap-4">
 
                 {/* Logo & Desktop Links */}
-                <div className="flex items-center gap-4 md:gap-12">
+                <div className="flex items-center gap-2.5 sm:gap-3 md:gap-4 lg:gap-5 xl:gap-7 min-w-0">
                     <div
-                        className="cursor-pointer"
+                        className="cursor-pointer flex items-center gap-2 shrink-0 group select-none"
                         onClick={() => handleNavClick('home')}
+                        title="My Donkey Home"
                     >
-                        <img src="/logo.png" className="h-10 md:h-12 lg:h-14 w-auto object-contain" alt="MY DONKEY Logo" />
+                        <img
+                            src="/logo.png"
+                            onError={(e) => {
+                                const target = e.currentTarget;
+                                if (!target.src.includes('cloudinary')) {
+                                    target.src = 'https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png';
+                                }
+                            }}
+                            className="h-8 sm:h-9 md:h-10 lg:h-11 w-auto object-contain drop-shadow-[0_2px_12px_rgba(229,9,20,0.5)] transition-transform group-hover:scale-105"
+                            alt="MY DONKEY Logo"
+                        />
+
                     </div>
 
-                    <div className="hidden lg:flex items-center gap-6">
+                    <div className="hidden lg:flex items-center gap-1.5 xl:gap-2.5 2xl:gap-3.5 shrink-0">
                         {[
                             { id: 'home', label: 'Home' },
                             { id: 'tv', label: 'TV Shows' },
@@ -304,21 +316,21 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                             <button
                                 key={item.id}
                                 onClick={() => handleNavClick(item.id)}
-                                className={`text-sm font-bold transition-all duration-300 relative px-5 py-2 rounded-full overflow-hidden group
+                                className={`text-xs xl:text-sm font-bold transition-all duration-300 relative px-3 py-1.5 xl:px-4 xl:py-2 rounded-full overflow-hidden group shrink-0 whitespace-nowrap
                                     ${item.id === 'exclusive'
-                                        ? `bg-gradient-to-r from-brand-red via-orange-500 to-brand-red bg-[length:200%_auto] animate-shimmer text-white italic tracking-wide shadow-[0_0_20px_rgba(229,9,20,0.6)] hover:shadow-[0_0_30px_rgba(229,9,20,0.8)] hover:scale-110 border border-white/20`
+                                        ? `bg-gradient-to-r from-brand-red via-orange-500 to-brand-red bg-[length:200%_auto] animate-shimmer text-white italic tracking-wide shadow-[0_0_20px_rgba(229,9,20,0.6)] hover:shadow-[0_0_30px_rgba(229,9,20,0.8)] hover:scale-105 border border-white/20`
                                         : item.id === 'theatre'
-                                        ? `bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 bg-[length:200%_auto] text-black font-extrabold tracking-wide shadow-[0_0_20px_rgba(245,158,11,0.5)] hover:shadow-[0_0_30px_rgba(245,158,11,0.8)] hover:scale-110 border border-yellow-200/60`
-                                        : item.id === 'anime'
-                                        ? `bg-gradient-to-r from-violet-600 via-pink-500 to-violet-600 bg-[length:200%_auto] animate-shimmer text-white italic tracking-wide shadow-[0_0_20px_rgba(168,85,247,0.6)] hover:shadow-[0_0_30px_rgba(236,72,153,0.8)] hover:scale-110 border border-white/20`
-                                        : `${activeTab === item.id
-                                            ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.4)] scale-105 border-transparent'
-                                            : 'bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10 hover:border-white/30 hover:text-white hover:shadow-[0_0_15px_rgba(255,255,255,0.1)] hover:scale-105'}`
+                                            ? `bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 bg-[length:200%_auto] text-black font-extrabold tracking-wide shadow-[0_0_20px_rgba(245,158,11,0.5)] hover:shadow-[0_0_30px_rgba(245,158,11,0.8)] hover:scale-105 border border-yellow-200/60`
+                                            : item.id === 'anime'
+                                                ? `bg-gradient-to-r from-violet-600 via-pink-500 to-violet-600 bg-[length:200%_auto] animate-shimmer text-white italic tracking-wide shadow-[0_0_20px_rgba(168,85,247,0.6)] hover:shadow-[0_0_30px_rgba(236,72,153,0.8)] hover:scale-105 border border-white/20`
+                                                : `${activeTab === item.id
+                                                    ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.4)] scale-105 border-transparent'
+                                                    : 'bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10 hover:border-white/30 hover:text-white hover:shadow-[0_0_15px_rgba(255,255,255,0.1)] hover:scale-105'}`
                                     }
                                 `}
                             >
                                 <span className="relative z-10 flex items-center gap-1.5">
-                                    {item.id === 'theatre' && <Armchair size={15} className="text-black inline-block" />}
+                                    {item.id === 'theatre' && <Armchair size={14} className="text-black inline-block" />}
                                     {item.label}
                                 </span>
                                 {item.id === 'anime' && (
@@ -330,18 +342,18 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                 </div>
 
                 {/* Right Actions */}
-                <div className="flex items-center gap-2 sm:gap-4 md:gap-6">
+                <div className="flex items-center gap-1.5 sm:gap-2.5 md:gap-3.5 shrink-0">
                     {/* Search Container with Instant Dropdown Results */}
-                    <div ref={searchContainerRef} className="relative">
+                    <div ref={searchContainerRef} className="relative shrink-0">
                         <form
                             onSubmit={handleSearchSubmit}
                             role="search"
                             className={`relative flex items-center transition-all duration-300 rounded-full border backdrop-blur-md group
                                 ${isSearchFocused || searchQuery
-                                    ? 'w-44 xs:w-56 sm:w-64 md:w-72 lg:w-80 bg-black/85 border-brand-red/80 shadow-[0_0_20px_rgba(229,9,20,0.35)]'
-                                    : 'w-36 xs:w-44 sm:w-56 md:w-64 lg:w-72 bg-white/10 hover:bg-white/15 border-white/20 hover:border-white/40'
+                                    ? 'w-44 sm:w-52 md:w-60 lg:w-52 xl:w-72 bg-black/85 border-brand-red/80 shadow-[0_0_20px_rgba(229,9,20,0.35)]'
+                                    : 'w-28 xs:w-36 sm:w-44 md:w-48 lg:w-40 xl:w-56 bg-white/10 hover:bg-white/15 border-white/20 hover:border-white/40'
                                 }
-                                h-9 md:h-10 px-3
+                                h-9 md:h-10 px-2.5 sm:px-3
                             `}
                         >
                             <button
@@ -451,13 +463,12 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                                                             {item.title}
                                                         </div>
                                                         <div className="flex items-center gap-2 mt-1 text-[11px] text-gray-400">
-                                                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wider ${
-                                                                isAnime
+                                                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wider ${isAnime
                                                                     ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
                                                                     : isSeries
-                                                                    ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                                                                    : 'bg-red-500/20 text-red-300 border border-red-500/30'
-                                                            }`}>
+                                                                        ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                                                                        : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                                                                }`}>
                                                                 {displayType}
                                                             </span>
                                                             {item.year ? <span>{item.year}</span> : null}
@@ -496,35 +507,45 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
 
                     {currentUser ? (
                         <>
-
-
                             {/* Profile / Account Nav & Dropdown */}
-                            <div className="relative flex items-center" ref={profileRef}>
+                            <div className="relative flex items-center gap-0.5 sm:gap-1 shrink-0" ref={profileRef}>
                                 <button
                                     onClick={() => {
                                         setProfileMenuOpen(false);
                                         handleNavClick('account');
                                     }}
-                                    className="flex items-center gap-1.5 group cursor-pointer focus:outline-none"
+                                    className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1.5 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 text-gray-200 hover:text-white transition-all cursor-pointer shadow-sm group active:scale-95 shrink-0"
                                     title="Go to Account & Settings"
                                 >
-                                    <img
-                                        src={currentUser?.avatarUrl || "/Mydonkey%20user.jpg"}
-                                        className="w-8 h-8 rounded border-2 border-transparent group-hover:border-white transition object-cover shadow-sm"
-                                        alt={currentUser?.name || "Account"}
-                                    />
+                                    <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-brand-red to-amber-500 flex items-center justify-center text-white shrink-0 overflow-hidden shadow-inner border border-white/20">
+                                        {currentUser?.avatarUrl ? (
+                                            <img
+                                                src={currentUser.avatarUrl}
+                                                className="w-full h-full object-cover"
+                                                alt={currentUser?.name || "Account"}
+                                                onError={(e) => {
+                                                    e.currentTarget.style.display = 'none';
+                                                }}
+                                            />
+                                        ) : (
+                                            <User size={14} className="text-white" />
+                                        )}
+                                    </div>
+                                    <span className="text-xs font-bold hidden md:inline-block max-w-[80px] truncate">
+                                        {currentUser?.name ? currentUser.name.split(' ')[0] : 'Account'}
+                                    </span>
                                 </button>
                                 <button
                                     onClick={() => setProfileMenuOpen(!isProfileMenuOpen)}
-                                    className="text-gray-400 hover:text-white p-1 transition cursor-pointer"
+                                    className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-white/10 transition cursor-pointer shrink-0"
                                     aria-label="Toggle profile menu"
-                                    title="Quick Menu"
+                                    title="Account Quick Menu"
                                 >
                                     <ChevronDown size={14} className={`transition-transform duration-200 ${isProfileMenuOpen ? 'rotate-180' : ''}`} />
                                 </button>
 
                                 {isProfileMenuOpen && (
-                                    <div className="absolute top-12 right-0 w-56 bg-cinema-black/95 backdrop-blur-xl border border-white/10 rounded-lg shadow-2xl py-2 animate-in slide-in-from-top-2">
+                                    <div className="absolute top-12 right-0 w-56 bg-cinema-black/95 backdrop-blur-xl border border-white/10 rounded-lg shadow-2xl py-2 animate-in slide-in-from-top-2 z-50">
                                         <div className="px-4 py-3 border-b border-white/10 mb-2">
                                             <div className="font-bold text-sm truncate text-white">{currentUser?.name || currentUser?.email?.split('@')[0]}</div>
                                             <div className="text-[10px] text-gray-500 truncate">{currentUser?.email}</div>
@@ -535,7 +556,6 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                                                 <LayoutDashboard size={18} /> Admin Panel
                                             </button>
                                         )}
-
 
                                         <button onClick={() => handleNavClick('account')} className="w-full flex items-center gap-3 px-4 py-2 text-sm hover:bg-white/10 transition text-gray-300 hover:text-white">
                                             <User size={18} /> Account
@@ -552,13 +572,15 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                     ) : (
                         <button
                             onClick={onLoginClick}
-                            className="bg-brand-red text-white px-4 py-2 rounded font-bold text-sm hover:bg-red-700 transition"
+                            className="bg-brand-red hover:bg-red-700 text-white px-3 sm:px-3.5 py-1.5 rounded-full font-bold text-xs flex items-center gap-1.5 transition active:scale-95 shadow-md shadow-brand-red/25 cursor-pointer shrink-0 whitespace-nowrap"
+                            title="Account Sign In"
                         >
-                            Sign In
+                            <User size={14} />
+                            <span>Sign In</span>
                         </button>
                     )}
 
-                    <button onClick={() => setMobileMenuOpen(true)} className="lg:hidden text-white p-1">
+                    <button onClick={() => setMobileMenuOpen(true)} className="lg:hidden text-white p-1 shrink-0" aria-label="Open mobile menu">
                         <Menu size={24} />
                     </button>
                 </div>
