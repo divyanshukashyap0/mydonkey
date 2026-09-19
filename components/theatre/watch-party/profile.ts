@@ -17,14 +17,16 @@ export function cleanProfile(profile: PlayerProfile): PlayerProfile {
 
 export function loadProfile(): PlayerProfile {
   try {
-    const saved: unknown = JSON.parse(localStorage.getItem('aethoflix-player') ?? 'null');
+    const saved: unknown = JSON.parse(localStorage.getItem('mydonkey-theatre-player') ?? localStorage.getItem('aethoflix-player') ?? 'null');
     if (saved && typeof saved === 'object' && 'name' in saved && 'color' in saved && typeof saved.name === 'string' && typeof saved.color === 'string') return cleanProfile({ name: saved.name, color: saved.color });
   } catch { /* A player profile is optional and never requires an account. */ }
   return { name: 'Guest', color: OUTFITS[0].color };
 }
 
 export function saveProfile(profile: PlayerProfile) {
-  try { localStorage.setItem('aethoflix-player', JSON.stringify(cleanProfile(profile))); } catch { /* Continue without persistent storage. */ }
+  try {
+    localStorage.setItem('mydonkey-theatre-player', JSON.stringify(cleanProfile(profile)));
+  } catch { /* Continue without persistent storage. */ }
 }
 
 export function initials(name: string) {

@@ -7,14 +7,14 @@ export type TmdbEndpoint = 'standard' | 'alternate';
 
 export function readEndpoint(): TmdbEndpoint {
   try {
-    const saved = localStorage.getItem('aethoflix-tmdb-endpoint');
+    const saved = localStorage.getItem('mydonkey-tmdb-endpoint') ?? localStorage.getItem('aethoflix-tmdb-endpoint');
     if (saved === 'standard') return 'standard';
     return 'alternate';
   } catch { return 'alternate'; }
 }
 
 export function saveEndpoint(endpoint: TmdbEndpoint) {
-  try { localStorage.setItem('aethoflix-tmdb-endpoint', endpoint); } catch { /* An endpoint selection can remain session-only. */ }
+  try { localStorage.setItem('mydonkey-tmdb-endpoint', endpoint); } catch { /* An endpoint selection can remain session-only. */ }
 }
 
 export function posterUrl(path: string | null): string | undefined {

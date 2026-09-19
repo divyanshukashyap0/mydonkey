@@ -525,7 +525,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                             <button
                                 onClick={() => handleDownload(content)}
                                 className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition cursor-pointer active:scale-95"
-                                title="Download HD File (Aethoflix Hub)"
+                                title="Download HD File (My Donkey Hub)"
                             >
                                 <Download size={20} className="text-blue-400" />
                                 <span className="text-[10px]">Download</span>
@@ -668,7 +668,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                                 <button
                                     onClick={() => handleDownload(content)}
                                     className="bg-gray-600/40 backdrop-blur-md p-3.5 rounded-full border border-white/20 hover:border-white transition hover:scale-105 active:scale-95 cursor-pointer"
-                                    title="High-Speed Download (Aethoflix Hub)"
+                                    title="High-Speed Download (My Donkey Hub)"
                                 >
                                     <Download size={24} className="text-blue-400 hover:text-white" />
                                 </button>

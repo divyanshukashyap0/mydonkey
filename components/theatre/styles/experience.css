@@ -77,6 +77,7 @@
 .cinema-stage { flex: 1; min-height: 0; position: relative; overflow: hidden; isolation: isolate; background: #0d1010; }
 .cinema-canvas { position: absolute; inset: 0; cursor: grab; touch-action: none; opacity: 1; transition: opacity 0.5s ease; }
 .cinema-canvas:active { cursor: grabbing; }
+.movie-session .cinema-canvas, .movie-session .cinema-canvas:active { cursor: default !important; }
 .cinema-canvas canvas, .cinema-webgl { display: block; width: 100% !important; height: 100% !important; }
 .provider-world-layer { position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important; pointer-events: none !important; overflow: hidden !important; z-index: 2 !important; }
 .provider-world-screen { position: absolute !important; width: 1600px !important; height: 900px !important; pointer-events: auto !important; background: #000 !important; border-radius: 4px !important; overflow: hidden !important; box-shadow: 0 0 80px rgba(0, 0, 0, 0.9) !important; }
@@ -102,32 +103,37 @@
 .room-mode.is-cinema .mode-icon { color: #b8c2ce; }
 .room-mode.is-cinema .mode-title { color: #bbc5d0; }
 
-.scene-controls { position: absolute; left: 0; right: 0; bottom: 0; height: 127px; z-index: 3; pointer-events: none; }
+.scene-controls { position: absolute; left: 0; right: 0; bottom: 0; height: 190px; z-index: 36; pointer-events: none; }
 .scene-controls button, .scene-controls .joystick { pointer-events: auto; }
-.desktop-controls { position: absolute; left: 42px; bottom: 48px; display: flex; align-items: center; gap: 24px; }
+.desktop-controls { position: absolute; left: 42px; bottom: 48px; display: flex; align-items: center; gap: 24px; z-index: 36; }
 .control-hint { display: inline-flex; align-items: center; gap: 8px; color: #8e908b; font-size: 9px; white-space: nowrap; }
 .control-hint > svg { color: #a29d91; }
 .key-group { display: inline-flex; gap: 3px; }
 kbd { font-family: 'DM Sans', sans-serif; font-size: 9px; font-weight: 450; display: inline-flex; width: 21px; height: 22px; align-items: center; justify-content: center; border: 1px solid rgba(189, 183, 168, 0.21); border-radius: 4px; color: #c2bfb4; box-shadow: 0 2px 0 rgba(0, 0, 0, 0.13); line-height: 1; background: rgba(21, 25, 25, 0.6); }
 .wide-key { width: auto; padding: 0 7px; }
-.seat-action { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); text-align: center; }
-.seat-action-buttons { display: flex; justify-content: center; gap: 8px; }
+.seat-action { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); text-align: center; z-index: 36; pointer-events: auto; }
+.seat-action-buttons { display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: nowrap; }
+.service-bell-button { width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0; margin: 0; border: 1px solid rgba(217, 189, 149, 0.42); background: rgba(27, 28, 27, 0.75); border-radius: 50%; color: #e5cfac; display: flex; align-items: center; justify-content: center; transition: background 180ms, border-color 180ms, transform 180ms, box-shadow 180ms, color 180ms; cursor: pointer; flex-shrink: 0; box-sizing: border-box; }
+.service-bell-button:hover:not(:disabled) { background: rgba(217, 189, 149, 0.22); border-color: #d9bd95; color: #fff; transform: translateY(-2px); box-shadow: 0 4px 18px rgba(217, 189, 149, 0.25); }
+.service-bell-button:active:not(:disabled) { transform: translateY(0); }
+.service-bell-button:disabled { opacity: 0.45; cursor: not-allowed; }
+.service-bell-button.is-eating { border-color: #eab308; color: #eab308; background: rgba(234, 179, 8, 0.14); }
 .primary-button { border: 1px solid #d9bd95; background: #d9bd95; color: #25231e; min-height: 47px; padding: 0 20px; font-size: 11px; font-weight: 550; display: inline-flex; align-items: center; justify-content: center; gap: 11px; border-radius: 5px; transition: background 200ms, border-color 200ms, transform 200ms, box-shadow 200ms; }
 .primary-button:hover:not(:disabled) { background: #ead3af; border-color: #ead3af; transform: translateY(-2px); box-shadow: 0 5px 26px rgba(217, 189, 149, 0.08); }
 .primary-button:active:not(:disabled) { transform: translateY(0); }
-.take-seat-button { width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0; gap: 0; border-radius: 50%; }
+.take-seat-button { width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0; gap: 0; border-radius: 50%; flex-shrink: 0; margin: 0; box-sizing: border-box; cursor: pointer; }
 .take-seat-button > span, .take-seat-button kbd { display: none; }
 .take-seat-button.stand-button { background: rgba(19, 22, 24, 0.8); color: #d7d9da; border-color: #555858; }
-.take-seat-button.stand-button:hover { background: #2d3235; border-color: #7a7c7c; }
-.seat-map-button { width: 44px; height: 44px; border: 1px solid rgba(196, 177, 146, 0.33); background: rgba(27, 28, 27, 0.68); border-radius: 50%; color: #c3b396; display: flex; align-items: center; justify-content: center; transition: background 180ms, border-color 180ms, transform 180ms; }
+.take-seat-button.stand-button:hover { background: #2d3235; border-color: #7a7c7c; transform: translateY(-2px); }
+.seat-map-button { width: 44px; min-width: 44px; height: 44px; min-height: 44px; border: 1px solid rgba(196, 177, 146, 0.33); background: rgba(27, 28, 27, 0.68); border-radius: 50%; color: #c3b396; display: flex; align-items: center; justify-content: center; transition: background 180ms, border-color 180ms, transform 180ms; flex-shrink: 0; margin: 0; box-sizing: border-box; cursor: pointer; }
 .seat-map-button:hover:not(:disabled) { background: #34312a; border-color: #b29c77; transform: translateY(-2px); }
-.change-server-button { width: 44px; height: 44px; border: 1px solid rgba(100, 180, 200, 0.35); background: rgba(27, 28, 27, 0.68); border-radius: 50%; color: #80b8c8; display: flex; align-items: center; justify-content: center; transition: background 180ms, border-color 180ms, transform 180ms; }
+.change-server-button { width: 44px; min-width: 44px; height: 44px; min-height: 44px; border: 1px solid rgba(100, 180, 200, 0.35); background: rgba(27, 28, 27, 0.68); border-radius: 50%; color: #80b8c8; display: flex; align-items: center; justify-content: center; transition: background 180ms, border-color 180ms, transform 180ms; flex-shrink: 0; margin: 0; box-sizing: border-box; cursor: pointer; }
 .change-server-button:hover:not(:disabled) { background: rgba(40, 70, 85, 0.8); border-color: rgba(100, 180, 210, 0.7); color: #a8d8e8; transform: translateY(-2px); box-shadow: 0 0 12px rgba(80, 160, 200, 0.18); }
 .change-server-button:disabled { opacity: 0.4; cursor: not-allowed; }
 .theatre-search-slot.is-hidden { opacity: 0; pointer-events: none; }
 .theatre-search-slot { transition: opacity 400ms ease; }
-.seat-action-caption { display: block; font-size: 9px; letter-spacing: 0.025em; color: #84877f; margin-top: 12px; white-space: nowrap; }
-.reset-view { position: absolute; right: 42px; bottom: 42px; display: flex; align-items: center; gap: 7px; padding: 8px 0 8px 8px; background: none; border: 0; color: #9b9b91; font-size: 9px; transition: color 180ms; }
+.seat-action-caption { display: block; font-size: 10px; letter-spacing: 0.03em; color: #9c9f95; margin-top: 10px; white-space: nowrap; }
+.reset-view { position: absolute; right: 42px; bottom: 42px; display: flex; align-items: center; gap: 7px; padding: 8px 0 8px 8px; background: none; border: 0; color: #9b9b91; font-size: 9px; transition: color 180ms; z-index: 36; }
 .reset-view:hover { color: var(--gold); }
 .mobile-look-hint { display: none; }
 .joystick { display: none; }
@@ -158,12 +164,15 @@ kbd { font-family: 'DM Sans', sans-serif; font-size: 9px; font-weight: 450; disp
 .icon-button:hover { color: #e7d8bd; background: rgba(218, 206, 184, 0.06); }
 .fullscreen-button { padding: 6px 0 6px 4px; }
 .movie-session .site-header { background: #0e1011; }
-.movie-session .playback-bar { background: #101314; }
+.movie-session .playback-bar { position: absolute; bottom: 0; left: 0; right: 0; z-index: 35; transition: transform 320ms ease, opacity 280ms ease; background: rgba(14, 16, 17, 0.92); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid var(--line); }
+.movie-session.hud-hidden .playback-bar { transform: translateY(100%); opacity: 0; pointer-events: none; }
+.movie-session .seat-action { left: 50%; right: auto; transform: translateX(-50%); bottom: calc(70px + 24px); z-index: 36; }
+.movie-session .desktop-controls { bottom: calc(70px + 20px); z-index: 36; }
+.movie-session .reset-view { bottom: calc(70px + 20px); z-index: 36; }
 .movie-session .stage-bottom-shade { background: linear-gradient(0deg, #0a0d0f, rgba(7, 9, 12, 0.2) 43%, transparent 67%); }
 .movie-session .footer-center { color: #525b5e; }
 /* While seated, keep Watch Party and the NPC toggle available. */
 .movie-session .site-header { display: flex; background: rgba(8, 10, 11, 0.72); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
-.movie-session .playback-bar { display: none; }
 .movie-session .scene-intro { display: none; }
 .movie-session .main-nav,
 .movie-session .back-to-site,
@@ -812,18 +821,19 @@ kbd { font-family: 'DM Sans', sans-serif; font-size: 9px; font-weight: 450; disp
   .stage-bottom-shade { background: linear-gradient(0deg, #101212, rgba(10, 14, 14, 0.75) 12%, transparent 38%); }
   .scene-controls { height: 167px; }
   .desktop-controls { display: none; }
-  .seat-action { left: auto; right: 22px; bottom: 42px; transform: none; }
-  .seat-action-buttons { gap: 7px; }
+  .seat-action { left: auto; right: 22px; bottom: 42px; transform: none; z-index: 36; }
+  .seat-action-buttons { gap: 12px; }
   .primary-button { font-size: 10px; padding: 0 14px; gap: 9px; }
-  .take-seat-button { min-width: 145px; height: 44px; min-height: 44px; }
-  .seat-map-button { width: 42px; height: 44px; }
-  .change-server-button { width: 42px; height: 44px; }
+  .take-seat-button { width: 42px; min-width: 42px; height: 42px; min-height: 42px; border-radius: 50%; }
+  .service-bell-button { width: 42px; min-width: 42px; height: 42px; min-height: 42px; }
+  .seat-map-button { width: 42px; min-width: 42px; height: 42px; min-height: 42px; }
+  .change-server-button { width: 42px; min-width: 42px; height: 42px; min-height: 42px; }
   .seat-action-caption { font-size: 8px; margin-top: 11px; }
-  .reset-view { right: 22px; bottom: 9px; font-size: 7px; padding: 5px 0 5px 6px; gap: 5px; }
+  .reset-view { right: 22px; bottom: 9px; font-size: 7px; padding: 5px 0 5px 6px; gap: 5px; z-index: 36; }
   .reset-view > svg { width: 11px; height: 11px; }
   .mobile-look-hint { display: block; position: absolute; top: 4px; right: 25px; color: #9a9d91; font-size: 7px; letter-spacing: 0.01em; }
   .movie-session .mobile-look-hint { display: none; }
-  .movie-session .seat-action { left: 50%; right: auto; transform: translateX(-50%); bottom: 36px; }
+  .movie-session .seat-action { left: 50%; right: auto; transform: translateX(-50%); bottom: calc(63px + env(safe-area-inset-bottom, 0px) + 20px); z-index: 36; }
   .joystick { display: block; position: absolute; left: 26px; bottom: 43px; width: 86px; height: 86px; border: 1px solid rgba(217, 196, 161, 0.4); background: rgba(25, 31, 27, 0.75); border-radius: 50%; touch-action: none; pointer-events: auto; }
   .joystick::before { content: ''; position: absolute; inset: 10px; border: 1px solid rgba(210, 200, 174, 0.09); border-radius: 50%; }
   .joystick-axis { position: absolute; background: rgba(216, 198, 164, 0.14); }
@@ -868,13 +878,13 @@ kbd { font-family: 'DM Sans', sans-serif; font-size: 9px; font-weight: 450; disp
   .scene-intro h1 { font-size: 31px; }
   .scene-intro p { font-size: 8px; }
   .seat-action { right: 17px; }
+  .seat-action-buttons { gap: 8px; }
   .joystick { left: 18px; width: 77px; height: 77px; }
   .joystick-knob { left: 22px; top: 22px; }
   .axis-horizontal { top: 38px; width: 59px; }
   .axis-vertical { left: 38px; height: 59px; }
-  .take-seat-button { width: 40px; min-width: 40px; height: 40px; min-height: 40px; }
-  .seat-map-button { width: 40px; height: 40px; }
-  .change-server-button { width: 40px; height: 40px; }
+  .take-seat-button, .service-bell-button, .seat-map-button, .change-server-button { width: 38px; min-width: 38px; height: 38px; min-height: 38px; }
+  .movie-session .seat-action { left: 50%; right: auto; transform: translateX(-50%); bottom: calc(63px + env(safe-area-inset-bottom, 0px) + 14px); z-index: 36; }
   .experience-tools { gap: 9px; }
   .quality-button + .tool-divider { display: none; }
   .film-meta strong { max-width: 95px; }
@@ -896,8 +906,11 @@ kbd { font-family: 'DM Sans', sans-serif; font-size: 9px; font-weight: 450; disp
   .scene-intro p { font-size: 9px; }
   .room-mode { top: 32px; }
   .seat-action { bottom: 17px; }
+  .movie-session .seat-action { bottom: calc(56px + 14px); z-index: 36; }
   .desktop-controls { bottom: 39px; }
+  .movie-session .desktop-controls { bottom: calc(56px + 14px); z-index: 36; }
   .reset-view { bottom: 33px; }
+  .movie-session .reset-view { bottom: calc(56px + 14px); z-index: 36; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -914,6 +927,9 @@ kbd { font-family: 'DM Sans', sans-serif; font-size: 9px; font-weight: 450; disp
   .scene-intro p { display: none; }
   .room-mode { top: 23px; }
   .seat-action { bottom: 17px; }
+  .movie-session .seat-action { bottom: calc(49px + 10px); z-index: 36; }
+  .seat-action-buttons { gap: 10px; }
+  .take-seat-button, .service-bell-button, .seat-map-button, .change-server-button { width: 36px; min-width: 36px; height: 36px; min-height: 36px; }
   .seat-action-caption { margin-top: 7px; }
   .joystick { width: 70px; height: 70px; bottom: 28px; }
   .joystick-knob { left: 19px; top: 19px; width: 30px; height: 30px; }
@@ -923,7 +939,7 @@ kbd { font-family: 'DM Sans', sans-serif; font-size: 9px; font-weight: 450; disp
 }
 
 /* ==========================================================================
-   Aethoflix External Provider Player & Screen Panel
+   My Donkey External Provider Player & Screen Panel
    ========================================================================== */
 
 .external-provider-player {
@@ -3986,4 +4002,109 @@ kbd { font-family: 'DM Sans', sans-serif; font-size: 9px; font-weight: 450; disp
     font-size: 9.5px;
   }
 }
+
+/* Floating Controls HUD */
+.theatre-fab-stack {
+  position: absolute;
+  right: 24px;
+  top: 84px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 30;
+  pointer-events: auto;
+  transition: opacity 280ms ease, transform 280ms ease;
+}
+.theatre-fab-stack.is-hidden {
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+}
+.tfab {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(20, 24, 25, 0.85);
+  border: 1px solid rgba(219, 203, 178, 0.2);
+  color: #e8e5df;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 180ms ease;
+}
+.tfab:hover {
+  background: rgba(40, 48, 50, 0.95);
+  border-color: var(--gold);
+  color: #fff;
+  transform: scale(1.06);
+}
+.tfab.is-on, .tfab.is-lite {
+  background: var(--gold);
+  color: #171816;
+  border-color: var(--gold);
+}
+.tfab.is-off {
+  opacity: 0.45;
+}
+.tfab-panel {
+  position: absolute;
+  right: 46px;
+  top: 0;
+  width: 300px;
+  max-height: 380px;
+  background: rgba(16, 18, 19, 0.96);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  backdrop-filter: blur(16px);
+  padding: 12px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+.tfab-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+.tfab-search input {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 12px;
+  width: 100%;
+}
+.tfab-results, .tfab-server-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tfab-item, .tfab-server-list button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #ddd;
+  text-align: left;
+  cursor: pointer;
+  font-size: 11px;
+}
+.tfab-item:hover, .tfab-server-list button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.tfab-item.is-active, .tfab-server-list button.is-active {
+  background: var(--gold);
+  color: #171816;
+}
+
 

@@ -129,25 +129,42 @@ export class CinemaEngine {
   private servicePhase: 'idle' | 'summoned' | 'coming' | 'delivering' | 'returning' = 'idle';
   private chewPhase = 0;
   private highRefresh = false;
-  private refreshTarget = (() => { try { return localStorage.getItem('aethoflix-high-refresh') !== 'off'; } catch { return true; } })();
+  private refreshTarget = (() => { try { return (localStorage.getItem('mydonkey-high-refresh') ?? localStorage.getItem('aethoflix-high-refresh')) !== 'off'; } catch { return true; } })();
   private fastFrames = 0;
   private sampledFrames = 0;
   private patrolPaths: { leg: Point2[]; next: Point2 }[] = [];
+  public isTV = false;
+  public isMobile = false;
+  public isLowEnd = false;
 
   constructor(host: HTMLDivElement, callbacks: Callbacks) {
     this.host = host;
     this.callbacks = callbacks;
+
+    // Detect device hardware profiles: Smartphone, Smart TV, and Laptop/PC
+    const touchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+    this.isTV = /TV|SmartTV|GoogleTV|HbbTV|CrKey|Tizen|WebOS|POV_TV|Bravia|BRAVIA|Viera|AppleTV/i.test(ua) || (typeof window !== 'undefined' && window.innerWidth >= 1920 && window.matchMedia('(any-pointer: none)').matches);
+    this.isMobile = touchDevice || /iPhone|iPad|iPod|Android/i.test(ua);
+    const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+    const cores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 8 : 8;
+    this.isLowEnd = this.isTV || this.isMobile || (typeof memory === 'number' && memory > 0 && memory <= 4) || cores <= 4;
+
     this.scene.background = new THREE.Color('#0c0e0f');
     this.scene.fog = new THREE.FogExp2('#0e1011', 0.003);
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', alpha: true });
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: !this.isLowEnd && !this.isTV,
+      powerPreference: 'high-performance',
+      alpha: true,
+    });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.32;
-    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.enabled = false;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.shadowMap.autoUpdate = false;
-    this.renderer.shadowMap.needsUpdate = true;
-    this.renderer.domElement.setAttribute('aria-label', 'Walkable AethoFlix private cinema. Use WASD to walk, drag to look, and E to sit or stand.');
+    this.renderer.shadowMap.needsUpdate = false;
+    this.renderer.domElement.setAttribute('aria-label', 'Walkable My Donkey private cinema. Use WASD to walk, drag to look, and E to sit or stand.');
     this.renderer.domElement.setAttribute('role', 'img');
     host.appendChild(this.renderer.domElement);
     this.environment = buildEnvironment(this.scene, this.renderer);
@@ -293,7 +310,16 @@ export class CinemaEngine {
   };
 
   private onContextMenu = (event: Event) => event.preventDefault();
-  private clearInput = () => { this.keys.clear(); this.joystick.set(0, 0); this.pointer = null; };
+  private clearInput = () => {
+    this.keys.clear();
+    this.joystick.set(0, 0);
+    if (this.pointer) {
+      if (this.host.hasPointerCapture(this.pointer.id)) {
+        try { this.host.releasePointerCapture(this.pointer.id); } catch {}
+      }
+      this.pointer = null;
+    }
+  };
   private onKeyDown = (event: KeyboardEvent) => {
     this.inactivityTime = 0;
     if (!this.inputsEnabled || event.ctrlKey || event.metaKey || event.altKey || /INPUT|TEXTAREA|SELECT/.test((event.target as HTMLElement)?.tagName)) return;
@@ -309,15 +335,20 @@ export class CinemaEngine {
   private onKeyUp = (event: KeyboardEvent) => this.keys.delete(event.key.toLowerCase());
 
   private onPointerDown = (event: PointerEvent) => {
-    if (!this.inputsEnabled || this.pointer) return;
+    if (!this.inputsEnabled || this.pointer || this.state === 'seated' || this.state === 'sitting') return;
     this.pointer = { id: event.pointerId, x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, moved: false };
-    this.host.setPointerCapture(event.pointerId);
+    // Only capture pointer once user starts dragging in onPointerMove, avoiding stuck clicks
   };
   private onPointerMove = (event: PointerEvent) => {
     if (!this.pointer || this.pointer.id !== event.pointerId || !this.inputsEnabled) return;
     const dx = event.clientX - this.pointer.x;
     const dy = event.clientY - this.pointer.y;
-    if (Math.hypot(event.clientX - this.pointer.startX, event.clientY - this.pointer.startY) > 5) this.pointer.moved = true;
+    if (!this.pointer.moved && Math.hypot(event.clientX - this.pointer.startX, event.clientY - this.pointer.startY) > 5) {
+      this.pointer.moved = true;
+      if (this.state === 'explore') {
+        try { this.host.setPointerCapture(event.pointerId); } catch {}
+      }
+    }
     if (this.pointer.moved && this.state !== 'seated' && this.state !== 'sitting') {
       this.overview = false;
       this.targetYaw -= dx * 0.004;
@@ -327,18 +358,26 @@ export class CinemaEngine {
     this.pointer.y = event.clientY;
   };
   private onPointerUp = (event: PointerEvent) => {
-    if (!this.pointer || this.pointer.id !== event.pointerId) return;
-    if (!this.pointer.moved && this.inputsEnabled && this.state === 'explore') {
+    if (this.host.hasPointerCapture(event.pointerId)) {
+      try { this.host.releasePointerCapture(event.pointerId); } catch {}
+    }
+    const currentPointer = this.pointer;
+    this.pointer = null;
+    if (!currentPointer || currentPointer.id !== event.pointerId) return;
+    if (!currentPointer.moved && this.inputsEnabled && this.state === 'explore') {
       const rect = this.host.getBoundingClientRect();
       this.mouse.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
       this.raycaster.setFromCamera(this.mouse, this.camera);
       const hit = this.raycaster.intersectObjects(this.environment.seats, true)[0];
       if (hit?.object.userData.seatId) this.takeSeat(hit.object.userData.seatId as string);
     }
-    if (this.host.hasPointerCapture(event.pointerId)) this.host.releasePointerCapture(event.pointerId);
+  };
+  private onPointerCancel = (event?: PointerEvent) => {
+    if (event && this.host.hasPointerCapture(event.pointerId)) {
+      try { this.host.releasePointerCapture(event.pointerId); } catch {}
+    }
     this.pointer = null;
   };
-  private onPointerCancel = () => { this.pointer = null; };
   private onWheel = (event: WheelEvent) => {
     if (!this.inputsEnabled || this.state === 'seated') return;
     event.preventDefault();
@@ -370,7 +409,7 @@ export class CinemaEngine {
 
   setRefreshTarget(on: boolean) {
     this.refreshTarget = on;
-    try { localStorage.setItem('aethoflix-high-refresh', on ? 'on' : 'off'); } catch { /* A session-only target is acceptable. */ }
+    try { localStorage.setItem('mydonkey-high-refresh', on ? 'on' : 'off'); } catch { /* A session-only target is acceptable. */ }
     this.publish();
   }
 
@@ -447,33 +486,83 @@ export class CinemaEngine {
   setQuality(quality: Quality) {
     this.quality = quality;
     const dpr = window.devicePixelRatio || 1;
-    const touchDevice = window.matchMedia('(pointer: coarse)').matches;
-    const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
-    const lowEnd = touchDevice || (typeof memory === 'number' && memory > 0 && memory <= 4) || (navigator.hardwareConcurrency || 8) <= 4;
-    // Performance is the theatre default and is tuned for weak phones/laptops.
-    this.pixelRatio = quality === 'high'
-      ? Math.min(dpr, lowEnd ? 1.15 : 1.75)
-      : quality === 'performance'
-        ? Math.min(1, Math.max(0.7, lowEnd ? 0.75 : 0.9))
-        : Math.min(dpr, lowEnd ? 0.9 : 1.25);
-    this.renderer.setPixelRatio(this.pixelRatio);
-    this.renderer.shadowMap.enabled = quality === 'high' && !lowEnd;
-    this.renderer.shadowMap.needsUpdate = true;
-    // Prefer stable frames over fancy GPU features on weak devices.
-    this.renderer.sortObjects = quality !== 'performance';
-    if (this.environment) {
-      const shadowSize = quality === 'high' ? (lowEnd ? 512 : 1536) : quality === 'auto' ? (touchDevice ? 256 : 512) : 128;
-      this.environment.screenShadow.shadow.mapSize.set(shadowSize, shadowSize);
-      this.environment.screenShadow.shadow.map?.dispose();
-      this.environment.screenShadow.shadow.map = null;
-      this.environment.screenShadow.castShadow = quality === 'high' && !lowEnd;
-      this.environment.roomLights.forEach(({ light }, index) => {
-        if (quality === 'high') light.visible = true;
-        else if (quality === 'performance') light.visible = !(light instanceof THREE.PointLight) || index % 4 === 0;
-        else light.visible = !(light instanceof THREE.PointLight) || index % 2 === 0;
-      });
-      if (this.environment.ambient) this.environment.ambient.intensity = quality === 'performance' ? 0.62 : 0.45;
+
+    // Platform-tailored pixel ratio resolution
+    if (this.isTV) {
+      // Smart TVs (4K/1080p weak GPUs): keep internal buffer lightweight (720p equivalent)
+      this.pixelRatio = Math.min(0.72, Math.max(0.55, dpr * 0.5));
+    } else if (this.isMobile) {
+      // Smartphones: High-DPI screens burn GPU fillrate; cap at 0.75 - 0.9 in performance, max 1.05 in high
+      this.pixelRatio = quality === 'high'
+        ? Math.min(dpr, 1.05)
+        : quality === 'performance'
+          ? Math.min(1, Math.max(0.72, dpr * 0.45))
+          : Math.min(dpr, 0.9);
+    } else {
+      // Laptops and Desktops: preserve high visual fidelity while preventing fan noise/lag on integrated graphics
+      this.pixelRatio = quality === 'high'
+        ? Math.min(dpr, this.isLowEnd ? 1.15 : 1.5)
+        : quality === 'performance'
+          ? Math.min(1, this.isLowEnd ? 0.8 : 0.95)
+          : Math.min(dpr, this.isLowEnd ? 0.9 : 1.25);
     }
+    this.renderer.setPixelRatio(this.pixelRatio);
+
+    // Dynamic real-time shadows: strictly disabled on TV, mobile, and low-end hardware
+    // Static soft baked contact shadows (under recliners & characters) remain active and look great.
+    const enableDynamicShadows = quality === 'high' && !this.isLowEnd && !this.isTV && !this.isMobile;
+    this.renderer.shadowMap.enabled = enableDynamicShadows;
+    this.renderer.shadowMap.needsUpdate = enableDynamicShadows;
+    this.renderer.sortObjects = quality !== 'performance';
+
+    if (this.environment) {
+      this.environment.screenShadow.castShadow = enableDynamicShadows;
+      if (!enableDynamicShadows) {
+        this.environment.screenShadow.shadow.map?.dispose();
+        this.environment.screenShadow.shadow.map = null;
+      } else {
+        const shadowSize = 1024;
+        this.environment.screenShadow.shadow.mapSize.set(shadowSize, shadowSize);
+      }
+
+      this.environment.roomLights.forEach(({ light }, index) => {
+        if (quality === 'high' && !this.isTV) {
+          light.visible = true;
+        } else if (this.isTV || quality === 'performance') {
+          // Keep only essential lights (skip high-cost secondary fill lights)
+          light.visible = !(light instanceof THREE.PointLight) ? index === 0 : index % 4 === 0;
+        } else {
+          light.visible = !(light instanceof THREE.PointLight) || index % 2 === 0;
+        }
+      });
+      if (this.environment.ambient) {
+        this.environment.ambient.intensity = (this.isTV || quality === 'performance') ? 0.65 : 0.45;
+      }
+    }
+  }
+
+  sitDirectly(id: string = 'B3') {
+    const seat = SEATS.find((item) => item.id === id) || SEATS[2];
+    if (!seat) return;
+    this.activeSeat = seat;
+    this.route = [];
+    this.position.x = seat.x;
+    this.position.z = seat.z - 0.09;
+    this.avatar.root.position.set(seat.x, seat.elevation, seat.z - 0.09);
+    this.avatar.root.rotation.y = 0;
+    this.state = 'seated';
+    this.sitAmount = 1;
+    this.targetYaw = 0;
+    this.targetPitch = 0.08;
+    this.yaw = 0;
+    this.pitch = 0.08;
+    this.overview = false;
+    this.desiredCamera.set(seat.x, seat.elevation + 1.25, seat.z + 0.35);
+    this.desiredTarget.set(0, 2.93, -6.8);
+    this.camera.position.copy(this.desiredCamera);
+    this.cameraTarget.copy(this.desiredTarget);
+    this.camera.lookAt(this.cameraTarget);
+    this.publish();
   }
 
   async takeSeat(id?: string) {
@@ -530,9 +619,8 @@ export class CinemaEngine {
     this.patrolWaitress.rig.root.visible = visible;
     this.environment.cafeteria.patrons.forEach((patron) => { patron.root.visible = visible; });
     this.environment.cafeteria.barista.root.visible = visible;
-    this.environment.cafeteria.walker.root.visible = visible;
     this.remotePlayers.forEach((remote) => { if (remote.bot) remote.avatar.root.visible = visible; });
-    this.renderer.shadowMap.needsUpdate = true;
+    if (this.renderer.shadowMap.enabled) this.renderer.shadowMap.needsUpdate = true;
   }
 
   toggleSeatZoom() {
@@ -681,9 +769,9 @@ export class CinemaEngine {
           w.phase = 'station';
           this.servicePhase = 'idle';
         }
-        this.renderer.shadowMap.needsUpdate = true;
+        if (this.renderer.shadowMap.enabled) this.renderer.shadowMap.needsUpdate = true;
       } else {
-        this.renderer.shadowMap.needsUpdate = true;
+        if (this.renderer.shadowMap.enabled) this.renderer.shadowMap.needsUpdate = true;
       }
     } else if (w.phase === 'coming') {
       w.phase = 'delivering';
@@ -692,7 +780,7 @@ export class CinemaEngine {
     } else if (w.phase === 'returning') {
       w.phase = 'station';
       this.servicePhase = 'idle';
-      this.renderer.shadowMap.needsUpdate = true;
+      if (this.renderer.shadowMap.enabled) this.renderer.shadowMap.needsUpdate = true;
     }
     if (w.phase === 'delivering') {
       w.timer -= dt;
@@ -728,12 +816,12 @@ export class CinemaEngine {
       }
       poseAvatar(p.rig, 0, 0.6, p.walkPhase, dt);
       this.holdTray(p.rig);
-      this.renderer.shadowMap.needsUpdate = true;
+      if (this.renderer.shadowMap.enabled) this.renderer.shadowMap.needsUpdate = true;
     } else {
       p.timer -= dt;
       poseAvatar(p.rig, 0, 0, p.walkPhase, dt);
       this.holdTray(p.rig);
-      if (p.timer <= 0) { p.moving = true; this.renderer.shadowMap.needsUpdate = true; }
+      if (p.timer <= 0) { p.moving = true; if (this.renderer.shadowMap.enabled) this.renderer.shadowMap.needsUpdate = true; }
     }
   }
 
@@ -750,7 +838,7 @@ export class CinemaEngine {
     barista.root.rotation.y = 0;
     barista.leftArm.rotation.x = 0.55 + Math.sin(this.time * 1.3) * 0.2;
     barista.rightForearm.rotation.x = -1.25;
-    if (Math.abs(Math.sin(this.time * 0.5)) > 0.94) this.renderer.shadowMap.needsUpdate = true;
+    if (Math.abs(Math.sin(this.time * 0.5)) > 0.94 && this.renderer.shadowMap.enabled) this.renderer.shadowMap.needsUpdate = true;
     const span = 4.55;
     const t = (Math.sin(this.time * 0.11) + 1) * 0.5;
     const direction = Math.cos(this.time * 0.11) >= 0;
@@ -758,7 +846,7 @@ export class CinemaEngine {
     walker.root.rotation.y = turnToward(walker.root.rotation.y, direction ? Math.PI / 2 : -Math.PI / 2, 1 - Math.exp(-4 * dt));
     const speed = Math.abs(Math.cos(this.time * 0.11)) * 0.75;
     poseAvatar(walker, 0, speed, direction ? this.time * 2.6 : -this.time * 2.6, dt);
-    if (speed > 0.03) this.renderer.shadowMap.needsUpdate = true;
+    if (speed > 0.03 && this.renderer.shadowMap.enabled) this.renderer.shadowMap.needsUpdate = true;
   }
 
   private updateServiceAndFood(dt: number) {
@@ -833,7 +921,7 @@ export class CinemaEngine {
     this.sitAmount = 0;
     this.overview = true;
     this.avatar.root.position.set(SPAWN.x, floorHeight(SPAWN.x, SPAWN.z), SPAWN.z);
-    this.renderer.shadowMap.needsUpdate = true;
+    if (this.renderer.shadowMap.enabled) this.renderer.shadowMap.needsUpdate = true;
     this.yaw = 0.35;
     this.pitch = 0.31;
     this.targetYaw = 0.35;
@@ -1148,12 +1236,12 @@ export class CinemaEngine {
       if (this.state === 'walking') this.cancelWalk();
     }
     let speed = this.keys.has('shift') ? 3.5 : 2.25;
-    if (this.state === 'walking' && this.route.length && this.inputsEnabled) {
+    if (this.state === 'walking' && this.route.length) {
       const target = this.route[0];
       const dx = target.x - this.position.x;
       const dz = target.z - this.position.z;
       const distance = Math.hypot(dx, dz);
-      if (distance < 0.08) {
+      if (distance < 0.16) {
         this.route.shift();
         if (!this.route.length) { this.beginSitting(); return; }
       }
@@ -1207,7 +1295,9 @@ export class CinemaEngine {
       remote.sit = damp(remote.sit, target.sit, 12, dt);
       const moving = performance.now() - receivedAt < 650;
       poseAvatar(avatar, remote.sit, moving ? target.speed : 0, target.phase, dt);
-      if (changing || (moving && target.speed > 0.025)) this.renderer.shadowMap.needsUpdate = true;
+      if (this.renderer.shadowMap.enabled && (changing || (moving && target.speed > 0.025))) {
+        this.renderer.shadowMap.needsUpdate = true;
+      }
     }
   }
 
@@ -1323,18 +1413,19 @@ export class CinemaEngine {
     e.materials.ledSoft.emissiveIntensity = 0.85 * this.lightLevel;
     e.materials.fixture.emissiveIntensity = 3.4 * Math.pow(this.lightLevel, 1.65);
     e.materials.fixture.color.setRGB(this.lightLevel, this.lightLevel * 0.85, this.lightLevel * 0.6);
-    if (this.video && this.video.readyState >= 2) {
+    if (this.video && this.video.readyState >= 2 && !this.isTV) {
       this.videoSampleTime += dt;
-      if (this.videoSampleTime > 0.28) {
+      const sampleInterval = (this.isMobile || this.isLowEnd) ? 1.5 : 0.75;
+      if (this.videoSampleTime > sampleInterval) {
         this.videoSampleTime = 0;
         const ctx = this.videoSample.getContext('2d', { willReadFrequently: true });
         if (ctx) {
           try {
-          ctx.drawImage(this.video, 0, 0, 8, 8);
-          const pixels = ctx.getImageData(0, 0, 8, 8).data;
-          let r = 0, g = 0, b = 0;
-          for (let i = 0; i < pixels.length; i += 4) { r += pixels[i]; g += pixels[i + 1]; b += pixels[i + 2]; }
-          this.sampledColor.setRGB(r / 16320, g / 16320, b / 16320, THREE.SRGBColorSpace);
+            ctx.drawImage(this.video, 0, 0, 8, 8);
+            const pixels = ctx.getImageData(0, 0, 8, 8).data;
+            let r = 0, g = 0, b = 0;
+            for (let i = 0; i < pixels.length; i += 4) { r += pixels[i]; g += pixels[i + 1]; b += pixels[i + 2]; }
+            this.sampledColor.setRGB(r / 16320, g / 16320, b / 16320, THREE.SRGBColorSpace);
           } catch { this.sampledColor.copy(this.coolColor); }
         }
       }
@@ -1362,9 +1453,15 @@ export class CinemaEngine {
 
   private animate = (now: number) => {
     if (this.disposed) return;
-    // Theatre Performance targets a stable 60 fps. Skip only if a frame arrived
-    // faster than 60 Hz so high-refresh phones don't waste GPU time.
-    if (this.quality === 'performance' && this.lastTime && now - this.lastTime < 15.5) {
+    // Adaptive target frame rate:
+    // Only throttle the 3D background room when completely seated watching the film.
+    // When walking, sitting, or exploring, run at full responsive rate (60 FPS).
+    const isMovingOrTransitioning = this.state === 'walking' || this.state === 'sitting' || this.state === 'standing';
+    const minFrameInterval = (!isMovingOrTransitioning && this.state === 'seated')
+      ? (this.isTV || this.isLowEnd ? 32 : 22)
+      : (this.quality === 'performance' ? 15.5 : 0);
+
+    if (minFrameInterval > 0 && this.lastTime && now - this.lastTime < minFrameInterval) {
       this.frameId = requestAnimationFrame(this.animate);
       return;
     }
@@ -1375,8 +1472,14 @@ export class CinemaEngine {
     if (this.playing) this.filmTime += dt * this.playbackRate;
     this.updateMovement(dt);
     this.animateAvatar(dt);
-    this.updateNpcs(dt);
-    this.updateCafeteria(dt);
+    // When seated watching the film, only update NPCs if a delivery is in progress
+    if (this.state !== 'seated' || this.waitress.phase !== 'station') {
+      this.updateNpcs(dt);
+    }
+    // Cafeteria is in the back room behind the theatre; do not simulate when seated facing forward
+    if (this.state !== 'seated' && this.serviceVisible) {
+      this.updateCafeteria(dt);
+    }
     this.updateServiceAndFood(dt);
     if (this.state === 'seated' && this.activeSeat) {
       this.inactivityTime += dt;
@@ -1393,7 +1496,9 @@ export class CinemaEngine {
     this.updateLighting(dt);
     this.provider.render(this.camera);
     this.renderer.domElement.style.pointerEvents = this.provider.isInRoom && this.state === 'seated' ? 'none' : 'auto';
-    if (this.velocity.lengthSq() > 0.00002 || this.state === 'sitting' || this.state === 'standing') this.renderer.shadowMap.needsUpdate = true;
+    if (this.renderer.shadowMap.enabled && (this.velocity.lengthSq() > 0.00002 || this.state === 'sitting' || this.state === 'standing')) {
+      this.renderer.shadowMap.needsUpdate = true;
+    }
     this.renderer.render(this.scene, this.camera);
     this.previewTime += dt;
     if (this.previewCanvas && this.previewTime > 1 / 24) { this.drawPreview(); this.previewTime = 0; }
@@ -1422,7 +1527,11 @@ export class CinemaEngine {
     }
     if (this.fpsTime < 0.01 && elapsed < 0.0105) this.fastFrames++;
     this.sampledFrames++;
-    if (this.snapshotTime > 0.12) { this.publish(); this.snapshotTime = 0; }
+    const publishInterval = this.state === 'seated' ? 1.0 : 0.25;
+    if (this.snapshotTime >= publishInterval) {
+      this.publish();
+      this.snapshotTime = 0;
+    }
     this.frameId = requestAnimationFrame(this.animate);
   };
 

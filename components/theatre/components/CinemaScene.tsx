@@ -24,7 +24,10 @@ export default function CinemaScene(props: Props) {
       if (cancelled || !host.current) return;
       engine = new Engine(host.current, {
         onUpdate: (snapshot) => latest.current.onUpdate(snapshot),
-        onReady: () => latest.current.onReady(),
+        onReady: () => {
+          if (engine) latest.current.onEngine(engine);
+          latest.current.onReady();
+        },
         onMessage: (message) => latest.current.onMessage(message),
         onValidation: (validation) => latest.current.onValidation(validation),
       });

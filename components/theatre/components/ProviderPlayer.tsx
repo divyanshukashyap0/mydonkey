@@ -73,7 +73,7 @@ export default function ProviderPlayer({ engine, snapshot, party }: { engine: Ci
   if (!embed) return null;
   const servers = serversFor(embed.selection.anime || embed.catalog.anime);
   const server = servers.find((item) => item.key === embed.selection.server);
-  const isSeries = embed.catalog.mediaType === 'tv' || embed.selection.anime || embed.catalog.anime;
+  const isSeries = embed.catalog.mediaType === 'tv' || (embed.catalog.mediaType !== 'movie' && (embed.selection.anime || embed.catalog.anime));
   const currentEpisode = episodes.find((item) => item.number === embed.selection.episode);
   const animeReady = !!(edition?.id || embed.selection.animeId);
 
@@ -124,7 +124,6 @@ export default function ProviderPlayer({ engine, snapshot, party }: { engine: Ci
       } else {
         await engine.loadMedia(media, true);
       }
-      root.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (problem) {
       setError(problem instanceof Error ? problem.message : 'That selection could not be opened.');
     }

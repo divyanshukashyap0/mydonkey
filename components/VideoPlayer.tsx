@@ -144,7 +144,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         setInitialLoad(false);
     }, []);
 
-    // Multi-Server Content Access & Auto-Fallback State (from Aethoflix)
+    // Multi-Server Content Access & Auto-Fallback State (My Donkey Engine)
     const isAnime = useMemo(() => {
         return Boolean(
             content.tags?.some(t => t.toLowerCase() === 'anime') ||

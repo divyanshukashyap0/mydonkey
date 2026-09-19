@@ -73,7 +73,7 @@ export default function ScreenPlayerPanel({ engine, snapshot, party, onClose, on
   };
 
   return <>
-    <div className="panel-heading screen-panel-heading"><span className="eyebrow">THE AETHOFLIX PLAYER</span><h2 id="panel-heading">Your story. Front and center.</h2><p>{snapshot.embed ? 'Your selected provider, with its own playback controls.' : connected ? isHost ? 'You are the host. The shared screen follows your controls.' : 'The host keeps the story in sync. Make yourself comfortable.' : 'The same picture. The same player. Right on the cinema screen.'}</p></div>
+    <div className="panel-heading screen-panel-heading"><span className="eyebrow">THE MY DONKEY PLAYER</span><h2 id="panel-heading">Your story. Front and center.</h2><p>{snapshot.embed ? 'Your selected provider, with its own playback controls.' : connected ? isHost ? 'You are the host. The shared screen follows your controls.' : 'The host keeps the story in sync. Make yourself comfortable.' : 'The same picture. The same player. Right on the cinema screen.'}</p></div>
     {snapshot.embed ? (
       <>
         <ProviderPlayer engine={engine} snapshot={snapshot} party={party} />
@@ -128,7 +128,7 @@ export default function ScreenPlayerPanel({ engine, snapshot, party, onClose, on
 
         <div className="screen-player-title">
           <div>
-            <span className="field-label">{snapshot.mediaKind === 'ambient' ? 'AETHOFLIX AMBIENT' : snapshot.mediaKind === 'file' ? 'LOCAL VIDEO' : 'DIRECT VIDEO'}</span>
+            <span className="field-label">{snapshot.mediaKind === 'ambient' ? 'MY DONKEY AMBIENT' : snapshot.mediaKind === 'file' ? 'LOCAL VIDEO' : 'DIRECT VIDEO'}</span>
             <h3>{snapshot.filmTitle}</h3>
           </div>
           {connected && (

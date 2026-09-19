@@ -98,6 +98,12 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
     return typeof navigator !== 'undefined' && (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || ('ontouchstart' in window && window.innerWidth < 1024));
   }, []);
 
+  const isTV = useMemo(() => {
+    if (typeof navigator === 'undefined') return false;
+    return /TV|SmartTV|GoogleTV|HbbTV|CrKey|Tizen|WebOS|POV_TV|Bravia|BRAVIA|Viera|AppleTV/i.test(navigator.userAgent) ||
+      (typeof window !== 'undefined' && window.innerWidth >= 1920 && window.matchMedia('(any-pointer: none)').matches);
+  }, []);
+
   const [isPortrait, setIsPortrait] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(orientation: portrait)').matches : false
   );
@@ -142,6 +148,7 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
   const engine = useRef<CinemaEngine | null>(null);
   const pendingSeat = useRef<string | null>(null);
   const pendingAutoPlay = useRef<{
+    playKey?: string;
     title: CatalogTitle;
     season: number;
     episode: number;
@@ -173,27 +180,52 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
   const [movieHint, setMovieHint] = useState(false);
   const hudTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Auto-hiding Topbar: hides after 3 seconds of inactivity
+  const movieMode = snapshot.mode === 'seated' || snapshot.mode === 'sitting';
+  const transitioning = snapshot.mode === 'sitting' || snapshot.mode === 'standing';
+
+  // Auto-hiding Topbar & HUD: hides after 4s inactivity ONLY during seated movieMode, and immediately reappears on any pointer/touch interaction
   const [topbarVisible, setTopbarVisible] = useState(true);
   const topbarTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTopbarHovered = useRef(false);
 
-  const resetTopbarTimer = useCallback(() => {
+  const showControls = useCallback(() => {
     setTopbarVisible(true);
+    setHudVisible(true);
+    engine.current?.reportActivity();
     if (topbarTimer.current) clearTimeout(topbarTimer.current);
-    if (!isTopbarHovered.current && panel === null) {
+    if (movieMode && !isTopbarHovered.current && panel === null) {
       topbarTimer.current = setTimeout(() => {
-        setTopbarVisible(false);
-      }, 3000);
+        if (!isTopbarHovered.current && panel === null) {
+          setTopbarVisible(false);
+          setHudVisible(false);
+        }
+      }, 4000);
     }
-  }, [panel]);
+  }, [movieMode, panel]);
 
   useEffect(() => {
-    resetTopbarTimer();
+    showControls();
     return () => {
       if (topbarTimer.current) clearTimeout(topbarTimer.current);
     };
-  }, [resetTopbarTimer]);
+  }, [showControls]);
+
+  // Global user activity detection (mouse move, touch tap, keypress) keeps controls accessible and clickable
+  useEffect(() => {
+    const handleActivity = () => {
+      showControls();
+    };
+    window.addEventListener('pointermove', handleActivity, { passive: true });
+    window.addEventListener('pointerdown', handleActivity, { passive: true });
+    window.addEventListener('touchstart', handleActivity, { passive: true });
+    window.addEventListener('keydown', handleActivity, { passive: true });
+    return () => {
+      window.removeEventListener('pointermove', handleActivity);
+      window.removeEventListener('pointerdown', handleActivity);
+      window.removeEventListener('touchstart', handleActivity);
+      window.removeEventListener('keydown', handleActivity);
+    };
+  }, [showControls]);
 
   const [profile, setProfile] = useState<PlayerProfile>(() => {
     const saved = loadProfile();
@@ -218,9 +250,6 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
   const [toast, setToast] = useState('');
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const movieMode = snapshot.mode === 'seated' || snapshot.mode === 'sitting';
-  const transitioning = snapshot.mode === 'sitting' || snapshot.mode === 'standing';
-
   const notify = useCallback((message: string) => {
     setToast(message);
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -231,13 +260,20 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
   const inParty = watchParty.state.status === 'connected';
   const canControlPlayback = !inParty || watchParty.state.room?.hostId === watchParty.state.selfId;
 
-  const isSeries = Boolean(
-    snapshot.embed?.catalog.mediaType === 'tv' ||
-    snapshot.embed?.selection.anime ||
-    snapshot.embed?.catalog.anime ||
+  const rawMediaType =
+    (searchParams.get('type') as 'movie' | 'tv' | null) ||
+    content?.type ||
+    snapshot.embed?.catalog.mediaType ||
+    catalogTitle?.mediaType;
+
+  const isMovie = rawMediaType === 'movie';
+
+  const isSeries = !isMovie && Boolean(
+    rawMediaType === 'tv' ||
     content?.type === 'tv' ||
     searchParams.get('type') === 'tv' ||
-    (snapshot.embed?.selection && ('season' in snapshot.embed.selection))
+    snapshot.embed?.catalog.mediaType === 'tv' ||
+    catalogTitle?.mediaType === 'tv'
   );
 
   const currentSeasonNum = snapshot.embed?.selection.season ?? propSeason ?? 1;
@@ -264,12 +300,20 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
     }
   }, [snapshot.embed, watchParty, notify]);
 
+  const addToWatchHistoryRef = useRef(addToWatchHistory);
+  addToWatchHistoryRef.current = addToWatchHistory;
+  const autoPlayedKey = useRef<string | null>(null);
+
   const executePendingPlay = useCallback(() => {
     if (!pendingAutoPlay.current || !engine.current) return;
     const pending = pendingAutoPlay.current;
     pendingAutoPlay.current = null;
 
     try {
+      if (pending.playKey) {
+        autoPlayedKey.current = pending.playKey;
+      }
+
       if (pending.streamUrl && (pending.streamUrl.endsWith('.mp4') || pending.streamUrl.endsWith('.m3u8') || pending.streamUrl.includes('drive.google.com'))) {
         // Direct video or direct stream
         const media: MediaSelection = {
@@ -294,9 +338,19 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
         void engine.current.loadMedia(media, true);
       }
 
-      setTimeout(() => {
+      if (engine.current && 'sitDirectly' in engine.current) {
+        (engine.current as any).sitDirectly('B3');
+      } else {
         engine.current?.takeSeat('B3');
-      }, 550);
+      }
+
+      setTimeout(() => {
+        if (engine.current && 'sitDirectly' in engine.current) {
+          (engine.current as any).sitDirectly('B3');
+        } else {
+          engine.current?.takeSeat('B3');
+        }
+      }, 350);
 
       // Record in browser cache watch history
       if (pending.title) {
@@ -314,7 +368,7 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
             vote_average: pending.title.rating || 7.5,
             createdAt: new Date().toISOString()
           };
-          addToWatchHistory(theatreContent).catch(() => {});
+          addToWatchHistoryRef.current(theatreContent).catch(() => {});
         } catch (_) {}
       }
 
@@ -322,59 +376,71 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
     } catch (err) {
       console.warn('Failed to autoplay media:', err);
     }
-  }, [notify, addToWatchHistory]);
+  }, [notify]);
 
   // Handle incoming movie/show prop or location state from mydonkey
   useEffect(() => {
     if (!content) return;
 
-    const isAnime = Boolean(content.genres?.some(g => g.toLowerCase().includes('anime')));
-    const serverKey: ServerKey = propServer || 'bingr';
-    const stream = propStreamUrl || content.videoUrl;
-    const controller = new AbortController();
-
     const targetId = content.tmdbId || content.id;
-    resolveTmdbTitle(targetId, content.type === 'tv' ? 'tv' : 'movie', content.title, 'standard', controller.signal)
+    const serverKey: ServerKey = propServer || 'bingr';
+    const season = propSeason || 1;
+    const episode = propEpisode || 1;
+    const playKey = `content-${targetId}-${season}-${episode}-${serverKey}`;
+
+    if (autoPlayedKey.current === playKey) return;
+    if (pendingAutoPlay.current?.playKey === playKey) return;
+    if (snapshot.embed && String(snapshot.embed.catalog.id) === String(targetId).replace(/^(tmdb_|imdb_)/, '') && snapshot.embed.selection.season === season && snapshot.embed.selection.episode === episode) {
+      return;
+    }
+
+    const isAnime = Boolean(content.genres?.some(g => g.toLowerCase().includes('anime')));
+    const stream = propStreamUrl || content.videoUrl;
+    const tmdbIdNum = Number(content.tmdbId)
+      || Number(String(content.id).replace(/^(tmdb_|imdb_)/, ''))
+      || 1;
+
+    const immediateTitle: CatalogTitle = {
+      id: tmdbIdNum,
+      mediaType: content.type === 'tv' ? 'tv' : 'movie',
+      title: content.title || 'Untitled',
+      originalTitle: content.title || 'Untitled',
+      overview: content.overview || '',
+      posterPath: content.poster_path || null,
+      backdropPath: content.backdrop_path || null,
+      year: String(content.year || ''),
+      rating: Number(content.vote_average || content.rating || 0),
+      anime: isAnime,
+    };
+
+    setCatalogTitle(immediateTitle);
+
+    pendingAutoPlay.current = {
+      playKey,
+      title: immediateTitle,
+      season,
+      episode,
+      server: serverKey,
+      streamUrl: stream,
+    };
+
+    if (engine.current) {
+      executePendingPlay();
+    }
+
+    // Background enrichment without blocking playback or being cancelled on remount
+    resolveTmdbTitle(targetId, content.type === 'tv' ? 'tv' : 'movie', content.title, 'standard')
       .then((resolved) => {
-        if (controller.signal.aborted) return;
-        const tmdbIdNum = resolved?.id
-          || Number(content.tmdbId)
-          || Number(String(content.id).replace(/^(tmdb_|imdb_)/, ''))
-          || 1;
-
-        const titleObj: CatalogTitle = resolved || {
-          id: tmdbIdNum,
-          mediaType: content.type === 'tv' ? 'tv' : 'movie',
-          title: content.title || 'Untitled',
-          originalTitle: content.title || 'Untitled',
-          overview: content.overview || '',
-          posterPath: content.poster_path || null,
-          backdropPath: content.backdrop_path || null,
-          year: String(content.year || ''),
-          rating: Number(content.vote_average || content.rating || 0),
-          anime: isAnime,
-        };
-
-        setCatalogTitle(titleObj);
-
-        pendingAutoPlay.current = {
-          title: titleObj,
-          season: propSeason,
-          episode: propEpisode,
-          server: serverKey,
-          streamUrl: stream,
-        };
-
-        if (ready && engine.current) {
-          executePendingPlay();
+        if (resolved) {
+          setCatalogTitle((prev) => (prev ? { ...prev, ...resolved } : resolved));
         }
       })
       .catch((err) => {
-        if (!controller.signal.aborted) console.warn('TMDB title resolution error:', err);
+        console.warn('Background TMDB title enrichment failed:', err);
       });
+  }, [content, propStreamUrl, propSeason, propEpisode, propServer, executePendingPlay, snapshot.embed]);
 
-    return () => controller.abort();
-  }, [content, propStreamUrl, propSeason, propEpisode, propServer, ready, executePendingPlay]);
+  const searchParamsString = searchParams.toString();
 
   // Deep-link query parameters (?id=...&type=...)
   useEffect(() => {
@@ -386,13 +452,36 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
     const directUrl = searchParams.get('url');
 
     if (directUrl) {
-      if (ready && engine.current) {
-        engine.current.loadMedia({
-          id: `url-${Date.now()}`,
-          kind: 'url',
-          title: titleParam || 'My Screening',
-          url: directUrl,
-        }, true);
+      const playKey = `direct-${directUrl}`;
+      if (autoPlayedKey.current === playKey) return;
+      if (pendingAutoPlay.current?.playKey === playKey) return;
+      autoPlayedKey.current = playKey;
+
+      const titleObj: CatalogTitle = {
+        id: 1,
+        mediaType: 'movie',
+        title: titleParam || 'My Screening',
+        originalTitle: titleParam || 'My Screening',
+        overview: '',
+        posterPath: null,
+        backdropPath: null,
+        year: '',
+        rating: 7.5,
+        anime: false,
+      };
+      setCatalogTitle(titleObj);
+
+      pendingAutoPlay.current = {
+        playKey,
+        title: titleObj,
+        season: 1,
+        episode: 1,
+        server: 'bingr',
+        streamUrl: directUrl,
+      };
+
+      if (engine.current) {
+        executePendingPlay();
       }
       return;
     }
@@ -402,34 +491,125 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
     const season = Math.max(1, Number(searchParams.get('s')) || 1);
     const episode = Math.max(1, Number(searchParams.get('e')) || 1);
     const srvIndex = Number(searchParams.get('srv'));
-    const controller = new AbortController();
+    const playKey = `deeplink-${idParam}-${type}-${season}-${episode}-${srvIndex}`;
 
-    resolveTmdbTitle(idParam, type, titleParam, 'standard', controller.signal)
-      .then((title) => {
-        if (controller.signal.aborted || !title) return;
-        setCatalogTitle(title);
-        const options = serversFor(title.anime);
-        const serverKey =
-          (Number.isInteger(srvIndex) && options[srvIndex] ? options[srvIndex].key : 'bingr') ??
-          'bingr';
+    if (autoPlayedKey.current === playKey) return;
+    if (pendingAutoPlay.current?.playKey === playKey) return;
+    if (snapshot.embed && String(snapshot.embed.catalog.id) === String(idParam).replace(/^(tmdb_|imdb_)/, '') && snapshot.embed.selection.season === season && snapshot.embed.selection.episode === episode) {
+      return;
+    }
 
-        pendingAutoPlay.current = {
-          title,
-          season,
-          episode,
-          server: serverKey,
-        };
+    const cleanId = String(idParam).replace(/^(tmdb_|imdb_)/, '');
+    const isImdb = cleanId.startsWith('tt') || String(idParam).startsWith('tt');
+    const options = serversFor(false);
+    const serverKey =
+      (Number.isInteger(srvIndex) && options[srvIndex] ? options[srvIndex].key : 'bingr') ??
+      'bingr';
 
-        if (ready && engine.current) {
-          executePendingPlay();
-        }
-      })
-      .catch((err) => {
-        if (!controller.signal.aborted) console.warn('Deep-link title lookup failed:', err);
-      });
+    if (!isImdb) {
+      const tmdbIdNum = parseInt(cleanId, 10) || 1;
+      const immediateTitle: CatalogTitle = {
+        id: tmdbIdNum,
+        mediaType: type,
+        title: titleParam || 'Cinema Feature',
+        originalTitle: titleParam || 'Cinema Feature',
+        overview: '',
+        posterPath: null,
+        backdropPath: null,
+        year: '',
+        rating: 7.5,
+        anime: false,
+      };
 
-    return () => controller.abort();
-  }, [searchParams, ready, content, executePendingPlay]);
+      setCatalogTitle(immediateTitle);
+
+      pendingAutoPlay.current = {
+        playKey,
+        title: immediateTitle,
+        season,
+        episode,
+        server: serverKey,
+      };
+
+      if (engine.current) {
+        executePendingPlay();
+      }
+
+      // Enrich metadata in background without blocking playback
+      resolveTmdbTitle(idParam, type, titleParam, 'standard')
+        .then((resolvedTitle) => {
+          if (resolvedTitle) {
+            setCatalogTitle((prev) => (prev ? { ...prev, ...resolvedTitle } : resolvedTitle));
+          }
+        })
+        .catch((err) => {
+          console.warn('Background TMDB title lookup failed:', err);
+        });
+    } else {
+      // For IMDb IDs, resolve numeric TMDB ID first
+      resolveTmdbTitle(idParam, type, titleParam, 'standard')
+        .then((resolvedTitle) => {
+          const tmdbIdNum = resolvedTitle?.id || 1;
+          const title: CatalogTitle = resolvedTitle || {
+            id: tmdbIdNum,
+            mediaType: type,
+            title: titleParam || 'Cinema Feature',
+            originalTitle: titleParam || 'Cinema Feature',
+            overview: '',
+            posterPath: null,
+            backdropPath: null,
+            year: '',
+            rating: 7.5,
+            anime: false,
+          };
+          setCatalogTitle(title);
+          const animeOptions = serversFor(title.anime);
+          const finalServerKey =
+            (Number.isInteger(srvIndex) && animeOptions[srvIndex] ? animeOptions[srvIndex].key : 'bingr') ??
+            'bingr';
+
+          pendingAutoPlay.current = {
+            playKey,
+            title,
+            season,
+            episode,
+            server: finalServerKey,
+          };
+
+          if (engine.current) {
+            executePendingPlay();
+          }
+        })
+        .catch((err) => {
+          console.warn('Deep-link IMDb lookup failed, using fallback:', err);
+          const fallbackTitle: CatalogTitle = {
+            id: 1,
+            mediaType: type,
+            title: titleParam || 'Cinema Feature',
+            originalTitle: titleParam || 'Cinema Feature',
+            overview: '',
+            posterPath: null,
+            backdropPath: null,
+            year: '',
+            rating: 7.5,
+            anime: false,
+          };
+          setCatalogTitle(fallbackTitle);
+
+          pendingAutoPlay.current = {
+            playKey,
+            title: fallbackTitle,
+            season,
+            episode,
+            server: serverKey,
+          };
+
+          if (engine.current) {
+            executePendingPlay();
+          }
+        });
+    }
+  }, [searchParamsString, content, executePendingPlay, snapshot.embed]);
 
   // Keep document title synced with active 3D content
   useEffect(() => {
@@ -465,7 +645,6 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
 
     if (!nextServer) {
       notify(`All servers have been tried. Settle in or open Screen Controls to select.`);
-      triedTheatreServers.current.clear();
       return;
     }
 
@@ -484,21 +663,19 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
     } catch (e) {
       console.warn('Failed to switch theatre server:', e);
     } finally {
-      setTimeout(() => setSwitchingServer(false), 2000);
+      setTimeout(() => setSwitchingServer(false), 2500);
     }
   }, [snapshot.embed, switchingServer, notify]);
 
   // Reactive fallback on providerStatus ('slow' or 'error')
   useEffect(() => {
     if (!snapshot.embed || switchingServer) return;
-    if (snapshot.providerStatus === 'slow') {
-      switchToNextTheatreServer('is taking too long');
-    } else if (snapshot.providerStatus === 'error') {
+    if (snapshot.providerStatus === 'error') {
       switchToNextTheatreServer('failed to load');
     }
   }, [snapshot.providerStatus, snapshot.embed, switchingServer, switchToNextTheatreServer]);
 
-  // Watchdog: If provider takes >10s to open and isn't playing, auto-try next server
+  // Watchdog: If provider takes >20s to open and isn't playing, auto-try next server
   useEffect(() => {
     if (!snapshot.embed || switchingServer) return;
     if (snapshot.providerStatus === 'opening') {
@@ -507,7 +684,7 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
         if (snapshot.providerStatus === 'opening') {
           switchToNextTheatreServer('is not responding');
         }
-      }, 10000);
+      }, 20000);
     } else {
       if (theatreWatchdogTimer.current) clearTimeout(theatreWatchdogTimer.current);
     }
@@ -524,8 +701,18 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
       instance.setInputEnabled(panel === null);
       instance.setProfile(profile);
       instance.setServiceVisible(waitersOn);
+      if (pendingAutoPlay.current) {
+        executePendingPlay();
+      }
     }
-  }, [quality, reducedMotion, panel, profile, waitersOn]);
+  }, [quality, reducedMotion, panel, profile, waitersOn, executePendingPlay]);
+
+  // Ensure media plays as soon as engine and ready state are achieved
+  useEffect(() => {
+    if (ready && engine.current && pendingAutoPlay.current) {
+      executePendingPlay();
+    }
+  }, [ready, executePendingPlay]);
 
   const onSnapshot = useCallback((next: CinemaSnapshot) => {
     setSnapshot(next);
@@ -562,56 +749,14 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
     engine.current?.setInputEnabled(panel === null);
   }, [panel]);
 
-  const revealHud = useCallback(() => {
-    if (!movieMode) return;
-    setHudVisible(true);
-    if (hudTimer.current) clearTimeout(hudTimer.current);
-    hudTimer.current = setTimeout(() => setHudVisible(false), 6500);
-  }, [movieMode]);
-
   useEffect(() => {
     if (movieMode) {
-      setHudVisible(false);
       setMovieHint(true);
       const hintTimer = setTimeout(() => setMovieHint(false), 7000);
       return () => clearTimeout(hintTimer);
     }
-    setHudVisible(true);
     setMovieHint(false);
   }, [movieMode]);
-
-  useEffect(() => {
-    let lastX = -1;
-    let lastY = -1;
-    const onPointer = (e: PointerEvent) => {
-      if (lastX >= 0) {
-        const dist = Math.hypot(e.clientX - lastX, e.clientY - lastY);
-        if (dist < 4) return;
-      }
-      lastX = e.clientX;
-      lastY = e.clientY;
-      resetTopbarTimer();
-      if (movieMode) revealHud();
-      engine.current?.reportActivity();
-    };
-    const onKeyOrWheel = () => {
-      resetTopbarTimer();
-      if (movieMode) revealHud();
-      engine.current?.reportActivity();
-    };
-    window.addEventListener('pointerdown', onKeyOrWheel, { passive: true });
-    window.addEventListener('pointermove', onPointer, { passive: true });
-    window.addEventListener('keydown', onKeyOrWheel, { passive: true });
-    window.addEventListener('wheel', onKeyOrWheel, { passive: true });
-    window.addEventListener('touchstart', onKeyOrWheel, { passive: true });
-    return () => {
-      window.removeEventListener('pointerdown', onKeyOrWheel);
-      window.removeEventListener('pointermove', onPointer);
-      window.removeEventListener('keydown', onKeyOrWheel);
-      window.removeEventListener('wheel', onKeyOrWheel);
-      window.removeEventListener('touchstart', onKeyOrWheel);
-    };
-  }, [movieMode, revealHud, resetTopbarTimer]);
 
   const toggleWaiters = useCallback(() => {
     setWaitersOn((v) => {
@@ -694,6 +839,22 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
     }
   };
 
+  const handleClosePanel = useCallback(() => {
+    setPanel(null);
+  }, []);
+
+  const handleOpenCatalog = useCallback(() => {
+    setCatalogReturn('party');
+    setPanel('catalog');
+  }, []);
+
+  const handleCloseCatalog = useCallback(() => {
+    setCatalogReturn((prev) => {
+      setPanel(prev);
+      return null;
+    });
+  }, []);
+
   const nearSeat = Boolean(snapshot.nearbySeatId && !snapshot.overview);
   const showSitStand = movieMode || snapshot.mode === 'walking' || snapshot.mode === 'standing' || Boolean(snapshot.reservingSeat) || nearSeat;
   let actionLabel = nearSeat ? `Sit ${snapshot.nearbySeatId}` : 'Sit';
@@ -708,13 +869,12 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
       <div
         className={`app-shell ${ready ? 'is-ready' : ''} ${movieMode ? 'movie-session' : ''} ${movieMode && !hudVisible ? 'hud-hidden' : ''
           } ${reducedMotion ? 'reduced-motion' : ''}`}
-        inert={panel ? true : undefined}
       >
         {/* Top edge hover sensor: only active when topbar is hidden */}
         {!topbarVisible && (
           <div
             className="fixed top-0 left-0 right-0 h-4 z-[35] pointer-events-auto"
-            onPointerEnter={resetTopbarTimer}
+            onPointerEnter={showControls}
           />
         )}
 
@@ -728,7 +888,7 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
           }}
           onMouseLeave={() => {
             isTopbarHovered.current = false;
-            resetTopbarTimer();
+            showControls();
           }}
         >
           <div className="header-left">
@@ -815,6 +975,9 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
               onReady={() => {
                 setReady(true);
                 executePendingPlay();
+                if (engine.current && 'sitDirectly' in engine.current) {
+                  (engine.current as any).sitDirectly('B3');
+                }
               }}
               onMessage={notify}
               onError={setError}
@@ -1186,7 +1349,7 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
       {panel && (
         <ExperiencePanels
           panel={panel}
-          onClose={() => setPanel(null)}
+          onClose={handleClosePanel}
           snapshot={snapshot}
           onChooseSeat={chooseSeat}
           quality={quality}
@@ -1202,15 +1365,8 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
           profile={profile}
           onProfile={updateProfile}
           onOpenPanel={setPanel}
-          onOpenCatalog={() => {
-            setCatalogReturn('party');
-            setPanel('catalog');
-          }}
-          onCloseCatalog={() => {
-            const back = catalogReturn;
-            setCatalogReturn(null);
-            setPanel(back);
-          }}
+          onOpenCatalog={handleOpenCatalog}
+          onCloseCatalog={handleCloseCatalog}
           initialCatalogTitle={catalogTitle}
           cinemaReady={ready && !error}
           currentContent={content}

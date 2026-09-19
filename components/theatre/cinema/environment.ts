@@ -124,7 +124,7 @@ export type CinemaEnvironment = {
   seats: THREE.Group[];
   cafeteria: { patrons: Avatar[]; barista: Avatar; walker: Avatar };
   screen: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
-  screenGlass: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshPhysicalMaterial>;
+  screenGlass: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshStandardMaterial>;
   screenLight: THREE.RectAreaLight;
   screenShadow: THREE.SpotLight;
   faceLight: THREE.PointLight;
@@ -554,9 +554,9 @@ export function buildEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRender
   const screen = new THREE.Mesh(new THREE.PlaneGeometry(7.8, 7.8 * 9 / 16), new THREE.MeshBasicMaterial({ map: filmTexture, toneMapped: false }));
   screen.position.set(0, 2.93, -6.828);
   scene.add(screen);
-  const screenGlass = new THREE.Mesh(new THREE.PlaneGeometry(7.8, 7.8 * 9 / 16), new THREE.MeshPhysicalMaterial({
+  const screenGlass = new THREE.Mesh(new THREE.PlaneGeometry(7.8, 7.8 * 9 / 16), new THREE.MeshStandardMaterial({
     color: '#b8c9d6', transparent: true, opacity: 0.008, roughness: 0.12,
-    metalness: 0.1, clearcoat: 0.65, clearcoatRoughness: 0.12, depthWrite: false,
+    metalness: 0.1, depthWrite: false,
   }));
   screenGlass.position.set(0, 2.93, -6.812);
   scene.add(screenGlass);

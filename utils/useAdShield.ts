@@ -182,16 +182,7 @@ export function useAdShield(options: UseAdShieldOptions = {}) {
             }
         };
 
-        // 5. Focus recovery: If an embed causes parent window to blur (popup trigger attempt), reclaim focus
-        const handleWindowBlur = () => {
-            setTimeout(() => {
-                try {
-                    window.focus();
-                } catch {}
-            }, 50);
-        };
-
-        // 6. Intercept external link clicks, touches, or programmatic navigation escaping to parent
+        // 5. Intercept external link clicks, touches, or programmatic navigation escaping to parent
         const handleExternalRedirectEvent = (e: Event) => {
             const target = (e.target as HTMLElement)?.closest('a');
             if (!target) return;
@@ -205,7 +196,6 @@ export function useAdShield(options: UseAdShieldOptions = {}) {
         };
 
         window.addEventListener('message', handleWindowMessage);
-        window.addEventListener('blur', handleWindowBlur);
         document.addEventListener('click', handleExternalRedirectEvent, true);
         document.addEventListener('auxclick', handleExternalRedirectEvent, true);
         document.addEventListener('touchend', handleExternalRedirectEvent, true);
@@ -218,7 +208,6 @@ export function useAdShield(options: UseAdShieldOptions = {}) {
             if (cleanupNav) cleanupNav();
             window.removeEventListener('beforeunload', handleBeforeUnload);
             window.removeEventListener('message', handleWindowMessage);
-            window.removeEventListener('blur', handleWindowBlur);
             document.removeEventListener('click', handleExternalRedirectEvent, true);
             document.removeEventListener('auxclick', handleExternalRedirectEvent, true);
             document.removeEventListener('touchend', handleExternalRedirectEvent, true);

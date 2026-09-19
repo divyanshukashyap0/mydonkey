@@ -77,7 +77,7 @@ export class ProviderSurface {
 
     this.timeout = setTimeout(() => {
       if (this.status === 'opening') this.setStatus('slow');
-    }, 9000);
+    }, 18000);
   }
 
   setDock(dock: HTMLDivElement | null) {
@@ -121,8 +121,14 @@ export class ProviderSurface {
       try { data = JSON.parse(data); } catch { return; }
     }
     if (data && typeof data === 'object') {
-      const str = JSON.stringify(data).toLowerCase();
-      if (str.includes('error') || str.includes('fail') || str.includes('not_found') || str.includes('unavailable')) {
+      const obj = data as Record<string, unknown>;
+      // Only treat explicit error signals as fatal; ignore harmless { error: null } or { error: false } status updates
+      const hasExplicitError =
+        (obj.event === 'error' && Boolean(obj.error)) ||
+        (obj.type === 'error' && Boolean(obj.error)) ||
+        (typeof obj.error === 'string' && obj.error.trim().length > 0) ||
+        (typeof obj.message === 'string' && /video unavailable|file not found|stream error/i.test(obj.message));
+      if (hasExplicitError) {
         this.setStatus('error');
       }
     }

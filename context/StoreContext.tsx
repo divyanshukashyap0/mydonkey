@@ -1404,7 +1404,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         });
     };
 
-    const addToWatchHistory = async (contentOrId: Content | string) => {
+    const addToWatchHistory = useCallback(async (contentOrId: Content | string) => {
         if (!contentOrId) return;
         const movieId = typeof contentOrId === 'string' ? contentOrId : contentOrId.id;
         if (!movieId) return;
@@ -1441,15 +1441,18 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         filtered.unshift(newEntry);
         saveCachedWatchHistory(filtered, movieId);
 
-        // 2. In-memory state only (STRICTLY BROWSER CACHE - NO DATABASE / FIRESTORE WRITE)
+        // 2. In-memory state only (avoid updating currentUser if already top item)
         setCurrentUser(prev => {
             if (!prev) return null;
+            if (prev.continueWatching && prev.continueWatching.length > 0 && prev.continueWatching[0]?.movieId === movieId) {
+                return prev;
+            }
             return {
                 ...prev,
                 continueWatching: filtered
             };
         });
-    };
+    }, [content]);
 
     const updateFavoriteGenres = async (genres: string[]) => {
         const uniqueGenres = Array.from(new Set(genres.map(g => g.trim()).filter(Boolean)));

@@ -39,8 +39,8 @@ export function makeMaterials() {
   const acoustic = surfaceTexture('acoustic');
   const wood = surfaceTexture('wood');
   const mats = {
-    leather: new THREE.MeshPhysicalMaterial({ color: '#641f2b', roughness: 0.4, metalness: 0.02, bumpMap: leather, bumpScale: 0.007, roughnessMap: leather, clearcoat: 0.22, clearcoatRoughness: 0.48 }),
-    cushion: new THREE.MeshPhysicalMaterial({ color: '#7c2938', roughness: 0.48, bumpMap: leather, bumpScale: 0.008, clearcoat: 0.17, clearcoatRoughness: 0.5 }),
+    leather: new THREE.MeshStandardMaterial({ color: '#641f2b', roughness: 0.38, metalness: 0.04, bumpMap: leather, bumpScale: 0.007, roughnessMap: leather }),
+    cushion: new THREE.MeshStandardMaterial({ color: '#7c2938', roughness: 0.46, metalness: 0.02, bumpMap: leather, bumpScale: 0.008 }),
     piping: new THREE.MeshStandardMaterial({ color: '#9a4954', roughness: 0.62 }),
     carpet: new THREE.MeshStandardMaterial({ color: '#282727', roughness: 1, map: carpet, bumpMap: carpet, bumpScale: 0.025 }),
     platform: new THREE.MeshStandardMaterial({ color: '#252322', roughness: 0.98, map: carpet, bumpMap: carpet, bumpScale: 0.016 }),
@@ -67,7 +67,7 @@ export function makeMaterials() {
     pastry: new THREE.MeshStandardMaterial({ color: '#d9a662', roughness: 0.85 }),
     bread: new THREE.MeshStandardMaterial({ color: '#a9763f', roughness: 0.9 }),
     china: new THREE.MeshStandardMaterial({ color: '#e8e4d8', roughness: 0.4 }),
-    glassDisplay: new THREE.MeshPhysicalMaterial({ color: '#cfe0e4', transparent: true, opacity: 0.16, roughness: 0.12, metalness: 0.1, depthWrite: false }),
+    glassDisplay: new THREE.MeshStandardMaterial({ color: '#cfe0e4', transparent: true, opacity: 0.16, roughness: 0.1, metalness: 0.1, depthWrite: false }),
     fridgeSteel: new THREE.MeshStandardMaterial({ color: '#3a4146', metalness: 0.75, roughness: 0.3 }),
   };
   return mats;

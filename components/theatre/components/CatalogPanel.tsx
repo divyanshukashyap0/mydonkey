@@ -19,7 +19,8 @@ function Poster({ title, className = '' }: { title: CatalogTitle; className?: st
   return <span className={`catalog-poster ${className}`}>{src && !failed ? <img src={src} alt={`${title.title} poster`} loading="lazy" decoding="async" onError={() => setFailed(true)} /> : <span className="missing-poster"><Film size={28} /><span>{title.title}</span></span>}</span>;
 }
 
-const MY_LIST_KEY = 'aethoflix-my-list-v1';
+const MY_LIST_KEY = 'mydonkey-my-list-v1';
+const LEGACY_MY_LIST_KEY = 'aethoflix-my-list-v1';
 
 function isStoredTitle(value: unknown): value is CatalogTitle {
   const title = value as Partial<CatalogTitle>;
@@ -30,7 +31,8 @@ function isStoredTitle(value: unknown): value is CatalogTitle {
 
 function readMyList(): CatalogTitle[] {
   try {
-    const value: unknown = JSON.parse(localStorage.getItem(MY_LIST_KEY) ?? '[]');
+    const raw = localStorage.getItem(MY_LIST_KEY) ?? localStorage.getItem(LEGACY_MY_LIST_KEY);
+    const value: unknown = JSON.parse(raw ?? '[]');
     return Array.isArray(value) ? value.filter(isStoredTitle).slice(0, 60) : [];
   } catch { return []; }
 }

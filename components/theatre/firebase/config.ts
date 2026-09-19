@@ -1,14 +1,17 @@
 // ══════════════════════════════════════════════════════════════════════
-// AETHOFLIX ↔ FIREBASE — CONNECTION CONFIG (watch party + admin)
+// MY DONKEY ↔ FIREBASE — CONNECTION CONFIG (watch party + admin)
 // ══════════════════════════════════════════════════════════════════════
-// AethoFlix talks to TWO Firebase projects, each with its own Realtime
-// Database:
 //
-//   • WATCH PARTY  → rooms, media, playback, seats, poses, bans
-//                    (src/watch-party/firebase.ts, DEFAULT app)
-//   • ADMIN PANEL  → page views, watch sessions/logs, reports, VIP codes,
-//                    broadcast, trial grants
-//                    (src/firebase/adminFirebase.ts, named app "aethoflix-admin")
+// My Donkey talks to TWO Firebase projects, each with its own Realtime
+// Database URL and optional auth:
+//
+//   1. WATCH PARTY  (VITE_FIREBASE_* or VITE_PARTY_FIREBASE_*)
+//                    Handles the shared synchronized cinema lobby, live seats,
+//                    play/pause state, chat messages, and user presence.
+//
+//   2. ADMIN METRICS (VITE_ADMIN_FIREBASE_*)
+//                    Tracks real-time visitor counts and concurrent viewers
+//                    (src/firebase/adminFirebase.ts, named app "mydonkey-admin")
 //
 // They stay isolated on purpose: the party keys are handed to every visitor's
 // browser, while the admin project holds viewer analytics. Nothing from the
@@ -216,5 +219,5 @@ if (import.meta.env?.DEV) {
   else notes.push(`watch party → ${PARTY_FIREBASE_CONFIG.projectId} (${firebaseRegionFromUrl(PARTY_FIREBASE_CONFIG.databaseURL)})`);
   if (!ADMIN_FIREBASE_READY) notes.push('admin: not configured');
   else notes.push(`admin → ${ADMIN_FIREBASE_CONFIG.projectId} (${firebaseRegionFromUrl(ADMIN_FIREBASE_CONFIG.databaseURL)})`);
-  console.info(`[aethoflix] Firebase: ${notes.join(' · ')}`);
+  console.info(`[mydonkey] Firebase: ${notes.join(' · ')}`);
 }

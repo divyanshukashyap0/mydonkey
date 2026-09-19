@@ -40,22 +40,43 @@ export type Panel = 'seats' | 'controls' | 'experience' | 'settings' | 'screen' 
 
 function Dialog({ children, onClose, kind }: { children: ReactNode; onClose: () => void; kind: string }) {
   const panel = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
-    const previouslyFocused = document.activeElement as HTMLElement | null;
-    panel.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    // Only focus the close button once on initial mount, preventing container scroll jumps
+    const firstButton = panel.current?.querySelector<HTMLButtonElement>('button');
+    if (firstButton) {
+      try {
+        firstButton.focus({ preventScroll: true });
+      } catch {
+        firstButton.focus();
+      }
+    }
+
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !document.fullscreenElement) { event.preventDefault(); onClose(); }
+      if (event.key === 'Escape' && !document.fullscreenElement) {
+        event.preventDefault();
+        onCloseRef.current();
+      }
       if (event.key !== 'Tab' || !panel.current) return;
       const scope = document.fullscreenElement && panel.current.contains(document.fullscreenElement) ? document.fullscreenElement : panel.current;
       const focusable = Array.from(scope.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex="0"], a[href]')).filter((element) => element.tabIndex >= 0 && element.getClientRects().length > 0);
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus({ preventScroll: true });
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus({ preventScroll: true });
+      }
     };
     document.addEventListener('keydown', onKeyDown);
-    return () => { document.removeEventListener('keydown', onKeyDown); previouslyFocused?.focus(); };
-  }, [onClose, kind]);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, []);
 
   return (
     <div className={`modal-backdrop ${kind === 'catalog' || kind === 'episodes' ? 'catalog-backdrop' : ''}`} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -210,7 +231,7 @@ function AboutPanel({
     : isAmbient
     ? [
         { id: 1, name: 'Elias North', job: 'Director & Vision', department: 'Directing', profilePath: null },
-        { id: 2, name: 'Studio Aethoflix', job: 'Spatial Audio Design', department: 'Sound', profilePath: null },
+        { id: 2, name: 'Studio My Donkey', job: 'Spatial Audio Design', department: 'Sound', profilePath: null },
         { id: 3, name: 'Grand Palais Design', job: 'Auditorium Architecture', department: 'Art', profilePath: null },
       ]
     : [
@@ -221,7 +242,7 @@ function AboutPanel({
   return (
     <div className="about-content-wrapper">
       <PanelHeading
-        eyebrow={isAmbient ? 'THE AETHOFLIX EXPERIENCE' : 'NOW SCREENING IN AUDITORIUM'}
+        eyebrow={isAmbient ? 'THE MY DONKEY EXPERIENCE' : 'NOW SCREENING IN AUDITORIUM'}
         title={<>{title}</>}
         description={isAmbient ? 'For the stories that deserve your full attention.' : 'Feature presentation details, cast, and screening technicals.'}
       />

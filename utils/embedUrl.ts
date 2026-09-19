@@ -192,7 +192,7 @@ export const getPlayableStreamUrl = (url?: string): string => {
     return trimmed;
 };
 
-// ── Multi-Server Content Access (Ported & Enhanced from Aethoflix) ────────────
+// ── Multi-Server Content Access (My Donkey Stream Hub) ───────────────────────
 
 export type StreamServerKey =
     | 'vidstuck'
@@ -362,7 +362,7 @@ export const getNextFallbackServer = (
 };
 
 /**
- * Generates direct high-speed download links (from Aethoflix hub resolvers).
+ * Generates direct high-speed download links (from My Donkey hub resolvers).
  */
 export const getMovieDownloadUrl = (
     id: number | string,

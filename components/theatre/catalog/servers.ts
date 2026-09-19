@@ -23,7 +23,8 @@ export const ANIME_SERVERS = [
 ] as const;
 
 export const DEFAULT_PREFERENCES: ServerPreferences = { audio: 'sub', source: RC_DEFAULT_SOURCE, zokoTemplate: '', sandbox: true };
-const PREF_KEY = 'aethoflix-server-preferences-v1';
+const PREF_KEY = 'mydonkey-server-preferences-v1';
+const LEGACY_PREF_KEY = 'aethoflix-server-preferences-v1';
 
 export function serversFor(anime: boolean): { key: ServerKey; name: string; tag: string; number: number }[] {
   const list = anime
@@ -34,7 +35,8 @@ export function serversFor(anime: boolean): { key: ServerKey; name: string; tag:
 
 export function readServerPreferences(key: ServerKey): ServerPreferences {
   try {
-    const all = JSON.parse(localStorage.getItem(PREF_KEY) ?? '{}') as Record<string, Partial<ServerPreferences>>;
+    const raw = localStorage.getItem(PREF_KEY) ?? localStorage.getItem(LEGACY_PREF_KEY);
+    const all = JSON.parse(raw ?? '{}') as Record<string, Partial<ServerPreferences>>;
     const value = all[key];
     return { audio: value?.audio === 'dub' ? 'dub' : 'sub', source: value?.source === 'hd-2' ? 'hd-2' : RC_DEFAULT_SOURCE,
       zokoTemplate: typeof value?.zokoTemplate === 'string' ? value.zokoTemplate.slice(0, 2000) : '',
@@ -44,7 +46,8 @@ export function readServerPreferences(key: ServerKey): ServerPreferences {
 
 export function saveServerPreferences(key: ServerKey, value: ServerPreferences) {
   try {
-    const previous: unknown = JSON.parse(localStorage.getItem(PREF_KEY) ?? '{}');
+    const raw = localStorage.getItem(PREF_KEY) ?? localStorage.getItem(LEGACY_PREF_KEY);
+    const previous: unknown = JSON.parse(raw ?? '{}');
     const all = previous && typeof previous === 'object' && !Array.isArray(previous) ? previous : {};
     localStorage.setItem(PREF_KEY, JSON.stringify({ ...all, [key]: value }));
   } catch { /* Keep using the selected preferences if storage is unavailable. */ }
@@ -57,7 +60,7 @@ export function serverName(key: ServerKey): string {
 // Download hand-offs. Neither provider publishes a documented public download
 // API, so these open the provider's own download hub for the title rather than
 // inventing a direct-file route. Nxsha's hub is the `/dl/` path referenced in
-// the original AethoFlix site; Zokoanime is used for anime.
+// the original My Donkey site; Zokoanime is used for anime.
 export function movieDownloadUrl(id: number, mediaType: 'movie' | 'tv' = 'movie', season = 1, episode = 1): string {
   return mediaType === 'movie'
     ? `https://nxsha.space/dl/movie/${id}`

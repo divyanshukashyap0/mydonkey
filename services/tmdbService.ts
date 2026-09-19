@@ -145,7 +145,7 @@ async function callTMDB(path: string, params: Record<string, any> = {}) {
             // Primary direct endpoint blocked or timed out
         }
 
-        // 3. Try alternate bypass endpoint (api.tmdb.org) from Aethoflix
+        // 3. Try alternate bypass endpoint (api.tmdb.org) from My Donkey engine
         try {
             const bypassUrl = `${TMDB_BYPASS_BASE}${path}?api_key=${API_KEY}&${searchParams.toString()}`;
             const bypassRes = await fetch(bypassUrl);

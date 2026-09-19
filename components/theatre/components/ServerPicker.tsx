@@ -33,7 +33,8 @@ export default function ServerPicker({ title, season, episode, active, suggested
   const [animeEpisode, setAnimeEpisode] = useState(String(initial?.animeEpisode ?? episode));
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const editionKey = `aethoflix-anime-edition-${title.mediaType}-${title.id}-${season}`;
+  const editionKey = `mydonkey-anime-edition-${title.mediaType}-${title.id}-${season}`;
+  const legacyEditionKey = `aethoflix-anime-edition-${title.mediaType}-${title.id}-${season}`;
   const servers = serversFor(anime);
   const server = servers.find((item) => item.key === selected);
   const preferences = selected ? allPreferences[selected] : DEFAULT_PREFERENCES;
@@ -48,11 +49,11 @@ export default function ServerPicker({ title, season, episode, active, suggested
 
   useEffect(() => {
     if (edition) return;
-    const saved = readEdition(editionKey);
+    const saved = readEdition(editionKey) || readEdition(legacyEditionKey);
     if (saved) setEdition(saved);
     setAnimeEpisode(String(initial?.season === season && initial.episode === episode ? initial.animeEpisode : episode));
     setError('');
-  }, [editionKey, season, episode]);
+  }, [editionKey, legacyEditionKey, season, episode]);
 
   const changePreferences = (next: Partial<ServerPreferences>) => {
     if (!selected) return;
