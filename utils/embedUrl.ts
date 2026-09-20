@@ -1,8 +1,19 @@
-import { SiteSettings } from '../types';
+import { SiteSettings, StreamServerKey } from '../types';
+export type { StreamServerKey };
 
 export const DEFAULT_EMBED_PROXY_BASE = 'https://proxy.garageband.rocks';
 export const DEFAULT_MOVIE_TYPE = 'movie';
 export const DEFAULT_TV_TYPE = 'tv';
+
+/**
+ * Gets the configured base content provider server key or falls back to 'bingr'.
+ */
+export const getBaseContentServer = (settings?: Partial<SiteSettings>): StreamServerKey => {
+    if (settings?.baseContentServer && STREAM_SERVERS.some(s => s.key === settings.baseContentServer)) {
+        return settings.baseContentServer;
+    }
+    return 'bingr';
+};
 
 /**
  * Builds an embed proxy URL using configured settings or defaults.
@@ -260,17 +271,33 @@ export interface ServerEmbedOptions {
 }
 
 /**
+ * Returns the fallback server order prioritized with the base content server first.
+ */
+export const getFallbackOrder = (
+    baseServer: StreamServerKey = 'bingr',
+    isAnime: boolean = false
+): StreamServerKey[] => {
+    const list = isAnime ? ANIME_SERVER_FALLBACK_ORDER : STANDARD_SERVER_FALLBACK_ORDER;
+    if (!baseServer || !list.includes(baseServer)) return list;
+    return [baseServer, ...list.filter(s => s !== baseServer)];
+};
+
+/**
  * Builds an embed URL for a chosen server key.
  * Accepts either a numeric TMDB ID or IMDb ID (tt...) or content ID.
+ * Defaults to the configured base content provider server if not specified.
  */
 export const buildServerEmbedUrl = (
     id: string | number,
     type: 'movie' | 'tv' | string = 'movie',
-    serverKey: StreamServerKey = 'bingr',
+    serverKey?: StreamServerKey,
     options: ServerEmbedOptions = {}
 ): string => {
     const rawId = String(id || '').trim();
     if (!rawId) return '';
+
+    const baseServer = getBaseContentServer(options.settings);
+    const targetKey: StreamServerKey = serverKey || baseServer;
 
     const cleanNumeric = rawId.replace(/^(tmdb_|imdb_)/, '');
     const numId = parseInt(cleanNumeric, 10);
@@ -282,61 +309,80 @@ export const buildServerEmbedUrl = (
     const audio = options.audioTrack || 'sub';
     const source = options.recloudSource || 'hd-1';
 
+    // Check for custom server base URL override
+    const customBase = options.settings?.serverBaseUrls?.[targetKey] || 
+        (targetKey === baseServer && options.settings?.baseContentServerUrl ? options.settings.baseContentServerUrl.trim().replace(/\/+$/, '') : '');
+
     // 1. Anime dedicated servers
-    if (serverKey === 'zokoanime') {
+    if (targetKey === 'zokoanime') {
         const mal = options.animeMalId;
         const ani = options.animeId || (hasNum ? numId : null);
-        if (mal) return `https://zokoanime.video/stream/mal/${mal}/${e}/${audio}?color=ffffff`;
-        if (ani) return `https://zokoanime.video/stream/anilist/${ani}/${e}/${audio}?color=ffffff`;
+        const zkBase = customBase || 'https://zokoanime.video';
+        if (mal) return `${zkBase}/stream/mal/${mal}/${e}/${audio}?color=ffffff`;
+        if (ani) return `${zkBase}/stream/anilist/${ani}/${e}/${audio}?color=ffffff`;
     }
-    if (serverKey === 'megaplay') {
+    if (targetKey === 'megaplay') {
         const ani = options.animeId || (hasNum ? numId : null);
-        if (ani) return `https://megaplay.buzz/stream/ani/${ani}/${e}/${audio}`;
+        const mpBase = customBase || 'https://megaplay.buzz';
+        if (ani) return `${mpBase}/stream/ani/${ani}/${e}/${audio}`;
     }
-    if (serverKey === 'recloud') {
+    if (targetKey === 'recloud') {
         const ani = options.animeId || (hasNum ? numId : null);
-        if (ani) return `https://cdn.4animo.xyz/embed/${source}/ani/${ani}/${e}/${audio}?k=1`;
+        const rcBase = customBase || 'https://cdn.4animo.xyz';
+        if (ani) return `${rcBase}/embed/${source}/ani/${ani}/${e}/${audio}?k=1`;
     }
 
     // 2. Standard multi-servers (Use TMDB numeric ID if available, otherwise raw or IMDb ID)
     const targetId = hasNum ? numId : (imdbId || rawId);
 
-    switch (serverKey) {
-        case 'vidstuck':
-            // VidStuck backend expects numeric TMDB ID. If only IMDb ID is available, gracefully route to VidLink which supports IMDb directly
+    switch (targetKey) {
+        case 'vidstuck': {
+            const vsBase = customBase || 'https://vidstuck.xyz';
+            // VidStuck backend expects numeric TMDB ID. If only IMDb ID is available, route to VidLink
             if (typeof targetId === 'string' && targetId.startsWith('tt')) {
                 return type === 'tv'
                     ? `https://vidlink.pro/tv/${targetId}/${s}/${e}?autoplay=true`
                     : `https://vidlink.pro/movie/${targetId}?autoplay=true`;
             }
             return type === 'tv'
-                ? `https://vidstuck.xyz/embed/tv/${targetId}/${s}/${e}?color=ffffff`
-                : `https://vidstuck.xyz/embed/movie/${targetId}?color=ffffff`;
+                ? `${vsBase}/embed/tv/${targetId}/${s}/${e}?color=ffffff`
+                : `${vsBase}/embed/movie/${targetId}?color=ffffff`;
+        }
 
-        case 'nxsha':
+        case 'nxsha': {
+            const nxBase = customBase || 'https://nxsha.space';
             return type === 'tv'
-                ? `https://nxsha.space/embed/tv/${targetId}/${s}/${e}?autoplay=true`
-                : `https://nxsha.space/embed/movie/${targetId}?autoplay=true`;
+                ? `${nxBase}/embed/tv/${targetId}/${s}/${e}?autoplay=true`
+                : `${nxBase}/embed/movie/${targetId}?autoplay=true`;
+        }
 
-        case 'bingr':
+        case 'bingr': {
+            const bgBase = customBase || 'https://bingr.one';
             return type === 'tv'
-                ? `https://bingr.one/watch/tv/${targetId}/${s}/${e}`
-                : `https://bingr.one/watch/movie/${targetId}`;
+                ? `${bgBase}/watch/tv/${targetId}/${s}/${e}`
+                : `${bgBase}/watch/movie/${targetId}`;
+        }
 
-        case 'zxc':
+        case 'zxc': {
+            const zxcBase = customBase || 'https://zxcstream.xyz';
             return type === 'tv'
-                ? `https://zxcstream.xyz/player/tv/${targetId}?season=${s}&episode=${e}`
-                : `https://zxcstream.xyz/player/movie/${targetId}`;
+                ? `${zxcBase}/player/tv/${targetId}?season=${s}&episode=${e}`
+                : `${zxcBase}/player/movie/${targetId}`;
+        }
 
-        case 'vidlink':
+        case 'vidlink': {
+            const vlBase = customBase || 'https://vidlink.pro';
             return type === 'tv'
-                ? `https://vidlink.pro/tv/${targetId}/${s}/${e}?autoplay=true`
-                : `https://vidlink.pro/movie/${targetId}?autoplay=true`;
+                ? `${vlBase}/tv/${targetId}/${s}/${e}?autoplay=true`
+                : `${vlBase}/movie/${targetId}?autoplay=true`;
+        }
 
-        case 'vidnest':
+        case 'vidnest': {
+            const vnBase = customBase || 'https://vidnest.fun';
             return type === 'tv'
-                ? `https://vidnest.fun/tv/${targetId}/${s}/${e}`
-                : `https://vidnest.fun/movie/${targetId}`;
+                ? `${vnBase}/tv/${targetId}/${s}/${e}`
+                : `${vnBase}/movie/${targetId}`;
+        }
 
         case 'default':
         default:
@@ -350,9 +396,10 @@ export const buildServerEmbedUrl = (
 export const getNextFallbackServer = (
     currentServer: StreamServerKey,
     isAnime: boolean,
-    failedServers: Set<StreamServerKey>
+    failedServers: Set<StreamServerKey>,
+    baseServer: StreamServerKey = 'bingr'
 ): StreamServerKey | null => {
-    const list = isAnime ? ANIME_SERVER_FALLBACK_ORDER : STANDARD_SERVER_FALLBACK_ORDER;
+    const list = getFallbackOrder(baseServer, isAnime);
     for (const server of list) {
         if (server !== currentServer && !failedServers.has(server)) {
             return server;

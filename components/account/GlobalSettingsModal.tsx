@@ -24,12 +24,15 @@ import {
     Plus,
     Search,
     Star,
-    Check
+    Check,
+    Server,
+    Zap,
+    ExternalLink
 } from 'lucide-react';
-import { SiteSettings } from '../../types';
+import { SiteSettings, StreamServerKey } from '../../types';
 import { doc, writeBatch } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { buildEmbedUrl, parseEmbedContentType } from '../../utils/embedUrl';
+import { buildEmbedUrl, parseEmbedContentType, buildServerEmbedUrl, STREAM_SERVERS, getBaseContentServer } from '../../utils/embedUrl';
 
 interface GlobalSettingsModalProps {
     isOpen: boolean;
@@ -134,8 +137,11 @@ const GlobalSettingsModal: React.FC<GlobalSettingsModalProps> = ({ isOpen, onClo
     };
 
     const handleUpdateAllContentUrls = async () => {
-        const newBase = (formData.embedProxyBaseUrl || 'https://proxy.garageband.rocks').trim().replace(/\/+$/, '');
-        const itemsToUpdate = (content || []).filter(c => c.imdbId || (c.videoUrl && (c.videoUrl.includes('/embed/') || c.videoUrl.includes('proxy.garageband.rocks'))));
+        const activeServerKey = formData.baseContentServer || 'bingr';
+        const serverObj = STREAM_SERVERS.find(s => s.key === activeServerKey);
+        const serverLabel = serverObj ? `${serverObj.name} (${serverObj.tag})` : activeServerKey;
+
+        const itemsToUpdate = (content || []).filter(c => c.imdbId || (c.videoUrl && (c.videoUrl.includes('/embed/') || c.videoUrl.includes('proxy.garageband.rocks') || c.videoUrl.includes('bingr') || c.videoUrl.includes('vidstuck') || c.videoUrl.includes('vidlink'))));
 
         if (itemsToUpdate.length === 0) {
             alert("No content items found with IMDb ID or embed stream URLs to update.");
@@ -143,7 +149,7 @@ const GlobalSettingsModal: React.FC<GlobalSettingsModalProps> = ({ isOpen, onClo
         }
 
         const confirmed = window.confirm(
-            `Update stream URLs for all ${itemsToUpdate.length} content items to use the global proxy "${newBase}"?\n\nMovies: /embed/${formData.embedMovieType || 'movie'}/\nTV Series: /embed/${formData.embedTvType || 'tv'}/`
+            `Update stream URLs for all ${itemsToUpdate.length} content items to use the base content server "${serverLabel}"?\n\nThis will reformat video URLs to stream via the selected base provider.`
         );
 
         if (!confirmed) return;
@@ -159,10 +165,17 @@ const GlobalSettingsModal: React.FC<GlobalSettingsModalProps> = ({ isOpen, onClo
 
                 for (const item of chunk) {
                     const imdbId = item.imdbId || (item.videoUrl ? item.videoUrl.match(/(tt\d+)/)?.[1] : null);
-                    if (imdbId) {
+                    const targetId = item.tmdbId || imdbId || item.id;
+                    if (targetId) {
                         const existingType = item.videoUrl ? parseEmbedContentType(item.videoUrl) : null;
                         const effectiveType = existingType || (item.type === 'tv' ? (formData.embedTvType || 'tv') : (formData.embedMovieType || 'movie'));
-                        const newUrl = buildEmbedUrl(imdbId, effectiveType, formData);
+                        
+                        let newUrl: string;
+                        if (activeServerKey === 'default') {
+                            newUrl = buildEmbedUrl(imdbId || targetId, effectiveType, formData);
+                        } else {
+                            newUrl = buildServerEmbedUrl(targetId, effectiveType, activeServerKey, { settings: formData });
+                        }
 
                         batch.update(doc(db, 'content', item.id), {
                             videoUrl: newUrl,
@@ -182,7 +195,7 @@ const GlobalSettingsModal: React.FC<GlobalSettingsModalProps> = ({ isOpen, onClo
                 contentVersion: (settings.contentVersion || 0) + 1
             });
 
-            alert(`Success! Updated stream URLs for ${updatedCount} items to use ${newBase}.`);
+            alert(`Success! Updated stream URLs for ${updatedCount} items to use ${serverLabel}.`);
         } catch (e: any) {
             console.error("Batch update failed:", e);
             alert("Failed to update all items: " + e.message);
@@ -390,58 +403,141 @@ const GlobalSettingsModal: React.FC<GlobalSettingsModalProps> = ({ isOpen, onClo
                     {/* TAB 2: Streaming & Proxy */}
                     {activeTab === 'streaming' && (
                         <div className="space-y-6 animate-in fade-in duration-150">
+                            {/* Header */}
                             <div>
-                                <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-1.5 flex items-center justify-between">
-                                    <span>Global Content Streaming Website URL</span>
-                                    <span className="text-[10px] text-brand-red font-semibold lowercase">Controls all video embed URLs</span>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <Server className="text-brand-red" size={18} />
+                                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">Base Content Provider Server</h3>
+                                </div>
+                                <p className="text-xs text-gray-400">
+                                    Select the primary content streaming server for all movies and TV shows across My Donkey.
+                                </p>
+                            </div>
+
+                            {/* Active Server Pill */}
+                            {(() => {
+                                const activeKey = formData.baseContentServer || 'bingr';
+                                const activeServerObj = STREAM_SERVERS.find(s => s.key === activeKey);
+                                return (
+                                    <div className="p-3.5 rounded-xl bg-brand-red/10 border border-brand-red/30 flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-brand-red/20 flex items-center justify-center text-brand-red shrink-0">
+                                                <Zap size={16} />
+                                            </div>
+                                            <div>
+                                                <div className="text-[10px] text-brand-red uppercase font-bold tracking-wider">Current Primary Server</div>
+                                                <div className="text-sm font-bold text-white flex items-center gap-2">
+                                                    <span>{activeServerObj?.name || activeKey}</span>
+                                                    <span className="text-[10px] px-2 py-0.2 rounded bg-brand-red/30 text-red-200">{activeServerObj?.tag}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <span className="text-xs text-emerald-400 font-semibold hidden sm:inline-block">
+                                            Auto-Failover Active
+                                        </span>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* Server Grid */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">
+                                    Choose Base Server
+                                </label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {STREAM_SERVERS.map((server) => {
+                                        const isSelected = (formData.baseContentServer || 'bingr') === server.key;
+                                        return (
+                                            <div
+                                                key={server.key}
+                                                onClick={() => handleChange({ baseContentServer: server.key })}
+                                                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
+                                                    isSelected
+                                                        ? 'border-brand-red bg-brand-red/10 ring-1 ring-brand-red'
+                                                        : 'border-white/10 bg-black/40 hover:border-white/20 hover:bg-white/5'
+                                                }`}
+                                            >
+                                                <div className="flex items-start justify-between gap-2 mb-1.5">
+                                                    <div>
+                                                        <div className="font-bold text-sm text-white flex items-center gap-1.5">
+                                                            <span>{server.name}</span>
+                                                            {isSelected && <span className="w-2 h-2 rounded-full bg-brand-red animate-pulse" />}
+                                                        </div>
+                                                        <span className="text-[10px] uppercase font-bold text-gray-400">{server.tag}</span>
+                                                    </div>
+                                                    <div className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                                                        isSelected ? 'bg-brand-red text-white' : 'border border-white/20 text-transparent'
+                                                    }`}>
+                                                        <Check size={10} strokeWidth={3} />
+                                                    </div>
+                                                </div>
+                                                <p className="text-[11px] text-gray-400 line-clamp-2">
+                                                    {server.description}
+                                                </p>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Base Server Domain / URL Configuration */}
+                            <div className="bg-black/40 p-4 rounded-xl border border-white/10 space-y-3">
+                                <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block">
+                                    Custom Base Server URL / Mirror (Optional)
                                 </label>
                                 <input
                                     type="url"
-                                    value={formData.embedProxyBaseUrl ?? 'https://proxy.garageband.rocks'}
-                                    onChange={(e) => handleChange({ embedProxyBaseUrl: e.target.value })}
+                                    value={formData.baseContentServerUrl || ''}
+                                    onChange={(e) => handleChange({ baseContentServerUrl: e.target.value })}
+                                    placeholder={
+                                        formData.baseContentServer === 'vidstuck' ? 'https://vidstuck.xyz' :
+                                        formData.baseContentServer === 'nxsha' ? 'https://nxsha.space' :
+                                        formData.baseContentServer === 'zxc' ? 'https://zxcstream.xyz' :
+                                        formData.baseContentServer === 'vidlink' ? 'https://vidlink.pro' :
+                                        formData.baseContentServer === 'vidnest' ? 'https://vidnest.fun' :
+                                        formData.baseContentServer === 'default' ? 'https://proxy.garageband.rocks' :
+                                        'https://bingr.one'
+                                    }
                                     className="w-full bg-black/60 border border-white/10 rounded-xl p-3 text-sm font-mono text-white outline-none focus:border-brand-red transition"
-                                    placeholder="https://proxy.garageband.rocks"
                                 />
-                                <p className="text-[10px] text-gray-500 mt-1">Default: https://proxy.garageband.rocks — Changing this updates the stream website for all content.</p>
+                                <p className="text-[10px] text-gray-500">
+                                    Default official endpoints are used automatically if left empty.
+                                </p>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="bg-white/5 p-4 rounded-xl border border-white/10">
-                                    <div className="flex items-center gap-2 mb-2 text-white font-bold text-xs">
-                                        <Film size={14} className="text-blue-400" />
-                                        <span>Movie Content Type Path</span>
-                                    </div>
-                                    <input
-                                        type="text"
-                                        value={formData.embedMovieType ?? 'movie'}
-                                        onChange={(e) => handleChange({ embedMovieType: e.target.value })}
-                                        className="w-full bg-black/60 border border-white/10 rounded-lg p-2.5 text-sm font-mono text-white outline-none focus:border-blue-500 transition mb-2"
-                                        placeholder="movie"
-                                    />
-                                    <div className="text-[11px] text-gray-400 font-mono break-all bg-black/40 p-2 rounded border border-white/5">
-                                        <span className="text-gray-500">Preview: </span>
-                                        {(formData.embedProxyBaseUrl || 'https://proxy.garageband.rocks').replace(/\/+$/, '')}/embed/<span className="text-blue-400 font-bold">{formData.embedMovieType || 'movie'}</span>/tt1375666
-                                    </div>
-                                </div>
+                            {/* Live Stream Previews */}
+                            {(() => {
+                                const activeKey = formData.baseContentServer || 'bingr';
+                                const moviePreview = buildServerEmbedUrl(27205, 'movie', activeKey, { settings: formData });
+                                const tvPreview = buildServerEmbedUrl(1396, 'tv', activeKey, { season: 1, episode: 1, settings: formData });
 
-                                <div className="bg-white/5 p-4 rounded-xl border border-white/10">
-                                    <div className="flex items-center gap-2 mb-2 text-white font-bold text-xs">
-                                        <Tv size={14} className="text-purple-400" />
-                                        <span>TV Series Content Type Path</span>
+                                return (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div className="bg-white/5 p-3.5 rounded-xl border border-white/10 space-y-1.5">
+                                            <div className="flex items-center justify-between text-xs font-bold text-blue-400">
+                                                <span className="flex items-center gap-1.5"><Film size={13} /> Movie Preview</span>
+                                                <a href={moviePreview} target="_blank" rel="noreferrer" className="text-[10px] text-gray-400 hover:text-white flex items-center gap-1 underline">
+                                                    Test <ExternalLink size={10} />
+                                                </a>
+                                            </div>
+                                            <div className="text-[10px] text-gray-300 font-mono break-all bg-black/60 p-2 rounded border border-white/5">
+                                                {moviePreview}
+                                            </div>
+                                        </div>
+                                        <div className="bg-white/5 p-3.5 rounded-xl border border-white/10 space-y-1.5">
+                                            <div className="flex items-center justify-between text-xs font-bold text-purple-400">
+                                                <span className="flex items-center gap-1.5"><Tv size={13} /> TV Preview</span>
+                                                <a href={tvPreview} target="_blank" rel="noreferrer" className="text-[10px] text-gray-400 hover:text-white flex items-center gap-1 underline">
+                                                    Test <ExternalLink size={10} />
+                                                </a>
+                                            </div>
+                                            <div className="text-[10px] text-gray-300 font-mono break-all bg-black/60 p-2 rounded border border-white/5">
+                                                {tvPreview}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <input
-                                        type="text"
-                                        value={formData.embedTvType ?? 'tv'}
-                                        onChange={(e) => handleChange({ embedTvType: e.target.value })}
-                                        className="w-full bg-black/60 border border-white/10 rounded-lg p-2.5 text-sm font-mono text-white outline-none focus:border-purple-500 transition mb-2"
-                                        placeholder="tv"
-                                    />
-                                    <div className="text-[11px] text-gray-400 font-mono break-all bg-black/40 p-2 rounded border border-white/5">
-                                        <span className="text-gray-500">Preview: </span>
-                                        {(formData.embedProxyBaseUrl || 'https://proxy.garageband.rocks').replace(/\/+$/, '')}/embed/<span className="text-purple-400 font-bold">{formData.embedTvType || 'tv'}</span>/tt0903747
-                                    </div>
-                                </div>
-                            </div>
+                                );
+                            })()}
 
                             {/* Batch Sync Database Card */}
                             <div className="bg-gradient-to-br from-neutral-900 to-neutral-950 border border-white/10 rounded-xl p-5">
@@ -452,17 +548,17 @@ const GlobalSettingsModal: React.FC<GlobalSettingsModalProps> = ({ isOpen, onClo
                                             <span>Sync All Existing Content in Database</span>
                                         </h4>
                                         <p className="text-xs text-gray-400 mt-1 max-w-xl">
-                                            Rewrites all existing movies and TV show stream URLs in the database to use the configured global streaming website URL and path parameters.
+                                            Rewrites all existing movies and TV show stream URLs in the database to use the selected base provider server and path parameters.
                                         </p>
                                     </div>
                                     <button
                                         type="button"
                                         onClick={handleUpdateAllContentUrls}
                                         disabled={isUpdatingBatch}
-                                        className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition disabled:opacity-50 whitespace-nowrap cursor-pointer"
+                                        className="px-4 py-2.5 bg-brand-red hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition disabled:opacity-50 whitespace-nowrap cursor-pointer shadow-lg shadow-red-950/30"
                                     >
                                         <RefreshCw size={14} className={isUpdatingBatch ? 'animate-spin' : ''} />
-                                        <span>{isUpdatingBatch ? (batchProgress || 'Updating...') : 'Apply to All Content'}</span>
+                                        <span>{isUpdatingBatch ? (batchProgress || 'Updating...') : 'Apply Base Server'}</span>
                                     </button>
                                 </div>
                             </div>

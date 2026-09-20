@@ -133,6 +133,7 @@ export class CinemaEngine {
   private fastFrames = 0;
   private sampledFrames = 0;
   private patrolPaths: { leg: Point2[]; next: Point2 }[] = [];
+  private shadowTick = 0;
   public isTV = false;
   public isMobile = false;
   public isLowEnd = false;
@@ -429,6 +430,15 @@ export class CinemaEngine {
   setPartyBridge(bridge: PartyBridge | null) {
     this.partyBridge = bridge;
     if (!bridge) this.latestPlayback = null;
+  }
+
+  private currentPosterUrl: string | null = null;
+  private currentPosterTitle: string | null = null;
+
+  setPoster(posterUrl?: string | null, title?: string | null) {
+    if (posterUrl) this.currentPosterUrl = posterUrl;
+    if (title) this.currentPosterTitle = title;
+    this.environment?.updatePosters(this.currentPosterUrl, this.currentPosterTitle);
   }
 
   setRemotePlayers(players: RemotePlayer[]) {
@@ -769,9 +779,6 @@ export class CinemaEngine {
           w.phase = 'station';
           this.servicePhase = 'idle';
         }
-        if (this.renderer.shadowMap.enabled) this.renderer.shadowMap.needsUpdate = true;
-      } else {
-        if (this.renderer.shadowMap.enabled) this.renderer.shadowMap.needsUpdate = true;
       }
     } else if (w.phase === 'coming') {
       w.phase = 'delivering';
@@ -816,12 +823,11 @@ export class CinemaEngine {
       }
       poseAvatar(p.rig, 0, 0.6, p.walkPhase, dt);
       this.holdTray(p.rig);
-      if (this.renderer.shadowMap.enabled) this.renderer.shadowMap.needsUpdate = true;
     } else {
       p.timer -= dt;
       poseAvatar(p.rig, 0, 0, p.walkPhase, dt);
       this.holdTray(p.rig);
-      if (p.timer <= 0) { p.moving = true; if (this.renderer.shadowMap.enabled) this.renderer.shadowMap.needsUpdate = true; }
+      if (p.timer <= 0) { p.moving = true; }
     }
   }
 
@@ -838,7 +844,6 @@ export class CinemaEngine {
     barista.root.rotation.y = 0;
     barista.leftArm.rotation.x = 0.55 + Math.sin(this.time * 1.3) * 0.2;
     barista.rightForearm.rotation.x = -1.25;
-    if (Math.abs(Math.sin(this.time * 0.5)) > 0.94 && this.renderer.shadowMap.enabled) this.renderer.shadowMap.needsUpdate = true;
     const span = 4.55;
     const t = (Math.sin(this.time * 0.11) + 1) * 0.5;
     const direction = Math.cos(this.time * 0.11) >= 0;
@@ -846,7 +851,6 @@ export class CinemaEngine {
     walker.root.rotation.y = turnToward(walker.root.rotation.y, direction ? Math.PI / 2 : -Math.PI / 2, 1 - Math.exp(-4 * dt));
     const speed = Math.abs(Math.cos(this.time * 0.11)) * 0.75;
     poseAvatar(walker, 0, speed, direction ? this.time * 2.6 : -this.time * 2.6, dt);
-    if (speed > 0.03 && this.renderer.shadowMap.enabled) this.renderer.shadowMap.needsUpdate = true;
   }
 
   private updateServiceAndFood(dt: number) {
@@ -1065,6 +1069,9 @@ export class CinemaEngine {
       this.clearVideo();
       this.media = media;
       this.filmTitle = media.title;
+      if (media.catalog) {
+        this.setPoster(media.catalog.posterPath || this.currentPosterUrl, media.catalog.title);
+      }
       this.playing = false;
       this.loading = this.buffering = this.autoplayBlocked = false;
       this.playbackError = '';
@@ -1086,6 +1093,9 @@ export class CinemaEngine {
       if (parsed.username || parsed.password) throw new Error('Use a video URL without embedded account credentials.');
     }
     this.cancelPendingMedia?.();
+    if (media.title) {
+      this.setPoster(this.currentPosterUrl, media.title);
+    }
     const generation = ++this.mediaGeneration;
     this.loading = true;
     this.publish();
@@ -1256,14 +1266,14 @@ export class CinemaEngine {
       inputZ = -inputX * Math.sin(this.yaw) + inputZ * Math.cos(this.yaw);
       inputX = x;
     }
-    this.velocity.x = damp(this.velocity.x, inputX * speed, 10, dt);
-    this.velocity.y = damp(this.velocity.y, inputZ * speed, 10, dt);
+    this.velocity.x = damp(this.velocity.x, inputX * speed, 18, dt);
+    this.velocity.y = damp(this.velocity.y, inputZ * speed, 18, dt);
     this.position = movePlayer(this.position, this.velocity.x * dt, this.velocity.y * dt);
     this.avatar.root.position.x = this.position.x;
     this.avatar.root.position.z = this.position.z;
-    this.avatar.root.position.y = damp(this.avatar.root.position.y, floorHeight(this.position.x, this.position.z), 19, dt);
+    this.avatar.root.position.y = damp(this.avatar.root.position.y, floorHeight(this.position.x, this.position.z), 24, dt);
     const actualSpeed = this.velocity.length();
-    if (actualSpeed > 0.07) this.avatar.root.rotation.y = turnToward(this.avatar.root.rotation.y, Math.atan2(-this.velocity.x, -this.velocity.y), 1 - Math.exp(-12 * dt));
+    if (actualSpeed > 0.07) this.avatar.root.rotation.y = turnToward(this.avatar.root.rotation.y, Math.atan2(-this.velocity.x, -this.velocity.y), 1 - Math.exp(-18 * dt));
     this.walkPhase += actualSpeed * dt * 5.1;
     this.sitAmount = 0;
     this.nearbySeat = null;
@@ -1375,7 +1385,7 @@ export class CinemaEngine {
       this.desiredCamera.y = THREE.MathUtils.clamp(this.desiredCamera.y, elevation + 0.85, 5.23);
       this.constrainCamera(this.desiredCamera);
     }
-    const cameraSpeed = this.reducedMotion ? 8 : this.state === 'seated' || this.state === 'sitting' ? 2.15 : 4.5;
+    const cameraSpeed = this.reducedMotion ? 10 : this.state === 'seated' || this.state === 'sitting' ? 2.15 : 16.0;
     this.camera.position.lerp(this.desiredCamera, 1 - Math.exp(-cameraSpeed * dt));
     if (!this.overview && (this.state === 'explore' || this.state === 'walking')) this.constrainCamera(this.camera.position);
     this.cameraTarget.lerp(this.desiredTarget, 1 - Math.exp(-cameraSpeed * dt));
@@ -1392,7 +1402,14 @@ export class CinemaEngine {
     this.rayDirection.normalize();
     this.cameraRay.set(this.playerCameraOrigin, this.rayDirection);
     let nearest = distance;
+    const minX = Math.min(this.playerCameraOrigin.x, position.x) - 0.35;
+    const maxX = Math.max(this.playerCameraOrigin.x, position.x) + 0.35;
+    const minZ = Math.min(this.playerCameraOrigin.z, position.z) - 0.35;
+    const maxZ = Math.max(this.playerCameraOrigin.z, position.z) + 0.35;
     for (const { box } of this.cameraBoxes) {
+      if (box.max.x < minX || box.min.x > maxX || box.max.z < minZ || box.min.z > maxZ) {
+        continue;
+      }
       if (this.cameraRay.intersectBox(box, this.rayHit)) {
         const hitDistance = this.rayHit.distanceTo(this.playerCameraOrigin);
         if (hitDistance > 0.03 && hitDistance < nearest) nearest = Math.max(0.26, hitDistance - 0.12);
@@ -1476,8 +1493,9 @@ export class CinemaEngine {
     if (this.state !== 'seated' || this.waitress.phase !== 'station') {
       this.updateNpcs(dt);
     }
-    // Cafeteria is in the back room behind the theatre; do not simulate when seated facing forward
-    if (this.state !== 'seated' && this.serviceVisible) {
+    // Cafeteria is in the back room behind the theatre; only simulate when player is near the hallway or inside cafeteria
+    const inOrNearCafe = this.position.x > 5.5 && this.position.z > 3.0;
+    if (this.state !== 'seated' && this.serviceVisible && inOrNearCafe) {
       this.updateCafeteria(dt);
     }
     this.updateServiceAndFood(dt);
@@ -1496,7 +1514,8 @@ export class CinemaEngine {
     this.updateLighting(dt);
     this.provider.render(this.camera);
     this.renderer.domElement.style.pointerEvents = this.provider.isInRoom && this.state === 'seated' ? 'none' : 'auto';
-    if (this.renderer.shadowMap.enabled && (this.velocity.lengthSq() > 0.00002 || this.state === 'sitting' || this.state === 'standing')) {
+    this.shadowTick++;
+    if (this.renderer.shadowMap.enabled && this.shadowTick % 2 === 0 && (this.velocity.lengthSq() > 0.0001 || this.state === 'sitting' || this.state === 'standing')) {
       this.renderer.shadowMap.needsUpdate = true;
     }
     this.renderer.render(this.scene, this.camera);
@@ -1527,7 +1546,7 @@ export class CinemaEngine {
     }
     if (this.fpsTime < 0.01 && elapsed < 0.0105) this.fastFrames++;
     this.sampledFrames++;
-    const publishInterval = this.state === 'seated' ? 1.0 : 0.25;
+    const publishInterval = this.state === 'seated' ? 1.0 : (this.velocity.lengthSq() > 0.01 ? 0.65 : 0.25);
     if (this.snapshotTime >= publishInterval) {
       this.publish();
       this.snapshotTime = 0;

@@ -159,6 +159,226 @@ export function posterTexture(title: string, subtitle: string, variant: number):
   return texture;
 }
 
+export function resolvePosterUrl(path?: string | null): string | undefined {
+  if (!path) return undefined;
+  const trimmed = path.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:') || trimmed.startsWith('blob:')) {
+    return trimmed;
+  }
+  if (trimmed.startsWith('/')) {
+    return `https://image.tmdb.org/t/p/w500${trimmed}`;
+  }
+  return `https://image.tmdb.org/t/p/w500/${trimmed}`;
+}
+
+function wrapPosterText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let currentLine = words[0] || '';
+
+  for (let i = 1; i < words.length; i++) {
+    const testLine = currentLine + ' ' + words[i];
+    if (ctx.measureText(testLine).width < maxWidth) {
+      currentLine = testLine;
+    } else {
+      lines.push(currentLine);
+      currentLine = words[i];
+    }
+  }
+  if (currentLine) lines.push(currentLine);
+  return lines.slice(0, 3);
+}
+
+function drawPosterCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number) {
+  const imgWidth = img.naturalWidth || img.width || 600;
+  const imgHeight = img.naturalHeight || img.height || 900;
+  const imgRatio = imgWidth / imgHeight;
+  const targetRatio = w / h;
+  let sx = 0, sy = 0, sw = imgWidth, sh = imgHeight;
+  if (imgRatio > targetRatio) {
+    sw = imgHeight * targetRatio;
+    sx = (imgWidth - sw) / 2;
+  } else {
+    sh = imgWidth / targetRatio;
+    sy = (imgHeight - sh) / 2;
+  }
+  ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+}
+
+/**
+ * Robustly loads an image avoiding the browser CORS disk-cache collision bug.
+ * When an image has been previously loaded in an <img> tag without crossOrigin,
+ * Chrome/Safari/Edge can reject subsequent Image(crossOrigin='anonymous') calls.
+ * We use fetch(mode:'cors') -> Blob URL as primary, with cache-busting fallbacks.
+ */
+async function loadPosterElement(url: string): Promise<HTMLImageElement> {
+  // Strategy 1: Fetch with mode: 'cors' and convert to local Blob URL (guaranteed same-origin)
+  try {
+    const res = await fetch(url, { mode: 'cors', cache: 'default' });
+    if (res.ok) {
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      return await new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = (e) => {
+          URL.revokeObjectURL(objectUrl);
+          reject(e);
+        };
+        img.src = objectUrl;
+      });
+    }
+  } catch (_) {
+    // Continue to strategy 2
+  }
+
+  // Strategy 2: Cache-busting query to bypass non-CORS cached entry in browser HTTP cache
+  try {
+    const sep = url.includes('?') ? '&' : '?';
+    const cacheBustUrl = `${url}${sep}_cb=${Date.now()}`;
+    const res = await fetch(cacheBustUrl, { mode: 'cors' });
+    if (res.ok) {
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      return await new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = (e) => {
+          URL.revokeObjectURL(objectUrl);
+          reject(e);
+        };
+        img.src = objectUrl;
+      });
+    }
+  } catch (_) {
+    // Continue to strategy 3
+  }
+
+  // Strategy 3: Standard Image element with crossOrigin anonymous
+  return await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+/**
+ * Creates a dynamic 3D cinema wall poster texture.
+ * Immediately paints a high-end styled canvas (with title and branding) so there is never an untextured blank,
+ * then asynchronously loads and composites the movie/show poster image into the texture.
+ */
+export function contentPosterTexture(
+  posterPath?: string | null,
+  title?: string | null,
+  variant = 0,
+  onUpdated?: () => void
+): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 600;
+  canvas.height = 900;
+  const ctx = canvas.getContext('2d')!;
+
+  const displayTitle = title?.trim() || (variant ? 'ORBITAL' : 'THE QUIET BETWEEN');
+  const subtitle = variant ? 'SOME THINGS ARE WORTH FINDING.' : 'NOW SCREENING IN 3D THEATRE';
+
+  // Base background gradient
+  const gradient = ctx.createLinearGradient(0, 0, 600, 900);
+  gradient.addColorStop(0, variant ? '#192b2d' : '#3d302a');
+  gradient.addColorStop(0.5, '#121619');
+  gradient.addColorStop(1, '#07090b');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 600, 900);
+
+  // Geometric artwork background
+  if (variant) {
+    for (let i = 5; i >= 0; i--) {
+      ctx.beginPath();
+      ctx.arc(300, 380, 50 + i * 32, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(204,178,132,${0.08 + i * 0.03})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(300, 380, 58, 0, Math.PI * 2);
+    ctx.fillStyle = '#bbaa8f';
+    ctx.fill();
+  } else {
+    for (let i = 0; i < 6; i++) {
+      ctx.beginPath();
+      ctx.moveTo(0, 560 - i * 45);
+      ctx.lineTo(145, 340 - i * 20);
+      ctx.lineTo(275, 490 - i * 28);
+      ctx.lineTo(438, 315 - i * 22);
+      ctx.lineTo(600, 470 - i * 24);
+      ctx.lineTo(600, 680);
+      ctx.lineTo(0, 680);
+      ctx.fillStyle = `rgba(14,23,27,${0.2 + i * 0.1})`;
+      ctx.fill();
+    }
+  }
+
+  // Header branding
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#d8cdbb';
+  ctx.font = '600 18px Arial';
+  ctx.fillText('M Y   D O N K E Y   C I N E M A', 300, 65);
+
+  // Feature Title
+  ctx.fillStyle = '#f3ebe0';
+  ctx.font = 'bold 42px Georgia, serif';
+  const lines = wrapPosterText(ctx, displayTitle.toUpperCase(), 520);
+  const startY = 660 - ((lines.length - 1) * 26);
+  lines.forEach((line, i) => {
+    ctx.fillText(line, 300, startY + i * 50);
+  });
+
+  // Subtitle
+  ctx.font = '14px Arial';
+  ctx.fillStyle = '#b4a896';
+  ctx.fillText(subtitle, 300, 800);
+
+  // Donkey icon
+  ctx.font = '28px Arial';
+  ctx.fillStyle = '#8a7c6a';
+  ctx.fillText('🫏', 300, 855);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+
+  const resolvedUrl = resolvePosterUrl(posterPath);
+  if (resolvedUrl) {
+    loadPosterElement(resolvedUrl)
+      .then((img) => {
+        ctx.clearRect(0, 0, 600, 900);
+        drawPosterCover(ctx, img, 0, 0, 600, 900);
+
+        // Subtle cinema vignette around edges so it sits naturally in the brass frame
+        const vignette = ctx.createRadialGradient(300, 450, 220, 300, 450, 580);
+        vignette.addColorStop(0, 'rgba(0,0,0,0)');
+        vignette.addColorStop(1, 'rgba(0,0,0,0.28)');
+        ctx.fillStyle = vignette;
+        ctx.fillRect(0, 0, 600, 900);
+
+        // Subtle inner rim line
+        ctx.strokeStyle = 'rgba(214, 187, 144, 0.2)';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(2, 2, 596, 896);
+
+        texture.needsUpdate = true;
+        onUpdated?.();
+      })
+      .catch((err) => {
+        console.warn('[Cinema Poster] Could not load artwork image, keeping stylized typography:', resolvedUrl, err);
+      });
+  }
+
+  return texture;
+}
+
 /** Renders a MY DONKEY logo canvas texture as a fallback (used until real image loads). */
 function myDonkeyLogoFallback(width: number, height: number, style: 'horizontal' | 'badge' | 'seat'): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');

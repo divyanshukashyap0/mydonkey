@@ -17,6 +17,7 @@ import {
     getPlayableStreamUrl,
     buildServerEmbedUrl,
     getNextFallbackServer,
+    getBaseContentServer,
     STREAM_SERVERS,
     StreamServerKey,
     STANDARD_SERVER_FALLBACK_ORDER,
@@ -69,7 +70,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 const found = list.find((i: any) => i.movieId === content.id || (content.imdbId && i.movieId === content.imdbId));
                 if (found) return found;
             }
-        } catch (_) {}
+        } catch (_) { }
         return currentUser?.continueWatching?.find(i => i.movieId === content.id);
     }, [isTrailer, content.id, content.imdbId, currentUser?.continueWatching]);
     const initialProgress = savedState?.progress || (isTrailer ? 0 : (content.progress || 0));
@@ -152,6 +153,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         );
     }, [content]);
 
+    const defaultBaseServer = useMemo(() => {
+        return getBaseContentServer(settings);
+    }, [settings?.baseContentServer]);
+
     const [activeServer, setActiveServer] = useState<StreamServerKey>(() => {
         try {
             const saved = localStorage.getItem('mydonkey_preferred_server') as StreamServerKey | null;
@@ -159,7 +164,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 return saved;
             }
         } catch { }
-        return 'bingr';
+        return getBaseContentServer(settings);
     });
 
     const [failedServers, setFailedServers] = useState<Set<StreamServerKey>>(new Set());
@@ -179,7 +184,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     }, [showOsd]);
 
     const handleNextServer = useCallback((reason?: string) => {
-        const next = getNextFallbackServer(activeServer, isAnime, failedServers);
+        const next = getNextFallbackServer(activeServer, isAnime, failedServers, defaultBaseServer);
         const curName = STREAM_SERVERS.find(s => s.key === activeServer)?.name || activeServer;
         if (next) {
             setFailedServers(prev => new Set(prev).add(activeServer));
@@ -194,7 +199,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             showOsd(`Retrying with ${fallbackName}...`, undefined, 'zap');
             handleServerSwitch(fallback);
         }
-    }, [activeServer, isAnime, failedServers, handleServerSwitch, showOsd]);
+    }, [activeServer, isAnime, failedServers, defaultBaseServer, handleServerSwitch, showOsd]);
 
 
     // Season & Episode State (TV Shows)
@@ -2127,68 +2132,61 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             {showContentLoader && !isDriveVideo && !isDirectIframeEmbed && (
                 <div className="z-[50] w-full h-full relative">
                     <ContentLoader
-                                item={content}
-                                duration={settings?.contentLoaderDuration || 2.5}
-                                durationAction={handleLoaderComplete}
-                            />
-                        </div>
-                    )}
+                        item={content}
+                        duration={settings?.contentLoaderDuration || 2.5}
+                        durationAction={handleLoaderComplete}
+                    />
+                </div>
+            )}
 
-                    {showDataWarning && (
-                        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-[130] animate-in slide-in-from-top-4 fade-in duration-300">
-                            <div className="bg-yellow-500/10 backdrop-blur-md border border-yellow-500/20 text-yellow-200 px-6 py-3 rounded-full flex items-center gap-3 shadow-lg max-w-sm text-center">
-                                <Wifi size={20} className="text-yellow-400 shrink-0" />
-                                <span className="text-sm font-medium">original Sound</span>
-                            </div>
-                        </div>
-                    )}
 
-                    {!isDriveVideo && !isDirectIframeEmbed && (
-                        <div className="absolute inset-0 z-10" onClick={() => setShowControls(!showControls)}></div>
-                    )}
 
-                    {/* Common Overlays (Error, Skip Intro, Stats) */}
-                    {playbackError && (
-                        <div className="absolute inset-0 z-[250] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in fade-in">
-                            <div className="bg-brand-red/10 p-6 rounded-full mb-6 border border-brand-red/20 shadow-[0_0_50px_rgba(229,9,20,0.2)]">
-                                <AlertCircle size={64} className="text-brand-red" />
-                            </div>
-                            <h2 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">Playback Error</h2>
-                            <p className="text-gray-400 mb-8 max-w-sm leading-relaxed">{playbackError}</p>
-                            <div className="flex gap-4">
-                                <button
-                                    onClick={() => window.location.reload()}
-                                    className="bg-white text-black px-8 py-3 rounded-xl font-black hover:bg-gray-200 transition-all active:scale-95 flex items-center gap-2"
-                                >
-                                    <RefreshCw size={18} /> RETRY
-                                </button>
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onClose();
-                                    }}
-                                    className="bg-white/5 border border-white/10 text-white px-8 py-3 rounded-xl font-bold hover:bg-white/10 transition-all cursor-pointer"
-                                >
-                                    GO BACK
-                                </button>
-                            </div>
-                        </div>
-                    )}
+            {!isDriveVideo && !isDirectIframeEmbed && (
+                <div className="absolute inset-0 z-10" onClick={() => setShowControls(!showControls)}></div>
+            )}
 
-                    {!isDriveVideo && showSkipIntro && (
+            {/* Common Overlays (Error, Skip Intro, Stats) */}
+            {playbackError && (
+                <div className="absolute inset-0 z-[250] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in fade-in">
+                    <div className="bg-brand-red/10 p-6 rounded-full mb-6 border border-brand-red/20 shadow-[0_0_50px_rgba(229,9,20,0.2)]">
+                        <AlertCircle size={64} className="text-brand-red" />
+                    </div>
+                    <h2 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">Playback Error</h2>
+                    <p className="text-gray-400 mb-8 max-w-sm leading-relaxed">{playbackError}</p>
+                    <div className="flex gap-4">
                         <button
-                            onClick={(e) => { e.stopPropagation(); handleSkip(90); setShowSkipIntro(false); }}
-                            className="absolute bottom-24 right-4 md:bottom-32 md:right-12 bg-white text-black px-4 py-2 rounded font-bold text-sm shadow-lg hover:bg-gray-200 z-[120] transition pointer-events-auto animate-in fade-in"
+                            onClick={() => window.location.reload()}
+                            className="bg-white text-black px-8 py-3 rounded-xl font-black hover:bg-gray-200 transition-all active:scale-95 flex items-center gap-2"
                         >
-                            Skip Intro
+                            <RefreshCw size={18} /> RETRY
                         </button>
-                    )}
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onClose();
+                            }}
+                            className="bg-white/5 border border-white/10 text-white px-8 py-3 rounded-xl font-bold hover:bg-white/10 transition-all cursor-pointer"
+                        >
+                            GO BACK
+                        </button>
+                    </div>
+                </div>
+            )}
 
-                    {showStats && isSports && (
-                        <div className="pointer-events-auto z-[120]">
-                            <StatsPanel content={content as any} onClose={() => setShowStats(false)} />
-                        </div>
-                    )}
+            {!isDriveVideo && showSkipIntro && (
+                <button
+                    onClick={(e) => { e.stopPropagation(); handleSkip(90); setShowSkipIntro(false); }}
+                    className="absolute bottom-24 right-4 md:bottom-32 md:right-12 bg-white text-black px-4 py-2 rounded font-bold text-sm shadow-lg hover:bg-gray-200 z-[120] transition pointer-events-auto animate-in fade-in"
+                >
+                    Skip Intro
+                </button>
+            )}
+
+            {showStats && isSports && (
+                <div className="pointer-events-auto z-[120]">
+                    <StatsPanel content={content as any} onClose={() => setShowStats(false)} />
+                </div>
+            )}
 
 
 
@@ -2345,8 +2343,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                                         key={s.key}
                                                         onClick={() => handleServerSwitch(s.key)}
                                                         className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${isSel
-                                                                ? 'bg-brand-red text-white shadow-md shadow-brand-red/30'
-                                                                : 'text-gray-300 hover:text-white hover:bg-white/10'
+                                                            ? 'bg-brand-red text-white shadow-md shadow-brand-red/30'
+                                                            : 'text-gray-300 hover:text-white hover:bg-white/10'
                                                             }`}
                                                     >
                                                         <div className="flex flex-col">

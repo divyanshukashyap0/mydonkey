@@ -352,6 +352,11 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
         }
       }, 350);
 
+      if (pending.title) {
+        const p = pending.title.posterPath || searchParams.get('poster') || content?.poster_path || content?.poster_path_mobile || null;
+        engine.current?.setPoster(p, pending.title.title);
+      }
+
       // Record in browser cache watch history
       if (pending.title) {
         try {
@@ -463,7 +468,7 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
         title: titleParam || 'My Screening',
         originalTitle: titleParam || 'My Screening',
         overview: '',
-        posterPath: null,
+        posterPath: searchParams.get('poster') || null,
         backdropPath: null,
         year: '',
         rating: 7.5,
@@ -514,7 +519,7 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
         title: titleParam || 'Cinema Feature',
         originalTitle: titleParam || 'Cinema Feature',
         overview: '',
-        posterPath: null,
+        posterPath: searchParams.get('poster') || null,
         backdropPath: null,
         year: '',
         rating: 7.5,
@@ -556,7 +561,7 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
             title: titleParam || 'Cinema Feature',
             originalTitle: titleParam || 'Cinema Feature',
             overview: '',
-            posterPath: null,
+            posterPath: resolvedTitle?.posterPath || searchParams.get('poster') || null,
             backdropPath: null,
             year: '',
             rating: 7.5,
@@ -588,7 +593,7 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
             title: titleParam || 'Cinema Feature',
             originalTitle: titleParam || 'Cinema Feature',
             overview: '',
-            posterPath: null,
+            posterPath: searchParams.get('poster') || null,
             backdropPath: null,
             year: '',
             rating: 7.5,
@@ -622,6 +627,44 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
 
     setTheatreTitle(rawTitle);
   }, [catalogTitle?.title, snapshot.embed?.title, snapshot.filmTitle, content?.title, searchParams]);
+
+  // Sync 3D auditorium wall posters with active movie or show content
+  useEffect(() => {
+    if (!engine.current) return;
+    const activePoster =
+      catalogTitle?.posterPath ||
+      content?.poster_path ||
+      content?.poster_path_mobile ||
+      snapshot.embed?.catalog.posterPath ||
+      (location.state as { content?: Content })?.content?.poster_path ||
+      (location.state as { content?: Content })?.content?.poster_path_mobile ||
+      searchParams.get('poster') ||
+      null;
+
+    const activeTitle =
+      catalogTitle?.title ||
+      content?.title ||
+      snapshot.embed?.catalog.title ||
+      snapshot.embed?.title ||
+      (location.state as { content?: Content })?.content?.title ||
+      searchParams.get('title') ||
+      null;
+
+    if (activePoster || activeTitle) {
+      engine.current.setPoster(activePoster, activeTitle);
+    }
+  }, [
+    catalogTitle?.posterPath,
+    catalogTitle?.title,
+    content?.poster_path,
+    content?.poster_path_mobile,
+    content?.title,
+    snapshot.embed?.catalog.posterPath,
+    snapshot.embed?.catalog.title,
+    snapshot.embed?.title,
+    searchParamsString,
+    ready,
+  ]);
 
   // ── Auto-Fallback Server Switcher for 3D Theatre ──────────────────────────
   const triedTheatreServers = useRef<Set<ServerKey>>(new Set());
@@ -975,8 +1018,27 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
               onReady={() => {
                 setReady(true);
                 executePendingPlay();
-                if (engine.current && 'sitDirectly' in engine.current) {
-                  (engine.current as any).sitDirectly('B3');
+                if (engine.current) {
+                  const p =
+                    catalogTitle?.posterPath ||
+                    content?.poster_path ||
+                    content?.poster_path_mobile ||
+                    (location.state as { content?: Content })?.content?.poster_path ||
+                    (location.state as { content?: Content })?.content?.poster_path_mobile ||
+                    searchParams.get('poster') ||
+                    null;
+                  const t =
+                    catalogTitle?.title ||
+                    content?.title ||
+                    (location.state as { content?: Content })?.content?.title ||
+                    searchParams.get('title') ||
+                    null;
+                  if (p || t) {
+                    engine.current.setPoster(p, t);
+                  }
+                  if ('sitDirectly' in engine.current) {
+                    (engine.current as any).sitDirectly('B3');
+                  }
                 }
               }}
               onMessage={notify}

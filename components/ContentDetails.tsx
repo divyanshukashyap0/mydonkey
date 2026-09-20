@@ -487,7 +487,8 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                             <button
                                 onClick={() => {
                                     const cid = content.tmdbId || (typeof content.id === 'string' ? content.id.replace(/^(tmdb_|imdb_)/, '') : content.id);
-                                    navigate(`/theatre?id=${cid}&type=${content.type === 'tv' ? 'tv' : 'movie'}&title=${encodeURIComponent(content.title || '')}`, { state: { content } });
+                                    const posterUrl = content.poster_path || content.poster_path_mobile || '';
+                                    navigate(`/theatre?id=${cid}&type=${content.type === 'tv' ? 'tv' : 'movie'}&title=${encodeURIComponent(content.title || '')}&poster=${encodeURIComponent(posterUrl)}`, { state: { content } });
                                 }}
                                 className="col-span-2 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 text-black py-3 rounded-xl font-extrabold text-sm flex items-center justify-center gap-2 hover:opacity-95 transition active:scale-95 shadow-lg border border-yellow-200/50"
                             >
@@ -635,7 +636,8 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                                 <button
                                     onClick={() => {
                                         const cid = content.tmdbId || (typeof content.id === 'string' ? content.id.replace(/^(tmdb_|imdb_)/, '') : content.id);
-                                        navigate(`/theatre?id=${cid}&type=${content.type === 'tv' ? 'tv' : 'movie'}&title=${encodeURIComponent(content.title || '')}`, { state: { content } });
+                                        const posterUrl = content.poster_path || content.poster_path_mobile || '';
+                                        navigate(`/theatre?id=${cid}&type=${content.type === 'tv' ? 'tv' : 'movie'}&title=${encodeURIComponent(content.title || '')}&poster=${encodeURIComponent(posterUrl)}`, { state: { content } });
                                     }}
                                     className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 text-black px-7 py-3.5 rounded-xl font-extrabold text-lg flex items-center gap-2 hover:opacity-95 transition-all hover:scale-105 active:scale-95 shadow-2xl border border-yellow-200/50 cursor-pointer"
                                     title="Watch on Big Screen in 3D Virtual Cinema"

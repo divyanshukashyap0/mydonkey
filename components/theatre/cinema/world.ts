@@ -87,37 +87,50 @@ function onFloor(x: number, z: number): boolean {
 export function isClear(x: number, z: number, radius = PLAYER_RADIUS): boolean {
   if (!onFloor(x, z) || !onFloor(x - radius, z) || !onFloor(x + radius, z)
     || !onFloor(x, z - radius) || !onFloor(x, z + radius)) return false;
+  const r2 = radius * radius;
   for (const c of COLLIDERS) {
+    if (x < c.minX - radius || x > c.maxX + radius || z < c.minZ - radius || z > c.maxZ + radius) {
+      continue;
+    }
     const dx = x - Math.max(c.minX, Math.min(x, c.maxX));
     const dz = z - Math.max(c.minZ, Math.min(z, c.maxZ));
-    if (dx * dx + dz * dz < radius * radius) return false;
+    if (dx * dx + dz * dz < r2) return false;
   }
   return true;
 }
 
 export function canTraverse(from: Point2, to: Point2): boolean {
-  const distance = Math.hypot(to.x - from.x, to.z - from.z);
-  const count = Math.max(1, Math.ceil(distance / 0.075));
+  const dx = to.x - from.x;
+  const dz = to.z - from.z;
+  const distSq = dx * dx + dz * dz;
+  if (distSq < 0.000001) return true;
+  const distance = Math.sqrt(distSq);
+  const count = Math.max(1, Math.ceil(distance / 0.12));
   let previousHeight = floorHeight(from.x, from.z);
   for (let i = 1; i <= count; i++) {
-    const x = from.x + (to.x - from.x) * i / count;
-    const z = from.z + (to.z - from.z) * i / count;
+    const t = i / count;
+    const x = from.x + dx * t;
+    const z = from.z + dz * t;
     if (!isClear(x, z)) return false;
     const nextHeight = floorHeight(x, z);
-    if (Math.abs(nextHeight - previousHeight) > STAIRS.rise + 0.015) return false;
+    if (Math.abs(nextHeight - previousHeight) > STAIRS.rise + 0.02) return false;
     previousHeight = nextHeight;
   }
   return true;
 }
 
-// Substeps prevent tunneling; separate axes allow the capsule to slide along furniture.
+// Substeps prevent tunneling; separate axes allow the capsule to slide smoothly along furniture.
 export function movePlayer(position: Point2, dx: number, dz: number): Point2 {
   let { x, z } = position;
-  const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / 0.055));
+  const distSq = dx * dx + dz * dz;
+  if (distSq < 0.000001) return position;
+  const steps = Math.max(1, Math.min(3, Math.ceil(Math.sqrt(distSq) / 0.08)));
+  const stepX = dx / steps;
+  const stepZ = dz / steps;
   for (let i = 0; i < steps; i++) {
-    const nextX = x + dx / steps;
+    const nextX = x + stepX;
     if (canTraverse({ x, z }, { x: nextX, z })) x = nextX;
-    const nextZ = z + dz / steps;
+    const nextZ = z + stepZ;
     if (canTraverse({ x, z }, { x, z: nextZ })) z = nextZ;
   }
   return { x, z };

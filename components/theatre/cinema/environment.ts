@@ -3,7 +3,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeMaterials, labelTexture, posterTexture, myDonkeyLogoTexture, paintLogoOnScreen, softShadowTexture, type CinemaMaterials } from './materials';
+import { makeMaterials, labelTexture, posterTexture, contentPosterTexture, myDonkeyLogoTexture, paintLogoOnScreen, softShadowTexture, type CinemaMaterials } from './materials';
 import { buildNpcAvatar, makeDrinkCup } from './npcs';
 import type { Avatar } from './avatar';
 import { PLATFORM, ROOM, SEATS, STAIRS } from './world';
@@ -34,12 +34,12 @@ class GeometryBatch {
     this.add(geometry, material, position, rotation);
   }
 
-  finish(parent: THREE.Object3D) {
+  finish(parent: THREE.Object3D, castShadow = false) {
     for (const [material, parts] of this.parts) {
       const merged = mergeGeometries(parts, false);
       if (!merged) continue;
       const mesh = new THREE.Mesh(merged, material);
-      mesh.castShadow = true;
+      mesh.castShadow = castShadow;
       mesh.receiveShadow = true;
       mesh.matrixAutoUpdate = false;
       parent.add(mesh);
@@ -106,7 +106,7 @@ function makePlant(batch: GeometryBatch, x: number, z: number, m: CinemaMaterial
   }
 }
 
-function makePoster(scene: THREE.Scene, batch: GeometryBatch, side: number, z: number, variant: number, m: CinemaMaterials) {
+function makePoster(scene: THREE.Scene, batch: GeometryBatch, side: number, z: number, variant: number, m: CinemaMaterials): THREE.Mesh<THREE.PlaneGeometry, THREE.MeshStandardMaterial> {
   batch.box([0.1, 1.7, 1.14], [side * 6.225, 2.43, z], m.brass, 0.01);
   batch.box([0.13, 1.65, 1.09], [side * 6.2, 2.43, z], m.black, 0.005);
   const texture = posterTexture(variant ? 'ORBITAL' : 'THE QUIET|BETWEEN', variant ? 'SOME THINGS ARE WORTH FINDING.' : 'A FILM BY ELIAS NORTH', variant);
@@ -116,6 +116,7 @@ function makePoster(scene: THREE.Scene, batch: GeometryBatch, side: number, z: n
   scene.add(plane);
   batch.box([0.25, 0.04, 0.63], [side * 6.08, 3.39, z], m.metal, 0.015);
   batch.box([0.02, 0.018, 0.49], [side * 6.02, 3.36, z], m.fixture);
+  return plane;
 }
 
 export type RoomLight = { light: THREE.Light; intensity: number };
@@ -133,6 +134,8 @@ export type CinemaEnvironment = {
   shadowTexture: THREE.CanvasTexture;
   filmTexture: THREE.CanvasTexture;
   environmentTarget: THREE.WebGLRenderTarget;
+  posters: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshStandardMaterial>[];
+  updatePosters: (posterUrl?: string | null, title?: string | null) => void;
   ready: Promise<void>;
 };
 
@@ -140,6 +143,7 @@ export function buildEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRender
   RectAreaLightUniformsLib.init();
   const m = makeMaterials();
   const b = new GeometryBatch();
+  const posterPlanes: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshStandardMaterial>[] = [];
   const roomLights: RoomLight[] = [];
   const addRoomLight = (light: THREE.Light) => {
     roomLights.push({ light, intensity: light.intensity });
@@ -249,8 +253,8 @@ export function buildEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRender
   makeSpeaker(b, 4.78, m);
   makePlant(b, -5.68, -5.52, m);
   makePlant(b, 5.68, -5.52, m);
-  makePoster(scene, b, -1, -2.0, 0, m);
-  makePoster(scene, b, 1, 1.95, 1, m);
+  posterPlanes.push(makePoster(scene, b, -1, -2.0, 0, m));
+  posterPlanes.push(makePoster(scene, b, 1, 1.95, 1, m));
 
   // Open rear/right doorway and the cafe beyond it.
   // Open rear/right doorway: a corridor that leads to the premium cafeteria at its end.
@@ -437,10 +441,12 @@ export function buildEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRender
   b.box([0.5, 0.34, 0.01], [13.6, 1.96, 4.062], m.ledSoft, 0.003);
   b.box([0.42, 0.75, 0.32], [8.75, 1.015, 3.9], m.wood, 0.02);
   for (const [px, variant] of [[10.4, 0], [12.2, 1]] as const) {
-    const posterPlane = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 1.35), new THREE.MeshStandardMaterial({ map: posterTexture(variant ? 'ORBITAL' : 'THE QUIET|BETWEEN', variant ? 'SOME THINGS ARE WORTH FINDING.' : 'A FILM BY ELIAS NORTH', variant), roughness: 0.5 }));
+    const posterTex = posterTexture(variant ? 'ORBITAL' : 'THE QUIET|BETWEEN', variant ? 'SOME THINGS ARE WORTH FINDING.' : 'A FILM BY ELIAS NORTH', variant);
+    const posterPlane = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 1.35), new THREE.MeshStandardMaterial({ map: posterTex, roughness: 0.5, emissive: '#ffffff', emissiveMap: posterTex, emissiveIntensity: 0.035 }));
     posterPlane.position.set(px, 2.3, 3.415);
     scene.add(posterPlane);
     b.box([0.98, 1.43, 0.05], [px, 2.3, 3.44], m.black, 0.006);
+    posterPlanes.push(posterPlane);
   }
   const cafePlant = (x: number, z: number) => {
     b.add(new THREE.CylinderGeometry(0.26, 0.2, 0.5, 16), m.planter, [x, 0.91, z]);
@@ -645,5 +651,27 @@ export function buildEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRender
   walker.root.position.set(8.95, 0.64, 5.55);
   walker.root.rotation.y = Math.PI / 2;
   const cafeteria = { patrons, barista, walker };
-  return { materials: m, seats, cafeteria, screen, screenGlass, screenLight, screenShadow, faceLight, roomLights, ambient, shadowTexture, filmTexture, environmentTarget, ready };
+
+  let activePosterTexture: THREE.CanvasTexture | null = null;
+  const updatePosters = (posterUrl?: string | null, title?: string | null) => {
+    if (!posterUrl && !title) return;
+    const newTexture = contentPosterTexture(posterUrl, title, 0, () => {
+      for (const plane of posterPlanes) {
+        plane.material.map = newTexture;
+        plane.material.emissiveMap = newTexture;
+        plane.material.needsUpdate = true;
+      }
+    });
+    for (const plane of posterPlanes) {
+      plane.material.map = newTexture;
+      plane.material.emissiveMap = newTexture;
+      plane.material.needsUpdate = true;
+    }
+    if (activePosterTexture && activePosterTexture !== newTexture) {
+      activePosterTexture.dispose();
+    }
+    activePosterTexture = newTexture;
+  };
+
+  return { materials: m, seats, cafeteria, screen, screenGlass, screenLight, screenShadow, faceLight, roomLights, ambient, shadowTexture, filmTexture, environmentTarget, posters: posterPlanes, updatePosters, ready };
 }

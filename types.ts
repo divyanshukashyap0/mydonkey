@@ -104,6 +104,18 @@ export interface Section {
 }
 
 
+export type StreamServerKey =
+  | 'vidstuck'
+  | 'nxsha'
+  | 'bingr'
+  | 'zxc'
+  | 'vidlink'
+  | 'vidnest'
+  | 'megaplay'
+  | 'recloud'
+  | 'zokoanime'
+  | 'default';
+
 export interface SiteSettings {
   siteName: string;
   siteUrl?: string;
@@ -126,6 +138,9 @@ export interface SiteSettings {
   twitterUrl?: string;
   youtubeUrl?: string;
   linkedinUrl?: string;
+  baseContentServer?: StreamServerKey; // Primary/base streaming server key chosen by admin
+  baseContentServerUrl?: string; // Optional custom base URL for the active base server or proxy
+  serverBaseUrls?: Partial<Record<StreamServerKey, string>>; // Custom base URLs per provider server
   embedProxyBaseUrl?: string;
   embedMovieType?: string;
   embedTvType?: string;

@@ -146,6 +146,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
     twitterUrl: '',
     youtubeUrl: '',
     linkedinUrl: '',
+    baseContentServer: 'bingr',
     embedProxyBaseUrl: 'https://proxy.garageband.rocks',
     embedMovieType: 'movie',
     embedTvType: 'tv',

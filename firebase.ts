@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, persistentSingleTabManager } from 'firebase/firestore';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 
 const firebaseConfig = {
@@ -30,9 +30,10 @@ if (typeof window !== 'undefined' && firebaseConfig.measurementId) {
   }).catch(() => {});
 }
 
-// Initialize Firestore with modern persistent cache settings (multi-tab enabled)
+// Initialize Firestore with single-tab persistence and force ownership.
+// This completely resolves the Firebase SDK "Target ID already exists" error caused by multi-tab lock collisions and HMR reloads.
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager()
+    tabManager: persistentSingleTabManager({ forceOwnership: true })
   })
 });

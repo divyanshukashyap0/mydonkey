@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../../../context/StoreContext';
-import { Save, AlertTriangle, Globe, Shield, ShieldCheck, Monitor, CheckCircle, Smartphone, Film, Tv, Link2, RefreshCw, Mail, Star, Trash2 } from 'lucide-react';
-import { SiteSettings, Content } from '../../../types';
+import { Save, AlertTriangle, Globe, Shield, ShieldCheck, Monitor, CheckCircle, Smartphone, Film, Tv, Link2, RefreshCw, Mail, Star, Trash2, Server, Zap, ExternalLink, Check } from 'lucide-react';
+import { SiteSettings, Content, StreamServerKey } from '../../../types';
 import { doc, writeBatch } from 'firebase/firestore';
 import { db } from '../../../firebase';
-import { buildEmbedUrl, parseEmbedContentType } from '../../../utils/embedUrl';
+import { buildEmbedUrl, parseEmbedContentType, buildServerEmbedUrl, STREAM_SERVERS, getBaseContentServer } from '../../../utils/embedUrl';
 
 const SettingsManager = () => {
     const { settings, updateSettings, content } = useStore();
-    const [activeTab, setActiveTab] = useState<'general' | 'media' | 'system'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'media' | 'streaming' | 'system'>('general');
 
     // Local state for changes before saving
     const [formData, setFormData] = useState<SiteSettings>(settings);
@@ -43,15 +43,18 @@ const SettingsManager = () => {
     };
 
     const handleUpdateAllContentUrls = async () => {
-        const newBase = (formData.embedProxyBaseUrl || 'https://proxy.garageband.rocks').trim().replace(/\/+$/, '');
-        const itemsToUpdate = content.filter(c => c.imdbId || (c.videoUrl && (c.videoUrl.includes('/embed/') || c.videoUrl.includes('proxy.garageband.rocks'))));
+        const activeServerKey = formData.baseContentServer || 'bingr';
+        const serverObj = STREAM_SERVERS.find(s => s.key === activeServerKey);
+        const serverLabel = serverObj ? `${serverObj.name} (${serverObj.tag})` : activeServerKey;
+
+        const itemsToUpdate = content.filter(c => c.imdbId || (c.videoUrl && (c.videoUrl.includes('/embed/') || c.videoUrl.includes('proxy.garageband.rocks') || c.videoUrl.includes('bingr') || c.videoUrl.includes('vidstuck') || c.videoUrl.includes('vidlink'))));
         
         if (itemsToUpdate.length === 0) {
             alert("No content items found with IMDb ID or embed stream URLs to update.");
             return;
         }
 
-        if (!confirm(`Update stream URLs for all ${itemsToUpdate.length} content items to use the global website URL "${newBase}"?\n\nMovies will use: /embed/${formData.embedMovieType || 'movie'}/\nTV Series will use: /embed/${formData.embedTvType || 'tv'}/`)) {
+        if (!confirm(`Update stream URLs for all ${itemsToUpdate.length} content items to use the base content server "${serverLabel}"?\n\nThis will reformat video URLs to stream via the selected base provider.`)) {
             return;
         }
 
@@ -67,10 +70,17 @@ const SettingsManager = () => {
 
                 for (const item of chunk) {
                     const imdbId = item.imdbId || (item.videoUrl ? item.videoUrl.match(/(tt\d+)/)?.[1] : null);
-                    if (imdbId) {
+                    const targetId = item.tmdbId || imdbId || item.id;
+                    if (targetId) {
                         const existingType = item.videoUrl ? parseEmbedContentType(item.videoUrl) : null;
                         const effectiveType = existingType || (item.type === 'tv' ? (formData.embedTvType || 'tv') : (formData.embedMovieType || 'movie'));
-                        const newUrl = buildEmbedUrl(imdbId, effectiveType, formData);
+                        
+                        let newUrl: string;
+                        if (activeServerKey === 'default') {
+                            newUrl = buildEmbedUrl(imdbId || targetId, effectiveType, formData);
+                        } else {
+                            newUrl = buildServerEmbedUrl(targetId, effectiveType, activeServerKey, { settings: formData });
+                        }
                         
                         batch.update(doc(db, 'content', item.id), {
                             videoUrl: newUrl,
@@ -90,7 +100,7 @@ const SettingsManager = () => {
                 contentVersion: (settings.contentVersion || 0) + 1
             });
 
-            alert(`Success! Updated stream URLs for ${updatedCount} content items to use ${newBase}.`);
+            alert(`Success! Updated stream URLs for ${updatedCount} content items to use ${serverLabel}.`);
         } catch (e: any) {
             console.error("Batch update failed:", e);
             alert("Failed to update all items: " + e.message);
@@ -139,14 +149,17 @@ const SettingsManager = () => {
             </div>
 
             {/* Tabs */}
-            <div className="flex border-b border-white/10">
-                <button onClick={() => setActiveTab('general')} className={`px-6 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 ${activeTab === 'general' ? 'border-brand-red text-white' : 'border-transparent text-gray-500 hover:text-white'}`}>
+            <div className="flex border-b border-white/10 overflow-x-auto">
+                <button onClick={() => setActiveTab('general')} className={`px-6 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 whitespace-nowrap ${activeTab === 'general' ? 'border-brand-red text-white' : 'border-transparent text-gray-500 hover:text-white'}`}>
                     <Globe size={16} /> General & Branding
                 </button>
-                <button onClick={() => setActiveTab('media')} className={`px-6 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 ${activeTab === 'media' ? 'border-brand-red text-white' : 'border-transparent text-gray-500 hover:text-white'}`}>
+                <button onClick={() => setActiveTab('media')} className={`px-6 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 whitespace-nowrap ${activeTab === 'media' ? 'border-brand-red text-white' : 'border-transparent text-gray-500 hover:text-white'}`}>
                     <Monitor size={16} /> Media & Hero
                 </button>
-                <button onClick={() => setActiveTab('system')} className={`px-6 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 ${activeTab === 'system' ? 'border-brand-red text-white' : 'border-transparent text-gray-500 hover:text-white'}`}>
+                <button onClick={() => setActiveTab('streaming')} className={`px-6 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 whitespace-nowrap ${activeTab === 'streaming' ? 'border-brand-red text-white' : 'border-transparent text-gray-500 hover:text-white'}`}>
+                    <Server size={16} /> Content Provider & Streaming
+                </button>
+                <button onClick={() => setActiveTab('system')} className={`px-6 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 whitespace-nowrap ${activeTab === 'system' ? 'border-brand-red text-white' : 'border-transparent text-gray-500 hover:text-white'}`}>
                     <Shield size={16} /> System & Security
                 </button>
             </div>
@@ -380,130 +393,317 @@ const SettingsManager = () => {
                         </div>
 
                         <div className="pt-6 border-t border-white/10">
-                            <div className="flex items-center gap-2 mb-2">
-                                <Link2 size={18} className="text-brand-red" />
-                                <h3 className="text-sm font-bold uppercase tracking-wider text-white">Stream Embed Proxy Settings</h3>
+                            <div className="p-4 rounded-xl bg-white/5 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2.5 rounded-lg bg-brand-red/10 text-brand-red">
+                                        <Server size={20} />
+                                    </div>
+                                    <div>
+                                        <div className="text-xs font-bold text-white">Content Provider & Streaming Settings</div>
+                                        <div className="text-[11px] text-gray-400">
+                                            Currently streaming via <span className="text-brand-red font-semibold">{STREAM_SERVERS.find(s => s.key === (formData.baseContentServer || 'bingr'))?.name || 'Bingr'}</span>. Configure base server, custom domains, and live previews in the dedicated tab.
+                                        </div>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveTab('streaming')}
+                                    className="px-3.5 py-2 rounded-lg bg-brand-red/20 hover:bg-brand-red/30 text-xs font-bold text-red-200 hover:text-white transition whitespace-nowrap self-start sm:self-auto flex items-center gap-1.5"
+                                >
+                                    <span>Manage Providers</span> →
+                                </button>
                             </div>
-                            <p className="text-xs text-gray-400 mb-4">
-                                Configure the embed proxy server and URL content types used for playing movies and TV series (e.g. RapidStream / IMDb player).
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'streaming' && (
+                    <div className="max-w-4xl space-y-8 animate-in slide-in-from-left-4 duration-300">
+                        {/* Section Header */}
+                        <div>
+                            <div className="flex items-center gap-2 mb-1">
+                                <Server className="text-brand-red" size={20} />
+                                <h3 className="text-lg font-bold text-white">Base Content Provider Server</h3>
+                            </div>
+                            <p className="text-xs text-gray-400">
+                                Choose the primary content provider engine used to stream movies and TV series across My Donkey OTT. All users and media players will default to this content provider.
+                            </p>
+                        </div>
+
+                        {/* Current Active Banner */}
+                        {(() => {
+                            const activeKey = formData.baseContentServer || 'bingr';
+                            const activeServerObj = STREAM_SERVERS.find(s => s.key === activeKey);
+                            return (
+                                <div className="p-4 rounded-xl bg-brand-red/10 border border-brand-red/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-lg bg-brand-red/20 flex items-center justify-center text-brand-red font-bold shrink-0">
+                                            <Zap size={20} />
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-brand-red uppercase font-bold tracking-wider">Active Base Provider</div>
+                                            <div className="text-base font-bold text-white flex items-center gap-2">
+                                                <span>{activeServerObj?.name || activeKey}</span>
+                                                <span className="text-xs px-2 py-0.5 rounded bg-brand-red/30 text-red-200 font-semibold">{activeServerObj?.tag}</span>
+                                            </div>
+                                            <div className="text-xs text-gray-400 mt-0.5">{activeServerObj?.description}</div>
+                                        </div>
+                                    </div>
+                                    <div className="text-left sm:text-right shrink-0">
+                                        <span className="text-[11px] text-gray-400 block font-medium">Automatic Failover:</span>
+                                        <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1 sm:justify-end">
+                                            <CheckCircle size={13} /> Multi-Server Fallback Enabled
+                                        </span>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        {/* Server Selection Cards */}
+                        <div className="space-y-3">
+                            <label className="text-xs text-gray-400 uppercase font-bold block">
+                                Select Primary Streaming Server
+                            </label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {STREAM_SERVERS.map((server) => {
+                                    const isSelected = (formData.baseContentServer || 'bingr') === server.key;
+                                    return (
+                                        <div
+                                            key={server.key}
+                                            onClick={() => handleChange({ baseContentServer: server.key })}
+                                            className={`p-4 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between ${
+                                                isSelected
+                                                    ? 'border-brand-red bg-brand-red/10 ring-1 ring-brand-red shadow-lg shadow-red-950/30'
+                                                    : 'border-white/10 bg-black/40 hover:border-white/25 hover:bg-white/5'
+                                            }`}
+                                        >
+                                            <div>
+                                                <div className="flex items-start justify-between gap-2 mb-2">
+                                                    <div>
+                                                        <div className="font-bold text-sm text-white flex items-center gap-1.5">
+                                                            <span>{server.name}</span>
+                                                            {isSelected && (
+                                                                <span className="w-2 h-2 rounded-full bg-brand-red animate-pulse" />
+                                                            )}
+                                                        </div>
+                                                        <span className="inline-block mt-0.5 text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-white/10 text-gray-300">
+                                                            {server.tag}
+                                                        </span>
+                                                    </div>
+                                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
+                                                        isSelected ? 'bg-brand-red text-white' : 'border border-white/20 text-transparent'
+                                                    }`}>
+                                                        <Check size={12} strokeWidth={3} />
+                                                    </div>
+                                                </div>
+                                                <p className="text-xs text-gray-400 leading-relaxed mb-3">
+                                                    {server.description}
+                                                </p>
+                                            </div>
+
+                                            <div className="flex items-center gap-1.5 pt-2 border-t border-white/5 text-[10px] text-gray-500">
+                                                {server.supports4K && <span className="text-amber-400 font-bold">4K UHD</span>}
+                                                {server.hasSubtitles && <span>• Subtitles</span>}
+                                                {server.isAnime && <span className="text-purple-400 font-bold">Anime Dub/Sub</span>}
+                                                {!server.supports4K && !server.isAnime && <span>Ultra-Fast CDN</span>}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Base Server Domain / URL Configuration */}
+                        <div className="bg-black/40 p-6 rounded-xl border border-white/5 space-y-4">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Link2 size={16} className="text-blue-400" />
+                                <h4 className="text-sm font-bold text-white uppercase tracking-wider">
+                                    Base Provider Server URL & Mirror Settings
+                                </h4>
+                            </div>
+                            <p className="text-xs text-gray-400">
+                                Specify a custom domain or mirror proxy for the active base server (leave blank to use the official high-speed default endpoint).
                             </p>
 
-                            <div className="space-y-4 bg-black/40 p-5 rounded-xl border border-white/5">
+                            <div className="space-y-3">
                                 <div>
-                                    <label className="text-xs text-gray-300 uppercase font-bold block mb-1.5 flex items-center justify-between">
-                                        <span>Global Content Streaming Website URL</span>
-                                        <span className="text-[10px] text-brand-red font-semibold lowercase">Controls all video embed URLs</span>
+                                    <label className="text-xs text-gray-300 uppercase font-bold block mb-1">
+                                        Custom Base Server URL / Mirror (Optional)
                                     </label>
                                     <input
                                         type="url"
-                                        value={formData.embedProxyBaseUrl ?? 'https://proxy.garageband.rocks'}
-                                        onChange={(e) => handleChange({ embedProxyBaseUrl: e.target.value })}
+                                        value={formData.baseContentServerUrl || ''}
+                                        onChange={(e) => handleChange({ baseContentServerUrl: e.target.value })}
+                                        placeholder={
+                                            formData.baseContentServer === 'vidstuck' ? 'https://vidstuck.xyz' :
+                                            formData.baseContentServer === 'nxsha' ? 'https://nxsha.space' :
+                                            formData.baseContentServer === 'zxc' ? 'https://zxcstream.xyz' :
+                                            formData.baseContentServer === 'vidlink' ? 'https://vidlink.pro' :
+                                            formData.baseContentServer === 'vidnest' ? 'https://vidnest.fun' :
+                                            formData.baseContentServer === 'default' ? 'https://proxy.garageband.rocks' :
+                                            'https://bingr.one'
+                                        }
                                         className="w-full bg-black/60 border border-white/10 rounded-lg p-3 text-sm font-mono text-white outline-none focus:border-brand-red transition"
-                                        placeholder="https://proxy.garageband.rocks"
                                     />
-                                    <p className="text-[10px] text-gray-500 mt-1">Default: https://proxy.garageband.rocks — Changing this updates the stream website for all content.</p>
+                                    <p className="text-[10px] text-gray-500 mt-1">
+                                        Leave empty to use standard high-availability cloud endpoints for {STREAM_SERVERS.find(s => s.key === (formData.baseContentServer || 'bingr'))?.name}.
+                                    </p>
                                 </div>
 
-                                {/* Embed Ad Shield Configuration */}
-                                <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20 space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2.5">
-                                            <ShieldCheck size={18} className="text-emerald-400 shrink-0" />
-                                            <div>
-                                                <div className="text-xs font-bold text-white">Embed Ad Shield (Anti-Popup & Anti-Redirect)</div>
-                                                <div className="text-[10px] text-gray-400">
-                                                    Restricts external video player embeds via HTML5 sandbox to completely block popup windows, new tabs, and site hijacking redirects.
-                                                </div>
+                                {formData.baseContentServer === 'default' && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                                        <div className="bg-white/5 p-3.5 rounded-lg border border-white/5">
+                                            <div className="flex items-center gap-2 mb-2 text-white font-bold text-xs">
+                                                <Film size={14} className="text-blue-400" /> Movie Path Segment
                                             </div>
-                                        </div>
-                                        <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-3">
                                             <input
-                                                type="checkbox"
-                                                checked={formData.enableAdShield !== false}
-                                                onChange={(e) => handleChange({ enableAdShield: e.target.checked })}
-                                                className="sr-only peer"
+                                                type="text"
+                                                value={formData.embedMovieType ?? 'movie'}
+                                                onChange={(e) => handleChange({ embedMovieType: e.target.value })}
+                                                className="w-full bg-black/60 border border-white/10 rounded p-2 text-sm font-mono text-white outline-none focus:border-blue-500 transition mb-1"
+                                                placeholder="movie"
                                             />
-                                            <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-                                        </label>
-                                    </div>
-                                    {formData.enableAdShield !== false && (
-                                        <div className="flex items-center justify-between pt-2 border-t border-emerald-500/10 text-xs">
-                                            <span className="text-gray-300 font-medium text-[11px]">Default Protection Level:</span>
-                                            <div className="flex gap-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleChange({ adShieldMode: 'strict' })}
-                                                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${formData.adShieldMode !== 'standard' ? 'bg-emerald-500 text-black shadow-sm' : 'bg-white/5 text-gray-400 hover:text-white'}`}
-                                                >
-                                                    Strict (Zero Popups)
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleChange({ adShieldMode: 'standard' })}
-                                                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${formData.adShieldMode === 'standard' ? 'bg-emerald-500 text-black shadow-sm' : 'bg-white/5 text-gray-400 hover:text-white'}`}
-                                                >
-                                                    Standard
-                                                </button>
+                                        </div>
+                                        <div className="bg-white/5 p-3.5 rounded-lg border border-white/5">
+                                            <div className="flex items-center gap-2 mb-2 text-white font-bold text-xs">
+                                                <Tv size={14} className="text-purple-400" /> TV Series Path Segment
                                             </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                                    <div className="bg-white/5 p-4 rounded-lg border border-white/5">
-                                        <div className="flex items-center gap-2 mb-2 text-white font-bold text-xs">
-                                            <Film size={14} className="text-blue-400" /> Movie Content Type Path
-                                        </div>
-                                        <input
-                                            type="text"
-                                            value={formData.embedMovieType ?? 'movie'}
-                                            onChange={(e) => handleChange({ embedMovieType: e.target.value })}
-                                            className="w-full bg-black/60 border border-white/10 rounded p-2 text-sm font-mono text-white outline-none focus:border-blue-500 transition mb-2"
-                                            placeholder="movie"
-                                        />
-                                        <div className="text-[11px] text-gray-400 font-mono break-all bg-black/40 p-2 rounded border border-white/5">
-                                            <span className="text-gray-500">Preview: </span>
-                                            {(formData.embedProxyBaseUrl || 'https://proxy.garageband.rocks').replace(/\/+$/, '')}/embed/<span className="text-blue-400 font-bold">{formData.embedMovieType || 'movie'}</span>/tt1375666
+                                            <input
+                                                type="text"
+                                                value={formData.embedTvType ?? 'tv'}
+                                                onChange={(e) => handleChange({ embedTvType: e.target.value })}
+                                                className="w-full bg-black/60 border border-white/10 rounded p-2 text-sm font-mono text-white outline-none focus:border-purple-500 transition mb-1"
+                                                placeholder="tv"
+                                            />
                                         </div>
                                     </div>
+                                )}
+                            </div>
+                        </div>
 
-                                    <div className="bg-white/5 p-4 rounded-lg border border-white/5">
-                                        <div className="flex items-center gap-2 mb-2 text-white font-bold text-xs">
-                                            <Tv size={14} className="text-purple-400" /> TV Series Content Type Path
+                        {/* Live URL Previews & Testing */}
+                        <div className="bg-black/40 p-6 rounded-xl border border-white/5 space-y-4">
+                            <h4 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                                <Monitor size={16} className="text-amber-400" />
+                                <span>Live Generated Stream Previews</span>
+                            </h4>
+
+                            {(() => {
+                                const activeKey = formData.baseContentServer || 'bingr';
+                                const moviePreviewUrl = buildServerEmbedUrl(27205, 'movie', activeKey, { settings: formData });
+                                const tvPreviewUrl = buildServerEmbedUrl(1396, 'tv', activeKey, { season: 1, episode: 1, settings: formData });
+
+                                return (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="bg-white/5 p-4 rounded-xl border border-white/10 space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-bold text-blue-400 flex items-center gap-1.5">
+                                                    <Film size={14} /> Movie Stream URL Preview
+                                                </span>
+                                                <a
+                                                    href={moviePreviewUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-[11px] text-gray-400 hover:text-white flex items-center gap-1 underline"
+                                                >
+                                                    Test <ExternalLink size={12} />
+                                                </a>
+                                            </div>
+                                            <div className="text-[11px] text-gray-300 font-mono break-all bg-black/60 p-2.5 rounded-lg border border-white/5">
+                                                {moviePreviewUrl}
+                                            </div>
+                                            <div className="text-[10px] text-gray-500">Sample: Inception (TMDB 27205)</div>
                                         </div>
-                                        <input
-                                            type="text"
-                                            value={formData.embedTvType ?? 'tv'}
-                                            onChange={(e) => handleChange({ embedTvType: e.target.value })}
-                                            className="w-full bg-black/60 border border-white/10 rounded p-2 text-sm font-mono text-white outline-none focus:border-purple-500 transition mb-2"
-                                            placeholder="tv"
-                                        />
-                                        <div className="text-[11px] text-gray-400 font-mono break-all bg-black/40 p-2 rounded border border-white/5">
-                                            <span className="text-gray-500">Preview: </span>
-                                            {(formData.embedProxyBaseUrl || 'https://proxy.garageband.rocks').replace(/\/+$/, '')}/embed/<span className="text-purple-400 font-bold">{formData.embedTvType || 'tv'}</span>/tt0903747
+
+                                        <div className="bg-white/5 p-4 rounded-xl border border-white/10 space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-bold text-purple-400 flex items-center gap-1.5">
+                                                    <Tv size={14} /> TV Show Stream URL Preview
+                                                </span>
+                                                <a
+                                                    href={tvPreviewUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-[11px] text-gray-400 hover:text-white flex items-center gap-1 underline"
+                                                >
+                                                    Test <ExternalLink size={12} />
+                                                </a>
+                                            </div>
+                                            <div className="text-[11px] text-gray-300 font-mono break-all bg-black/60 p-2.5 rounded-lg border border-white/5">
+                                                {tvPreviewUrl}
+                                            </div>
+                                            <div className="text-[10px] text-gray-500">Sample: Breaking Bad S1:E1 (TMDB 1396)</div>
                                         </div>
                                     </div>
-                                </div>
+                                );
+                            })()}
+                        </div>
 
-                                {/* Batch Update Button */}
-                                <div className="pt-4 border-t border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        {/* Embed Ad Shield Configuration */}
+                        <div className="p-5 rounded-xl bg-emerald-500/5 border border-emerald-500/20 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2.5">
+                                    <ShieldCheck size={20} className="text-emerald-400 shrink-0" />
                                     <div>
-                                        <div className="text-xs font-bold text-white">Sync All Existing Content in Database</div>
+                                        <div className="text-xs font-bold text-white">Embed Ad Shield (Anti-Popup & Anti-Redirect)</div>
                                         <div className="text-[10px] text-gray-400">
-                                            Rewrite all existing movies and TV show stream URLs in the database to use this global website URL and content types.
+                                            Restricts external video player embeds via HTML5 sandbox to completely block popup windows, new tabs, and site hijacking redirects.
                                         </div>
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={handleUpdateAllContentUrls}
-                                        disabled={isUpdatingBatch}
-                                        className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition disabled:opacity-50 whitespace-nowrap"
-                                    >
-                                        <RefreshCw size={14} className={isUpdatingBatch ? 'animate-spin' : ''} />
-                                        {isUpdatingBatch ? (batchProgress || 'Updating...') : 'Apply to All Content'}
-                                    </button>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-3">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.enableAdShield !== false}
+                                        onChange={(e) => handleChange({ enableAdShield: e.target.checked })}
+                                        className="sr-only peer"
+                                    />
+                                    <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                                </label>
+                            </div>
+                            {formData.enableAdShield !== false && (
+                                <div className="flex items-center justify-between pt-2 border-t border-emerald-500/10 text-xs">
+                                    <span className="text-gray-300 font-medium text-[11px]">Default Protection Level:</span>
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleChange({ adShieldMode: 'strict' })}
+                                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${formData.adShieldMode !== 'standard' ? 'bg-emerald-500 text-black shadow-sm' : 'bg-white/5 text-gray-400 hover:text-white'}`}
+                                        >
+                                            Strict (Zero Popups)
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleChange({ adShieldMode: 'standard' })}
+                                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${formData.adShieldMode === 'standard' ? 'bg-emerald-500 text-black shadow-sm' : 'bg-white/5 text-gray-400 hover:text-white'}`}
+                                        >
+                                            Standard
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Batch Update Button */}
+                        <div className="bg-black/40 p-5 rounded-xl border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                                    <RefreshCw size={14} className="text-brand-red" />
+                                    <span>Sync All Existing Content in Database</span>
+                                </div>
+                                <div className="text-[10px] text-gray-400 mt-0.5">
+                                    Batch updates all movies and TV shows in Firestore to use the selected base provider server URL format.
                                 </div>
                             </div>
+                            <button
+                                type="button"
+                                onClick={handleUpdateAllContentUrls}
+                                disabled={isUpdatingBatch}
+                                className="px-4 py-2.5 bg-brand-red hover:bg-red-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition disabled:opacity-50 whitespace-nowrap shadow-lg shadow-red-950/20"
+                            >
+                                <RefreshCw size={14} className={isUpdatingBatch ? 'animate-spin' : ''} />
+                                {isUpdatingBatch ? (batchProgress || 'Updating...') : 'Apply Base Server to All Content'}
+                            </button>
                         </div>
                     </div>
                 )}
