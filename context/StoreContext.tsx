@@ -97,6 +97,7 @@ interface StoreContextType {
     deleteProfile: (profileId: string) => Promise<void>;
     updatePlaybackProgress: (movieId: string, progress: number, stoppedAt: number, duration: number, contentData?: Partial<Content>) => Promise<void>;
     addToWatchHistory: (contentOrId: Content | string) => Promise<void>;
+    removeFromContinueWatching: (movieId: string) => Promise<void>;
     updateFavoriteGenres: (genres: string[]) => Promise<void>;
     updateUserEmail: (newEmail: string) => Promise<void>;
     triggerPasswordReset: () => Promise<void>;
@@ -211,10 +212,23 @@ export function sanitizeSections(rawSections: Section[]): Section[] {
                     showRanking: true
                 });
             }
-        } else if (sec.id === 'sec_indian_webseries' || (titleLower.includes('web series') && sec.tagFilter === 'Indian')) {
+        } else if (sec.id === 'sec_indian_webseries' || (titleLower.includes('web series') && sec.tagFilter === 'Indian') || titleLower.includes('web series')) {
+            const fallbackSeriesIds = [
+                'tmdb_79352', 'tmdb_84105', 'tmdb_93352', 'tmdb_101352', 'tmdb_111363',
+                'tmdb_132117', 'tmdb_89113', 'tmdb_103051', 'tmdb_100911', 'tmdb_100612',
+                'tmdb_124411', 'tmdb_138211', 'tmdb_90966', 'tmdb_87508', 'tmdb_213895',
+                'tmdb_156714', 'tmdb_203832'
+            ];
+            const existingIds = Array.isArray(sec.contentIds) ? sec.contentIds : [];
+            const mergedIds = existingIds.length >= 10 
+                ? existingIds 
+                : [...existingIds, ...fallbackSeriesIds].filter((id, idx, arr) => arr.indexOf(id) === idx);
+
             result.push({
                 ...sec,
-                tagFilter: 'Web Series'
+                title: sec.title || 'Top Indian Web Series',
+                tagFilter: 'Web Series',
+                contentIds: mergedIds
             });
         } else {
             result.push(sec);
@@ -265,7 +279,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             try {
                 const raw = localStorage.getItem('my_donkey_watch_history');
                 if (raw) {
-                    user.continueWatching = JSON.parse(raw);
+                    const parsed = JSON.parse(raw);
+                    user.continueWatching = Array.isArray(parsed) ? parsed.slice(0, 10) : [];
                 }
             } catch (_) {}
         }
@@ -783,9 +798,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     }
 
                     if (freshContent.length > 0) {
-                        setContent(freshContent);
+                        const healed = healAndMergeCatalog(freshContent);
+                        setContent(healed);
                         localContentVersionRef.current = serverContentVersion;
-                        idbSet('cachedContent', freshContent).catch(() => {});
+                        idbSet('cachedContent', healed).catch(() => {});
                         idbSet('contentVersion', serverContentVersion).catch(() => {});
                     }
                 }
@@ -1352,14 +1368,101 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
     };
 
+    const deduplicateWatchHistory = (list: any[]): any[] => {
+        if (!Array.isArray(list)) return [];
+        const result: any[] = [];
+        const seenTitles = new Set<string>();
+        const seenIds = new Set<string>();
+        const seenTmdb = new Set<string>();
+        const seenImdb = new Set<string>();
+
+        for (const item of list) {
+            if (!item) continue;
+            const movieId = (item.movieId || item.id || '').toString().toLowerCase().trim();
+            const normId = movieId.replace(/^tmdb_/, '').replace(/^imdb_/, '');
+            const c = item.content || {};
+            const title = (c.title || item.title || '').toString().toLowerCase().trim();
+            const tmdbId = (c.tmdbId || item.tmdbId ? String(c.tmdbId || item.tmdbId) : '').trim();
+            const imdbId = (c.imdbId || item.imdbId || '').toString().toLowerCase().trim();
+
+            const isDuplicate =
+                (movieId && seenIds.has(movieId)) ||
+                (normId && seenIds.has(normId)) ||
+                (title && seenTitles.has(title)) ||
+                (tmdbId && seenTmdb.has(tmdbId)) ||
+                (imdbId && seenImdb.has(imdbId));
+
+            if (isDuplicate) continue;
+
+            if (movieId) seenIds.add(movieId);
+            if (normId) seenIds.add(normId);
+            if (title) seenTitles.add(title);
+            if (tmdbId) seenTmdb.add(tmdbId);
+            if (imdbId) seenImdb.add(imdbId);
+
+            result.push(item);
+        }
+        return result.slice(0, 10);
+    };
+
+    const isSameWatchItem = (item: any, targetId: string, targetContent?: Partial<Content>): boolean => {
+        if (!item) return false;
+        const targetClean = (targetId || '').toString().toLowerCase().trim();
+        const targetNorm = targetClean.replace(/^tmdb_/, '').replace(/^imdb_/, '');
+
+        const itemMovieId = (item.movieId || item.id || '').toString().toLowerCase().trim();
+        const itemNorm = itemMovieId.replace(/^tmdb_/, '').replace(/^imdb_/, '');
+
+        if (itemMovieId && targetClean && itemMovieId === targetClean) return true;
+        if (itemNorm && targetNorm && itemNorm === targetNorm) return true;
+
+        const c = item.content || {};
+        const target = targetContent || {};
+
+        const itemTitle = (c.title || item.title || '').toString().toLowerCase().trim();
+        const targetTitle = (target.title || '').toString().toLowerCase().trim();
+        if (itemTitle && targetTitle && itemTitle === targetTitle) return true;
+
+        const itemTmdb = (c.tmdbId || item.tmdbId ? String(c.tmdbId || item.tmdbId) : '').trim();
+        const targetTmdb = (target.tmdbId ? String(target.tmdbId) : '').trim();
+        if (itemTmdb && targetTmdb && itemTmdb === targetTmdb) return true;
+        if (itemTmdb && targetNorm && itemTmdb === targetNorm) return true;
+
+        const itemImdb = (c.imdbId || item.imdbId || '').toString().toLowerCase().trim();
+        const targetImdb = (target.imdbId || '').toString().toLowerCase().trim();
+        if (itemImdb && targetImdb && itemImdb === targetImdb) return true;
+        if (itemImdb && targetClean && itemImdb === targetClean) return true;
+
+        return false;
+    };
+
     const saveCachedWatchHistory = (list: any[], targetMovieId?: string) => {
         try {
-            localStorage.setItem('my_donkey_watch_history', JSON.stringify(list.slice(0, 40)));
+            // Strictly deduplicate and cap to maximum 10 items (no duplicate content allowed)
+            const cleaned = deduplicateWatchHistory(list);
+            localStorage.setItem('my_donkey_watch_history', JSON.stringify(cleaned));
             window.dispatchEvent(new CustomEvent('mydonkey_watch_updated', { detail: { movieId: targetMovieId } }));
         } catch (e) {
             console.warn("Local watch history update failed:", e);
         }
     };
+
+    const removeFromContinueWatching = useCallback(async (movieId: string) => {
+        if (!movieId) return;
+        // 1. Remove matching content across all identifier variants
+        const list = getCachedWatchHistory();
+        const updated = list.filter((i: any) => !isSameWatchItem(i, movieId));
+        saveCachedWatchHistory(updated, movieId);
+
+        // 2. Update currentUser in-memory state
+        setCurrentUser(prev => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                continueWatching: deduplicateWatchHistory(updated)
+            };
+        });
+    }, []);
 
     const updatePlaybackProgress = async (
         movieId: string,
@@ -1373,13 +1476,16 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
         // 1. Update browser cache (localStorage)
         const list = getCachedWatchHistory();
-        const prevEntry = list.find((i: any) => i.movieId === movieId);
-        const filtered = list.filter((i: any) => i.movieId !== movieId);
-
-        let snapContent = contentData || prevEntry?.content;
+        let snapContent = contentData;
         if (!snapContent) {
             const found = content.find(c => c.id === movieId || (c.imdbId && c.imdbId === movieId));
             if (found) snapContent = found;
+        }
+
+        const prevEntry = list.find((i: any) => isSameWatchItem(i, movieId, snapContent));
+        const filtered = list.filter((i: any) => !isSameWatchItem(i, movieId, snapContent));
+        if (!snapContent && prevEntry?.content) {
+            snapContent = prevEntry.content;
         }
 
         const newEntry: ContinueWatchingItem = {
@@ -1391,16 +1497,17 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             ...(snapContent ? { content: snapContent as Content } : {})
         };
 
-        // Most recently watched content is strictly first in the list
+        // Most recently watched content is strictly first; deduplicated and capped to max 10
         filtered.unshift(newEntry);
-        saveCachedWatchHistory(filtered, movieId);
+        const cleaned = deduplicateWatchHistory(filtered);
+        saveCachedWatchHistory(cleaned, movieId);
 
         // 2. In-memory state only (STRICTLY BROWSER CACHE - NO DATABASE / FIRESTORE WRITE)
         setCurrentUser(prev => {
             if (!prev) return null;
             return {
                 ...prev,
-                continueWatching: filtered
+                continueWatching: cleaned
             };
         });
     };
@@ -1417,10 +1524,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             contentSnapshot = content.find(c => c.id === movieId || (c.imdbId && c.imdbId === movieId)) || null;
         }
 
-        // 1. Update browser cache (localStorage)
+        // 1. Update browser cache (localStorage) with strict deduplication
         const list = getCachedWatchHistory();
-        const prevEntry = list.find((i: any) => i.movieId === movieId);
-        const filtered = list.filter((i: any) => i.movieId !== movieId);
+        const prevEntry = list.find((i: any) => isSameWatchItem(i, movieId, contentSnapshot));
+        const filtered = list.filter((i: any) => !isSameWatchItem(i, movieId, contentSnapshot));
 
         const progress = prevEntry?.progress ?? 10;
         const stoppedAt = prevEntry?.stoppedAt ?? 30;
@@ -1438,19 +1545,20 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             ...(contentSnapshot ? { content: contentSnapshot as Content } : {})
         };
 
-        // Strictly place last watched content in first position
+        // Strictly place last watched content in first position; deduplicated & capped to max 10
         filtered.unshift(newEntry);
-        saveCachedWatchHistory(filtered, movieId);
+        const cleaned = deduplicateWatchHistory(filtered);
+        saveCachedWatchHistory(cleaned, movieId);
 
         // 2. In-memory state only (avoid updating currentUser if already top item)
         setCurrentUser(prev => {
             if (!prev) return null;
-            if (prev.continueWatching && prev.continueWatching.length > 0 && prev.continueWatching[0]?.movieId === movieId) {
+            if (prev.continueWatching && prev.continueWatching.length > 0 && isSameWatchItem(prev.continueWatching[0], movieId, contentSnapshot)) {
                 return prev;
             }
             return {
                 ...prev,
-                continueWatching: filtered
+                continueWatching: cleaned
             };
         });
     }, [content]);
@@ -1716,6 +1824,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         deleteProfile,
         updatePlaybackProgress,
         addToWatchHistory,
+        removeFromContinueWatching,
         updateFavoriteGenres,
         updateUserEmail,
         triggerPasswordReset,

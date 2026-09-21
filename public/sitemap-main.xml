@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
+        xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
+  <url>
+    <loc>https://www.mydonkey.in/</loc>
+    <lastmod>2026-09-21</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.00</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>My Donkey | Watch Free Movies, TV Shows &amp; Anime in HD</image:title>
+      <image:caption>Stream on My Donkey - Free movies, TV shows, and anime streaming in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/movies</loc>
+    <lastmod>2026-09-21</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Watch Free Movies Online in HD | My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Free movies, TV shows, and anime streaming in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/tv</loc>
+    <lastmod>2026-09-21</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Watch Free TV Shows &amp; Web Series Online | My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Free movies, TV shows, and anime streaming in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/anime</loc>
+    <lastmod>2026-09-21</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Watch Free Anime Online in HD | My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Free movies, TV shows, and anime streaming in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/categories</loc>
+    <lastmod>2026-09-21</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.90</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Browse Movies &amp; TV Categories | My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Free movies, TV shows, and anime streaming in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/exclusive</loc>
+    <lastmod>2026-09-21</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>My Donkey Originals &amp; Exclusive Movies</image:title>
+      <image:caption>Stream on My Donkey - Free movies, TV shows, and anime streaming in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/adblocker</loc>
+    <lastmod>2026-09-21</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Adblocker &amp; Mobile DNS Setup Guide | My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Free movies, TV shows, and anime streaming in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/sound-enhancements</loc>
+    <lastmod>2026-09-21</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Sound Enhancements &amp; Audio Booster | My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Free movies, TV shows, and anime streaming in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/support</loc>
+    <lastmod>2026-09-21</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Help &amp; Support Hub — Guides &amp; FAQs | My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Free movies, TV shows, and anime streaming in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/community-chat</loc>
+    <lastmod>2026-09-21</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.80</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Community Help Chat &amp; Q&amp;A Discussion | My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Free movies, TV shows, and anime streaming in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/devices</loc>
+    <lastmod>2026-09-21</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.70</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>Supported Devices — Smart TV, Mobile &amp; PC | My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Free movies, TV shows, and anime streaming in HD.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.mydonkey.in/theatre-help</loc>
+    <lastmod>2026-09-21</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.70</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/dpba1gvra/image/upload/v1770155013/logo_mgcysp.png</image:loc>
+      <image:title>3D Virtual Cinema Theatre Guide | My Donkey</image:title>
+      <image:caption>Stream on My Donkey - Free movies, TV shows, and anime streaming in HD.</image:caption>
+    </image:image>
+  </url>
+</urlset>

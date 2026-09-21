@@ -420,7 +420,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                     <div className="relative z-10 mt-[34vh] p-5 pb-12 flex flex-col gap-4 bg-transparent">
                         {/* Title & Metadata */}
                         <div>
-                            <h2 className="text-3xl font-black mb-2 text-white leading-tight drop-shadow-xl">{content.title}</h2>
+                            <h1 className="text-3xl font-black mb-2 text-white leading-tight drop-shadow-xl">{content.title}</h1>
                             <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-gray-300">
                                 {content.vote_average ? (
                                     <span className="text-amber-400 font-bold flex items-center gap-1">★ {content.vote_average.toFixed(1)}</span>
@@ -597,7 +597,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                     {/* Hero Section: Title & Actions positioned over background thumbnail */}
                     <div className="relative pt-[32vh] md:pt-[36vh] pb-6 px-8 md:px-14 w-full flex-shrink-0">
                         <div className="max-w-7xl mx-auto w-full">
-                            <h2 className="text-4xl md:text-6xl font-black mb-4 drop-shadow-2xl text-white">{content.title}</h2>
+                            <h1 className="text-4xl md:text-6xl font-black mb-4 drop-shadow-2xl text-white">{content.title}</h1>
 
                             {/* Desktop Server & Stream Availability Badge */}
                             <div className="flex items-center gap-2 mb-6">

@@ -4,31 +4,39 @@ Allow: /movies
 Allow: /tv
 Allow: /anime
 Allow: /categories
+Allow: /categories*
 Allow: /category
-Disallow: /search*
+Allow: /category*
 Allow: /exclusive
-Allow: /my-list
 Allow: /adblocker
 Allow: /sound-enhancements
-Allow: /about
-Allow: /help
 Allow: /support
 Allow: /community-chat
 Allow: /contact
-Allow: /careers
-Allow: /press
-Allow: /blog
-Allow: /investors
-Allow: /terms
 Allow: /devices
+Allow: /theatre-help
 Allow: /browse/
+
+Disallow: /search*
 Disallow: /watch/*
 Disallow: /admin/*
 Disallow: /account/*
 Disallow: /activate/*
+Disallow: /scan
+Disallow: /my-list
+Disallow: /login
+Disallow: /help
+Disallow: /help-center
 
 # Host
 Host: https://www.mydonkey.in
 
-# Sitemap
+# Master Sitemap Index
 Sitemap: https://www.mydonkey.in/sitemap.xml
+
+# Structured Sub-Sitemaps for Fast Targeted Crawling
+Sitemap: https://www.mydonkey.in/sitemap-main.xml
+Sitemap: https://www.mydonkey.in/sitemap-categories.xml
+Sitemap: https://www.mydonkey.in/sitemap-tv.xml
+Sitemap: https://www.mydonkey.in/sitemap-anime.xml
+Sitemap: https://www.mydonkey.in/sitemap-movies.xml

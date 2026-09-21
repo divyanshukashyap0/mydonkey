@@ -42,7 +42,9 @@ import {
     getBecauseYouWatchedSection,
     getTopPicksForGenre,
     normalizeGenre,
-    isIndianOrMarvelContent
+    isIndianOrMarvelContent,
+    isIndianContent,
+    isHindiContent
 } from './services/recommendationService';
 import {
     fetchTMDBDetails,
@@ -64,7 +66,7 @@ import { StoreProvider, PERMANENT_ADMINS } from './context/StoreContext';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, Link } from 'react-router-dom';
 
 const MainLayout = () => {
-    const { content, rawContent, currentUser, currentProfile, isLoading, isAuthenticated, sections, pages, settings, incrementViews, addToWatchHistory, fetchContentById, isQuotaExceeded } = useStore();
+    const { content, rawContent, currentUser, currentProfile, isLoading, isAuthenticated, sections, pages, settings, incrementViews, addToWatchHistory, removeFromContinueWatching, fetchContentById, isQuotaExceeded } = useStore();
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -804,6 +806,25 @@ const MainLayout = () => {
 
     // Continue Watching Items (Strictly Browser Cache - sorted so last watched show is always in first place)
     const continueWatchingItems = useMemo(() => {
+        const rawHistory: any[] = [];
+
+        // 1. Ingest from browser cache (localStorage)
+        try {
+            const raw = localStorage.getItem('my_donkey_watch_history');
+            if (raw) {
+                const localList = JSON.parse(raw);
+                if (Array.isArray(localList)) {
+                    rawHistory.push(...localList);
+                }
+            }
+        } catch (e) { }
+
+        // 2. Supplement and merge with in-memory currentUser state
+        if (currentUser?.continueWatching && Array.isArray(currentUser.continueWatching)) {
+            rawHistory.push(...currentUser.continueWatching);
+        }
+
+        // 3. Deduplicate entries by canonical entity (title, tmdbId, imdbId, movieId)
         const historyMap = new Map<string, { 
             movieId: string; 
             progress: number; 
@@ -813,54 +834,58 @@ const MainLayout = () => {
             cachedContent?: any;
         }>();
 
-        // 1. Ingest from browser cache (localStorage)
-        try {
-            const raw = localStorage.getItem('my_donkey_watch_history');
-            if (raw) {
-                const localList = JSON.parse(raw);
-                if (Array.isArray(localList)) {
-                    localList.forEach((lh: any) => {
-                        if (!lh || !lh.movieId) return;
-                        const localTimestamp = lh.lastWatchedAt ? new Date(lh.lastWatchedAt).getTime() : 0;
-                        historyMap.set(lh.movieId, {
-                            movieId: lh.movieId,
-                            progress: lh.progress || 15,
-                            lastWatchedAt: localTimestamp,
-                            stoppedAt: lh.stoppedAt,
-                            duration: lh.duration,
-                            cachedContent: lh.content || null
-                        });
-                    });
-                }
-            }
-        } catch (e) { }
+        for (const item of rawHistory) {
+            if (!item) continue;
+            const movieId = item.movieId || item.id;
+            if (!movieId) continue;
 
-        // 2. Supplement and merge with in-memory currentUser state
-        if (currentUser?.continueWatching && Array.isArray(currentUser.continueWatching)) {
-            currentUser.continueWatching.forEach(h => {
-                if (!h || !h.movieId) return;
-                const timestamp = h.lastWatchedAt ? new Date(h.lastWatchedAt).getTime() : 0;
-                const existing = historyMap.get(h.movieId);
-                if (!existing || timestamp >= existing.lastWatchedAt) {
-                    historyMap.set(h.movieId, {
-                        movieId: h.movieId,
-                        progress: h.progress || 15,
-                        lastWatchedAt: Math.max(timestamp, existing?.lastWatchedAt || 0),
-                        stoppedAt: h.stoppedAt ?? existing?.stoppedAt,
-                        duration: h.duration ?? existing?.duration,
-                        cachedContent: (h as any).content || existing?.cachedContent || null
-                    });
-                }
-            });
+            const c = item.content || content.find(x => 
+                x.id === movieId || 
+                (x.imdbId && x.imdbId === movieId) ||
+                (x.tmdbId && `tmdb_${x.tmdbId}` === movieId) ||
+                (x.tmdbId && String(x.tmdbId) === movieId)
+            );
+            const cleanTitle = (c?.title || item.title || '').trim().toLowerCase();
+            const tmdbId = c?.tmdbId || item.tmdbId ? String(c?.tmdbId || item.tmdbId) : '';
+            const imdbId = (c?.imdbId || item.imdbId || '').trim().toLowerCase();
+
+            // Canonical key groups any variation of ID or title into the exact same entry
+            const canonicalKey = cleanTitle 
+                ? `title_${cleanTitle}` 
+                : (tmdbId ? `tmdb_${tmdbId}` : (imdbId ? `imdb_${imdbId}` : `id_${String(movieId).toLowerCase().replace(/^tmdb_/, '')}`));
+
+            const timestamp = item.lastWatchedAt ? new Date(item.lastWatchedAt).getTime() : 0;
+            const existing = historyMap.get(canonicalKey);
+
+            if (!existing || timestamp >= existing.lastWatchedAt) {
+                historyMap.set(canonicalKey, {
+                    movieId: movieId,
+                    progress: item.progress || 15,
+                    lastWatchedAt: Math.max(timestamp, existing?.lastWatchedAt || 0),
+                    stoppedAt: item.stoppedAt ?? existing?.stoppedAt,
+                    duration: item.duration ?? existing?.duration,
+                    cachedContent: c || existing?.cachedContent || null
+                });
+            }
         }
 
-        // 3. Sort entries strictly by lastWatchedAt DESCENDING (most recently watched show strictly first)
-        const sortedHistory = Array.from(historyMap.values()).sort((a, b) => b.lastWatchedAt - a.lastWatchedAt);
+        // 4. Sort entries strictly by lastWatchedAt DESCENDING, capped to max 10
+        const sortedHistory = Array.from(historyMap.values())
+            .sort((a, b) => b.lastWatchedAt - a.lastWatchedAt)
+            .slice(0, 10);
 
-        // 4. Map to Content objects preserving exact descending order
+        // 5. Map to Content objects with strict deduplication
         const items: (Content & { progress?: number })[] = [];
+        const seenTitles = new Set<string>();
+        const seenIds = new Set<string>();
+
         for (const h of sortedHistory) {
-            let c: Content | undefined = content.find(x => x.id === h.movieId || (x.imdbId && x.imdbId === h.movieId));
+            let c: Content | undefined = content.find(x => 
+                x.id === h.movieId || 
+                (x.imdbId && x.imdbId === h.movieId) ||
+                (x.tmdbId && `tmdb_${x.tmdbId}` === h.movieId) ||
+                (x.tmdbId && String(x.tmdbId) === h.movieId)
+            );
             if (!c && h.cachedContent) {
                 c = h.cachedContent;
             }
@@ -880,47 +905,70 @@ const MainLayout = () => {
                 };
             }
 
-            if (c && !items.some(it => it.id === c!.id)) {
-                items.push({ ...c, progress: h.progress || 15 });
-            }
+            if (!c) continue;
+
+            const titleKey = (c.title || '').trim().toLowerCase();
+            const idKey = (c.id || '').toLowerCase();
+            const tmdbKey = c.tmdbId ? `tmdb_${c.tmdbId}` : '';
+            const imdbKey = c.imdbId ? `imdb_${c.imdbId.toLowerCase()}` : '';
+
+            if (titleKey && seenTitles.has(titleKey)) continue;
+            if (idKey && seenIds.has(idKey)) continue;
+            if (tmdbKey && seenIds.has(tmdbKey)) continue;
+            if (imdbKey && seenIds.has(imdbKey)) continue;
+
+            if (titleKey) seenTitles.add(titleKey);
+            if (idKey) seenIds.add(idKey);
+            if (tmdbKey) seenIds.add(tmdbKey);
+            if (imdbKey) seenIds.add(imdbKey);
+
+            items.push({ ...c, progress: h.progress || 15 });
         }
 
-        return items;
+        return items.slice(0, 10);
     }, [currentUser?.continueWatching, content, watchHistoryVer]);
 
-    // Combined Watch History (Strictly Browser Cache + in-memory, sorted newest first)
+    const handleRemoveContinueWatching = useCallback((item: Content) => {
+        removeFromContinueWatching(item.id);
+        setWatchHistoryVer(v => v + 1);
+    }, [removeFromContinueWatching]);
+
+    // Combined Watch History (Strictly Browser Cache + in-memory, sorted newest first, capped to 10 items)
     const combinedWatchHistory = useMemo(() => {
-        const historyMap = new Map<string, ContinueWatchingItem | { movieId: string; progress?: number; lastWatchedAt?: string; content?: any }>();
+        const rawHistory: any[] = [];
         try {
             const raw = localStorage.getItem('my_donkey_watch_history');
             if (raw) {
                 const localList = JSON.parse(raw);
-                if (Array.isArray(localList)) {
-                    localList.forEach((lh: any) => {
-                        if (lh?.movieId) historyMap.set(lh.movieId, lh);
-                    });
-                }
+                if (Array.isArray(localList)) rawHistory.push(...localList);
             }
         } catch (e) { }
 
         if (currentUser?.continueWatching && Array.isArray(currentUser.continueWatching)) {
-            currentUser.continueWatching.forEach(item => {
-                if (item?.movieId) {
-                    const existing = historyMap.get(item.movieId);
-                    const localTime = existing?.lastWatchedAt ? new Date(existing.lastWatchedAt).getTime() : 0;
-                    const itemTime = item.lastWatchedAt ? new Date(item.lastWatchedAt).getTime() : 0;
-                    if (!existing || itemTime >= localTime) {
-                        historyMap.set(item.movieId, item);
-                    }
-                }
-            });
+            rawHistory.push(...currentUser.continueWatching);
+        }
+
+        const historyMap = new Map<string, ContinueWatchingItem | { movieId: string; progress?: number; lastWatchedAt?: string; content?: any }>();
+        for (const item of rawHistory) {
+            if (!item?.movieId) continue;
+            const c = item.content;
+            const cleanTitle = (c?.title || item.title || '').trim().toLowerCase();
+            const tmdbId = c?.tmdbId || item.tmdbId ? String(c?.tmdbId || item.tmdbId) : '';
+            const key = cleanTitle ? `title_${cleanTitle}` : (tmdbId ? `tmdb_${tmdbId}` : String(item.movieId).toLowerCase());
+
+            const existing = historyMap.get(key);
+            const localTime = existing?.lastWatchedAt ? new Date(existing.lastWatchedAt).getTime() : 0;
+            const itemTime = item.lastWatchedAt ? new Date(item.lastWatchedAt).getTime() : 0;
+            if (!existing || itemTime >= localTime) {
+                historyMap.set(key, item);
+            }
         }
 
         return Array.from(historyMap.values()).sort((a, b) => {
             const timeA = a.lastWatchedAt ? new Date(a.lastWatchedAt).getTime() : 0;
             const timeB = b.lastWatchedAt ? new Date(b.lastWatchedAt).getTime() : 0;
             return timeB - timeA;
-        });
+        }).slice(0, 10);
     }, [currentUser?.continueWatching, watchHistoryVer]);
 
     // Resolved User Favorite Genres (Profile -> Account -> LocalStorage)
@@ -1393,14 +1441,16 @@ const MainLayout = () => {
                     return false;
                 }
                 if (scope === 'home') {
-                    // Strictly keep only the 3 user-specified curated sections on Home:
-                    // 1. Marvel Cinematic Universe
-                    // 2. Bollywood & Indian Blockbusters
-                    // 3. Top Indian Web Series
+                    // Curated sections on Home:
+                    // 1. Trending Now in India
+                    // 2. Bollywood & Hindi Movies / Indian Blockbusters
+                    // 3. Marvel Cinematic Universe
+                    // 4. Top Indian Web Series
                     const isMarvel = titleLower.includes('marvel') || s.tagFilter?.toLowerCase() === 'marvel';
-                    const isBollywood = titleLower.includes('bollywood') || titleLower.includes('indian blockbusters') || s.tagFilter?.toLowerCase() === 'indian';
+                    const isBollywood = titleLower.includes('bollywood') || titleLower.includes('indian blockbusters') || titleLower.includes('hindi') || s.tagFilter?.toLowerCase() === 'indian' || s.tagFilter?.toLowerCase().includes('bollywood');
                     const isWebSeries = titleLower.includes('web series') || titleLower.includes('indian web') || s.tagFilter?.toLowerCase() === 'web series';
-                    return isMarvel || isBollywood || isWebSeries;
+                    const isTrending = titleLower.includes('trending') || s.id === 'sec_dyn_trending';
+                    return isTrending || isBollywood || isMarvel || isWebSeries;
                 }
                 return true;
             })
@@ -1416,9 +1466,10 @@ const MainLayout = () => {
                 if (scope === 'home') {
                     const getHomeOrder = (sec: Section) => {
                         const t = (sec.title || '').toLowerCase();
-                        if (t.includes('marvel') || sec.tagFilter?.toLowerCase() === 'marvel') return 1;
-                        if (t.includes('bollywood') || t.includes('indian blockbusters') || sec.tagFilter?.toLowerCase() === 'indian') return 2;
-                        if (t.includes('web series') || t.includes('indian web') || sec.tagFilter?.toLowerCase() === 'web series') return 3;
+                        if (t.includes('trending') || sec.id === 'sec_dyn_trending') return 1;
+                        if (t.includes('bollywood') || t.includes('hindi') || t.includes('indian blockbusters')) return 2;
+                        if (t.includes('marvel') || sec.tagFilter?.toLowerCase() === 'marvel') return 3;
+                        if (t.includes('web series') || t.includes('indian web') || sec.tagFilter?.toLowerCase() === 'web series') return 4;
                         return 99;
                     };
                     return getHomeOrder(a) - getHomeOrder(b);
@@ -1431,14 +1482,40 @@ const MainLayout = () => {
 
             return scopeSections.map(section => {
                 let autoItems: Content[] = [];
+                const titleLower = (section.title || '').toLowerCase();
+                const isTrendingSec = section.type === 'trending' || section.id === 'sec_dyn_trending' || titleLower.includes('trending');
+                const isBollywoodSec = titleLower.includes('bollywood') || titleLower.includes('hindi') || section.tagFilter?.toLowerCase().includes('bollywood');
+                const isWebSeriesSec = section.id === 'sec_indian_webseries' || titleLower.includes('web series') || titleLower.includes('indian web') || section.tagFilter?.toLowerCase() === 'web series';
 
                 // Auto-population logic
                 if (section.type === 'recommended') {
                     autoItems = scope === 'movie'
                         ? moviePersonalized.recommendations
                         : (scope === 'tv' ? tvPersonalized.recommendations : homePersonalized.recommendations);
-                } else if (section.type === 'trending') {
-                    autoItems = scopeContent.filter(c => c.featured || (c.vote_average && c.vote_average > 7.5)).slice(0, 20);
+                } else if (isTrendingSec) {
+                    // Trending Now in India: prioritize high-voted and featured Indian content
+                    autoItems = scopeContent.filter(isIndianContent);
+                    if (autoItems.length < 15) {
+                        const fbIndian = FALLBACK_CATALOG.filter(isIndianContent);
+                        autoItems = [...autoItems, ...fbIndian].filter((c, i, s) => i === s.findIndex(x => x.id === c.id));
+                    }
+                    autoItems = autoItems.slice(0, 25);
+                } else if (isBollywoodSec) {
+                    // Bollywood & Hindi Movies: all Hindi movies
+                    autoItems = scopeContent.filter(c => isHindiContent(c) && (c.type === 'movie' || !c.type));
+                    if (autoItems.length < 15) {
+                        const fbHindi = FALLBACK_CATALOG.filter(c => isHindiContent(c) && (c.type === 'movie' || !c.type));
+                        autoItems = [...autoItems, ...fbHindi].filter((c, i, s) => i === s.findIndex(x => x.id === c.id));
+                    }
+                    autoItems = autoItems.slice(0, 25);
+                } else if (isWebSeriesSec) {
+                    // Top Indian Web Series: Indian TV shows / web series
+                    autoItems = scopeContent.filter(c => isIndianContent(c) && c.type === 'tv');
+                    if (autoItems.length < 15) {
+                        const fbSeries = FALLBACK_CATALOG.filter(c => isIndianContent(c) && c.type === 'tv');
+                        autoItems = [...autoItems, ...fbSeries].filter((c, i, s) => i === s.findIndex(x => x.id === c.id));
+                    }
+                    autoItems = autoItems.slice(0, 25);
                 } else if (section.type === 'genre' && section.genreFilter) {
                     autoItems = scopeContent.filter(c => c.genres?.includes(section.genreFilter!)).slice(0, 20);
                 } else if (section.type === 'originals') {
@@ -1448,7 +1525,23 @@ const MainLayout = () => {
                 } else if (section.type === 'new_tv') {
                     autoItems = scopeContent.filter(c => c.type === 'tv').slice(0, 20);
                 } else if (section.type === 'tag' && section.tagFilter) {
-                    autoItems = scopeContent.filter(c => c.tags?.includes(section.tagFilter!) || c.genres?.includes(section.tagFilter!)).slice(0, 25);
+                    const tf = section.tagFilter.toLowerCase();
+                    if (tf === 'indian') {
+                        autoItems = scopeContent.filter(isIndianContent);
+                    } else if (tf.includes('bollywood') || tf.includes('hindi')) {
+                        autoItems = scopeContent.filter(isHindiContent);
+                    } else if (tf === 'web series') {
+                        autoItems = scopeContent.filter(c => isIndianContent(c) && c.type === 'tv');
+                    } else {
+                        autoItems = scopeContent.filter(c => c.tags?.some(t => t.toLowerCase() === tf || t.toLowerCase().includes(tf)) || c.genres?.some(g => g.toLowerCase() === tf || g.toLowerCase().includes(tf)));
+                    }
+                    if (autoItems.length < 15 && (tf === 'indian' || tf.includes('bollywood') || tf.includes('hindi') || tf === 'web series')) {
+                        const fbPool = tf === 'web series'
+                            ? FALLBACK_CATALOG.filter(c => isIndianContent(c) && c.type === 'tv')
+                            : (tf === 'indian' ? FALLBACK_CATALOG.filter(isIndianContent) : FALLBACK_CATALOG.filter(isHindiContent));
+                        autoItems = [...autoItems, ...fbPool].filter((c, i, s) => i === s.findIndex(x => x.id === c.id));
+                    }
+                    autoItems = autoItems.slice(0, 25);
                 } else if (section.type === 'my_list') {
                     if (currentProfile?.myList) {
                         autoItems = scopeContent.filter(c => currentProfile.myList.includes(c.id));
@@ -1456,7 +1549,6 @@ const MainLayout = () => {
                 }
 
                 // Media type differentiation: Series/Shows must NEVER have movies, Movies must NEVER have series
-                const titleLower = (section.title || '').toLowerCase();
                 const isSeriesSection = section.type === 'new_tv' ||
                     (section.scopes?.includes('tv') && !section.scopes?.includes('movie')) ||
                     /\b(series|shows?|web series|tv)\b/i.test(titleLower);
@@ -1483,14 +1575,42 @@ const MainLayout = () => {
                 }
 
                 // Merge: Manual first, then Auto. Deduplicate within section.
-                const merged = [...manualItems, ...autoItems].filter((item, index, self) =>
+                let merged = [...manualItems, ...autoItems].filter((item, index, self) =>
                     index === self.findIndex(t => t.id === item.id)
                 );
+
+                // Enforce minimum 10+ items for critical Indian rails (Web Series, Bollywood, Trending)
+                if (isWebSeriesSec && merged.length < 10) {
+                    const fbSeries = FALLBACK_CATALOG.filter(c => isIndianContent(c) && c.type === 'tv');
+                    for (const s of fbSeries) {
+                        if (!merged.some(m => m.id === s.id)) {
+                            merged.push(s);
+                            if (merged.length >= 15) break;
+                        }
+                    }
+                } else if (isBollywoodSec && merged.length < 10) {
+                    const fbHindi = FALLBACK_CATALOG.filter(c => isHindiContent(c) && (c.type === 'movie' || !c.type));
+                    for (const m of fbHindi) {
+                        if (!merged.some(x => x.id === m.id)) {
+                            merged.push(m);
+                            if (merged.length >= 15) break;
+                        }
+                    }
+                } else if (isTrendingSec && merged.length < 10) {
+                    const fbIndian = FALLBACK_CATALOG.filter(isIndianContent);
+                    for (const item of fbIndian) {
+                        if (!merged.some(x => x.id === item.id)) {
+                            merged.push(item);
+                            if (merged.length >= 15) break;
+                        }
+                    }
+                }
 
                 // Cross-collection deduplication: prioritize fresh items so collections don't show the exact same content
                 const freshItems = merged.filter(item => !seenContentIds.has(item.id));
                 const repeatedItems = merged.filter(item => seenContentIds.has(item.id));
-                const items = freshItems.length >= 4 ? freshItems : [...freshItems, ...repeatedItems];
+                // Guarantee minimum 10+ items per rail if available
+                const items = freshItems.length >= 10 ? freshItems : [...freshItems, ...repeatedItems].slice(0, 25);
 
                 // Record seen IDs
                 items.forEach(item => seenContentIds.add(item.id));
@@ -1681,6 +1801,7 @@ const MainLayout = () => {
                                 items={homeContinueWatching}
                                 onDetails={handleDetails}
                                 onPlay={handlePlay}
+                                onRemoveItem={handleRemoveContinueWatching}
                             />
                         )}
 
@@ -2173,15 +2294,17 @@ const MainLayout = () => {
 const SitemapHandler = () => {
     const [xmlContent, setXmlContent] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const location = useLocation();
 
     useEffect(() => {
-        fetch('/sitemap.xml', { cache: 'reload', headers: { Accept: 'application/xml, text/xml' } })
+        const targetUrl = location.pathname || '/sitemap.xml';
+        fetch(targetUrl, { cache: 'reload', headers: { Accept: 'application/xml, text/xml' } })
             .then(res => {
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 return res.text();
             })
             .then(text => {
-                if (text.startsWith('<?xml') || text.includes('<urlset')) {
+                if (text.startsWith('<?xml') || text.includes('<urlset') || text.includes('<sitemapindex')) {
                     setXmlContent(text);
                 } else {
                     throw new Error('Received non-XML response');
@@ -2190,7 +2313,7 @@ const SitemapHandler = () => {
             .catch(err => {
                 setError(err.message);
             });
-    }, []);
+    }, [location.pathname]);
 
     if (error) {
         return (
@@ -2239,6 +2362,7 @@ const AppRoutes = () => {
     return (
         <Routes>
             <Route path="/sitemap.xml" element={<SitemapHandler />} />
+            <Route path="/sitemap-:slug" element={<SitemapHandler />} />
             <Route path="/robots.txt" element={<RobotsHandler />} />
             <Route
                 path="/login"

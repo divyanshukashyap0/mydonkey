@@ -87,7 +87,13 @@ export function bulkSaveContentTitles(items: Array<{ id?: string; tmdbId?: numbe
  */
 export function setWebpageTitle(title: string) {
     if (!title) return;
-    const formatted = `${title.trim()} | My Donkey`;
+    const clean = title.trim();
+    // Keep titles strictly under 60 characters to satisfy Google & Bing Search Console (Bing flags > 65)
+    let formatted = `${clean} | My Donkey`;
+    if (formatted.length > 60) {
+        const maxLen = 60 - ' | My Donkey'.length;
+        formatted = `${clean.substring(0, maxLen).trim()} | My Donkey`;
+    }
     if (document.title !== formatted) {
         document.title = formatted;
     }

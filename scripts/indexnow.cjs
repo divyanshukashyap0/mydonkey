@@ -60,19 +60,32 @@ async function runIndexNow() {
         process.exit(1);
     }
 
-    // Extract all <loc> entries from sitemap.xml
+    // Extract all <loc> entries from sitemap.xml and any sub-sitemaps
     const sitemapContent = fs.readFileSync(SITEMAP_PATH, 'utf8');
     const locRegex = /<loc>(https?:\/\/[^<]+)<\/loc>/g;
     const urls = [];
     let match;
 
-    while ((match = locRegex.exec(sitemapContent)) !== null) {
-        urls.push(match[1].trim());
+    const publicDir = path.dirname(SITEMAP_PATH);
+    if (sitemapContent.includes('<sitemapindex')) {
+        console.log('📑 Detected Sitemap Index. Extracting URLs from all sub-sitemaps...');
+        const sitemapFiles = fs.readdirSync(publicDir).filter(f => f.startsWith('sitemap-') && f.endsWith('.xml'));
+        for (const sf of sitemapFiles) {
+            const sfContent = fs.readFileSync(path.join(publicDir, sf), 'utf8');
+            let m;
+            while ((m = locRegex.exec(sfContent)) !== null) {
+                urls.push(m[1].trim());
+            }
+        }
+    } else {
+        while ((match = locRegex.exec(sitemapContent)) !== null) {
+            urls.push(match[1].trim());
+        }
     }
 
     // Deduplicate
     const uniqueUrls = Array.from(new Set(urls));
-    console.log(`📋 Discovered ${uniqueUrls.length} unique URLs from sitemap.xml.\n`);
+    console.log(`📋 Discovered ${uniqueUrls.length} unique URLs from sitemaps.\n`);
 
     if (uniqueUrls.length === 0) {
         console.error('❌ No URLs found in sitemap.');

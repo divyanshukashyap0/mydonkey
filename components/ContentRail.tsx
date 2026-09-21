@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { ChevronRight, ChevronLeft, Play, Plus, Check, ThumbsUp, Trash2 } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Play, Plus, Check, ThumbsUp, Trash2, X } from 'lucide-react';
 import { Content } from '../types';
 import { useStore } from '../context/StoreContext';
 
@@ -8,6 +8,7 @@ interface ContentRailProps {
     items: Content[];
     onDetails: (item: Content) => void;
     onPlay?: (item: Content, mode?: 'trailer' | 'movie') => void;
+    onRemoveItem?: (item: Content) => void;
     isTop10?: boolean;
     isOriginal?: boolean;
     layout?: 'portrait' | 'landscape';
@@ -23,6 +24,7 @@ const ContentRail: React.FC<ContentRailProps> = ({
     items,
     onDetails,
     onPlay,
+    onRemoveItem,
     isTop10 = false,
     isOriginal = false,
     layout = 'portrait',
@@ -252,6 +254,21 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                                 >
                                                     <ThumbsUp size={14} className={isLiked ? "fill-white text-white" : "text-white"} />
                                                 </button>
+
+                                                {/* Remove from Continue Watching Button */}
+                                                {onRemoveItem && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onRemoveItem(item);
+                                                        }}
+                                                        className="w-8 h-8 rounded-full bg-zinc-800/80 hover:bg-red-600 border border-white/30 hover:border-red-400 text-white flex items-center justify-center transition-all cursor-pointer active:scale-95 shadow-md flex-shrink-0"
+                                                        title="Remove from Continue Watching"
+                                                        aria-label="Remove from Continue Watching"
+                                                    >
+                                                        <Trash2 size={14} className="text-white" />
+                                                    </button>
+                                                )}
                                             </div>
                                             <div className="text-sm font-bold truncate">{item.title}</div>
                                             <div className="flex items-center gap-2 text-[10px] mt-1">
@@ -270,8 +287,23 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                             )}
                                         </div>
 
+                                        {/* User Corner Remove Button (e.g. for Continue Watching) */}
+                                        {onRemoveItem && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onRemoveItem(item);
+                                                }}
+                                                className="absolute top-2 right-2 z-30 w-7 h-7 sm:w-8 sm:h-8 bg-black/85 hover:bg-red-600 text-white/90 hover:text-white rounded-full shadow-2xl flex items-center justify-center opacity-85 sm:opacity-0 group-hover/card:opacity-100 transition-all duration-200 hover:scale-110 active:scale-95 border border-white/25 hover:border-red-400 cursor-pointer backdrop-blur-sm"
+                                                title="Remove from Continue Watching"
+                                                aria-label="Remove from Continue Watching"
+                                            >
+                                                <X size={15} />
+                                            </button>
+                                        )}
+
                                         {/* Admin Corner Delete Button on Hover */}
-                                        {isAdmin && (
+                                        {isAdmin && !onRemoveItem && (
                                             <button
                                                 onClick={async (e) => {
                                                     e.stopPropagation();
