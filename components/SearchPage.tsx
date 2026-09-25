@@ -446,7 +446,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
                         autoComplete="off"
                         autoCorrect="off"
                         spellCheck="false"
-                        className="block w-full pl-14 pr-12 py-5 bg-[#141414] border border-white/10 rounded-2xl focus:ring-2 focus:ring-brand-red focus:border-transparent text-white placeholder-gray-500 text-xl font-medium transition-all shadow-xl"
+                        aria-label="Search movies, TV shows, and anime"
+                        className="block w-full pl-14 pr-12 py-5 bg-zinc-900/90 hover:bg-zinc-900 border border-white/20 hover:border-white/35 rounded-2xl focus:ring-2 focus:ring-brand-red/50 focus:border-brand-red text-white placeholder-gray-400 text-xl font-medium transition-all shadow-xl"
                         placeholder="Search for movies, TV shows..."
                         value={searchQuery}
                         onChange={(e) => handleQueryChange(e.target.value)}

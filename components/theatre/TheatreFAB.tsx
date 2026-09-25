@@ -23,7 +23,8 @@ export const TheatreFAB: React.FC<TheatreFABProps> = ({ className = '', onClick 
       navigate('/theatre');
     }
   };
-  return null;
+
+
 };
 
 export default TheatreFAB;

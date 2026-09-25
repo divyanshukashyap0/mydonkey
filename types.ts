@@ -101,6 +101,7 @@ export interface Section {
   enabled: boolean;
   scopes: ('home' | 'tv' | 'movie' | 'new')[];
   showRanking?: boolean;
+  layout?: 'portrait' | 'landscape';
 }
 
 

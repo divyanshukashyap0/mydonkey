@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Plus, X, ThumbsUp, Check, Download, Share2, Search, Music2, Trash2, ArrowLeft, Maximize, Minimize, Armchair } from 'lucide-react';
+import { Play, Plus, X, ThumbsUp, Check, Share2, Search, Music2, Trash2, ArrowLeft, Maximize, Minimize, Armchair } from 'lucide-react';
 import { Content, Season, Episode } from '../types';
 import { useStore } from '../context/StoreContext';
 import ContentRail from './ContentRail';
 import SongsSection from './SongsSection';
 
-import { buildEmbedUrl, hasDriveSource, isExternalEmbedUrl, getMovieDownloadUrl, getAnimeDownloadUrl } from '../utils/embedUrl';
+import { buildEmbedUrl, hasDriveSource, isExternalEmbedUrl } from '../utils/embedUrl';
 import { saveContentTitle, setWebpageTitle } from '../utils/titleManager';
 
 interface ContentDetailsProps {
@@ -205,49 +205,6 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
         }
     }
 
-    const [downloadOptions, setDownloadOptions] = useState<Content | Episode | null>(null);
-
-    const handleDownload = (item: Content | Episode) => {
-        if (currentUser?.isGuest) {
-            alert('Guest mode download is not allowed. Please log in with your credentials to download this content.');
-            return;
-        }
-
-        const links = item.downloadLinks || [];
-        // Check legacy drive ID if no links
-        const legacyId = 'movieDriveId' in item ? item.movieDriveId : (item as Episode).driveId;
-        // Check for direct video URL as last resort
-        const videoUrl = 'videoUrl' in item ? item.videoUrl : (item as Episode).videoUrl;
-
-        if (links.length > 0) {
-            setDownloadOptions(item);
-        } else if (legacyId) {
-            window.location.href = `https://drive.google.com/uc?id=${legacyId}&export=download`;
-        } else if (videoUrl && !videoUrl.includes('/embed/')) {
-            // Fallback: Trigger direct file download without navigating the window
-            const a = document.createElement('a');
-            a.href = videoUrl;
-            a.setAttribute('download', `${item.title || 'video'}.mp4`);
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        } else {
-            const cid = content.tmdbId || (typeof content.id === 'string' ? content.id.replace(/^(tmdb_|imdb_)/, '') : content.id);
-            const isAnime = Boolean(
-                content.tags?.some(t => t.toLowerCase() === 'anime') ||
-                content.genres?.some(g => g.toLowerCase() === 'anime' || g.toLowerCase() === 'animation')
-            );
-            const dlUrl = isAnime
-                ? getAnimeDownloadUrl(typeof cid === 'number' ? cid : parseInt(cid, 10) || null, 1)
-                : getMovieDownloadUrl(cid, content.type === 'tv' ? 'tv' : 'movie', 1, 1);
-
-            if (dlUrl) {
-                window.open(dlUrl, '_blank', 'noopener,noreferrer');
-            } else {
-                alert('Direct download is not available for this stream. You can watch it directly in the player.');
-            }
-        }
-    };
 
     const handleShareContent = async () => {
         const shareUrl = `${window.location.origin}/browse/${content.id}?title=${encodeURIComponent(content.title || '')}`;
@@ -316,37 +273,6 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
 
     return (
         <div className="fixed inset-0 z-[200] w-full h-full bg-[#121212] flex flex-col overflow-hidden animate-in fade-in duration-300">
-            {/* Download Options Modal */}
-            {downloadOptions && (
-                <div className="absolute inset-0 z-[220] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
-                    <div className="bg-[#181818] border border-white/10 p-6 rounded-xl w-full max-w-sm shadow-2xl relative">
-                        <button
-                            onClick={() => setDownloadOptions(null)}
-                            className="absolute top-2 right-2 text-gray-400 hover:text-white"
-                        >
-                            <X size={20} />
-                        </button>
-                        <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                            <Download size={20} /> Select Quality
-                        </h3>
-                        <div className="space-y-2">
-                            {downloadOptions.downloadLinks?.map((link, idx) => (
-                                <a
-                                    key={idx}
-                                    href={link.url}
-                                    target="_self"
-                                    rel="noreferrer"
-                                    className="block p-4 bg-white/5 hover:bg-white/10 border border-white/5 rounded-lg text-center font-bold text-white transition flex justify-between items-center group"
-                                    onClick={() => setDownloadOptions(null)}
-                                >
-                                    <span>{link.label}</span>
-                                    <Download size={16} className="text-gray-400 group-hover:text-white" />
-                                </a>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Top Navigation Bar: Back, Fullscreen Toggle, & Close */}
             <div className="absolute top-4 left-4 right-4 md:top-6 md:left-8 md:right-8 z-[70] flex items-center justify-between pointer-events-none">
@@ -452,7 +378,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
 
                         {/* Server & Stream Availability Badge */}
                         <div className="flex items-center gap-2 mt-2 mb-1">
-                            <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold flex items-center gap-1.5 shadow-sm">
+                            <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-1.5 shadow-sm">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                                 9 High-Speed Servers (4K • 1080p • Multi-Sub)
                             </span>
@@ -523,15 +449,6 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                                 <span className="text-[10px]">Share</span>
                             </button>
 
-                            <button
-                                onClick={() => handleDownload(content)}
-                                className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition cursor-pointer active:scale-95"
-                                title="Download HD File (My Donkey Hub)"
-                            >
-                                <Download size={20} className="text-blue-400" />
-                                <span className="text-[10px]">Download</span>
-                            </button>
-
                             {isAdmin && (
                                 <button
                                     onClick={async () => {
@@ -597,7 +514,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                     {/* Hero Section: Title & Actions positioned over background thumbnail */}
                     <div className="relative pt-[32vh] md:pt-[36vh] pb-6 px-8 md:px-14 w-full flex-shrink-0">
                         <div className="max-w-7xl mx-auto w-full">
-                            <h1 className="text-4xl md:text-6xl font-black mb-4 drop-shadow-2xl text-white">{content.title}</h1>
+                            <h2 id="content-details-title" className="text-4xl md:text-6xl font-black mb-4 drop-shadow-2xl text-white">{content.title}</h2>
 
                             {/* Desktop Server & Stream Availability Badge */}
                             <div className="flex items-center gap-2 mb-6">
@@ -667,13 +584,6 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                                 >
                                     <Share2 size={24} />
                                 </button>
-                                <button
-                                    onClick={() => handleDownload(content)}
-                                    className="bg-gray-600/40 backdrop-blur-md p-3.5 rounded-full border border-white/20 hover:border-white transition hover:scale-105 active:scale-95 cursor-pointer"
-                                    title="High-Speed Download (My Donkey Hub)"
-                                >
-                                    <Download size={24} className="text-blue-400 hover:text-white" />
-                                </button>
 
                                 {isAdmin && (
                                     <button
@@ -712,7 +622,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                                     ) : (
                                         content.duration && content.duration !== '0m' && <span className="text-gray-400">{content.duration}</span>
                                     )}
-                                    <span className="border border-white/30 px-1.5 rounded text-[10px] font-black tracking-tighter">{content.resolution || 'HD'}</span>
+                                    <span className="border border-white/30 px-1.5 rounded text-xs font-black tracking-tighter">{content.resolution || 'HD'}</span>
                                 </div>
                                 <div className="space-y-2">
                                     <p className={`text-xl leading-relaxed text-gray-200 ${!isOverviewExpanded ? 'line-clamp-3' : ''}`}>

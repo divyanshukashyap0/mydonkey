@@ -206,10 +206,11 @@ const ScrollToTop = () => {
         if (navigationType === 'POP') {
             const saved = scrollPositions.get(location.key) ||
                           scrollPositions.get(location.pathname + location.search);
-            if (saved && (saved.x > 0 || saved.y > 0)) {
+            // On home root path ('/'), always start fresh from the top (y=0) to preserve hero layout
+            if (location.pathname !== '/' && saved && (saved.x > 0 || saved.y > 0)) {
                 restoreScroll(saved.x, saved.y);
             } else {
-                // If no saved position, start from top
+                // If on home or no saved position, start from top
                 window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
                 document.documentElement.scrollTo({ top: 0, left: 0, behavior: 'instant' });
                 document.body.scrollTo({ top: 0, left: 0, behavior: 'instant' });

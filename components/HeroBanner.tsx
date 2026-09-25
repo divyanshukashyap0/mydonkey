@@ -302,7 +302,7 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onDetails, onPlay 
                         {isOriginal && (
                             <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left duration-700">
                                 <img src="/logo.png" className="h-5 w-auto object-contain" alt="Logo" />
-                                <div className="text-gray-300 text-[10px] font-bold tracking-widest">ORIGINAL</div>
+                                <div className="text-gray-300 text-xs font-bold tracking-widest">ORIGINAL</div>
                             </div>
                         )}
 
@@ -334,13 +334,13 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onDetails, onPlay 
                         <div className="flex gap-3 pt-2 animate-fade-up delay-300 opacity-0">
                             <button
                                 onClick={() => onPlay({ ...currentItem, playMode: 'movie' })}
-                                className="bg-white text-black px-5 md:px-8 py-2.5 md:py-3 rounded-full font-bold text-base md:text-lg flex items-center gap-2 hover:bg-gray-200 transition-transform hover:scale-105 active:scale-95"
+                                className="btn-primary px-5 md:px-8 py-2.5 md:py-3 rounded-full font-bold text-base md:text-lg flex items-center gap-2 cursor-pointer shadow-lg"
                             >
                                 <PlayCircle size={22} fill="black" /> Play
                             </button>
                             <button
                                 onClick={() => onDetails(currentItem)}
-                                className="bg-gray-600/40 backdrop-blur-md text-white px-5 md:px-8 py-2.5 md:py-3 rounded-full font-bold text-base md:text-lg flex items-center gap-2 hover:bg-gray-600/60 transition-transform hover:scale-105 active:scale-95"
+                                className="btn-secondary px-5 md:px-8 py-2.5 md:py-3 rounded-full font-bold text-base md:text-lg flex items-center gap-2 cursor-pointer shadow-lg"
                             >
                                 <Info size={22} /> More Info
                             </button>
@@ -371,15 +371,15 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onDetails, onPlay 
 
             {/* ── Dot indicators ────────────────────────────────────────── */}
             {slides.length > 1 && (
-                <div className="absolute bottom-4 md:bottom-6 right-6 md:right-16 z-50 flex gap-1.5 items-center">
+                <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-50 flex gap-2 items-center bg-black/40 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/10 shadow-lg">
                     {slides.map((_, idx) => (
                         <button
                             key={idx}
                             onClick={() => goTo(idx)}
                             aria-label={`Go to slide ${idx + 1}`}
-                            className={`rounded-full transition-all duration-300 ${idx === activeIdx
-                                ? 'w-6 h-2 bg-white'
-                                : 'w-2 h-2 bg-white/40 hover:bg-white/70'
+                            className={`rounded-full transition-all duration-300 cursor-pointer ${idx === activeIdx
+                                ? 'w-8 h-2.5 bg-brand-red shadow-[0_0_8px_rgba(229,9,20,0.8)]'
+                                : 'w-2.5 h-2.5 bg-white/40 hover:bg-white/90 hover:scale-125'
                             }`}
                         />
                     ))}

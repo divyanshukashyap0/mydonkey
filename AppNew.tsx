@@ -889,23 +889,14 @@ const MainLayout = () => {
             if (!c && h.cachedContent) {
                 c = h.cachedContent;
             }
-            if (!c) {
-                c = {
-                    id: h.movieId,
-                    title: h.movieId,
-                    overview: '',
-                    poster_path: '',
-                    backdrop_path: '',
-                    youtubeId: '',
-                    type: 'movie',
-                    genres: [],
-                    release_date: '',
-                    vote_average: 7.0,
-                    createdAt: new Date(h.lastWatchedAt || Date.now()).toISOString()
-                };
-            }
-
             if (!c) continue;
+
+            // Filter out items without valid artwork or with unresolved raw ID titles (fixes Issue 6)
+            const hasValidArtwork = Boolean(c.poster_path || c.backdrop_path || (c as any).posterUrl || (c as any).thumbnailUrl || (c as any).bannerUrl);
+            const isPlaceholderTitle = !c.title || c.title === h.movieId || /^tmdb_\d+$/i.test(c.title) || /^imdb_/i.test(c.title);
+            if (!hasValidArtwork || isPlaceholderTitle) {
+                continue;
+            }
 
             const titleKey = (c.title || '').trim().toLowerCase();
             const idKey = (c.id || '').toLowerCase();
@@ -1479,6 +1470,8 @@ const MainLayout = () => {
 
         if (scopeSections.length > 0) {
             const seenContentIds = new Set<string>();
+            const seenNormalizedTitles = new Set<string>();
+            const normalizeTitle = (t?: string) => (t || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
             return scopeSections.map(section => {
                 let autoItems: Content[] = [];
@@ -1574,16 +1567,26 @@ const MainLayout = () => {
                     manualItems = manualItems.filter(c => c.type === 'tv');
                 }
 
-                // Merge: Manual first, then Auto. Deduplicate within section.
-                let merged = [...manualItems, ...autoItems].filter((item, index, self) =>
-                    index === self.findIndex(t => t.id === item.id)
-                );
+                // Merge: Manual first, then Auto. Strict ID and Title-based deduplication within section.
+                const seenInSection = new Set<string>();
+                let merged: Content[] = [];
+                for (const item of [...manualItems, ...autoItems]) {
+                    if (!item) continue;
+                    const norm = normalizeTitle(item.title);
+                    if (seenInSection.has(item.id) || (norm && seenInSection.has(norm))) continue;
+                    seenInSection.add(item.id);
+                    if (norm) seenInSection.add(norm);
+                    merged.push(item);
+                }
 
                 // Enforce minimum 10+ items for critical Indian rails (Web Series, Bollywood, Trending)
                 if (isWebSeriesSec && merged.length < 10) {
                     const fbSeries = FALLBACK_CATALOG.filter(c => isIndianContent(c) && c.type === 'tv');
                     for (const s of fbSeries) {
-                        if (!merged.some(m => m.id === s.id)) {
+                        const norm = normalizeTitle(s.title);
+                        if (!seenInSection.has(s.id) && (!norm || !seenInSection.has(norm))) {
+                            seenInSection.add(s.id);
+                            if (norm) seenInSection.add(norm);
                             merged.push(s);
                             if (merged.length >= 15) break;
                         }
@@ -1591,7 +1594,10 @@ const MainLayout = () => {
                 } else if (isBollywoodSec && merged.length < 10) {
                     const fbHindi = FALLBACK_CATALOG.filter(c => isHindiContent(c) && (c.type === 'movie' || !c.type));
                     for (const m of fbHindi) {
-                        if (!merged.some(x => x.id === m.id)) {
+                        const norm = normalizeTitle(m.title);
+                        if (!seenInSection.has(m.id) && (!norm || !seenInSection.has(norm))) {
+                            seenInSection.add(m.id);
+                            if (norm) seenInSection.add(norm);
                             merged.push(m);
                             if (merged.length >= 15) break;
                         }
@@ -1599,21 +1605,30 @@ const MainLayout = () => {
                 } else if (isTrendingSec && merged.length < 10) {
                     const fbIndian = FALLBACK_CATALOG.filter(isIndianContent);
                     for (const item of fbIndian) {
-                        if (!merged.some(x => x.id === item.id)) {
+                        const norm = normalizeTitle(item.title);
+                        if (!seenInSection.has(item.id) && (!norm || !seenInSection.has(norm))) {
+                            seenInSection.add(item.id);
+                            if (norm) seenInSection.add(norm);
                             merged.push(item);
                             if (merged.length >= 15) break;
                         }
                     }
                 }
 
-                // Cross-collection deduplication: prioritize fresh items so collections don't show the exact same content
-                const freshItems = merged.filter(item => !seenContentIds.has(item.id));
-                const repeatedItems = merged.filter(item => seenContentIds.has(item.id));
-                // Guarantee minimum 10+ items per rail if available
-                const items = freshItems.length >= 10 ? freshItems : [...freshItems, ...repeatedItems].slice(0, 25);
+                // Cross-collection deduplication: prioritize fresh items by ID & Title so collections don't duplicate cards
+                const freshItems = merged.filter(item => {
+                    const norm = normalizeTitle(item.title);
+                    return !seenContentIds.has(item.id) && (!norm || !seenNormalizedTitles.has(norm));
+                });
+                if (!section.title || !section.title.trim()) return null;
+                const items = freshItems.length >= 4 ? freshItems.slice(0, 25) : [];
 
-                // Record seen IDs
-                items.forEach(item => seenContentIds.add(item.id));
+                // Record seen IDs & Titles
+                items.forEach(item => {
+                    seenContentIds.add(item.id);
+                    const norm = normalizeTitle(item.title);
+                    if (norm) seenNormalizedTitles.add(norm);
+                });
 
                 if (items.length === 0) return null;
 
@@ -1625,6 +1640,7 @@ const MainLayout = () => {
                         onDetails={handleDetails}
                         isTop10={section.showRanking}
                         showRanking={section.showRanking}
+                        layout={section.layout || 'portrait'}
                     />
                 );
             });
@@ -1823,9 +1839,9 @@ const MainLayout = () => {
                                 actionButton={
                                     <button
                                         onClick={() => setShowGenreModal(true)}
-                                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/10 hover:bg-white/15 text-gray-300 hover:text-white border border-white/10 flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm"
+                                        className="btn-secondary px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-zinc-800/90 hover:bg-brand-red border border-white/20 hover:border-brand-red flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-md hover:shadow-brand-red/30 group"
                                     >
-                                        <SlidersHorizontal size={13} />
+                                        <SlidersHorizontal size={14} className="text-brand-red group-hover:text-white transition-colors" />
                                         <span>Tune Taste</span>
                                     </button>
                                 }
@@ -1911,9 +1927,9 @@ const MainLayout = () => {
                                 actionButton={
                                     <button
                                         onClick={() => setShowGenreModal(true)}
-                                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/10 hover:bg-white/15 text-gray-300 hover:text-white border border-white/10 flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm"
+                                        className="btn-secondary px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-zinc-800/90 hover:bg-brand-red border border-white/20 hover:border-brand-red flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-md hover:shadow-brand-red/30 group"
                                     >
-                                        <SlidersHorizontal size={13} />
+                                        <SlidersHorizontal size={14} className="text-brand-red group-hover:text-white transition-colors" />
                                         <span>Tune Taste</span>
                                     </button>
                                 }
@@ -1985,9 +2001,9 @@ const MainLayout = () => {
                                 actionButton={
                                     <button
                                         onClick={() => setShowGenreModal(true)}
-                                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/10 hover:bg-white/15 text-gray-300 hover:text-white border border-white/10 flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm"
+                                        className="btn-secondary px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-zinc-800/90 hover:bg-brand-red border border-white/20 hover:border-brand-red flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-md hover:shadow-brand-red/30 group"
                                     >
-                                        <SlidersHorizontal size={13} />
+                                        <SlidersHorizontal size={14} className="text-brand-red group-hover:text-white transition-colors" />
                                         <span>Tune Taste</span>
                                     </button>
                                 }

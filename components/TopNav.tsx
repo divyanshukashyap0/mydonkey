@@ -273,9 +273,12 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
     const isAdmin = currentUser?.role === 'admin';
 
     return (
-        <nav className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-700 ${isScrolled ? 'bg-gradient-to-b from-black via-black/90 to-transparent shadow-none' : 'bg-gradient-to-b from-black/90 via-black/40 to-transparent'}`}>
+        <nav
+            style={{ top: 0 }}
+            className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-700 ${isScrolled ? 'bg-black/95 shadow-lg' : 'bg-gradient-to-b from-black/95 via-black/50 to-transparent'}`}
+        >
             {settings?.announcementBanner?.trim() && (
-                <aside aria-label="Site announcement" className="w-full bg-gradient-to-r from-red-700 via-brand-red to-red-700 text-white text-[11px] sm:text-xs font-semibold py-1.5 px-4 text-center tracking-wide flex items-center justify-center gap-2 border-b border-red-500/30 shadow-md">
+                <aside aria-label="Site announcement" className="w-full bg-gradient-to-r from-red-700 via-brand-red to-red-700 text-white text-xs font-semibold py-2.5 px-4 text-center tracking-wide flex items-center justify-center gap-2 border-b border-red-500/30 shadow-md">
                     <span className="inline-block animate-pulse">📢</span>
                     <span>{settings.announcementBanner}</span>
                 </aside>
@@ -312,32 +315,30 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                             { id: 'anime', label: 'Anime' },
                             { id: 'theatre', label: '3D Theatre' },
                             { id: 'my-list', label: 'My List' },
-                        ].map(item => (
-                            <button
-                                key={item.id}
-                                onClick={() => handleNavClick(item.id)}
-                                className={`text-xs xl:text-sm font-bold transition-all duration-300 relative px-3 py-1.5 xl:px-4 xl:py-2 rounded-full overflow-hidden group shrink-0 whitespace-nowrap
-                                    ${item.id === 'exclusive'
-                                        ? `bg-gradient-to-r from-brand-red via-orange-500 to-brand-red bg-[length:200%_auto] animate-shimmer text-white italic tracking-wide shadow-[0_0_20px_rgba(229,9,20,0.6)] hover:shadow-[0_0_30px_rgba(229,9,20,0.8)] hover:scale-105 border border-white/20`
-                                        : item.id === 'theatre'
-                                            ? `bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 bg-[length:200%_auto] text-black font-extrabold tracking-wide shadow-[0_0_20px_rgba(245,158,11,0.5)] hover:shadow-[0_0_30px_rgba(245,158,11,0.8)] hover:scale-105 border border-yellow-200/60`
-                                            : item.id === 'anime'
-                                                ? `bg-gradient-to-r from-violet-600 via-pink-500 to-violet-600 bg-[length:200%_auto] animate-shimmer text-white italic tracking-wide shadow-[0_0_20px_rgba(168,85,247,0.6)] hover:shadow-[0_0_30px_rgba(236,72,153,0.8)] hover:scale-105 border border-white/20`
-                                                : `${activeTab === item.id
-                                                    ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.4)] scale-105 border-transparent'
-                                                    : 'bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10 hover:border-white/30 hover:text-white hover:shadow-[0_0_15px_rgba(255,255,255,0.1)] hover:scale-105'}`
-                                    }
-                                `}
-                            >
-                                <span className="relative z-10 flex items-center gap-1.5">
-                                    {item.id === 'theatre' && <Armchair size={14} className="text-black inline-block" />}
-                                    {item.label}
-                                </span>
-                                {item.id === 'anime' && (
-                                    <div className="absolute inset-0 bg-white/20 group-hover:bg-white/30 transition-colors duration-300" />
-                                )}
-                            </button>
-                        ))}
+                        ].map(item => {
+                            const isActive = activeTab === item.id;
+                            return (
+                                <button
+                                    key={item.id}
+                                    onClick={() => handleNavClick(item.id)}
+                                    aria-current={isActive ? 'page' : undefined}
+                                    className={`text-xs xl:text-sm font-bold transition-all duration-300 relative px-3 py-1.5 xl:px-4 xl:py-2 rounded-full overflow-hidden group shrink-0 whitespace-nowrap cursor-pointer
+                                        ${isActive
+                                            ? 'bg-white text-black font-extrabold shadow-[0_0_20px_rgba(255,255,255,0.5)] scale-105 border-2 border-brand-red ring-2 ring-brand-red/40'
+                                            : 'bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10 hover:border-white/30 hover:text-white hover:shadow-[0_0_15px_rgba(255,255,255,0.1)] hover:scale-105'
+                                        }
+                                    `}
+                                >
+                                    <span className="relative z-10 flex items-center gap-1.5">
+                                        {item.id === 'theatre' && <Armchair size={14} className={isActive ? "text-black inline-block" : "text-gray-300 inline-block group-hover:text-white"} />}
+                                        {item.label}
+                                    </span>
+                                    {isActive && (
+                                        <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-brand-red rounded-full" />
+                                    )}
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 
@@ -348,10 +349,11 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                         <form
                             onSubmit={handleSearchSubmit}
                             role="search"
+                            aria-label="Site search"
                             className={`relative flex items-center transition-all duration-300 rounded-full border backdrop-blur-md group
                                 ${isSearchFocused || searchQuery
-                                    ? 'w-44 sm:w-52 md:w-60 lg:w-52 xl:w-72 bg-black/85 border-brand-red/80 shadow-[0_0_20px_rgba(229,9,20,0.35)]'
-                                    : 'w-28 xs:w-36 sm:w-44 md:w-48 lg:w-40 xl:w-56 bg-white/10 hover:bg-white/15 border-white/20 hover:border-white/40'
+                                    ? 'w-44 sm:w-52 md:w-60 lg:w-52 xl:w-72 bg-zinc-950/95 border-brand-red shadow-[0_0_20px_rgba(229,9,20,0.35)]'
+                                    : 'w-28 xs:w-36 sm:w-44 md:w-48 lg:w-40 xl:w-56 bg-zinc-900/90 hover:bg-zinc-850 border-white/25 hover:border-white/40 shadow-inner'
                                 }
                                 h-9 md:h-10 px-2.5 sm:px-3
                             `}
@@ -359,7 +361,7 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                             <button
                                 type="button"
                                 onClick={handleSearchIconClick}
-                                className="text-gray-400 group-hover:text-white group-focus-within:text-brand-red transition-colors flex-shrink-0 p-0.5"
+                                className="text-gray-300 group-hover:text-white group-focus-within:text-brand-red transition-colors flex-shrink-0 p-0.5"
                                 aria-label="Search"
                                 title="Search"
                             >
@@ -377,7 +379,8 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                                 onBlur={() => setIsSearchFocused(false)}
                                 onKeyDown={handleKeyDown}
                                 placeholder="Search movies, TV shows..."
-                                className="w-full bg-transparent text-white text-xs md:text-sm pl-2 pr-1 focus:outline-none placeholder-gray-400 font-medium tracking-wide"
+                                aria-label="Search query"
+                                className="w-full bg-transparent text-white text-xs md:text-sm pl-2 pr-1 focus:outline-none placeholder-gray-300 font-medium tracking-wide"
                                 autoComplete="off"
                                 autoCorrect="off"
                                 spellCheck="false"

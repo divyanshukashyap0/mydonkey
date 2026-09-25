@@ -52,13 +52,13 @@ const PersonalizeBanner: React.FC<PersonalizeBannerProps> = ({ onOpenModal }) =>
     };
 
     return (
-        <div className="relative mx-4 md:mx-12 my-6 p-5 md:p-6 rounded-2xl bg-gradient-to-r from-red-950/40 via-zinc-900/60 to-purple-950/30 border border-white/10 shadow-2xl backdrop-blur-md overflow-hidden">
+        <div className="relative my-4 p-6 md:p-8 rounded-2xl bg-gradient-to-r from-red-950/40 via-zinc-900/60 to-purple-950/30 border border-white/10 shadow-2xl backdrop-blur-md overflow-hidden">
             {/* Background Glow */}
             <div className="absolute -top-24 -left-24 w-60 h-60 bg-red-600/20 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute -bottom-24 -right-24 w-60 h-60 bg-purple-600/15 rounded-full blur-3xl pointer-events-none" />
 
             <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                     <div className="flex items-center gap-2">
                         <span className="p-1 rounded-md bg-red-600/30 text-brand-red border border-red-500/30">
                             <Sparkles size={16} />
@@ -67,7 +67,7 @@ const PersonalizeBanner: React.FC<PersonalizeBannerProps> = ({ onOpenModal }) =>
                             Personalise Your Experience
                         </h3>
                         {activeGenres.length > 0 && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 border border-emerald-500/30 text-emerald-300">
+                            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 border border-emerald-500/30 text-emerald-300">
                                 {activeGenres.length} Selected
                             </span>
                         )}

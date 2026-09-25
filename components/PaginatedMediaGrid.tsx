@@ -181,35 +181,25 @@ export const PaginatedMediaGrid: React.FC<PaginatedMediaGridProps> = ({
                                     }}
                                 />
 
-                                {/* Type Badge */}
-                                {type === 'all' && item.type && (
-                                    <div className="absolute top-2 left-2 z-10">
-                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-black/75 text-gray-200 border border-white/15 backdrop-blur-md">
-                                            {item.type === 'tv' ? 'Series' : 'Movie'}
-                                        </span>
-                                    </div>
-                                )}
-
-                                {/* Rating badge */}
-                                {rating && parseFloat(rating) >= 6.5 && (
-                                    <div className="absolute top-2 right-2 z-10">
-                                        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-amber-500/90 text-black shadow-md">
-                                            <Star size={10} className="fill-black text-black" />
-                                            {rating}
-                                        </span>
-                                    </div>
-                                )}
-
-                                {/* Hover Overlay with details & Quick Play */}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3 text-left">
+                                {/* Hover Overlay with details & Quick Play (matches ContentRail aesthetic) */}
+                                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3 text-left">
                                     <h3 className="text-white font-bold text-sm leading-snug line-clamp-2 drop-shadow-md mb-1">
                                         {item.title}
                                     </h3>
 
-                                    <div className="flex items-center gap-2 text-[11px] text-gray-300 mb-2.5">
+                                    <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-300 mb-2.5">
+                                        {item.type && (
+                                            <span className="border border-white/30 px-1 py-0.2 rounded text-xs uppercase font-semibold">
+                                                {item.type === 'tv' ? 'Series' : 'Movie'}
+                                            </span>
+                                        )}
+                                        {rating && parseFloat(rating) >= 6.0 && (
+                                            <span className="text-amber-400 font-bold flex items-center gap-0.5">
+                                                ★ {rating}
+                                            </span>
+                                        )}
                                         {item.year && <span>{item.year}</span>}
-                                        {item.year && primaryGenre && <span>•</span>}
-                                        {primaryGenre && <span className="text-red-400 font-semibold truncate">{primaryGenre}</span>}
+                                        {primaryGenre && <span className="text-brand-red font-semibold truncate">• {primaryGenre}</span>}
                                     </div>
 
                                     <div className="flex items-center gap-1.5 pt-1 border-t border-white/10">
@@ -222,9 +212,10 @@ export const PaginatedMediaGrid: React.FC<PaginatedMediaGridProps> = ({
                                                     onDetails(item);
                                                 }
                                             }}
-                                            className="flex-1 py-1.5 px-2 rounded-lg bg-brand-red hover:bg-red-600 text-white font-semibold text-xs flex items-center justify-center gap-1 shadow-md active:scale-95 transition"
+                                            className="btn-primary flex-1 py-1 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 shadow-md cursor-pointer"
+                                            aria-label={`Watch ${item.title}`}
                                         >
-                                            <Play size={12} className="fill-white" />
+                                            <Play size={12} className="fill-black" />
                                             <span>Watch</span>
                                         </button>
                                         <button
@@ -232,22 +223,26 @@ export const PaginatedMediaGrid: React.FC<PaginatedMediaGridProps> = ({
                                                 e.stopPropagation();
                                                 toggleWatchlist(item.id);
                                             }}
-                                            className="p-1.5 rounded-lg bg-zinc-800/90 hover:bg-zinc-700 border border-white/20 text-white transition active:scale-95 flex items-center justify-center"
+                                            className="btn-icon w-7 h-7 rounded-lg bg-zinc-800/90 hover:bg-zinc-700 border border-white/20 text-white transition active:scale-95 flex items-center justify-center cursor-pointer shadow-md"
                                             title={isAdded ? "Remove from My List" : "Add to My List"}
+                                            aria-label={isAdded ? `Remove ${item.title} from My List` : `Add ${item.title} to My List`}
                                         >
-                                            {isAdded ? <Check size={13} className="text-green-400" /> : <Plus size={13} />}
+                                            {isAdded ? <Check size={14} className="text-green-400" /> : <Plus size={14} />}
                                         </button>
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 toggleLike(item.id);
                                             }}
-                                            className={`p-1.5 rounded-lg border transition active:scale-95 flex items-center justify-center ${
-                                                isLiked ? 'bg-white/25 border-white text-white' : 'bg-zinc-800/90 hover:bg-zinc-700 border-white/20 text-white'
+                                            className={`btn-icon w-7 h-7 rounded-lg border transition active:scale-95 flex items-center justify-center cursor-pointer shadow-md ${
+                                                isLiked
+                                                    ? 'bg-brand-red/30 border-brand-red text-brand-red'
+                                                    : 'bg-zinc-800/90 hover:bg-zinc-700 border-white/20 text-white'
                                             }`}
                                             title={isLiked ? "Liked" : "Like"}
+                                            aria-label={isLiked ? `Unlike ${item.title}` : `Like ${item.title}`}
                                         >
-                                            <ThumbsUp size={13} className={isLiked ? "fill-white text-white" : "text-white"} />
+                                            <ThumbsUp size={12} className={isLiked ? "fill-current" : ""} />
                                         </button>
                                     </div>
                                 </div>
@@ -258,7 +253,7 @@ export const PaginatedMediaGrid: React.FC<PaginatedMediaGridProps> = ({
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
-                <div className="mt-8">
+                <div className="mt-4 pt-4 border-t border-white/10">
                     <Pagination
                         currentPage={currentPage}
                         totalPages={totalPages}

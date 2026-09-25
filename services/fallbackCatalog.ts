@@ -1873,7 +1873,7 @@ export const FALLBACK_SECTIONS: Section[] = [
         tagFilter: 'Indian',
         enabled: true,
         scopes: ['home', 'movie'],
-        showRanking: true
+        showRanking: false
     },
     {
         id: 'sec_indian_webseries',

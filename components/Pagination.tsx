@@ -62,7 +62,7 @@ const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPage
     };
 
     return (
-        <div className="flex items-center justify-center gap-1.5 sm:gap-2 mt-8 mb-12 animate-in fade-in select-none">
+        <nav aria-label="Pagination" className="flex items-center justify-center gap-1.5 sm:gap-2 my-4 animate-in fade-in select-none">
             <button
                 onClick={() => onPageChange(currentPage - 1)}
                 disabled={currentPage === 1}
@@ -84,7 +84,7 @@ const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPage
             >
                 <ChevronRight size={18} />
             </button>
-        </div>
+        </nav>
     );
 };
 

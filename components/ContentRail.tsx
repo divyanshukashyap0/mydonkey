@@ -46,31 +46,31 @@ const ContentRail: React.FC<ContentRailProps> = ({
         }
     };
 
-    if (!items || items.length === 0) return null;
+    if (!items || items.length === 0 || !title || !title.trim()) return null;
 
     return (
         <div className={`relative group/rail ${size === 'mid' ? 'py-1 md:py-2' : 'py-2 md:py-3'}`}>
-            <div className={`${size === 'mid' ? 'px-0 mb-2' : 'px-4 md:px-12 mb-2 md:mb-3'} flex flex-col sm:flex-row sm:items-end justify-between gap-2`}>
-                <div>
-                    {badge && (
-                        <div className="mb-1.5 flex items-center">
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-500/15 border border-red-500/30 text-red-300 shadow-sm">
-                                {badge}
-                            </span>
-                        </div>
-                    )}
+            <div className={`${size === 'mid' ? 'px-0 mb-2' : 'px-4 md:px-12 mb-2 md:mb-3'} flex flex-col gap-1`}>
+                {badge && (
+                    <div className="mb-1 flex items-center">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-500/15 border border-red-500/30 text-red-300 shadow-sm">
+                            {badge}
+                        </span>
+                    </div>
+                )}
+                <div className="flex items-center justify-between gap-4">
                     <h2 className={`${size === 'mid' ? 'text-lg md:text-xl' : 'text-xl md:text-2xl'} font-bold flex items-center gap-2 group/title cursor-pointer text-white`}>
                         {title}
                         <ChevronRight size={size === 'mid' ? 16 : 20} className="text-brand-red opacity-0 group-hover/title:opacity-100 transition-opacity translate-y-0.5" />
                     </h2>
-                    {subtitle && (
-                        <p className="text-xs md:text-sm text-gray-400 mt-1 font-normal leading-relaxed">{subtitle}</p>
+                    {actionButton && (
+                        <div className="flex-shrink-0">
+                            {actionButton}
+                        </div>
                     )}
                 </div>
-                {actionButton && (
-                    <div className="flex-shrink-0 self-start sm:self-auto">
-                        {actionButton}
-                    </div>
+                {subtitle && (
+                    <p className="text-xs md:text-sm text-gray-400 mt-0.5 font-normal leading-relaxed">{subtitle}</p>
                 )}
             </div>
 
@@ -211,7 +211,7 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                         {/* Overlay on hover */}
                                         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent opacity-0 group-hover/card:opacity-100 transition-all duration-300 flex flex-col justify-end p-4 translate-y-4 group-hover/card:translate-y-0">
                                             <div className="flex items-center gap-2 mb-3">
-                                                {/* Play Button */}
+                                                {/* Primary Play / Resume Action */}
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -221,10 +221,12 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                                             onDetails(item);
                                                         }
                                                     }}
-                                                    className="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center hover:bg-neutral-200 transition-all cursor-pointer active:scale-95 shadow-md flex-shrink-0"
-                                                    title="Play"
+                                                    className="btn-primary px-3 h-8 rounded-full text-xs font-semibold flex items-center gap-1.5 shadow-md flex-shrink-0 cursor-pointer"
+                                                    title={typeof (item as any).progress === 'number' && (item as any).progress > 0 ? "Resume" : "Play"}
+                                                    aria-label={typeof (item as any).progress === 'number' && (item as any).progress > 0 ? `Resume ${item.title}` : `Play ${item.title}`}
                                                 >
-                                                    <Play size={15} className="fill-black text-black ml-0.5" />
+                                                    <Play size={13} className="fill-black text-black ml-0.5" />
+                                                    <span>{typeof (item as any).progress === 'number' && (item as any).progress > 0 ? "Resume" : "Play"}</span>
                                                 </button>
 
                                                 {/* Add to My List Button */}
@@ -233,8 +235,9 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                                         e.stopPropagation();
                                                         toggleWatchlist(item.id);
                                                     }}
-                                                    className="w-8 h-8 rounded-full bg-zinc-800/80 hover:bg-zinc-700/80 border border-white/30 hover:border-white text-white flex items-center justify-center transition-all cursor-pointer active:scale-95 shadow-md flex-shrink-0"
+                                                    className="btn-icon w-8 h-8 rounded-full bg-zinc-800/80 hover:bg-zinc-700/80 border border-white/30 hover:border-white text-white flex items-center justify-center transition-all cursor-pointer active:scale-95 shadow-md flex-shrink-0"
                                                     title={isAdded ? "Remove from My List" : "Add to My List"}
+                                                    aria-label={isAdded ? `Remove ${item.title} from My List` : `Add ${item.title} to My List`}
                                                 >
                                                     {isAdded ? <Check size={16} className="text-green-400" /> : <Plus size={16} className="text-white" />}
                                                 </button>
@@ -245,43 +248,29 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                                         e.stopPropagation();
                                                         toggleLike(item.id);
                                                     }}
-                                                    className={`w-8 h-8 rounded-full border flex items-center justify-center transition-all cursor-pointer active:scale-95 shadow-md flex-shrink-0 ${
+                                                    className={`btn-icon w-8 h-8 rounded-full border flex items-center justify-center transition-all cursor-pointer active:scale-95 shadow-md flex-shrink-0 ${
                                                         isLiked
                                                             ? 'bg-white/25 border-white text-white'
                                                             : 'bg-zinc-800/80 hover:bg-zinc-700/80 border-white/30 hover:border-white text-white'
                                                     }`}
                                                     title={isLiked ? "Liked" : "Like"}
+                                                    aria-label={isLiked ? `Unlike ${item.title}` : `Like ${item.title}`}
                                                 >
                                                     <ThumbsUp size={14} className={isLiked ? "fill-white text-white" : "text-white"} />
                                                 </button>
-
-                                                {/* Remove from Continue Watching Button */}
-                                                {onRemoveItem && (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            onRemoveItem(item);
-                                                        }}
-                                                        className="w-8 h-8 rounded-full bg-zinc-800/80 hover:bg-red-600 border border-white/30 hover:border-red-400 text-white flex items-center justify-center transition-all cursor-pointer active:scale-95 shadow-md flex-shrink-0"
-                                                        title="Remove from Continue Watching"
-                                                        aria-label="Remove from Continue Watching"
-                                                    >
-                                                        <Trash2 size={14} className="text-white" />
-                                                    </button>
-                                                )}
                                             </div>
                                             <div className="text-sm font-bold truncate">{item.title}</div>
-                                            <div className="flex items-center gap-2 text-[10px] mt-1">
-                                                <span className="border border-white/30 px-1 rounded">HD</span>
-                                                {item.year && <span className="text-gray-300 font-medium">{item.year}</span>}
+                                            <div className="flex items-center gap-2 text-xs mt-1">
+                                                <span className="border border-white/30 px-1 rounded text-xs">HD</span>
+                                                {item.year && <span className="text-gray-300 font-medium text-xs">{item.year}</span>}
                                                 {item.addedBy && (
-                                                    <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.2 rounded font-medium truncate max-w-[80px]">
+                                                    <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.2 rounded font-medium truncate max-w-[80px] text-xs">
                                                         User Added
                                                     </span>
                                                 )}
                                             </div>
                                             {(item as any).matchReason && (
-                                                <div className="text-[10px] text-amber-300/90 font-medium truncate mt-0.5">
+                                                <div className="text-xs text-amber-300/90 font-medium truncate mt-0.5">
                                                     {(item as any).matchReason}
                                                 </div>
                                             )}
@@ -331,7 +320,7 @@ const ContentRail: React.FC<ContentRailProps> = ({
 
                                         {/* Top 10 Badge (if explicit top 10 but not using numbered raking, or both) */}
                                         {isTop10 && !showRanking && (
-                                            <div className="absolute top-0 left-0 bg-brand-red text-white text-[10px] font-black px-1.5 py-0.5 rounded-br uppercase tracking-tighter">
+                                            <div className="absolute top-0 left-0 bg-brand-red text-white text-xs font-black px-1.5 py-0.5 rounded-br uppercase tracking-tighter">
                                                 TOP 10
                                             </div>
                                         )}

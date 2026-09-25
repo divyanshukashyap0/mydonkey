@@ -79,7 +79,7 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               </div>
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-extrabold uppercase tracking-widest px-2.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  <span className="text-xs font-bold tracking-wide px-2.5 py-1 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
                     A Huge Sincere Apology
                   </span>
                 </div>
@@ -101,7 +101,7 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               </div>
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-extrabold uppercase tracking-widest px-2.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                  <span className="text-xs font-semibold tracking-normal px-2.5 py-1 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
                     Audio Language Notice
                   </span>
                 </div>

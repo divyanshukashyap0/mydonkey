@@ -107,6 +107,15 @@ const SongsPlayer: React.FC<SongsPlayerProps> = ({ song, onNext, onShuffle, hasN
               <SkipForward size={13} /> Next
             </button>
           )}
+          <a
+            href={`https://www.youtube.com/watch?v=${song.videoId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-bold text-gray-400 hover:text-white transition ml-auto"
+            title="Open track on YouTube"
+          >
+            <ExternalLink size={13} /> YouTube
+          </a>
         </div>
       </div>
     </div>

@@ -36,25 +36,31 @@ const SongsSection: React.FC<SongsSectionProps> = ({ movieName, contentType }) =
   const type = (contentType === 'tv' ? 'tv' : 'movie') as 'movie' | 'tv';
   const fallbackUrl = getFallbackSearchUrl(movieName, type);
 
-  // Fetch on first render
-  useEffect(() => {
-    if (hasFetched) return;
-    setHasFetched(true);
+  const loadSongs = useCallback(async () => {
     setLoading(true);
     setError(null);
 
-    fetchMovieSongs(movieName, type)
-      .then((data) => {
-        setApiData(data);
-        if (data.results.length > 0) {
-          setActiveSong(data.results[0]); // auto-select first song
-        }
-      })
-      .catch((e) => {
-        setError(e.message || 'Failed to load songs');
-      })
-      .finally(() => setLoading(false));
-  }, [movieName, type, hasFetched]);
+    try {
+      const data = await fetchMovieSongs(movieName, type);
+      setApiData(data);
+      if (data.results && data.results.length > 0) {
+        setActiveSong(data.results[0]); // auto-select first song
+      }
+    } catch (e: any) {
+      setError(e.message || 'Failed to load songs');
+    } finally {
+      setLoading(false);
+      setHasFetched(true);
+    }
+  }, [movieName, type]);
+
+  // Fetch when movie or type changes
+  useEffect(() => {
+    setHasFetched(false);
+    setApiData(null);
+    setActiveSong(null);
+    loadSongs();
+  }, [loadSongs]);
 
   const allSongs = apiData?.results || [];
   const isQuotaExceeded = apiData?.quota_exceeded || apiData?.source === 'quota_exceeded';
@@ -88,47 +94,35 @@ const SongsSection: React.FC<SongsSectionProps> = ({ movieName, contentType }) =
     }
   }, [tabSongs, activeSong]);
 
-  // Fallback UI — no API key or quota exceeded
-  if (!loading && (isQuotaExceeded || noApiKey || (hasFetched && !error && allSongs.length === 0))) {
-    const reason = noApiKey
-      ? 'Internal problem occured'
-      : isQuotaExceeded
-        ? 'Internal problem occured.'
-        : 'No songs found for this title.';
-
+  // Fallback UI — when songs are empty or unavailable
+  if (!loading && (isQuotaExceeded || noApiKey || error || (hasFetched && allSongs.length === 0))) {
     return (
       <div className="py-6">
-        <div className="flex flex-col items-center justify-center gap-4 py-10 bg-white/[0.03] rounded-2xl border border-dashed border-white/10">
-          <div className="w-12 h-12 rounded-full bg-yellow-500/10 flex items-center justify-center">
-            <AlertCircle size={22} className="text-yellow-400" />
+        <div className="flex flex-col items-center justify-center gap-3 py-8 px-4 bg-white/[0.02] rounded-2xl border border-white/10 text-center">
+          <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+            <Music2 size={20} className="text-gray-400" />
           </div>
-          <div className="text-center">
-            <p className="text-gray-300 font-semibold text-sm">{reason}</p>
-            <p className="text-gray-500 text-xs mt-1">Try searching directly on YouTube</p>
+          <div>
+            <h3 className="text-white font-bold text-sm">Official Soundtrack</h3>
+            <p className="text-gray-400 text-xs mt-0.5">Explore full album and OST for {movieName} on YouTube</p>
           </div>
-          <button
-            onClick={() => fetchSongs()}
-            className="flex items-center gap-2 bg-[#E50914] hover:bg-red-700 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition shadow-lg"
-          >
-            Retry Loading Songs
-          </button>
+          <div className="flex items-center gap-2 mt-2">
+            <a
+              href={fallbackUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 bg-[#E50914] hover:bg-red-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs transition shadow-lg active:scale-95"
+            >
+              <ExternalLink size={14} /> Search on YouTube
+            </a>
+            <button
+              onClick={loadSongs}
+              className="inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-gray-300 font-medium px-4 py-2.5 rounded-xl text-xs transition active:scale-95"
+            >
+              Retry
+            </button>
+          </div>
         </div>
-      </div>
-    );
-  }
-
-  // Error UI
-  if (error && !loading) {
-    return (
-      <div className="py-10 text-center text-sm text-gray-500">
-        <Music2 size={32} className="mx-auto mb-3 text-gray-700" />
-        <p>{error}</p>
-        <button
-          onClick={() => fetchSongs()}
-          className="mt-3 inline-flex items-center gap-1 text-red-400 hover:underline text-xs font-bold"
-        >
-          Retry Loading
-        </button>
       </div>
     );
   }
@@ -151,20 +145,33 @@ const SongsSection: React.FC<SongsSectionProps> = ({ movieName, contentType }) =
         hasNext={tabSongs.length > 1}
       />
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-white/10 pb-0">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 text-xs font-bold rounded-t-lg transition border-b-2 -mb-px ${activeTab === tab.id
-                ? 'text-white border-red-500'
-                : 'text-gray-500 border-transparent hover:text-gray-300'
+      {/* Tabs & Search on YouTube */}
+      <div className="flex items-center justify-between border-b border-white/10 pb-0 gap-2">
+        <div className="flex gap-1 overflow-x-auto no-scrollbar">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-2 text-xs font-bold rounded-t-lg transition border-b-2 -mb-px whitespace-nowrap ${
+                activeTab === tab.id
+                  ? 'text-white border-red-500'
+                  : 'text-gray-500 border-transparent hover:text-gray-300'
               }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <a
+          href={fallbackUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition px-3 py-1.5 rounded-lg hover:bg-white/5 flex-shrink-0"
+          title={`Search ${movieName} on YouTube`}
+        >
+          <ExternalLink size={13} />
+          <span>Search on YouTube</span>
+        </a>
       </div>
 
       {/* Songs List */}
