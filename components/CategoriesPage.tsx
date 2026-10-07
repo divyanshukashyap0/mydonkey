@@ -439,9 +439,14 @@ const CategoriesPage: React.FC<CategoriesPageProps> = ({ onDetails, onPlay }) =>
             let detail: any = null;
             try {
                 detail = await fetchTMDBDetails(tmdbId, requestedType);
-            } catch (_) {
-                // If requested type failed, try the alternate type
-                detail = await fetchTMDBDetails(tmdbId, requestedType === 'tv' ? 'movie' : 'tv');
+            } catch (_) {}
+            if (!detail || !detail.id || (!detail.title && !detail.name)) {
+                try {
+                    detail = await fetchTMDBDetails(tmdbId, requestedType === 'tv' ? 'movie' : 'tv');
+                } catch (_) {}
+            }
+            if (!detail || !detail.id || (!detail.title && !detail.name)) {
+                throw new Error(`Failed to resolve TMDB details for id: ${tmdbId}`);
             }
 
             const trailerKey = extractTMDBTrailer(detail);

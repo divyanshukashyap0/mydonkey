@@ -160,7 +160,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const [activeServer, setActiveServer] = useState<StreamServerKey>(() => {
         try {
             const saved = localStorage.getItem('mydonkey_preferred_server') as StreamServerKey | null;
-            if (saved && saved !== 'nxsha' && STREAM_SERVERS.some(s => s.key === saved)) {
+            if (saved && STREAM_SERVERS.some(s => s.key === saved)) {
                 return saved;
             }
         } catch { }

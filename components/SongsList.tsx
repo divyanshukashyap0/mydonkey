@@ -61,9 +61,9 @@ const SongsList: React.FC<SongsListProps> = ({ songs, activeSongId, onSelect, lo
                 loading="lazy"
                 className="w-full h-full object-cover"
                 onError={(e) => {
-                  if (song.videoId) {
-                    (e.currentTarget as HTMLImageElement).src = `https://i.ytimg.com/vi/${song.videoId}/hqdefault.jpg`;
-                  }
+                  const target = e.currentTarget as HTMLImageElement;
+                  target.onerror = null;
+                  target.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=60';
                 }}
               />
               <div className={`absolute inset-0 flex items-center justify-center transition-opacity bg-black/50 ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>

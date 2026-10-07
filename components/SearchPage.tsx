@@ -327,7 +327,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ onDetails }) => {
         (async () => {
             try {
                 const detail = await fetchTMDBDetails(item.tmdbId!, immediateType);
-                if (!detail) return;
+                if (!detail || !detail.id || (!detail.title && !detail.name)) return;
 
                 const imdbId = detail.external_ids?.imdb_id || (detail as any).imdb_id || '';
                 const trailerKey = extractTMDBTrailer(detail);

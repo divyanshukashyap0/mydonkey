@@ -241,27 +241,32 @@ const MainLayout = () => {
             const rawId = currentPath.split('/')[2];
             const contentId = rawId ? decodeURIComponent(rawId).trim() : '';
             activeContentIdRef.current = contentId;
-            const stateItem = (location.state as any)?.item;
+            const rawStateItem = (location.state as any)?.item;
+            const stateItem = (rawStateItem?.title && rawStateItem.title !== 'undefined' && rawStateItem.title.trim() !== '') ? rawStateItem : null;
 
             // Instant title resolution for deep link before any network calls
             const earlyTitle = stateItem?.title || resolveContentTitleInstant(location.pathname, location.search, location.state, rawContentRef.current || contentRef.current);
-            if (earlyTitle) {
+            if (earlyTitle && earlyTitle !== 'undefined' && earlyTitle !== 'null') {
                 setWebpageTitle(earlyTitle);
             }
 
             if (contentId) {
-                // If already viewing this item, don't restart
+                // If already viewing this item and it has a valid title, don't restart
                 if (viewingContentRef.current?.id === contentId || (viewingContentRef.current?.tmdbId && `tmdb_${viewingContentRef.current.tmdbId}` === contentId)) {
-                    setIsResolvingModalContent(false);
-                    return;
+                    if (viewingContentRef.current.title && viewingContentRef.current.title !== 'undefined') {
+                        setIsResolvingModalContent(false);
+                        return;
+                    }
                 }
 
-                // 1. Instant Synchronous Search in memory catalogs
+                // 1. Instant Synchronous Search in memory catalogs (strictly requiring valid title)
                 const findInMemory = (idToFind: string): Content | undefined => {
                     const pool = [...(rawContentRef.current || []), ...(contentRef.current || []), ...FALLBACK_CATALOG];
                     const cleanTarget = idToFind.toLowerCase();
                     return pool.find(c => {
                         if (!c) return false;
+                        // Phantom or corrupt items missing title must NOT be returned
+                        if (!c.title || c.title === 'undefined' || c.title === 'null' || c.title.trim() === '') return false;
                         if (c.id && c.id.toLowerCase() === cleanTarget) return true;
                         if (c.tmdbId && (`tmdb_${c.tmdbId}`.toLowerCase() === cleanTarget || String(c.tmdbId) === cleanTarget)) return true;
                         if (c.imdbId && c.imdbId.toLowerCase() === cleanTarget) return true;
@@ -280,7 +285,7 @@ const MainLayout = () => {
                     }
                     if (isCancelled || !window.location.pathname.startsWith('/browse/')) return;
                     setViewingContent(item);
-                    if (item.title) {
+                    if (item.title && item.title !== 'undefined') {
                         setWebpageTitle(item.title);
                         saveContentTitle(item.id, item.title);
                     }
@@ -304,12 +309,16 @@ const MainLayout = () => {
                             let resolvedType: 'movie' | 'tv' = hintType || 'movie';
                             if (hintType === 'tv') {
                                 try { detail = await fetchTMDBDetails(numericId, 'tv'); } catch (_) { }
-                                if (!detail) { try { detail = await fetchTMDBDetails(numericId, 'movie'); resolvedType = 'movie'; } catch (_) { } }
+                                if (!detail || !detail.id || (!detail.title && !detail.name)) {
+                                    try { detail = await fetchTMDBDetails(numericId, 'movie'); resolvedType = 'movie'; } catch (_) { }
+                                }
                             } else {
                                 try { detail = await fetchTMDBDetails(numericId, 'movie'); } catch (_) { }
-                                if (!detail) { try { detail = await fetchTMDBDetails(numericId, 'tv'); resolvedType = 'tv'; } catch (_) { } }
+                                if (!detail || !detail.id || (!detail.title && !detail.name)) {
+                                    try { detail = await fetchTMDBDetails(numericId, 'tv'); resolvedType = 'tv'; } catch (_) { }
+                                }
                             }
-                            if (detail) {
+                            if (detail && detail.id && (detail.title || detail.name)) {
                                 const trailerUrl = extractTMDBTrailer(detail);
                                 const imdbId = detail.external_ids?.imdb_id || (detail as any).imdb_id || '';
                                 const effectiveType: 'movie' | 'tv' = (detail.name || detail.media_type === 'tv' || resolvedType === 'tv') ? 'tv' : 'movie';
@@ -436,6 +445,12 @@ const MainLayout = () => {
                         if (resolved.title) {
                             setWebpageTitle(resolved.title);
                             saveContentTitle(resolved.id, resolved.title);
+                            // Clean up browser URL if it contains title=undefined
+                            if (window.location.search.includes('title=undefined') || window.location.search.includes('title=null')) {
+                                const cleanParams = new URLSearchParams(window.location.search);
+                                cleanParams.set('title', resolved.title);
+                                navigate(`/browse/${resolved.id}?${cleanParams.toString()}`, { replace: true, state: { item: resolved } });
+                            }
                         }
                     } else {
                         console.warn(`Deep link content not found across catalog, TMDB & Firestore: ${contentId}`);
@@ -724,7 +739,10 @@ const MainLayout = () => {
         if (playingContent && location.pathname.startsWith('/watch/')) {
             const targetWatchPath = `/watch/${playingContent.id}`;
             if (!location.pathname.startsWith(targetWatchPath)) {
-                navigate(`${targetWatchPath}?mode=${playingContent.playMode || 'movie'}&title=${encodeURIComponent(playingContent.title)}`, {
+                const titleParam = (playingContent.title && playingContent.title !== 'undefined' && playingContent.title !== 'null')
+                    ? `&title=${encodeURIComponent(playingContent.title.trim())}`
+                    : '';
+                navigate(`${targetWatchPath}?mode=${playingContent.playMode || 'movie'}${titleParam}`, {
                     replace: true,
                     state: {
                         item: playingContent,
@@ -1241,11 +1259,14 @@ const MainLayout = () => {
             const fullItem = { ...playableItem, id: targetId, playMode: 'movie' as const };
             addToWatchHistory(fullItem).catch(() => {});
             const isFromBrowse = location.pathname.startsWith('/browse/');
-            setViewingContent(null);
-            setPlayingContent(fullItem);
-            setWebpageTitle(fullItem.title);
-            saveContentTitle(targetId, fullItem.title);
-            navigate(`/watch/${targetId}?mode=movie&title=${encodeURIComponent(fullItem.title)}`, {
+            if (fullItem.title && fullItem.title !== 'undefined' && fullItem.title !== 'null') {
+                setWebpageTitle(fullItem.title);
+                saveContentTitle(targetId, fullItem.title);
+            }
+            const titleParam = (fullItem.title && fullItem.title !== 'undefined' && fullItem.title !== 'null')
+                ? `&title=${encodeURIComponent(fullItem.title.trim())}`
+                : '';
+            navigate(`/watch/${targetId}?mode=movie${titleParam}`, {
                 replace: isFromBrowse,
                 state: {
                     item: fullItem,
@@ -1260,13 +1281,20 @@ const MainLayout = () => {
 
     const handleDetails = (item: Content) => {
         setViewingContent(item);
-        setWebpageTitle(item.title);
-        saveContentTitle(item.id, item.title);
+        if (item.title && item.title !== 'undefined' && item.title !== 'null') {
+            setWebpageTitle(item.title);
+            saveContentTitle(item.id, item.title);
+        }
         const fromUrl = (location.state as any)?.from || (isModalRoute ? lastNonModalUrlRef.current : (location.pathname + location.search));
         const fromTab = (location.state as any)?.fromTab || activeTab;
         const searchParams = new URLSearchParams((!isModalRoute && location.search) ? location.search : '');
-        searchParams.set('title', item.title);
-        navigate(`/browse/${item.id}?${searchParams.toString()}`, {
+        if (item.title && item.title !== 'undefined' && item.title !== 'null' && item.title.trim() !== '') {
+            searchParams.set('title', item.title.trim());
+        } else {
+            searchParams.delete('title');
+        }
+        const queryString = searchParams.toString();
+        navigate(`/browse/${item.id}${queryString ? `?${queryString}` : ''}`, {
             state: {
                 item,
                 from: fromUrl,

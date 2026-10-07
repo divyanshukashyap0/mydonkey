@@ -134,7 +134,7 @@ export default function AdminLayout({ onExit }: { onExit: () => void }) {
     const group = SIDEBAR_GROUPS.find(g => g.items.some(i => i.id === activeModule));
     const item = group?.items.find(i => i.id === activeModule);
     if (item) {
-      document.title = `${item.label} • Consigliere Mode | MyDonkey`;
+      document.title = `${item.label} • Admin mode | MyDonkey`;
     }
   }, [activeModule]);
 
@@ -176,7 +176,7 @@ export default function AdminLayout({ onExit }: { onExit: () => void }) {
         <div className="p-6 flex items-center justify-between border-b border-white/5">
           <div>
             <img src="/logo.png" className="h-8 w-auto object-contain mb-1" alt="DONKEY ADMIN" />
-            <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Consigliere Mode</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Admin Mode</p>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="md:hidden text-gray-400"><X size={20} /></button>
         </div>

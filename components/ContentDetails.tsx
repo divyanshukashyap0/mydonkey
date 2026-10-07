@@ -8,6 +8,7 @@ import SongsSection from './SongsSection';
 
 import { buildEmbedUrl, hasDriveSource, isExternalEmbedUrl } from '../utils/embedUrl';
 import { saveContentTitle, setWebpageTitle } from '../utils/titleManager';
+import { fetchTMDBDetails, tmdbPosterUrl, tmdbBackdropUrl, mapTMDBGenres, extractTMDBTrailer } from '../services/tmdbService';
 
 interface ContentDetailsProps {
     content: Content;
@@ -70,6 +71,55 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                 }).catch(() => {});
             }
         }
+
+        // Auto-heal TMDB item if title or images are missing
+        const isTmdbId = contentId.startsWith('tmdb_') || /^\d+$/.test(contentId);
+        const isMissingTmdbData = isTmdbId && (!initialContent.title || initialContent.title === 'undefined' || initialContent.title === 'null' || !initialContent.poster_path);
+        if (isMissingTmdbData && !fetchedDocIdsRef.current.has(`tmdb_heal_${contentId}`)) {
+            fetchedDocIdsRef.current.add(`tmdb_heal_${contentId}`);
+            const numericId = parseInt(contentId.replace('tmdb_', ''), 10);
+            if (!isNaN(numericId)) {
+                (async () => {
+                    let detail: any = null;
+                    const reqType = initialContent.type === 'tv' ? 'tv' : 'movie';
+                    try { detail = await fetchTMDBDetails(numericId, reqType); } catch (_) {}
+                    if (!detail || !detail.id || (!detail.title && !detail.name)) {
+                        try { detail = await fetchTMDBDetails(numericId, reqType === 'tv' ? 'movie' : 'tv'); } catch (_) {}
+                    }
+                    if (detail && detail.id && (detail.title || detail.name)) {
+                        const trailerUrl = extractTMDBTrailer(detail);
+                        const imdbId = detail.external_ids?.imdb_id || (detail as any).imdb_id || '';
+                        const effType = (detail.name || detail.media_type === 'tv') ? 'tv' : 'movie';
+                        const resolvedTitle = detail.title || detail.name || 'Untitled';
+                        setContent(prev => {
+                            if (!prev || prev.id !== contentId) return prev;
+                            return {
+                                ...prev,
+                                title: resolvedTitle,
+                                type: effType,
+                                imdbId: imdbId || prev.imdbId,
+                                genres: (detail.genres && detail.genres.length > 0) ? mapTMDBGenres(detail.genres.map((g: any) => g.id)) : prev.genres,
+                                poster_path: detail.poster_path ? tmdbPosterUrl(detail.poster_path) : prev.poster_path,
+                                backdrop_path: detail.backdrop_path ? tmdbBackdropUrl(detail.backdrop_path) : prev.backdrop_path,
+                                overview: detail.overview || prev.overview,
+                                release_date: detail.release_date || detail.first_air_date || prev.release_date,
+                                year: (detail.release_date || detail.first_air_date) ? parseInt((detail.release_date || detail.first_air_date).split('-')[0]) : prev.year,
+                                vote_average: detail.vote_average || prev.vote_average,
+                                rating: detail.vote_average || prev.rating,
+                                youtubeId: trailerUrl || prev.youtubeId,
+                                tmdbId: detail.id,
+                                cast: detail.credits?.cast ? detail.credits.cast.slice(0, 12).map((c: any) => c.name) : prev.cast,
+                                director: detail.credits?.crew?.find((c: any) => c.job === 'Director')?.name || prev.director,
+                            };
+                        });
+                        if (resolvedTitle && resolvedTitle !== 'undefined') {
+                            setWebpageTitle(resolvedTitle);
+                            saveContentTitle(contentId, resolvedTitle);
+                        }
+                    }
+                })();
+            }
+        }
     }, [initialContent.id, fetchContentById]);
 
     const isAdmin = currentUser?.role === 'admin';
@@ -124,7 +174,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
 
     // Dynamically update document title to content name when viewing content page
     useEffect(() => {
-        if (content?.title) {
+        if (content?.title && content.title !== 'undefined' && content.title !== 'null') {
             setWebpageTitle(content.title);
             if (content.id) saveContentTitle(content.id, content.title);
         }
@@ -207,7 +257,8 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
 
 
     const handleShareContent = async () => {
-        const shareUrl = `${window.location.origin}/browse/${content.id}?title=${encodeURIComponent(content.title || '')}`;
+        const titleParam = (content.title && content.title !== 'undefined' && content.title !== 'null') ? `?title=${encodeURIComponent(content.title)}` : '';
+        const shareUrl = `${window.location.origin}/browse/${content.id}${titleParam}`;
         const titleText = content.title || 'Movie';
         const year = content.release_date?.split('-')[0] || '';
         const descText = content.overview ? `${content.overview.slice(0, 110)}...` : 'Watch in HD for free on My Donkey';
@@ -414,7 +465,8 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                                 onClick={() => {
                                     const cid = content.tmdbId || (typeof content.id === 'string' ? content.id.replace(/^(tmdb_|imdb_)/, '') : content.id);
                                     const posterUrl = content.poster_path || content.poster_path_mobile || '';
-                                    navigate(`/theatre?id=${cid}&type=${content.type === 'tv' ? 'tv' : 'movie'}&title=${encodeURIComponent(content.title || '')}&poster=${encodeURIComponent(posterUrl)}`, { state: { content } });
+                                    const theatreTitle = (content.title && content.title !== 'undefined' && content.title !== 'null') ? `&title=${encodeURIComponent(content.title)}` : '';
+                                    navigate(`/theatre?id=${cid}&type=${content.type === 'tv' ? 'tv' : 'movie'}${theatreTitle}&poster=${encodeURIComponent(posterUrl)}`, { state: { content } });
                                 }}
                                 className="col-span-2 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 text-black py-3 rounded-xl font-extrabold text-sm flex items-center justify-center gap-2 hover:opacity-95 transition active:scale-95 shadow-lg border border-yellow-200/50"
                             >
@@ -520,7 +572,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                             <div className="flex items-center gap-2 mb-6">
                                 <span className="px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-2 shadow-md">
                                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                                    9 High-Speed Streaming Servers (Bingr 4K • Nxsha HD • VidStuck • ZXC • MegaPlay Anime)
+                                    9 High-Speed Streaming Servers (Nxsha HD • Bingr 4K • VidStuck • ZXC • MegaPlay Anime)
                                 </span>
                             </div>
 
@@ -554,7 +606,8 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                                     onClick={() => {
                                         const cid = content.tmdbId || (typeof content.id === 'string' ? content.id.replace(/^(tmdb_|imdb_)/, '') : content.id);
                                         const posterUrl = content.poster_path || content.poster_path_mobile || '';
-                                        navigate(`/theatre?id=${cid}&type=${content.type === 'tv' ? 'tv' : 'movie'}&title=${encodeURIComponent(content.title || '')}&poster=${encodeURIComponent(posterUrl)}`, { state: { content } });
+                                        const theatreTitle = (content.title && content.title !== 'undefined' && content.title !== 'null') ? `&title=${encodeURIComponent(content.title)}` : '';
+                                        navigate(`/theatre?id=${cid}&type=${content.type === 'tv' ? 'tv' : 'movie'}${theatreTitle}&poster=${encodeURIComponent(posterUrl)}`, { state: { content } });
                                     }}
                                     className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 text-black px-7 py-3.5 rounded-xl font-extrabold text-lg flex items-center gap-2 hover:opacity-95 transition-all hover:scale-105 active:scale-95 shadow-2xl border border-yellow-200/50 cursor-pointer"
                                     title="Watch on Big Screen in 3D Virtual Cinema"

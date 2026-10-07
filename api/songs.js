@@ -220,8 +220,8 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') { res.status(405).json({ error: 'Method not allowed' }); return; }
 
   const { movie, type = 'movie' } = req.query || {};
-  if (!movie || !movie.trim()) {
-    return res.status(400).json({ error: 'Missing movie query param' });
+  if (!movie || !movie.trim() || movie === 'undefined' || movie === 'null') {
+    return res.status(400).json({ error: 'Missing or invalid movie query param' });
   }
 
   const movieName = movie.trim();

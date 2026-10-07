@@ -75,7 +75,8 @@ const SparksFeed: React.FC<SparksFeedProps> = ({ items }) => {
 
                      <button
                         onClick={async () => {
-                            const shareUrl = `${window.location.origin}/browse/${item.id}?title=${encodeURIComponent(item.title)}`;
+                            const titleParam = (item.title && item.title !== 'undefined' && item.title !== 'null') ? `?title=${encodeURIComponent(item.title.trim())}` : '';
+                            const shareUrl = `${window.location.origin}/browse/${item.id}${titleParam}`;
                             const text = `🎬 Watch "${item.title}" on My Donkey!\n\n🍿 Stream Free:`;
                             const fullText = `${text} ${shareUrl}`;
                             if (navigator.share) {

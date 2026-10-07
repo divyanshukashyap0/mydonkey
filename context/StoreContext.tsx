@@ -54,8 +54,6 @@ import {
     getDocsFromCache,
     increment,
     writeBatch,
-    disableNetwork,
-    enableNetwork,
 } from 'firebase/firestore';
 import { idbGet, idbSet } from '../utils/idbCache';
 import { FALLBACK_CATALOG, FALLBACK_SECTIONS, fetchDynamicFallbackContent, buildDynamicSections } from '../services/fallbackCatalog';
@@ -147,7 +145,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
     twitterUrl: '',
     youtubeUrl: '',
     linkedinUrl: '',
-    baseContentServer: 'bingr',
+    baseContentServer: 'nxsha',
     embedProxyBaseUrl: 'https://proxy.garageband.rocks',
     embedMovieType: 'movie',
     embedTvType: 'tv',
@@ -367,7 +365,18 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
         const brokenPatterns = ['_poster.jpg', '_backdrop.jpg', 'geCRueV3ElhRTr0xtJu3J8WODRf', 'jYW3jHl8D1wS4w7w9H4t9w8l'];
 
-        const healed = existing.map(item => {
+        // Filter out zombie / phantom documents that have no valid title and no poster
+        const validExisting = (existing || []).filter(item => {
+            if (!item) return false;
+            const hasTitle = item.title && item.title !== 'undefined' && item.title !== 'null' && item.title.trim() !== '';
+            const hasImage = Boolean(item.poster_path || item.backdrop_path || (item as any).posterUrl || (item as any).bannerUrl);
+            if (!hasTitle && !hasImage && !curatedMap.has(item.id)) {
+                return false;
+            }
+            return true;
+        });
+
+        const healed = validExisting.map(item => {
             const curated = curatedMap.get(item.id);
             if (curated) {
                 return {
@@ -396,18 +405,14 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         return healed;
     }, []);
 
-    const handleQuotaExceeded = useCallback((forceDisableNetwork: boolean = false) => {
+    const handleQuotaExceeded = useCallback((forceOffline: boolean = false) => {
         setIsQuotaExceeded(true);
         setIsLoading(false);
-        if (forceDisableNetwork) {
+        if (forceOffline) {
             try {
                 sessionStorage.setItem('firebase_quota_exceeded', 'true');
             } catch (e) { }
-            // Only shut down Firestore network if actual quota was exhausted (resource-exhausted error)
-            try {
-                disableNetwork(db).catch(() => {});
-            } catch (e) { }
-            console.warn("[Quota Fallback] Database quota strictly exceeded. Offline fallback active.");
+            console.warn("[Quota Fallback] Database quota exceeded. Serving offline cached/curated catalog.");
         } else {
             console.warn("[Quota Fallback] Network delayed or database initial sync in progress. Seamlessly serving cached/curated titles.");
         }
@@ -437,13 +442,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     const handleQuotaExceededRef = useRef(handleQuotaExceeded);
     handleQuotaExceededRef.current = handleQuotaExceeded;
-
-    // Re-enable network if needed so admin operations and background sync can proceed
-    useEffect(() => {
-        try {
-            enableNetwork(db).catch(() => {});
-        } catch (e) { }
-    }, []);
 
     // --- Theme Application ---
     useEffect(() => {
@@ -1352,9 +1350,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
         if (!isCurrentlyLiked) {
             try {
-                await setDoc(doc(db, 'content', contentId), {
-                    likes: increment(1)
-                }, { merge: true });
+                const itemExists = content.some(c => c.id === contentId && c.title && c.title !== 'undefined');
+                if (itemExists) {
+                    await setDoc(doc(db, 'content', contentId), {
+                        likes: increment(1)
+                    }, { merge: true });
+                }
             } catch (_) {}
         }
     };
@@ -1867,9 +1868,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             try {
                 if (!id || viewedContentIds.current.has(id)) return;
                 viewedContentIds.current.add(id);
-                await setDoc(doc(db, 'content', id), {
-                    views: increment(1)
-                }, { merge: true });
+                const itemExists = content.some(c => c.id === id && c.title && c.title !== 'undefined');
+                if (itemExists) {
+                    await setDoc(doc(db, 'content', id), {
+                        views: increment(1)
+                    }, { merge: true });
+                }
             } catch {
                 // Silently ignore
             }
@@ -1877,9 +1881,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         incrementLikes: async (id: string) => {
             try {
                 if (!id) return;
-                await setDoc(doc(db, 'content', id), {
-                    likes: increment(1)
-                }, { merge: true });
+                const itemExists = content.some(c => c.id === id && c.title && c.title !== 'undefined');
+                if (itemExists) {
+                    await setDoc(doc(db, 'content', id), {
+                        likes: increment(1)
+                    }, { merge: true });
+                }
             } catch {
                 // Silently ignore
             }

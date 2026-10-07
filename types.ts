@@ -106,8 +106,8 @@ export interface Section {
 
 
 export type StreamServerKey =
-  | 'vidstuck'
   | 'nxsha'
+  | 'vidstuck'
   | 'bingr'
   | 'zxc'
   | 'vidlink'

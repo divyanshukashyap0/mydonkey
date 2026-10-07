@@ -51,6 +51,11 @@ const SongsPlayer: React.FC<SongsPlayerProps> = ({ song, onNext, onShuffle, hasN
               alt={song.title}
               className="absolute inset-0 w-full h-full object-cover opacity-60"
               loading="lazy"
+              onError={(e) => {
+                const target = e.currentTarget as HTMLImageElement;
+                target.onerror = null;
+                target.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=60';
+              }}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
             <div className="relative z-10 w-16 h-16 rounded-full bg-red-600/90 group-hover:bg-red-500 flex items-center justify-center shadow-2xl transition-all transform group-hover:scale-110">

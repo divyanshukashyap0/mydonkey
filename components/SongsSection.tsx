@@ -33,15 +33,20 @@ const SongsSection: React.FC<SongsSectionProps> = ({ movieName, contentType }) =
   const [activeTab, setActiveTab] = useState<SongsTab>('top');
   const [hasFetched, setHasFetched] = useState(false);
 
+  const cleanMovieName = (movieName && movieName !== 'undefined' && movieName !== 'null' && movieName.trim() !== '') ? movieName.trim() : '';
   const type = (contentType === 'tv' ? 'tv' : 'movie') as 'movie' | 'tv';
-  const fallbackUrl = getFallbackSearchUrl(movieName, type);
+  const fallbackUrl = getFallbackSearchUrl(cleanMovieName || 'movie songs', type);
 
   const loadSongs = useCallback(async () => {
+    if (!cleanMovieName) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
 
     try {
-      const data = await fetchMovieSongs(movieName, type);
+      const data = await fetchMovieSongs(cleanMovieName, type);
       setApiData(data);
       if (data.results && data.results.length > 0) {
         setActiveSong(data.results[0]); // auto-select first song
@@ -52,15 +57,17 @@ const SongsSection: React.FC<SongsSectionProps> = ({ movieName, contentType }) =
       setLoading(false);
       setHasFetched(true);
     }
-  }, [movieName, type]);
+  }, [cleanMovieName, type]);
 
   // Fetch when movie or type changes
   useEffect(() => {
     setHasFetched(false);
     setApiData(null);
     setActiveSong(null);
-    loadSongs();
-  }, [loadSongs]);
+    if (cleanMovieName) {
+      loadSongs();
+    }
+  }, [cleanMovieName, loadSongs]);
 
   const allSongs = apiData?.results || [];
   const isQuotaExceeded = apiData?.quota_exceeded || apiData?.source === 'quota_exceeded';
@@ -104,7 +111,7 @@ const SongsSection: React.FC<SongsSectionProps> = ({ movieName, contentType }) =
           </div>
           <div>
             <h3 className="text-white font-bold text-sm">Official Soundtrack</h3>
-            <p className="text-gray-400 text-xs mt-0.5">Explore full album and OST for {movieName} on YouTube</p>
+            <p className="text-gray-400 text-xs mt-0.5">Explore full album and OST for {cleanMovieName || 'this title'} on YouTube</p>
           </div>
           <div className="flex items-center gap-2 mt-2">
             <a

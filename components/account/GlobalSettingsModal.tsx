@@ -137,11 +137,11 @@ const GlobalSettingsModal: React.FC<GlobalSettingsModalProps> = ({ isOpen, onClo
     };
 
     const handleUpdateAllContentUrls = async () => {
-        const activeServerKey = formData.baseContentServer || 'bingr';
+        const activeServerKey = formData.baseContentServer || 'nxsha';
         const serverObj = STREAM_SERVERS.find(s => s.key === activeServerKey);
         const serverLabel = serverObj ? `${serverObj.name} (${serverObj.tag})` : activeServerKey;
 
-        const itemsToUpdate = (content || []).filter(c => c.imdbId || (c.videoUrl && (c.videoUrl.includes('/embed/') || c.videoUrl.includes('proxy.garageband.rocks') || c.videoUrl.includes('bingr') || c.videoUrl.includes('vidstuck') || c.videoUrl.includes('vidlink'))));
+        const itemsToUpdate = (content || []).filter(c => c.imdbId || (c.videoUrl && (c.videoUrl.includes('/embed/') || c.videoUrl.includes('proxy.garageband.rocks') || c.videoUrl.includes('nxsha') || c.videoUrl.includes('bingr') || c.videoUrl.includes('vidstuck') || c.videoUrl.includes('vidlink'))));
 
         if (itemsToUpdate.length === 0) {
             alert("No content items found with IMDb ID or embed stream URLs to update.");
@@ -416,7 +416,7 @@ const GlobalSettingsModal: React.FC<GlobalSettingsModalProps> = ({ isOpen, onClo
 
                             {/* Active Server Pill */}
                             {(() => {
-                                const activeKey = formData.baseContentServer || 'bingr';
+                                const activeKey = formData.baseContentServer || 'nxsha';
                                 const activeServerObj = STREAM_SERVERS.find(s => s.key === activeKey);
                                 return (
                                     <div className="p-3.5 rounded-xl bg-brand-red/10 border border-brand-red/30 flex items-center justify-between gap-3">
@@ -446,7 +446,7 @@ const GlobalSettingsModal: React.FC<GlobalSettingsModalProps> = ({ isOpen, onClo
                                 </label>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     {STREAM_SERVERS.map((server) => {
-                                        const isSelected = (formData.baseContentServer || 'bingr') === server.key;
+                                        const isSelected = (formData.baseContentServer || 'nxsha') === server.key;
                                         return (
                                             <div
                                                 key={server.key}
@@ -496,7 +496,8 @@ const GlobalSettingsModal: React.FC<GlobalSettingsModalProps> = ({ isOpen, onClo
                                         formData.baseContentServer === 'vidlink' ? 'https://vidlink.pro' :
                                         formData.baseContentServer === 'vidnest' ? 'https://vidnest.fun' :
                                         formData.baseContentServer === 'default' ? 'https://proxy.garageband.rocks' :
-                                        'https://bingr.one'
+                                        formData.baseContentServer === 'bingr' ? 'https://bingr.one' :
+                                        'https://nxsha.space'
                                     }
                                     className="w-full bg-black/60 border border-white/10 rounded-xl p-3 text-sm font-mono text-white outline-none focus:border-brand-red transition"
                                 />
@@ -507,7 +508,7 @@ const GlobalSettingsModal: React.FC<GlobalSettingsModalProps> = ({ isOpen, onClo
 
                             {/* Live Stream Previews */}
                             {(() => {
-                                const activeKey = formData.baseContentServer || 'bingr';
+                                const activeKey = formData.baseContentServer || 'nxsha';
                                 const moviePreview = buildServerEmbedUrl(27205, 'movie', activeKey, { settings: formData });
                                 const tvPreview = buildServerEmbedUrl(1396, 'tv', activeKey, { season: 1, episode: 1, settings: formData });
 

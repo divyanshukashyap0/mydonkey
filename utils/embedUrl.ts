@@ -6,13 +6,13 @@ export const DEFAULT_MOVIE_TYPE = 'movie';
 export const DEFAULT_TV_TYPE = 'tv';
 
 /**
- * Gets the configured base content provider server key or falls back to 'bingr'.
+ * Gets the configured base content provider server key or falls back to 'nxsha'.
  */
 export const getBaseContentServer = (settings?: Partial<SiteSettings>): StreamServerKey => {
     if (settings?.baseContentServer && STREAM_SERVERS.some(s => s.key === settings.baseContentServer)) {
         return settings.baseContentServer;
     }
-    return 'bingr';
+    return 'nxsha';
 };
 
 /**
@@ -228,8 +228,8 @@ export interface StreamServerOption {
 }
 
 export const STREAM_SERVERS: StreamServerOption[] = [
-    { key: 'bingr', name: 'Bingr', tag: '4K Ultra', description: 'Crystal-clear 4K / UHD resolution', supports4K: true },
     { key: 'nxsha', name: 'Nxsha', tag: 'HD + Subs', description: 'High definition with multilingual subtitles', hasSubtitles: true },
+    { key: 'bingr', name: 'Bingr', tag: '4K Ultra', description: 'Crystal-clear 4K / UHD resolution', supports4K: true },
     { key: 'vidstuck', name: 'VidStuck', tag: 'Fast 1080p', description: 'Ultra-fast bufferless streaming' },
     { key: 'zxc', name: 'ZXC', tag: 'Instant', description: 'Low-latency direct player' },
     { key: 'vidlink', name: 'VidLink', tag: 'Multi-CDN', description: 'Redundant high-availability CDN' },
@@ -241,8 +241,8 @@ export const STREAM_SERVERS: StreamServerOption[] = [
 ];
 
 export const STANDARD_SERVER_FALLBACK_ORDER: StreamServerKey[] = [
-    'bingr',
     'nxsha',
+    'bingr',
     'vidstuck',
     'zxc',
     'vidlink',
@@ -251,8 +251,8 @@ export const STANDARD_SERVER_FALLBACK_ORDER: StreamServerKey[] = [
 ];
 
 export const ANIME_SERVER_FALLBACK_ORDER: StreamServerKey[] = [
-    'bingr',
     'nxsha',
+    'bingr',
     'megaplay',
     'recloud',
     'zokoanime',
@@ -274,7 +274,7 @@ export interface ServerEmbedOptions {
  * Returns the fallback server order prioritized with the base content server first.
  */
 export const getFallbackOrder = (
-    baseServer: StreamServerKey = 'bingr',
+    baseServer: StreamServerKey = 'nxsha',
     isAnime: boolean = false
 ): StreamServerKey[] => {
     const list = isAnime ? ANIME_SERVER_FALLBACK_ORDER : STANDARD_SERVER_FALLBACK_ORDER;

@@ -43,11 +43,11 @@ const SettingsManager = () => {
     };
 
     const handleUpdateAllContentUrls = async () => {
-        const activeServerKey = formData.baseContentServer || 'bingr';
+        const activeServerKey = formData.baseContentServer || 'nxsha';
         const serverObj = STREAM_SERVERS.find(s => s.key === activeServerKey);
         const serverLabel = serverObj ? `${serverObj.name} (${serverObj.tag})` : activeServerKey;
 
-        const itemsToUpdate = content.filter(c => c.imdbId || (c.videoUrl && (c.videoUrl.includes('/embed/') || c.videoUrl.includes('proxy.garageband.rocks') || c.videoUrl.includes('bingr') || c.videoUrl.includes('vidstuck') || c.videoUrl.includes('vidlink'))));
+        const itemsToUpdate = content.filter(c => c.imdbId || (c.videoUrl && (c.videoUrl.includes('/embed/') || c.videoUrl.includes('proxy.garageband.rocks') || c.videoUrl.includes('nxsha') || c.videoUrl.includes('bingr') || c.videoUrl.includes('vidstuck') || c.videoUrl.includes('vidlink'))));
         
         if (itemsToUpdate.length === 0) {
             alert("No content items found with IMDb ID or embed stream URLs to update.");
@@ -401,7 +401,7 @@ const SettingsManager = () => {
                                     <div>
                                         <div className="text-xs font-bold text-white">Content Provider & Streaming Settings</div>
                                         <div className="text-[11px] text-gray-400">
-                                            Currently streaming via <span className="text-brand-red font-semibold">{STREAM_SERVERS.find(s => s.key === (formData.baseContentServer || 'bingr'))?.name || 'Bingr'}</span>. Configure base server, custom domains, and live previews in the dedicated tab.
+                                            Currently streaming via <span className="text-brand-red font-semibold">{STREAM_SERVERS.find(s => s.key === (formData.baseContentServer || 'nxsha'))?.name || 'Nxsha'}</span>. Configure base server, custom domains, and live previews in the dedicated tab.
                                         </div>
                                     </div>
                                 </div>
@@ -432,7 +432,7 @@ const SettingsManager = () => {
 
                         {/* Current Active Banner */}
                         {(() => {
-                            const activeKey = formData.baseContentServer || 'bingr';
+                            const activeKey = formData.baseContentServer || 'nxsha';
                             const activeServerObj = STREAM_SERVERS.find(s => s.key === activeKey);
                             return (
                                 <div className="p-4 rounded-xl bg-brand-red/10 border border-brand-red/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -466,7 +466,7 @@ const SettingsManager = () => {
                             </label>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                 {STREAM_SERVERS.map((server) => {
-                                    const isSelected = (formData.baseContentServer || 'bingr') === server.key;
+                                    const isSelected = (formData.baseContentServer || 'nxsha') === server.key;
                                     return (
                                         <div
                                             key={server.key}
@@ -541,12 +541,13 @@ const SettingsManager = () => {
                                             formData.baseContentServer === 'vidlink' ? 'https://vidlink.pro' :
                                             formData.baseContentServer === 'vidnest' ? 'https://vidnest.fun' :
                                             formData.baseContentServer === 'default' ? 'https://proxy.garageband.rocks' :
-                                            'https://bingr.one'
+                                            formData.baseContentServer === 'bingr' ? 'https://bingr.one' :
+                                            'https://nxsha.space'
                                         }
                                         className="w-full bg-black/60 border border-white/10 rounded-lg p-3 text-sm font-mono text-white outline-none focus:border-brand-red transition"
                                     />
                                     <p className="text-[10px] text-gray-500 mt-1">
-                                        Leave empty to use standard high-availability cloud endpoints for {STREAM_SERVERS.find(s => s.key === (formData.baseContentServer || 'bingr'))?.name}.
+                                        Leave empty to use standard high-availability cloud endpoints for {STREAM_SERVERS.find(s => s.key === (formData.baseContentServer || 'nxsha'))?.name}.
                                     </p>
                                 </div>
 
@@ -589,7 +590,7 @@ const SettingsManager = () => {
                             </h4>
 
                             {(() => {
-                                const activeKey = formData.baseContentServer || 'bingr';
+                                const activeKey = formData.baseContentServer || 'nxsha';
                                 const moviePreviewUrl = buildServerEmbedUrl(27205, 'movie', activeKey, { settings: formData });
                                 const tvPreviewUrl = buildServerEmbedUrl(1396, 'tv', activeKey, { season: 1, episode: 1, settings: formData });
 

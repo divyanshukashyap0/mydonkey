@@ -192,7 +192,8 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
             if (onDetails) {
                 onDetails(localMatch);
             } else {
-                navigate(`/browse/${localMatch.id}?title=${encodeURIComponent(localMatch.title)}`, { state: { item: localMatch } });
+                const titleParam = (localMatch.title && localMatch.title !== 'undefined' && localMatch.title !== 'null') ? `?title=${encodeURIComponent(localMatch.title.trim())}` : '';
+                navigate(`/browse/${localMatch.id}${titleParam}`, { state: { item: localMatch } });
             }
             return;
         }
@@ -219,7 +220,7 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
             createdAt: new Date().toISOString()
         };
 
-        if (immediateContent.title) {
+        if (immediateContent.title && immediateContent.title !== 'undefined' && immediateContent.title !== 'null') {
             setWebpageTitle(immediateContent.title);
             saveContentTitle(immediateContent.id, immediateContent.title);
         }
@@ -227,7 +228,8 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
         if (onDetails) {
             onDetails(immediateContent);
         } else {
-            navigate(`/browse/${immediateContent.id}?title=${encodeURIComponent(immediateContent.title)}`, { state: { item: immediateContent } });
+            const titleParam = (immediateContent.title && immediateContent.title !== 'undefined' && immediateContent.title !== 'null') ? `?title=${encodeURIComponent(immediateContent.title.trim())}` : '';
+            navigate(`/browse/${immediateContent.id}${titleParam}`, { state: { item: immediateContent } });
         }
     };
 

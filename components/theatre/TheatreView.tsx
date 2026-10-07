@@ -508,8 +508,8 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
     const isImdb = cleanId.startsWith('tt') || String(idParam).startsWith('tt');
     const options = serversFor(false);
     const serverKey =
-      (Number.isInteger(srvIndex) && options[srvIndex] ? options[srvIndex].key : 'bingr') ??
-      'bingr';
+      (Number.isInteger(srvIndex) && options[srvIndex] ? options[srvIndex].key : 'nxsha') ??
+      'nxsha';
 
     if (!isImdb) {
       const tmdbIdNum = parseInt(cleanId, 10) || 1;
@@ -570,8 +570,8 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
           setCatalogTitle(title);
           const animeOptions = serversFor(title.anime);
           const finalServerKey =
-            (Number.isInteger(srvIndex) && animeOptions[srvIndex] ? animeOptions[srvIndex].key : 'bingr') ??
-            'bingr';
+            (Number.isInteger(srvIndex) && animeOptions[srvIndex] ? animeOptions[srvIndex].key : 'nxsha') ??
+            'nxsha';
 
           pendingAutoPlay.current = {
             playKey,

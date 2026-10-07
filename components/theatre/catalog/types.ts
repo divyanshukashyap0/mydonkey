@@ -41,7 +41,7 @@ export type TitleDetails = CatalogTitle & {
 };
 export type Episode = { number: number; name: string; airDate: string | null };
 export type AnimeEdition = { id: number; malId: number | null; title: string; year: number | null; format: string; episodes: number | null; poster: string | null };
-export type ServerKey = 'vidstuck' | 'megaplay' | 'recloud' | 'zokoanime' | 'zxc' | 'bingr' | 'nxsha' | 'vidlink' | 'vidnest';
+export type ServerKey = 'nxsha' | 'bingr' | 'vidstuck' | 'megaplay' | 'recloud' | 'zokoanime' | 'zxc' | 'vidlink' | 'vidnest';
 export type AudioTrack = 'sub' | 'dub';
 export type RecloudSource = 'hd-1' | 'hd-2';
 export type ServerPreferences = { audio: AudioTrack; source: RecloudSource; zokoTemplate: string; sandbox: boolean };

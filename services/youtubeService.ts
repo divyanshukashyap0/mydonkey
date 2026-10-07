@@ -65,15 +65,15 @@ const CURATED_BACKUPS: Record<string, YouTubeSongResult[]> = {
   ],
   animal: [
     {
-      videoId: 'DHMVf4_Q55U',
+      videoId: 'sVx1mJDeUj8',
       title: 'ANIMAL: Arjan Vailly | Ranbir Kapoor | Sandeep Vanga | Bhupinder Babbal',
-      thumbnail: 'https://i.ytimg.com/vi/DHMVf4_Q55U/hqdefault.jpg',
+      thumbnail: 'https://i.ytimg.com/vi/sVx1mJDeUj8/hqdefault.jpg',
       channelTitle: 'T-Series',
     },
     {
-      videoId: 'mQp_H3kE_wY',
+      videoId: 'dZ0fwJojhrs',
       title: 'ANIMAL: Pehle Bhi Main | Ranbir Kapoor, Tripti Dimri | Vishal Mishra',
-      thumbnail: 'https://i.ytimg.com/vi/mQp_H3kE_wY/hqdefault.jpg',
+      thumbnail: 'https://i.ytimg.com/vi/dZ0fwJojhrs/hqdefault.jpg',
       channelTitle: 'T-Series',
     },
   ],

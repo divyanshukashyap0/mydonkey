@@ -129,7 +129,9 @@ async function callTMDB(path: string, params: Record<string, any> = {}) {
         const res = await fetch(proxyUrl);
         if (res.ok) {
             const data = await res.json();
-            return data;
+            if (data && !data.fallback && !data.error) {
+                return data;
+            }
         }
     } catch {
         // Proxy unreachable, fallback to direct endpoints below

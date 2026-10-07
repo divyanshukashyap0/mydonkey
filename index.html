@@ -250,11 +250,14 @@
           // 1. Instant check from URL query param ?title= (0ms for shared/copied links)
           var params = new URLSearchParams(window.location.search);
           var paramTitle = params.get('title');
-          if (paramTitle) {
-            document.title = isTheatre
-              ? '3D - ' + decodeURIComponent(paramTitle) + '  | MyDonkey'
-              : decodeURIComponent(paramTitle) + ' | My Donkey';
-            return;
+          if (paramTitle && paramTitle !== 'undefined' && paramTitle !== 'null' && paramTitle.trim() !== '') {
+            var decodedParam = decodeURIComponent(paramTitle).trim();
+            if (decodedParam && decodedParam !== 'undefined' && decodedParam !== 'null') {
+              document.title = isTheatre
+                ? '3D - ' + decodedParam + '  | MyDonkey'
+                : decodedParam + ' | My Donkey';
+              return;
+            }
           }
           // 2. Instant check from localStorage title cache
           var id = params.get('id');
@@ -271,7 +274,7 @@
             var raw = localStorage.getItem('mydonkey_content_titles');
             if (raw) {
               var cache = JSON.parse(raw);
-              if (cache && cache[id]) {
+              if (cache && cache[id] && cache[id] !== 'undefined' && cache[id] !== 'null') {
                 document.title = isTheatre
                   ? '3D - ' + cache[id] + '  | MyDonkey'
                   : cache[id] + ' | My Donkey';

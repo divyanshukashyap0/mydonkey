@@ -1,8 +1,8 @@
 import type { AudioTrack, CatalogTitle, EmbedMedia, EmbedSelection, ServerKey, ServerPreferences } from './types';
 
 export const STD_SERVERS = [
-  { key: 'bingr', name: 'Bingr', tag: '4K', movie: (id: number) => `https://bingr.one/watch/movie/${id}`, tv: (id: number, s: number, e: number) => `https://bingr.one/watch/tv/${id}/${s}/${e}`, highlight: true },
-  { key: 'nxsha', name: 'Nxsha', tag: 'HD + Subs', movie: (id: number) => `https://nxsha.space/embed/movie/${id}?autoplay=true`, tv: (id: number, s: number, e: number) => `https://nxsha.space/embed/tv/${id}/${s}/${e}?autoplay=true` },
+  { key: 'nxsha', name: 'Nxsha', tag: 'HD + Subs', movie: (id: number) => `https://nxsha.space/embed/movie/${id}?autoplay=true`, tv: (id: number, s: number, e: number) => `https://nxsha.space/embed/tv/${id}/${s}/${e}?autoplay=true`, highlight: true },
+  { key: 'bingr', name: 'Bingr', tag: '4K', movie: (id: number) => `https://bingr.one/watch/movie/${id}`, tv: (id: number, s: number, e: number) => `https://bingr.one/watch/tv/${id}/${s}/${e}` },
   { key: 'vidstuck', name: 'VidStuck', tag: 'Fast', movie: (id: number) => `https://vidstuck.xyz/embed/movie/${id}?color=ffffff`, tv: (id: number, s: number, e: number) => `https://vidstuck.xyz/embed/tv/${id}/${s}/${e}?color=ffffff` },
   { key: 'zxc', name: 'ZXC', tag: 'Fast', movie: (id: number) => `https://zxcstream.xyz/player/movie/${id}`, tv: (id: number, s: number, e: number) => `https://zxcstream.xyz/player/tv/${id}?season=${s}&episode=${e}` },
   { key: 'vidlink', name: 'VidLink', tag: 'Multi', movie: (id: number) => `https://vidlink.pro/movie/${id}?autoplay=true`, tv: (id: number, s: number, e: number) => `https://vidlink.pro/tv/${id}/${s}/${e}?autoplay=true` },
@@ -28,7 +28,7 @@ const LEGACY_PREF_KEY = 'aethoflix-server-preferences-v1';
 
 export function serversFor(anime: boolean): { key: ServerKey; name: string; tag: string; number: number }[] {
   const list = anime
-    ? [{ key: 'bingr' as const, name: 'Bingr', tag: '4K' }, ...ANIME_SERVERS, ...STD_SERVERS.filter((s) => s.key !== 'bingr')]
+    ? [{ key: 'nxsha' as const, name: 'Nxsha', tag: 'HD + Subs' }, ...ANIME_SERVERS, ...STD_SERVERS.filter((s) => s.key !== 'nxsha')]
     : STD_SERVERS;
   return list.map((server, index) => ({ key: server.key, name: server.name, tag: server.tag, number: index + 1 }));
 }
