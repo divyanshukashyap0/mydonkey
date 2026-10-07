@@ -14,6 +14,7 @@ Allow: /support
 Allow: /community-chat
 Allow: /contact
 Allow: /devices
+Allow: /theatre
 Allow: /theatre-help
 Allow: /browse/
 
@@ -31,8 +32,9 @@ Disallow: /help-center
 # Host
 Host: https://www.mydonkey.in
 
-# Master Sitemap Index
+# Master Sitemap (Contains all website URLs)
 Sitemap: https://www.mydonkey.in/sitemap.xml
+Sitemap: https://www.mydonkey.in/sitemap-index.xml
 
 # Structured Sub-Sitemaps for Fast Targeted Crawling
 Sitemap: https://www.mydonkey.in/sitemap-main.xml

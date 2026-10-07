@@ -298,12 +298,14 @@ async function generateStructuredSitemaps() {
         { path: '/anime',      priority: '0.95', changefreq: 'daily',  title: 'Watch Free Anime Online in HD | My Donkey' },
         { path: '/categories', priority: '0.90', changefreq: 'daily',  title: 'Browse Movies & TV Categories | My Donkey' },
         { path: '/exclusive',  priority: '0.85', changefreq: 'weekly', title: 'My Donkey Originals & Exclusive Movies' },
+        { path: '/theatre',    priority: '0.85', changefreq: 'weekly', title: '3D Virtual Cinema Theatre | My Donkey' },
+        { path: '/theatre-help', priority: '0.80', changefreq: 'monthly', title: '3D Virtual Cinema Theatre Guide | My Donkey' },
+        { path: '/contact',    priority: '0.80', changefreq: 'monthly', title: 'Contact Desk & Inquiries | My Donkey' },
         { path: '/adblocker',  priority: '0.80', changefreq: 'weekly', title: 'Adblocker & Mobile DNS Setup Guide | My Donkey' },
         { path: '/sound-enhancements', priority: '0.80', changefreq: 'weekly', title: 'Sound Enhancements & Audio Booster | My Donkey' },
         { path: '/support',    priority: '0.80', changefreq: 'weekly', title: 'Help & Support Hub — Guides & FAQs | My Donkey' },
         { path: '/community-chat', priority: '0.80', changefreq: 'daily', title: 'Community Help Chat & Q&A Discussion | My Donkey' },
         { path: '/devices',    priority: '0.70', changefreq: 'monthly', title: 'Supported Devices — Smart TV, Mobile & PC | My Donkey' },
-        { path: '/theatre-help', priority: '0.70', changefreq: 'monthly', title: '3D Virtual Cinema Theatre Guide | My Donkey' },
     ];
 
     let mainXml = '';
@@ -468,19 +470,31 @@ async function generateStructuredSitemaps() {
         movieChunks.push(movieDocs.slice(i, i + MOVIE_CHUNK_SIZE));
     }
 
+    let allMoviesXml = '';
     movieChunks.forEach((chunk, idx) => {
         let chunkXml = '';
-        chunk.forEach(item => { chunkXml += buildContentUrlXml(item, today); });
+        chunk.forEach(item => { 
+            const itemXml = buildContentUrlXml(item, today);
+            chunkXml += itemXml;
+            allMoviesXml += itemXml;
+        });
         const fileName = movieChunks.length === 1 ? 'sitemap-movies.xml' : `sitemap-movies-${idx + 1}.xml`;
         fs.writeFileSync(path.join(publicDir, fileName), wrapUrlset(chunkXml), 'utf8');
         generatedSitemaps.push(fileName);
         console.log(`✅ [5/5] Generated ${fileName} (${chunk.length} Movie titles)`);
     });
 
-    // 5. MASTER SITEMAP INDEX (sitemap.xml)
+    // 5. MASTER ALL-INCLUSIVE SITEMAP (sitemap.xml)
+    // Sitemaps.org official <urlset> specification containing ALL website URLs directly
+    const allWebsiteUrlsXml = mainXml + catXml + tvXml + animeXml + allMoviesXml;
+    const masterSitemapPath = path.join(publicDir, 'sitemap.xml');
+    fs.writeFileSync(masterSitemapPath, wrapUrlset(allWebsiteUrlsXml), 'utf8');
+
+    // 6. SITEMAP INDEX (sitemap-index.xml)
     // Sitemaps.org official <sitemapindex> specification
     let indexXml = '<?xml version="1.0" encoding="UTF-8"?>\n';
     indexXml += '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n';
+    indexXml += `  <sitemap>\n    <loc>${BASE_URL}/sitemap.xml</loc>\n    <lastmod>${today}</lastmod>\n  </sitemap>\n`;
 
     for (const smFile of generatedSitemaps) {
         indexXml += '  <sitemap>\n';
@@ -490,16 +504,15 @@ async function generateStructuredSitemaps() {
     }
     indexXml += '</sitemapindex>\n';
 
-    const masterSitemapPath = path.join(publicDir, 'sitemap.xml');
-    fs.writeFileSync(masterSitemapPath, indexXml, 'utf8');
+    const sitemapIndexPath = path.join(publicDir, 'sitemap-index.xml');
+    fs.writeFileSync(sitemapIndexPath, indexXml, 'utf8');
 
     const totalIndexedUrls = CORE_ROUTES.length + REGIONS.length + CATEGORY_GENRES.length + tvDocs.length + animeDocs.length + movieDocs.length;
 
     console.log('\n======================================================');
-    console.log(`🏆 MASTER SITEMAP INDEX GENERATED at: ${masterSitemapPath}`);
-    console.log(`📁 Total Sub-Sitemaps: ${generatedSitemaps.length}`);
-    console.log(`📈 Total Canonical Content URLs: ${totalIndexedUrls}`);
-    console.log('Sub-Sitemaps registered:');
+    console.log(`🏆 ALL WEBSITE URLS WRITTEN TO SITEMAP: ${masterSitemapPath}`);
+    console.log(`📈 Total URLs in sitemap.xml: ${totalIndexedUrls}`);
+    console.log(`📑 Also generated sitemap-index.xml and ${generatedSitemaps.length} modular sub-sitemaps:`);
     generatedSitemaps.forEach(sm => console.log(`   👉 ${BASE_URL}/${sm}`));
     console.log('======================================================\n');
 }
