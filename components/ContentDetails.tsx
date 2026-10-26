@@ -359,33 +359,28 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
 
                 {/* Full Screen Ambient / Backdrop Image across entire page */}
                 <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden select-none">
-                    {/* Desktop background (prefers backdrop_path) - Crystal clear image */}
-                    <img
-                        src={content.backdrop_path || content.poster_path || '/logo.png'}
-                        className={`hidden md:block w-full h-full ${(content.backdrop_path || content.poster_path) ? 'object-cover object-top' : 'object-contain p-16 bg-black/80'}`}
-                        alt={content.title}
-                        onError={(e) => {
-                            const t = e.currentTarget;
-                            if (!t.src.endsWith('/logo.png')) {
-                                t.src = '/logo.png';
-                                t.className = "hidden md:block w-full h-full object-contain p-16 bg-black/80";
-                            }
-                        }}
-                    />
-
-                    {/* Mobile background (prefers poster_path) - Crystal clear image */}
-                    <img
-                        src={content.poster_path || content.backdrop_path || '/logo.png'}
-                        className={`md:hidden w-full h-full ${(content.poster_path || content.backdrop_path) ? 'object-cover object-top' : 'object-contain p-12 bg-black/80'}`}
-                        alt={content.title}
-                        onError={(e) => {
-                            const t = e.currentTarget;
-                            if (!t.src.endsWith('/logo.png')) {
-                                t.src = '/logo.png';
-                                t.className = "md:hidden w-full h-full object-contain p-12 bg-black/80";
-                            }
-                        }}
-                    />
+                    <picture className="w-full h-full block">
+                        {(content.backdrop_path || content.poster_path) && (
+                            <source media="(min-width: 768px)" srcSet={content.backdrop_path || content.poster_path} />
+                        )}
+                        <img
+                            src={content.poster_path || content.backdrop_path || '/logo.png'}
+                            className={`w-full h-full ${(content.poster_path || content.backdrop_path) ? 'object-cover object-top' : 'object-contain p-12 bg-black/80'}`}
+                            alt={content.title}
+                            decoding="async"
+                            loading="lazy"
+                            width={1280}
+                            height={720}
+                            style={{ aspectRatio: '16/9' }}
+                            onError={(e) => {
+                                const t = e.currentTarget;
+                                if (!t.src.endsWith('/logo.png')) {
+                                    t.src = '/logo.png';
+                                    t.className = "w-full h-full object-contain p-12 bg-black/80";
+                                }
+                            }}
+                        />
+                    </picture>
 
                     {/* ONLY bottom part of the image is blackish: smooth gradient transitioning to solid #121212 */}
                     <div className="absolute inset-0 bg-gradient-to-t from-[#121212] from-5% via-[#121212]/90 via-35% to-transparent" />

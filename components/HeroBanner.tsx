@@ -20,6 +20,7 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onDetails, onPlay 
     const slides: Content[] = items && items.length > 0 ? items : (item ? [item] : []);
 
     const [activeIdx, setActiveIdx] = useState(0);
+    const [loadedSlides, setLoadedSlides] = useState<Set<number>>(() => new Set([0]));
     const [showVideo, setShowVideo] = useState(false);
     const [videoPlaying, setVideoPlaying] = useState(false);
     // Permanent mute: background trailer must never play sound or music
@@ -35,6 +36,18 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onDetails, onPlay 
         : (currentUser?.autoplayEnabled !== false);
 
     const currentItem = slides[activeIdx] ?? null;
+
+    // Track active and adjacent slides to load images on demand without blocking initial boot
+    useEffect(() => {
+        setLoadedSlides(prev => {
+            const next = new Set(prev);
+            next.add(activeIdx);
+            if (slides.length > 1) {
+                next.add((activeIdx + 1) % slides.length);
+            }
+            return next;
+        });
+    }, [activeIdx, slides.length]);
 
     // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -237,50 +250,51 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onDetails, onPlay 
             onTouchEnd={handleTouchEnd}
         >
             {/* ── Slides (stacked, cross-fade) ─────────────────────────── */}
-            {slides.map((slide, idx) => (
-                <div
-                    key={slide.id + idx}
-                    className={`absolute inset-0 transition-opacity duration-700 ${
-                        idx === activeIdx
-                            ? (videoPlaying ? 'opacity-0 pointer-events-none z-0 invisible' : 'opacity-100 z-10 visible')
-                            : 'opacity-0 z-0 pointer-events-none invisible'
-                    }`}
-                >
-                    {/* Mobile poster */}
-                    <img
-                        src={slide.poster_path_mobile || slide.poster_path || '/logo.png'}
-                        className={`w-full h-full ${(slide.poster_path_mobile || slide.poster_path) ? 'object-cover' : 'object-contain p-12 bg-black'} md:hidden`}
-                        alt={slide.title}
-                        loading={idx === 0 ? 'eager' : 'lazy'}
-                        fetchPriority={idx === 0 ? 'high' : 'auto'}
-                        decoding="async"
-                        onError={(e) => {
-                            const t = e.currentTarget;
-                            if (!t.src.endsWith('/logo.png')) {
-                                t.src = '/logo.png';
-                                t.className = "w-full h-full object-contain p-12 bg-black md:hidden";
-                            }
-                        }}
-                    />
-                    {/* Desktop backdrop */}
-                    <img
-                        src={slide.backdrop_path || slide.poster_path || '/logo.png'}
-                        className={`w-full h-full ${(slide.backdrop_path || slide.poster_path) ? 'object-cover' : 'object-contain p-20 bg-black'} hidden md:block`}
-                        alt={slide.title}
-                        loading={idx === 0 ? 'eager' : 'lazy'}
-                        fetchPriority={idx === 0 ? 'high' : 'auto'}
-                        decoding="async"
-                        onError={(e) => {
-                            const t = e.currentTarget;
-                            if (!t.src.endsWith('/logo.png')) {
-                                t.src = '/logo.png';
-                                t.className = "w-full h-full object-contain p-20 bg-black hidden md:block";
-                            }
-                        }}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-cinema-black via-cinema-black/20 to-transparent md:bg-gradient-to-r md:from-black md:via-black/40 md:to-transparent" />
-                </div>
-            ))}
+            {slides.map((slide, idx) => {
+                const shouldRender = idx === 0 || loadedSlides.has(idx) || idx === activeIdx;
+                const isCurrent = idx === activeIdx;
+                const mobileImg = slide.poster_path_mobile || slide.poster_path;
+                const desktopImg = slide.backdrop_path || slide.poster_path;
+                const fallbackImg = '/logo.png';
+
+                return (
+                    <div
+                        key={slide.id + idx}
+                        className={`absolute inset-0 transition-opacity duration-700 ${
+                            isCurrent
+                                ? (videoPlaying ? 'opacity-0 pointer-events-none z-0 invisible' : 'opacity-100 z-10 visible')
+                                : 'opacity-0 z-0 pointer-events-none invisible'
+                        }`}
+                    >
+                        {shouldRender && (
+                            <picture className="w-full h-full block">
+                                {desktopImg && (
+                                    <source media="(min-width: 768px)" srcSet={desktopImg} />
+                                )}
+                                <img
+                                    src={mobileImg || desktopImg || fallbackImg}
+                                    className={`w-full h-full ${(mobileImg || desktopImg) ? 'object-cover' : 'object-contain p-12 bg-black'}`}
+                                    alt={slide.title}
+                                    loading={idx === 0 ? 'eager' : 'lazy'}
+                                    fetchPriority={idx === 0 ? 'high' : 'auto'}
+                                    decoding="async"
+                                    width={1280}
+                                    height={720}
+                                    style={{ aspectRatio: '16/9' }}
+                                    onError={(e) => {
+                                        const t = e.currentTarget;
+                                        if (!t.src.endsWith('/logo.png')) {
+                                            t.src = '/logo.png';
+                                            t.className = "w-full h-full object-contain p-12 bg-black";
+                                        }
+                                    }}
+                                />
+                            </picture>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-cinema-black via-cinema-black/20 to-transparent md:bg-gradient-to-r md:from-black md:via-black/40 md:to-transparent" />
+                    </div>
+                );
+            })}
 
             {/* ── YouTube player ────────────────────────────────────────── */}
             {showVideo && currentItem.youtubeId && (

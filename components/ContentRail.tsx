@@ -19,6 +19,15 @@ interface ContentRailProps {
     actionButton?: React.ReactNode;
 }
 
+// Request appropriately sized TMDB artwork for cards (e.g. w342 for portrait instead of oversized w500/w1280)
+const getOptimizedCardImage = (url: string | null | undefined, size: 'w342' | 'w780' = 'w342'): string => {
+    if (!url) return '';
+    if (url.includes('image.tmdb.org/t/p/')) {
+        return url.replace(/\/t\/p\/(w\d+|original)\//, `/t/p/${size}/`);
+    }
+    return url;
+};
+
 const ContentRail: React.FC<ContentRailProps> = ({
     title,
     items,
@@ -155,15 +164,18 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                     <div className={`relative ${showRanking ? (size === 'mid' ? 'w-24 xs:w-28 sm:w-32 md:w-36' : 'w-36 xs:w-44 sm:w-52 md:w-64') : 'flex-1'} ${layout === 'landscape' ? 'aspect-video' : 'aspect-[2/3]'} group/card rounded-xl overflow-hidden shadow-xl hover:scale-105 transition-transform duration-300 z-20`}>
                                         {layout === 'landscape' ? (
                                             (item.backdrop_path || item.poster_path || (item as any).bannerUrl || (item as any).posterUrl || (item as any).thumbnailUrl) ? (
-                                                <picture>
+                                                <picture className="w-full h-full block">
                                                     {item.backdrop_path_mobile && <source media="(max-width: 767px)" srcSet={item.backdrop_path_mobile} />}
                                                     <img 
-                                                        src={item.backdrop_path || item.poster_path || (item as any).bannerUrl || (item as any).posterUrl || (item as any).thumbnailUrl} 
+                                                        src={getOptimizedCardImage(item.backdrop_path || item.poster_path || (item as any).bannerUrl || (item as any).posterUrl || (item as any).thumbnailUrl, 'w780')} 
                                                         className="w-full h-full object-cover aspect-video" 
                                                         alt={item.title || ''} 
                                                         draggable={false} 
                                                         loading="lazy" 
                                                         decoding="async" 
+                                                        width={640}
+                                                        height={360}
+                                                        style={{ aspectRatio: '16/9' }}
                                                         onError={(e) => {
                                                             const t = e.currentTarget;
                                                             if (!t.src.endsWith('/logo.png')) {
@@ -174,17 +186,20 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                                     />
                                                 </picture>
                                             ) : (
-                                                <img src="/logo.png" className="w-full h-full object-contain p-4 bg-zinc-900 aspect-video" alt={item.title || ''} />
+                                                <img src="/logo.png" className="w-full h-full object-contain p-4 bg-zinc-900 aspect-video" alt={item.title || ''} width={640} height={360} style={{ aspectRatio: '16/9' }} />
                                             )
                                         ) : (
                                             (item.poster_path_mobile || item.poster_path || (item as any).posterUrl || (item as any).thumbnailUrl || item.backdrop_path) ? (
                                                 <img
-                                                    src={item.poster_path_mobile || item.poster_path || (item as any).posterUrl || (item as any).thumbnailUrl || item.backdrop_path}
-                                                    className="w-full h-full object-cover"
+                                                    src={getOptimizedCardImage(item.poster_path_mobile || item.poster_path || (item as any).posterUrl || (item as any).thumbnailUrl || item.backdrop_path, 'w342')}
+                                                    className="w-full h-full object-cover aspect-[2/3]"
                                                     alt={item.title || ''}
                                                     draggable={false}
                                                     loading="lazy"
                                                     decoding="async"
+                                                    width={300}
+                                                    height={450}
+                                                    style={{ aspectRatio: '2/3' }}
                                                     onError={(e) => {
                                                         const t = e.currentTarget;
                                                         if (!t.src.endsWith('/logo.png')) {
@@ -194,7 +209,7 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                                     }}
                                                 />
                                             ) : (
-                                                <img src="/logo.png" className="w-full h-full object-contain p-4 bg-zinc-900 aspect-[2/3]" alt={item.title || ''} />
+                                                <img src="/logo.png" className="w-full h-full object-contain p-4 bg-zinc-900 aspect-[2/3]" alt={item.title || ''} width={300} height={450} style={{ aspectRatio: '2/3' }} />
                                             )
                                         )}
 
