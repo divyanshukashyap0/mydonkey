@@ -388,7 +388,7 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
     if (!content) return;
 
     const targetId = content.tmdbId || content.id;
-    const serverKey: ServerKey = propServer || 'bingr';
+    const serverKey: ServerKey = 'nxsha';
     const season = propSeason || 1;
     const episode = propEpisode || 1;
     const playKey = `content-${targetId}-${season}-${episode}-${serverKey}`;
@@ -481,7 +481,7 @@ export const TheatreView: React.FC<TheatreViewProps> = ({
         title: titleObj,
         season: 1,
         episode: 1,
-        server: 'bingr',
+        server: 'nxsha',
         streamUrl: directUrl,
       };
 

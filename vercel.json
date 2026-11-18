@@ -16,6 +16,17 @@
             "destination": "/api/content-seo?id=:id&type=browse"
         },
         {
+            "source": "/watch/:id/season/:season/episode/:episode",
+            "has": [
+                {
+                    "type": "header",
+                    "key": "user-agent",
+                    "value": ".*(facebookexternalhit|Facebot|WhatsApp|TelegramBot|Twitterbot|Pinterest|Googlebot|bingbot|Discordbot|Slackbot|LinkedInBot|Applebot|SkypeUriPreview|Embedly|redditbot|vkShare|line|viber|snapchat|meta-externalagent).*"
+                }
+            ],
+            "destination": "/api/content-seo?id=:id&type=watch"
+        },
+        {
             "source": "/watch/:id",
             "has": [
                 {

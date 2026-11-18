@@ -20,7 +20,7 @@ function readEdition(key: string): AnimeEdition | null {
 export default function ServerPicker({ title, season, episode, active, suggestedEdition, disabled, onLoad }: Props) {
   const initial = active?.catalog.id === title.id && active.catalog.mediaType === title.mediaType ? active.selection : null;
   const [anime, setAnime] = useState(initial?.anime ?? title.anime);
-  const [selected, setSelected] = useState<ServerKey | null>(initial?.server ?? 'bingr');
+  const [selected, setSelected] = useState<ServerKey | null>('nxsha');
   const [allPreferences, setAllPreferences] = useState(() => {
     const preferences = Object.fromEntries(serversFor(true).map((server) => [server.key, readServerPreferences(server.key)])) as Record<ServerKey, ServerPreferences>;
     if (initial) preferences[initial.server] = { ...initial.preferences };
@@ -81,8 +81,8 @@ export default function ServerPicker({ title, season, episode, active, suggested
   };
 
   return <div className="server-picker">
-    <div className="catalog-section-label"><span>CHOOSE A SERVER</span><span>{anime ? '9 anime servers' : '6 movie / series servers'}</span></div>
-    <div className="server-pills" role="radiogroup" aria-label="Playback server">{servers.map((item) => <button key={item.key} type="button" role="radio" aria-checked={selected === item.key} className={`server-pill ${selected === item.key ? 'is-selected' : ''}`} onClick={() => { setSelected(item.key); setError(''); }} disabled={disabled || loading}><span>Server {item.number}{selected === item.key && <Check size={12} />}</span><strong>{item.name}</strong><small>{item.tag}{item.key === 'bingr' && <span className="default-badge">DEFAULT</span>}</small></button>)}</div>
+    <div className="catalog-section-label"><span>STREAMING SERVER</span><span>Nxsha HD</span></div>
+    <div className="server-pills" role="radiogroup" aria-label="Playback server">{servers.map((item) => <button key={item.key} type="button" role="radio" aria-checked={selected === item.key} className={`server-pill ${selected === item.key ? 'is-selected' : ''}`} onClick={() => { setSelected(item.key); setError(''); }} disabled={disabled || loading}><span>Server {item.number}{selected === item.key && <Check size={12} />}</span><strong>{item.name}</strong><small>{item.tag}<span className="default-badge">DEFAULT</span></small></button>)}</div>
     <p className="server-fallback-notice"><Info size={15} /><span>If a server fails, choose another one. <strong>No automatic fallback.</strong> Only your selected server is requested. Quality labels are provider labels, not guarantees.</span></p>
     {!title.anime && <label className="anime-mode-toggle"><input type="checkbox" checked={anime} disabled={disabled || loading} onChange={(event) => { setAnime(event.target.checked); setError(''); }} /><span>This is anime: show all 9 servers</span></label>}
     {anime && selected && <div className="server-language"><div><span className="field-label">SERVER {server?.number} AUDIO</span><div className="language-switch" role="group" aria-label={`Audio preference for Server ${server?.number}`}>{(['sub', 'dub'] as const).map((audio) => <button key={audio} aria-pressed={preferences.audio === audio} disabled={disabled || loading} onClick={() => changePreferences({ audio })}>{audio === 'sub' ? 'Sub' : 'Dub'}</button>)}</div></div>{selected === 'recloud' && <label><span className="field-label">RECLOUD SOURCE</span><select className="catalog-select" value={preferences.source} disabled={disabled || loading} onChange={(event) => changePreferences({ source: event.target.value as ServerPreferences['source'] })}>{RC_SOURCES.map((source) => <option key={source} value={source}>{source.toUpperCase()}</option>)}</select></label>}</div>}

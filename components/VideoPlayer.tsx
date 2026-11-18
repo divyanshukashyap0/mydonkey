@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Hls from 'hls.js';
-import { Play, Pause, Volume2, Volume1, VolumeX, Maximize, Settings, SkipForward, ArrowLeft, RotateCcw, RotateCw, Subtitles, Layers, BarChart2, Minimize, Headphones, Check, MessageSquare, Wifi, X, ExternalLink, Scan, Scaling, AlertCircle, RefreshCw, Zap, Sliders, Sparkles, ShieldCheck, ChevronDown, ChevronLeft, ChevronRight, Server } from 'lucide-react';
+import { Play, Pause, Volume2, Volume1, VolumeX, Maximize, Settings, SkipForward, ArrowLeft, RotateCcw, RotateCw, Subtitles, Layers, BarChart2, Minimize, Headphones, Check, MessageSquare, Wifi, X, ExternalLink, Scan, Scaling, AlertCircle, RefreshCw, Zap, Sliders, Sparkles, ShieldCheck, ShieldOff, Copy, ChevronDown, ChevronLeft, ChevronRight, Server, Search } from 'lucide-react';
 import { Content, Season, Episode } from '../types';
 import StatsPanel from './StatsPanel';
 import DrivePlayer from './DrivePlayer';
@@ -27,6 +28,13 @@ import { soundBooster } from '../player/SoundBooster';
 import { useAdShield } from '../utils/useAdShield';
 import { fetchTMDBDetails, fetchTMDBSeason } from '../services/tmdbService';
 import { saveContentTitle, setWebpageTitle } from '../utils/titleManager';
+import {
+    getSeriesEpisodeProgress,
+    isEpisodeWatched,
+    recordEpisodeWatched,
+    syncSeriesProgressFromCloud,
+    SeriesEpisodeProgress,
+} from '../utils/episodeProgress';
 
 interface VideoPlayerProps {
     content: Content;
@@ -41,19 +49,17 @@ declare global {
 }
 
 const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
+    const location = useLocation();
+    const navigate = useNavigate();
     const { updatePlaybackProgress, currentUser, updateContentDuration, settings, addToWatchHistory } = useStore();
 
-    // Embed Ad Shield: Blocks external popups, new tabs, and site hijacking redirects
+    // Embed Ad Shield: Always automatically active to block popups, new tabs, and redirects
     const {
         isEnabled: isAdShieldEnabled,
-        mode: adShieldMode,
-        blockedCount: adShieldBlockedCount,
         sandboxAttributes: adShieldSandbox,
-        toggleAdShield,
-        changeMode: changeAdShieldMode,
     } = useAdShield({
-        defaultEnabled: settings?.enableAdShield !== false,
-        defaultMode: settings?.adShieldMode || 'strict',
+        defaultEnabled: true,
+        defaultMode: 'strict',
         isActive: true,
     });
 
@@ -86,8 +92,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const [showStats, setShowStats] = useState(false);
 
     // Menus
-    const [showAudioSubMenu, setShowAudioSubMenu] = useState(false);
-    const [showQualityMenu, setShowQualityMenu] = useState(false);
+    const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+    const [settingsTab, setSettingsTab] = useState<'quality' | 'subtitles' | 'audio'>('quality');
 
     const [volume, setVolume] = useState(100);
     const [isMuted, setIsMuted] = useState(false);
@@ -153,53 +159,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         );
     }, [content]);
 
-    const defaultBaseServer = useMemo(() => {
-        return getBaseContentServer(settings);
-    }, [settings?.baseContentServer]);
+    const activeServer: StreamServerKey = 'nxsha';
+    const [audioTrack] = useState<'sub' | 'dub'>('sub');
 
-    const [activeServer, setActiveServer] = useState<StreamServerKey>(() => {
+    useEffect(() => {
         try {
-            const saved = localStorage.getItem('mydonkey_preferred_server') as StreamServerKey | null;
-            if (saved && STREAM_SERVERS.some(s => s.key === saved)) {
-                return saved;
-            }
+            localStorage.setItem('mydonkey_preferred_server', 'nxsha');
         } catch { }
-        return getBaseContentServer(settings);
-    });
-
-    const [failedServers, setFailedServers] = useState<Set<StreamServerKey>>(new Set());
-    const [showServerMenu, setShowServerMenu] = useState(false);
-    const [audioTrack, setAudioTrack] = useState<'sub' | 'dub'>('sub');
-
-    const handleServerSwitch = useCallback((serverKey: StreamServerKey) => {
-        setActiveServer(serverKey);
-        setShowServerMenu(false);
-        setInitialLoad(true);
-        setIsMovieLoading(true);
-        try {
-            localStorage.setItem('mydonkey_preferred_server', serverKey);
-        } catch { }
-        const sObj = STREAM_SERVERS.find(s => s.key === serverKey);
-        showOsd(`Switched to ${sObj?.name || 'Server'}`, sObj?.tag, 'zap');
-    }, [showOsd]);
-
-    const handleNextServer = useCallback((reason?: string) => {
-        const next = getNextFallbackServer(activeServer, isAnime, failedServers, defaultBaseServer);
-        const curName = STREAM_SERVERS.find(s => s.key === activeServer)?.name || activeServer;
-        if (next) {
-            setFailedServers(prev => new Set(prev).add(activeServer));
-            const nextName = STREAM_SERVERS.find(s => s.key === next)?.name || 'Next Server';
-            showOsd(`${curName} ${reason || 'is not responding'}. Trying ${nextName}...`, undefined, 'zap');
-            handleServerSwitch(next);
-        } else {
-            setFailedServers(new Set());
-            const list = isAnime ? ANIME_SERVER_FALLBACK_ORDER : STANDARD_SERVER_FALLBACK_ORDER;
-            const fallback = list.find(s => s !== activeServer) || list[0];
-            const fallbackName = STREAM_SERVERS.find(s => s.key === fallback)?.name || 'Server';
-            showOsd(`Retrying with ${fallbackName}...`, undefined, 'zap');
-            handleServerSwitch(fallback);
-        }
-    }, [activeServer, isAnime, failedServers, defaultBaseServer, handleServerSwitch, showOsd]);
+    }, []);
 
 
     // Season & Episode State (TV Shows)
@@ -208,15 +175,35 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const [showEpisodesMenu, setShowEpisodesMenu] = useState(false);
     const embedIframeRef = useRef<HTMLIFrameElement | null>(null);
 
+    // Parse unique episode URL: /watch/:id/season/:s/episode/:e (or ?season=..&episode=..)
+    const routeSeasonEp = useMemo(() => {
+        const pathMatch = location.pathname.match(/\/season\/(\d+)\/episode\/(\d+)/i);
+        if (pathMatch) {
+            const season = parseInt(pathMatch[1], 10);
+            const episode = parseInt(pathMatch[2], 10);
+            if (season > 0 && episode > 0) return { season, episode };
+        }
+        const params = new URLSearchParams(location.search);
+        const sParam = params.get('season') || params.get('s');
+        const eParam = params.get('episode') || params.get('e');
+        if (sParam && eParam) {
+            const season = parseInt(sParam, 10);
+            const episode = parseInt(eParam, 10);
+            if (season > 0 && episode > 0) return { season, episode };
+        }
+        return null;
+    }, [location.pathname, location.search]);
+
     // Parse season & episode from embed URL if present (e.g. /embed/tv/tt13404982/1/2)
     const urlSeasonEp = useMemo(() => {
+        if (routeSeasonEp) return routeSeasonEp;
         const target = content.videoUrl || '';
         const match = target.match(/(?:embed\/tv\/|tt\d+\/)?(\d+)\/(\d+)/);
         if (match) {
             return { season: parseInt(match[1]), episode: parseInt(match[2]) };
         }
         return null;
-    }, [content.videoUrl]);
+    }, [routeSeasonEp, content.videoUrl]);
 
     const isTV = Boolean(
         content.type === 'tv' ||
@@ -224,6 +211,34 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         (content.seasons && content.seasons.length > 0) ||
         (content.videoUrl && content.videoUrl.includes('/embed/tv/'))
     );
+
+    // Require episode selection before showing the video player screen for TV series
+    // (unless the user opened a direct unique episode URL like /watch/:id/season/1/episode/3)
+    const [hasSelectedEpisode, setHasSelectedEpisode] = useState<boolean>(() => !isTV || isTrailer || Boolean(routeSeasonEp));
+    const [isLoadingSeasons, setIsLoadingSeasons] = useState<boolean>(() =>
+        isTV && !isTrailer && !(content.seasons && content.seasons.length > 0 && content.seasons.some(s => s.episodes && s.episodes.length > 0))
+    );
+    const needsEpisodeSelection = isTV && !isTrailer && !hasSelectedEpisode;
+
+    useEffect(() => {
+        setHasSelectedEpisode(!isTV || isTrailer || Boolean(routeSeasonEp));
+    }, [content.id, isTV, isTrailer, Boolean(routeSeasonEp)]);
+
+    // Build and navigate to the unique URL for each episode (/watch/:id/season/:s/episode/:e)
+    const syncEpisodeUrl = useCallback((seasonNum: number, episodeNum: number) => {
+        if (!content?.id || isTrailer) return;
+        const basePath = `/watch/${encodeURIComponent(content.id)}/season/${seasonNum}/episode/${episodeNum}`;
+        const params = new URLSearchParams(location.search);
+        if (!params.get('mode')) params.set('mode', content.playMode || 'movie');
+        if (content.title && content.title !== 'undefined' && content.title !== 'null') {
+            params.set('title', content.title.trim());
+        }
+        const nextUrl = `${basePath}?${params.toString()}`;
+        const currentFull = `${location.pathname}${location.search}`;
+        if (currentFull !== nextUrl) {
+            navigate(nextUrl, { replace: true, state: location.state });
+        }
+    }, [content?.id, content?.playMode, content?.title, isTrailer, location.pathname, location.search, location.state, navigate]);
 
     const [dynamicSeasons, setDynamicSeasons] = useState<Season[]>(() => {
         if (content.seasons && content.seasons.length > 0) {
@@ -257,11 +272,27 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         if (!isTV) return;
         if (content.seasons && content.seasons.length > 0 && content.seasons.some(s => s.episodes && s.episodes.length > 0)) {
             setDynamicSeasons(content.seasons);
+            setIsLoadingSeasons(false);
             return;
         }
 
         let isCancelled = false;
+        const makeFallbackSeason = () => {
+            const defaultEpsCount = urlSeasonEp ? Math.max(urlSeasonEp.episode, 8) : 8;
+            return [{
+                id: 'season_1',
+                seasonNumber: urlSeasonEp?.season || 1,
+                title: `Season ${urlSeasonEp?.season || 1}`,
+                episodes: Array.from({ length: defaultEpsCount }, (_, i) => ({
+                    id: `ep_${i + 1}`,
+                    episodeNumber: i + 1,
+                    title: `Episode ${i + 1}`,
+                }))
+            }];
+        };
+
         const loadTvSeasons = async () => {
+            setIsLoadingSeasons(true);
             try {
                 let tmdbId = content.tmdbId;
                 if (!tmdbId && typeof content.id === 'string' && content.id.startsWith('tmdb_')) {
@@ -269,28 +300,22 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 }
 
                 if (!tmdbId) {
-                    if (dynamicSeasons.length === 0) {
-                        const defaultEpsCount = urlSeasonEp ? Math.max(urlSeasonEp.episode, 8) : 8;
-                        const defaultEps: Episode[] = Array.from({ length: defaultEpsCount }, (_, i) => ({
-                            id: `ep_${i + 1}`,
-                            episodeNumber: i + 1,
-                            title: `Episode ${i + 1}`,
-                        }));
-                        setDynamicSeasons([{
-                            id: 'season_1',
-                            seasonNumber: urlSeasonEp?.season || 1,
-                            title: `Season ${urlSeasonEp?.season || 1}`,
-                            episodes: defaultEps,
-                        }]);
-                    }
+                    setDynamicSeasons(prev => (prev.length > 0 ? prev : makeFallbackSeason()));
                     return;
                 }
 
                 const details = await fetchTMDBDetails(tmdbId, 'tv');
-                if (isCancelled || !details) return;
+                if (isCancelled) return;
+                if (!details) {
+                    setDynamicSeasons(prev => (prev.length > 0 ? prev : makeFallbackSeason()));
+                    return;
+                }
 
                 const validSeasons = (details.seasons || []).filter(s => s.season_number > 0);
-                if (validSeasons.length === 0) return;
+                if (validSeasons.length === 0) {
+                    setDynamicSeasons(prev => (prev.length > 0 ? prev : makeFallbackSeason()));
+                    return;
+                }
 
                 const targetSeasonNum = urlSeasonEp?.season || validSeasons[0].season_number;
                 const seasonDetail = await fetchTMDBSeason(tmdbId, targetSeasonNum);
@@ -327,19 +352,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 setDynamicSeasons(populatedSeasons);
             } catch (err) {
                 console.warn('Could not fetch TMDB TV seasons:', err);
-                if (dynamicSeasons.length === 0) {
-                    const defaultEpsCount = urlSeasonEp ? Math.max(urlSeasonEp.episode, 8) : 8;
-                    setDynamicSeasons([{
-                        id: 'season_1',
-                        seasonNumber: urlSeasonEp?.season || 1,
-                        title: `Season ${urlSeasonEp?.season || 1}`,
-                        episodes: Array.from({ length: defaultEpsCount }, (_, i) => ({
-                            id: `ep_${i + 1}`,
-                            episodeNumber: i + 1,
-                            title: `Episode ${i + 1}`,
-                        }))
-                    }]);
+                if (!isCancelled) {
+                    setDynamicSeasons(prev => (prev.length > 0 ? prev : makeFallbackSeason()));
                 }
+            } finally {
+                if (!isCancelled) setIsLoadingSeasons(false);
             }
         };
 
@@ -444,16 +461,76 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         }
     };
 
-    const handleSelectEpisode = (seasonIdx: number, epIdx: number) => {
+    // Per-series watched episode progress & last-watched memory
+    const [seriesProgress, setSeriesProgress] = useState<SeriesEpisodeProgress | null>(() =>
+        isTV && !isTrailer ? getSeriesEpisodeProgress(content) : null
+    );
+    const hasAutoFocusedResumeSeasonRef = useRef<boolean>(false);
+
+    useEffect(() => {
+        if (!isTV || isTrailer) {
+            setSeriesProgress(null);
+            return;
+        }
+        hasAutoFocusedResumeSeasonRef.current = false;
+        setSeriesProgress(getSeriesEpisodeProgress(content));
+        if (currentUser?.uid && !currentUser.isGuest) {
+            let cancelled = false;
+            syncSeriesProgressFromCloud(content, currentUser.uid).then((merged) => {
+                if (!cancelled && merged) setSeriesProgress(merged);
+            });
+            return () => { cancelled = true; };
+        }
+    }, [content.id, content.tmdbId, isTV, isTrailer, currentUser?.uid, currentUser?.isGuest]);
+
+    // Auto-focus the user's last watched season tab on the Episode Selection Gate
+    useEffect(() => {
+        if (!needsEpisodeSelection || routeSeasonEp || hasAutoFocusedResumeSeasonRef.current) return;
+        if (seriesProgress && dynamicSeasons.length > 0) {
+            const sIdx = dynamicSeasons.findIndex(s => s.seasonNumber === seriesProgress.lastSeason);
+            if (sIdx !== -1) {
+                hasAutoFocusedResumeSeasonRef.current = true;
+                setCurrentSeasonIdx(sIdx);
+                void handleSelectSeason(sIdx);
+            }
+        }
+    }, [needsEpisodeSelection, routeSeasonEp, seriesProgress?.lastSeason, dynamicSeasons.length]);
+
+    // Auto-play Next Episode state
+    const [upNextCountdown, setUpNextCountdown] = useState<number | null>(null);
+    const episodeEndedTriggeredRef = useRef<boolean>(false);
+
+    const handleSelectEpisode = useCallback((seasonIdx: number, epIdx: number) => {
         const targetSeason = dynamicSeasons[seasonIdx];
         const targetEp = targetSeason?.episodes[epIdx];
         if (!targetSeason || !targetEp) return;
 
+        setUpNextCountdown(null);
+        episodeEndedTriggeredRef.current = false;
         setCurrentSeasonIdx(seasonIdx);
         setCurrentEpisodeIdx(epIdx);
+        setHasSelectedEpisode(true);
         setShowEpisodesMenu(false);
         setInitialLoad(true);
+        setIsMovieLoading(true);
         setPlaying(true);
+
+        // Save watched episode & last-watched S/E progress (localStorage + Firestore)
+        const updatedProgress = recordEpisodeWatched(
+            content,
+            targetSeason.seasonNumber,
+            targetEp.episodeNumber,
+            targetEp.title,
+            targetEp.stillUrl,
+            currentUser && !currentUser.isGuest ? currentUser.uid : undefined
+        );
+        setSeriesProgress(updatedProgress);
+
+        // Give every episode its own unique URL (/watch/:id/season/:s/episode/:e)
+        syncEpisodeUrl(targetSeason.seasonNumber, targetEp.episodeNumber);
+
+        // Lazy-load TMDB metadata for the selected season if needed
+        void handleSelectSeason(seasonIdx);
 
         if (embedIframeRef.current?.contentWindow) {
             try {
@@ -472,10 +549,151 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             targetEp.title || `Episode ${targetEp.episodeNumber}`,
             'zap'
         );
-    };
+    }, [dynamicSeasons, content, currentUser, syncEpisodeUrl, showOsd]);
+
+    const handleResumeLastEpisode = useCallback(() => {
+        if (!seriesProgress) return;
+        const sIdx = dynamicSeasons.findIndex(s => s.seasonNumber === seriesProgress.lastSeason);
+        if (sIdx !== -1) {
+            const eIdx = dynamicSeasons[sIdx].episodes.findIndex(e => e.episodeNumber === seriesProgress.lastEpisode);
+            if (eIdx !== -1) {
+                handleSelectEpisode(sIdx, eIdx);
+                return;
+            }
+        }
+        // Fallback when TMDB seasons are still hydrating: jump directly via unique URL
+        setHasSelectedEpisode(true);
+        setIsMovieLoading(true);
+        setPlaying(true);
+        syncEpisodeUrl(seriesProgress.lastSeason, seriesProgress.lastEpisode);
+    }, [seriesProgress, dynamicSeasons, handleSelectEpisode, syncEpisodeUrl]);
 
     const currentSeason = (isTV && dynamicSeasons.length > 0) ? (dynamicSeasons[currentSeasonIdx] || dynamicSeasons[0]) : null;
     const currentEpisode = (isTV && currentSeason && currentSeason.episodes.length > 0) ? (currentSeason.episodes[currentEpisodeIdx] || currentSeason.episodes[0]) : null;
+
+    const nextEpisodeInfo = useMemo(() => {
+        if (!isTV || isTrailer || dynamicSeasons.length === 0) return null;
+        const season = dynamicSeasons[currentSeasonIdx];
+        if (season && currentEpisodeIdx + 1 < season.episodes.length) {
+            return {
+                seasonIdx: currentSeasonIdx,
+                epIdx: currentEpisodeIdx + 1,
+                season,
+                episode: season.episodes[currentEpisodeIdx + 1],
+            };
+        }
+        if (currentSeasonIdx + 1 < dynamicSeasons.length) {
+            const nextSeason = dynamicSeasons[currentSeasonIdx + 1];
+            if (nextSeason && nextSeason.episodes.length > 0) {
+                return {
+                    seasonIdx: currentSeasonIdx + 1,
+                    epIdx: 0,
+                    season: nextSeason,
+                    episode: nextSeason.episodes[0],
+                };
+            }
+        }
+        return null;
+    }, [isTV, isTrailer, dynamicSeasons, currentSeasonIdx, currentEpisodeIdx]);
+
+    const playNextEpisode = useCallback(() => {
+        if (!nextEpisodeInfo) {
+            setUpNextCountdown(null);
+            return;
+        }
+        handleSelectEpisode(nextEpisodeInfo.seasonIdx, nextEpisodeInfo.epIdx);
+    }, [nextEpisodeInfo, handleSelectEpisode]);
+
+    const triggerEpisodeEnded = useCallback(() => {
+        if (!isTV || isTrailer || needsEpisodeSelection || !nextEpisodeInfo) return;
+        if (episodeEndedTriggeredRef.current) return;
+        episodeEndedTriggeredRef.current = true;
+        setUpNextCountdown(5);
+    }, [isTV, isTrailer, needsEpisodeSelection, nextEpisodeInfo]);
+
+    const triggerEpisodeEndedRef = useRef(triggerEpisodeEnded);
+    useEffect(() => {
+        triggerEpisodeEndedRef.current = triggerEpisodeEnded;
+    }, [triggerEpisodeEnded]);
+
+    // Reset auto-next state whenever the episode changes
+    useEffect(() => {
+        setUpNextCountdown(null);
+        episodeEndedTriggeredRef.current = false;
+    }, [content.id, currentSeasonIdx, currentEpisodeIdx]);
+
+    // Countdown tick -> automatically plays next episode when timer hits 0
+    useEffect(() => {
+        if (upNextCountdown === null) return;
+        if (upNextCountdown <= 0) {
+            playNextEpisode();
+            return;
+        }
+        const timer = setTimeout(() => {
+            setUpNextCountdown(prev => (prev !== null ? prev - 1 : null));
+        }, 1000);
+        return () => clearTimeout(timer);
+    }, [upNextCountdown, playNextEpisode]);
+
+    // Keep unique episode URL & watched progress synced if user opened an episode directly
+    useEffect(() => {
+        if (isTV && !isTrailer && hasSelectedEpisode && currentSeason && currentEpisode) {
+            syncEpisodeUrl(currentSeason.seasonNumber, currentEpisode.episodeNumber);
+            const updated = recordEpisodeWatched(
+                content,
+                currentSeason.seasonNumber,
+                currentEpisode.episodeNumber,
+                currentEpisode.title,
+                currentEpisode.stillUrl,
+                currentUser && !currentUser.isGuest ? currentUser.uid : undefined
+            );
+            setSeriesProgress(updated);
+        }
+    }, [isTV, isTrailer, hasSelectedEpisode, currentSeason?.seasonNumber, currentEpisode?.episodeNumber, syncEpisodeUrl]);
+
+    // Listen for episode end / completion signals from external embed iframes (Nxsha / HTML5 / JW / Plyr)
+    useEffect(() => {
+        if (!isTV || isTrailer || needsEpisodeSelection) return;
+        const handleEmbedEndedMsg = (event: MessageEvent) => {
+            try {
+                const raw = event.data;
+                if (!raw) return;
+                const data = typeof raw === 'string'
+                    ? (raw.length < 5000 && raw.trim().startsWith('{') ? JSON.parse(raw) : { event: raw })
+                    : raw;
+                if (!data || typeof data !== 'object') return;
+
+                const evt = String(data.event || data.type || data.action || data.state || data.status || '').toLowerCase();
+                const nestedEvt = String(data.data?.event || data.data?.state || '').toLowerCase();
+
+                if (
+                    evt === 'ended' ||
+                    evt === 'complete' ||
+                    evt === 'video_ended' ||
+                    evt === 'playback_ended' ||
+                    nestedEvt === 'ended' ||
+                    nestedEvt === 'complete' ||
+                    data.playerState === 0 ||
+                    data.info?.playerState === 0
+                ) {
+                    triggerEpisodeEndedRef.current();
+                    return;
+                }
+
+                // Many embed players emit timeupdate payloads with currentTime & duration
+                const curr = Number(data.data?.currentTime ?? data.currentTime);
+                const dur = Number(data.data?.duration ?? data.duration);
+                if (Number.isFinite(curr) && Number.isFinite(dur) && dur > 60 && curr >= dur - 1.5) {
+                    triggerEpisodeEndedRef.current();
+                }
+            } catch {
+                // Ignore non-JSON cross-origin messages
+            }
+        };
+
+        window.addEventListener('message', handleEmbedEndedMsg);
+        return () => window.removeEventListener('message', handleEmbedEndedMsg);
+    }, [isTV, isTrailer, needsEpisodeSelection]);
 
     const embedBaseHost = useMemo(() => {
         return (settings?.embedProxyBaseUrl || 'https://proxy.garageband.rocks').replace(/^https?:\/\//, '').replace(/\/+$/, '');
@@ -548,8 +766,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         // Only lock to overrideUrl if it is an actual direct video file (MP4/HLS/Cloudflare)
         directVideoUrl = overrideUrl;
     } else if (isTV) {
-        const sNum = currentSeason?.seasonNumber || (urlSeasonEp?.season || 1);
-        const eNum = currentEpisode?.episodeNumber || (urlSeasonEp?.episode || 1);
+        const sNum = currentSeason?.seasonNumber || routeSeasonEp?.season || urlSeasonEp?.season || 1;
+        const eNum = currentEpisode?.episodeNumber || routeSeasonEp?.episode || urlSeasonEp?.episode || 1;
         if (currentEpisode?.videoUrl && isDirectVideoUrl(currentEpisode.videoUrl)) {
             directVideoUrl = currentEpisode.videoUrl;
         } else if (targetContentId && !content.isManual) {
@@ -610,48 +828,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const isExternalStream = isDirectIframeEmbed && !isDriveVideo;
     // --- End Video Source Logic ---
 
-    // ── Auto-Fallback Watchdog & Error Detector for Normal Player ────────────
-    const serverWatchdogTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    // Watchdog: If the external embed server is taking >10s to load, auto-try next server
-    useEffect(() => {
-        if (!isExternalStream) return;
-
-        if (serverWatchdogTimer.current) clearTimeout(serverWatchdogTimer.current);
-        serverWatchdogTimer.current = setTimeout(() => {
-            if (isMovieLoading) {
-                handleNextServer('is taking too long or busy');
-            }
-        }, 10000);
-
-        return () => {
-            if (serverWatchdogTimer.current) clearTimeout(serverWatchdogTimer.current);
-        };
-    }, [isExternalStream, isMovieLoading, activeServer, handleNextServer]);
-
     const handleIframeError = useCallback(() => {
-        handleNextServer('failed to connect');
-    }, [handleNextServer]);
-
-    // Cross-origin message listener: catch provider error reports
-    useEffect(() => {
-        if (!isExternalStream) return;
-        const onMsg = (event: MessageEvent) => {
-            let data = event.data;
-            if (typeof data === 'string') {
-                if (data.length > 5000) return;
-                try { data = JSON.parse(data); } catch { return; }
-            }
-            if (data && typeof data === 'object') {
-                const str = JSON.stringify(data).toLowerCase();
-                if (str.includes('error') || str.includes('fail') || str.includes('not_found') || str.includes('unavailable')) {
-                    handleNextServer('reported an error');
-                }
-            }
-        };
-        window.addEventListener('message', onMsg);
-        return () => window.removeEventListener('message', onMsg);
-    }, [isExternalStream, handleNextServer]);
+        finishLoading();
+    }, [finishLoading]);
 
     const isMobile = useMemo(() => {
         return (window.innerWidth <= 768 || window.innerHeight <= 768) && /Mobile|Android|iPhone|iPad/i.test(navigator.userAgent);
@@ -673,9 +852,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
 
 
-    // Lock orientation to landscape on mount for mobile, unlock on unmount
+    // Lock orientation to landscape on mobile once playback screen is visible, unlock on unmount
     useEffect(() => {
-        if (!isMobile) return;
+        if (!isMobile || needsEpisodeSelection) return;
         const lockOrientation = async () => {
             try {
                 if (screen.orientation && (screen.orientation as any).lock) {
@@ -690,7 +869,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 try { (screen.orientation as any).unlock(); } catch (_) { }
             }
         };
-    }, [isMobile]);
+    }, [isMobile, needsEpisodeSelection]);
 
     // Lock document & window scroll during video playback so no scrollbar appears on the side
     useEffect(() => {
@@ -930,6 +1109,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             setIsBuffering(true);
         } else if (event.data === window.YT.PlayerState.ENDED) {
             setPlaying(false);
+            triggerEpisodeEndedRef.current();
         }
     };
 
@@ -1000,7 +1180,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         });
 
         setCurrentQuality(quality);
-        setShowQualityMenu(false);
+        setShowSettingsMenu(false);
     };
 
     const BOOST_PRESETS = [1.0, 1.5, 2.0, 3.0, 4.0];
@@ -1170,6 +1350,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                     const prog = (curr / dur) * 100;
                     setProgress(prog);
                     progressRef.current = prog;
+                    if (dur > 30 && curr >= dur - 0.75) {
+                        triggerEpisodeEndedRef.current();
+                    }
                 }
             }
         }, 500);
@@ -1189,38 +1372,50 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         soundBooster.scanAndAttach();
     }, [volume, isMuted, isHls, isNativeVideo, boostLevel]);
 
-    // Initialize YouTube Player
+    // Initialize YouTube Player (only when YouTube is the active visible player)
     useEffect(() => {
-        if (!isApiReady || isDriveVideo || isHls || playerRef.current || !youtubeVideoId) return;
+        if (needsEpisodeSelection || !isApiReady || isDriveVideo || isHls || isNativeVideo || isDirectIframeEmbed || playerRef.current || !youtubeVideoId) return;
+        if (!/^[a-zA-Z0-9_-]{11}$/.test(youtubeVideoId)) {
+            setPlaybackError('Invalid video source. Please go back or search for another title.');
+            finishLoading();
+            return;
+        }
 
-        playerRef.current = new window.YT.Player('youtube-player', {
-            videoId: youtubeVideoId,
-            playerVars: {
-                autoplay: playing ? 1 : 0,
-                controls: 0,
-                modestbranding: 1,
-                rel: 0,
-                iv_load_policy: 3,
-                playsinline: 1,
-                origin: window.location.origin, // Critical for API communication
-                enablejsapi: 1
-            },
-            events: {
-                onReady: onPlayerReady,
-                onStateChange: onPlayerStateChange,
-                onApiChange: onPlayerApiChange,
-                onError: (e: any) => {
-                    console.error('YouTube Player Error:', e.data);
-                    setIsBuffering(false);
-                    let msg = 'Playback error occurred';
-                    if (e.data === 2) msg = 'Invalid video ID';
-                    if (e.data === 5) msg = 'Embedded player error';
-                    if (e.data === 100) msg = 'Video not found or removed';
-                    if (e.data === 101 || e.data === 150) msg = 'Playback restricted by owner';
-                    setPlaybackError(msg);
+        try {
+            playerRef.current = new window.YT.Player('youtube-player', {
+                videoId: youtubeVideoId,
+                playerVars: {
+                    autoplay: playing ? 1 : 0,
+                    controls: 0,
+                    modestbranding: 1,
+                    rel: 0,
+                    iv_load_policy: 3,
+                    playsinline: 1,
+                    origin: window.location.origin, // Critical for API communication
+                    enablejsapi: 1
+                },
+                events: {
+                    onReady: onPlayerReady,
+                    onStateChange: onPlayerStateChange,
+                    onApiChange: onPlayerApiChange,
+                    onError: (e: any) => {
+                        console.error('YouTube Player Error:', e.data);
+                        setIsBuffering(false);
+                        let msg = 'Playback error occurred';
+                        if (e.data === 2) msg = 'Invalid video ID';
+                        if (e.data === 5) msg = 'Embedded player error';
+                        if (e.data === 100) msg = 'Video not found or removed';
+                        if (e.data === 101 || e.data === 150) msg = 'Playback restricted by owner';
+                        setPlaybackError(msg);
+                    }
                 }
-            }
-        });
+            });
+        } catch (err) {
+            console.error('Failed to initialize YouTube Player:', err);
+            setIsBuffering(false);
+            finishLoading();
+            setPlaybackError('Unable to load this video stream. Please go back or search for new content.');
+        }
 
         return () => {
             if (playerRef.current) {
@@ -1233,7 +1428,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 }
             }
         };
-    }, [isApiReady, isDriveVideo, youtubeVideoId]);
+    }, [needsEpisodeSelection, isApiReady, isDriveVideo, isHls, isNativeVideo, isDirectIframeEmbed, youtubeVideoId]);
 
     // React -> Player Sync & Logging
     useEffect(() => {
@@ -1524,16 +1719,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     }, [syncProgressToFirestore]);
 
 
-    // Controls & Movie Card Visibility Timer (Hides after 2 seconds of inactivity)
+    // Controls Visibility Timer (Hides after 3.5 seconds of inactivity; stays open while any menu is open)
     const resetInactivityTimer = useCallback(() => {
         setShowControls(true);
         if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
         controlsTimeoutRef.current = setTimeout(() => {
-            if (!showStats && !showAudioSubMenu && !showQualityMenu && !showEpisodesMenu) {
+            if (!showStats && !showSettingsMenu && !showEpisodesMenu) {
                 setShowControls(false);
             }
-        }, 2000);
-    }, [showStats, showAudioSubMenu, showQualityMenu, showEpisodesMenu]);
+        }, 3500);
+    }, [showStats, showSettingsMenu, showEpisodesMenu]);
 
     useEffect(() => {
         const handleUserActivity = () => {
@@ -1552,7 +1747,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         window.addEventListener('blur', handleUserActivity);
         window.addEventListener('focus', handleUserActivity);
 
-        // Initial 2-second timer on mount
+        // Initial timer on mount
         resetInactivityTimer();
 
         return () => {
@@ -1565,18 +1760,34 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         };
     }, [resetInactivityTimer]);
 
-    // Fullscreen change listener to keep isFullscreen state in sync with browser
+    // Unified Fullscreen change listener: sync state & keep container promoted for overlays
     useEffect(() => {
         const handleFullscreenChange = () => {
             const doc = document as any;
-            const isFull = !!(
+            const fsElement =
                 doc.fullscreenElement ||
                 doc.webkitFullscreenElement ||
                 doc.mozFullScreenElement ||
-                doc.msFullscreenElement
-            );
+                doc.msFullscreenElement;
+            const isFull = !!fsElement;
             setIsFullscreen(isFull);
             resetInactivityTimer();
+
+            // If an inner child (such as the embed iframe, video, or canvas) entered fullscreen,
+            // promote our playerContainerRef to fullscreen so overlays & watermark stay consistent
+            if (fsElement && playerContainerRef.current && fsElement !== playerContainerRef.current) {
+                if (playerContainerRef.current.contains(fsElement)) {
+                    try {
+                        const requestFS = playerContainerRef.current.requestFullscreen ||
+                            (playerContainerRef.current as any).webkitRequestFullscreen ||
+                            (playerContainerRef.current as any).mozRequestFullScreen ||
+                            (playerContainerRef.current as any).msRequestFullscreen;
+                        if (requestFS) {
+                            requestFS.call(playerContainerRef.current).catch(() => { });
+                        }
+                    } catch { }
+                }
+            }
         };
 
         document.addEventListener('fullscreenchange', handleFullscreenChange);
@@ -1592,12 +1803,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         };
     }, [resetInactivityTimer]);
 
-    // When menus (episodes, quality, audio, stats) close, automatically begin 2s inactivity hide countdown
+    // When menus close, automatically begin inactivity hide countdown
     useEffect(() => {
-        if (!showEpisodesMenu && !showQualityMenu && !showAudioSubMenu && !showStats) {
+        if (!showEpisodesMenu && !showSettingsMenu && !showStats) {
             resetInactivityTimer();
+        } else {
+            if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+            setShowControls(true);
         }
-    }, [showEpisodesMenu, showQualityMenu, showAudioSubMenu, showStats, resetInactivityTimer]);
+    }, [showEpisodesMenu, showSettingsMenu, showStats, resetInactivityTimer]);
 
     // Keyboard Shortcuts
     useEffect(() => {
@@ -1717,60 +1931,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         };
     }, [content.playMode, currentUser?.autoFullscreen]);
 
-    // Fullscreen Event Listener
-    useEffect(() => {
-        const handleFullscreenChange = () => {
-            const fsElement = document.fullscreenElement ||
-                (document as any).webkitFullscreenElement ||
-                (document as any).mozFullScreenElement ||
-                (document as any).msFullscreenElement;
-            const isFull = !!fsElement;
-            setIsFullscreen(isFull);
-            if (isFull) setShowControls(false);
-
-            // If an inner child (such as the embed iframe, video, or canvas) entered fullscreen,
-            // promote our playerContainerRef to fullscreen so the watermark logo remains visible on top!
-            if (fsElement && playerContainerRef.current && fsElement !== playerContainerRef.current) {
-                if (playerContainerRef.current.contains(fsElement)) {
-                    try {
-                        const requestFS = playerContainerRef.current.requestFullscreen ||
-                            (playerContainerRef.current as any).webkitRequestFullscreen ||
-                            (playerContainerRef.current as any).mozRequestFullScreen ||
-                            (playerContainerRef.current as any).msRequestFullscreen;
-                        if (requestFS) {
-                            requestFS.call(playerContainerRef.current).catch(() => { });
-                        }
-                    } catch (e) {
-                        // ignore
-                    }
-                }
-            }
-        };
-
-        document.addEventListener('fullscreenchange', handleFullscreenChange);
-        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-        document.addEventListener('MSFullscreenChange', handleFullscreenChange);
-
-        return () => {
-            document.removeEventListener('fullscreenchange', handleFullscreenChange);
-            document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-            document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
-            document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
-        };
-    }, []);
-
-    // Escape Key Listener to exit player
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape' && !document.fullscreenElement) {
-                onClose();
-            }
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [onClose]);
-
     // Gesture State
     const lastTapRef = useRef<{ time: number, x: number } | null>(null);
     const [rippleSides, setRippleSides] = useState<('left' | 'right')[]>([]);
@@ -1778,11 +1938,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     const startHideTimer = useCallback(() => {
         if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
         controlsTimeoutRef.current = setTimeout(() => {
-            if (!showStats && !showAudioSubMenu && !showQualityMenu && !showEpisodesMenu) {
+            if (!showStats && !showSettingsMenu && !showEpisodesMenu) {
                 setShowControls(false);
             }
-        }, 3000);
-    }, [showStats, showAudioSubMenu, showQualityMenu, showEpisodesMenu]);
+        }, 3500);
+    }, [showStats, showSettingsMenu, showEpisodesMenu]);
 
     const handleTap = (e: React.MouseEvent) => {
         const now = Date.now();
@@ -1901,18 +2061,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         if (!url) return '';
         const trimmed = url.trim();
 
-        // If it is already a direct multi-server URL generated for the active provider, keep it!
-        if (
-            trimmed.includes('vidstuck.xyz') ||
-            trimmed.includes('zxcstream.xyz') ||
-            trimmed.includes('bingr.one') ||
-            trimmed.includes('nxsha.space') ||
-            trimmed.includes('vidlink.pro') ||
-            trimmed.includes('vidnest.fun') ||
-            trimmed.includes('megaplay.buzz') ||
-            trimmed.includes('4animo.xyz') ||
-            trimmed.includes('zokoanime.video')
-        ) {
+        // Keep Nxsha embed URLs directly
+        if (trimmed.includes('nxsha.space')) {
             return trimmed;
         }
 
@@ -1924,51 +2074,36 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             return url;
         }
 
-        // Check if it's an IMDb-related URL or raw IMDb ID
-        if (trimmed.includes('imdb.com') || /^tt\d+$/.test(trimmed)) {
-            if (imdbMatch) {
-                return buildServerEmbedUrl(imdbMatch[1], fallbackType, activeServer, {
+        // Route IMDb IDs, legacy proxy URLs, or legacy server URLs to Nxsha
+        if (
+            trimmed.includes('imdb.com') ||
+            /^tt\d+$/.test(trimmed) ||
+            trimmed.includes('proxy.garageband.rocks') ||
+            (embedBaseHost && trimmed.includes(embedBaseHost))
+        ) {
+            const idForNxsha = content.tmdbId || imdbMatch?.[1];
+            if (idForNxsha) {
+                return buildServerEmbedUrl(idForNxsha, fallbackType, 'nxsha', {
                     season: currentSeason?.seasonNumber || 1,
                     episode: currentEpisode?.episodeNumber || 1,
                     audioTrack,
                     settings
                 });
             }
-        }
-
-        // If it is a proxy.garageband.rocks URL or matches configured embed host
-        if (trimmed.includes('proxy.garageband.rocks') || (embedBaseHost && trimmed.includes(embedBaseHost))) {
-            if (activeServer !== 'default' && imdbMatch) {
-                return buildServerEmbedUrl(imdbMatch[1], fallbackType, activeServer, {
-                    season: currentSeason?.seasonNumber || 1,
-                    episode: currentEpisode?.episodeNumber || 1,
-                    audioTrack,
-                    settings
-                });
-            }
-            const existingType = parseEmbedContentType(trimmed);
-            if (imdbMatch) {
-                const typeToUse = existingType || fallbackType;
-                const seasonEpMatch = trimmed.match(new RegExp(`${imdbMatch[1]}(\\/\\d+\\/\\d+)`));
-                const extraPath = seasonEpMatch ? seasonEpMatch[1] : '';
-                return `${buildEmbedUrl(imdbMatch[1], typeToUse, settings)}${extraPath}`;
-            }
-            return trimmed.startsWith('http') ? trimmed : `https://${trimmed}`;
         }
 
         return url;
     };
 
-    const finalUrl = useMemo(() => getFinalVideoUrl(directVideoUrl || ''), [directVideoUrl, isTV, settings, embedBaseHost, activeServer, audioTrack]);
+    const finalUrl = useMemo(() => getFinalVideoUrl(directVideoUrl || ''), [directVideoUrl, isTV, settings, embedBaseHost, audioTrack, content.tmdbId, currentSeason?.seasonNumber, currentEpisode?.episodeNumber]);
 
-    const isBingrServer = useMemo(() => {
-        return activeServer === 'bingr' || (typeof finalUrl === 'string' && finalUrl.includes('bingr.one'));
-    }, [activeServer, finalUrl]);
-
-    // Dynamically update document title to movie/show name during playback
+    // Dynamically update document title to movie/show (and episode) name during playback
     useEffect(() => {
         if (content?.title) {
-            setWebpageTitle(content.title);
+            const titleText = (isTV && hasSelectedEpisode && currentSeason && currentEpisode)
+                ? `${content.title} — S${currentSeason.seasonNumber} E${currentEpisode.episodeNumber}`
+                : content.title;
+            setWebpageTitle(titleText);
             if (content.id) saveContentTitle(content.id, content.title);
         }
         return () => {
@@ -1976,7 +2111,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 document.title = 'My Donkey | Watch Free Movies, TV Shows & Anime in HD';
             }
         };
-    }, [content?.title, content?.id]);
+    }, [content?.title, content?.id, isTV, hasSelectedEpisode, currentSeason?.seasonNumber, currentEpisode?.episodeNumber]);
 
     // Record watch history for stream sources without redirecting away (guarded to once per content ID)
     const hasRecordedWatchHistoryRef = useRef<string | null>(null);
@@ -1986,6 +2121,240 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             addToWatchHistory(content).catch(e => console.error("Error saving watch history:", e));
         }
     }, [content, isTrailer, addToWatchHistory]);
+
+    // TV Series Episode Selection Gate: Ask user to choose an episode BEFORE showing/loading the player screen
+    if (needsEpisodeSelection) {
+        const bgImage = content.backdrop_path || content.poster_path || '';
+        return (
+            <div
+                id="video-player-root"
+                className="fixed inset-0 z-[100] bg-[#0a0a0b] text-white flex flex-col font-sans overflow-hidden"
+            >
+                {/* Subtle Backdrop */}
+                {bgImage && (
+                    <div className="pointer-events-none fixed inset-0 z-0">
+                        <img
+                            src={bgImage}
+                            alt=""
+                            className="w-full h-full object-cover opacity-20 blur-2xl scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0b]/80 via-[#0a0a0b]/90 to-[#0a0a0b]" />
+                    </div>
+                )}
+
+                {/* Top Header */}
+                <header className="relative z-10 border-b border-white/[0.08] bg-black/40 backdrop-blur-xl shrink-0">
+                    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="w-9 h-9 rounded-full bg-white/[0.08] hover:bg-white/[0.16] border border-white/10 flex items-center justify-center text-white transition shrink-0 cursor-pointer"
+                                aria-label="Go Back"
+                            >
+                                <ArrowLeft size={18} />
+                            </button>
+                            <div className="min-w-0">
+                                <h1 className="text-base sm:text-xl font-semibold tracking-tight text-white truncate">
+                                    {content.title}
+                                </h1>
+                                <p className="text-xs text-zinc-400 truncate mt-0.5">
+                                    Select an episode to start watching
+                                    {(content as any).releaseYear || content.year ? ` · ${(content as any).releaseYear || content.year}` : ''}
+                                </p>
+                            </div>
+                        </div>
+
+                        {dynamicSeasons.length > 0 && (
+                            <span className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/10 text-zinc-300 shrink-0">
+                                {dynamicSeasons.length} {dynamicSeasons.length === 1 ? 'Season' : 'Seasons'}
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Season Tabs */}
+                    {dynamicSeasons.length > 1 && (
+                        <div className="max-w-4xl mx-auto px-4 sm:px-6 pb-3 flex items-center gap-2 overflow-x-auto no-scrollbar">
+                            {dynamicSeasons.map((s, idx) => {
+                                const isSelected = currentSeasonIdx === idx;
+                                return (
+                                    <button
+                                        key={s.id || `gate_season_${s.seasonNumber}`}
+                                        type="button"
+                                        onClick={() => handleSelectSeason(idx)}
+                                        className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition shrink-0 cursor-pointer flex items-center gap-1.5 ${isSelected
+                                            ? 'bg-white text-black font-semibold'
+                                            : 'bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white'
+                                            }`}
+                                    >
+                                        <span>{s.title || `Season ${s.seasonNumber}`}</span>
+                                        {s.episodes && s.episodes.length > 0 && (
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isSelected ? 'bg-black/15 text-black' : 'bg-white/10 text-zinc-400'}`}>
+                                                {s.episodes.length}
+                                            </span>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                </header>
+
+                {/* Episodes List */}
+                <main className="relative z-10 flex-1 overflow-y-auto custom-scrollbar">
+                    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-5 sm:py-6">
+                        {/* 1-Tap Continue Watching Resume Banner for returning TV viewers */}
+                        {seriesProgress && (
+                            <div className="mb-5 p-4 rounded-2xl bg-[#141418]/95 border border-white/15 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
+                                <div className="flex items-center gap-3.5 min-w-0">
+                                    {seriesProgress.lastStillUrl ? (
+                                        <img
+                                            src={seriesProgress.lastStillUrl}
+                                            alt={seriesProgress.lastEpisodeTitle || 'Last watched episode'}
+                                            className="w-24 sm:w-28 aspect-video rounded-xl object-cover border border-white/10 shrink-0 bg-black"
+                                        />
+                                    ) : (
+                                        <div className="w-12 h-12 rounded-xl bg-brand-red/20 border border-brand-red/30 text-brand-red flex flex-col items-center justify-center font-bold shrink-0">
+                                            <span className="text-[9px] uppercase">S{seriesProgress.lastSeason}</span>
+                                            <span className="text-sm leading-none">E{seriesProgress.lastEpisode}</span>
+                                        </div>
+                                    )}
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="text-[11px] font-semibold uppercase tracking-wider text-brand-red">
+                                                Continue Watching
+                                            </span>
+                                            {seriesProgress.watchedEpisodes.length > 0 && (
+                                                <span className="text-[11px] text-zinc-400">
+                                                    · {seriesProgress.watchedEpisodes.length} watched
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="text-sm sm:text-base font-semibold text-white truncate mt-0.5">
+                                            S{seriesProgress.lastSeason} · E{seriesProgress.lastEpisode}
+                                            {seriesProgress.lastEpisodeTitle ? ` — ${seriesProgress.lastEpisodeTitle}` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={handleResumeLastEpisode}
+                                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-white hover:bg-zinc-200 text-black text-xs sm:text-sm font-semibold inline-flex items-center justify-center gap-2 shrink-0 transition cursor-pointer"
+                                >
+                                    <Play size={14} className="fill-current" />
+                                    <span>Resume S{seriesProgress.lastSeason} · E{seriesProgress.lastEpisode}</span>
+                                </button>
+                            </div>
+                        )}
+
+                        {isLoadingSeasons && dynamicSeasons.length === 0 ? (
+                            <div className="py-20 flex flex-col items-center justify-center gap-3 text-center">
+                                <div className="w-9 h-9 rounded-full border-2 border-white/15 border-t-brand-red animate-spin" />
+                                <p className="text-sm text-zinc-400">Loading seasons and episodes...</p>
+                            </div>
+                        ) : currentSeason && currentSeason.episodes.length > 0 ? (
+                            <div className="space-y-2.5 pb-10">
+                                {currentSeason.episodes.map((ep, idx) => {
+                                    const watched = isEpisodeWatched(seriesProgress, currentSeason.seasonNumber, ep.episodeNumber);
+                                    const isLastWatched =
+                                        seriesProgress?.lastSeason === currentSeason.seasonNumber &&
+                                        seriesProgress?.lastEpisode === ep.episodeNumber;
+                                    return (
+                                        <button
+                                            key={ep.id || `gate_ep_${ep.episodeNumber}`}
+                                            type="button"
+                                            onClick={() => handleSelectEpisode(currentSeasonIdx, idx)}
+                                            className={`w-full text-left p-3 sm:p-4 rounded-2xl flex items-center gap-3.5 sm:gap-4 transition group cursor-pointer border ${isLastWatched
+                                                ? 'bg-brand-red/10 border-brand-red/40 hover:bg-brand-red/15'
+                                                : 'bg-[#111114]/90 hover:bg-[#19191f] border-white/[0.08] hover:border-white/20'
+                                                }`}
+                                        >
+                                            {ep.stillUrl ? (
+                                                <div className="w-28 sm:w-36 aspect-video rounded-xl overflow-hidden bg-black/70 relative shrink-0 border border-white/10">
+                                                    <img
+                                                        src={ep.stillUrl}
+                                                        alt={ep.title}
+                                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                                        loading="lazy"
+                                                    />
+                                                    <div className="absolute inset-0 bg-black/35 group-hover:bg-black/15 flex items-center justify-center transition">
+                                                        <div className="w-9 h-9 rounded-full bg-white/90 text-black flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                                                            <Play size={15} className="fill-current ml-0.5" />
+                                                        </div>
+                                                    </div>
+                                                    {watched && (
+                                                        <span className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-emerald-500 text-black flex items-center justify-center shadow">
+                                                            <Check size={12} strokeWidth={3} />
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex flex-col items-center justify-center font-bold shrink-0 transition relative ${isLastWatched
+                                                    ? 'bg-brand-red text-white'
+                                                    : 'bg-white/[0.06] group-hover:bg-brand-red text-zinc-200 group-hover:text-white'
+                                                    }`}>
+                                                    <span className="text-[9px] uppercase tracking-wider opacity-70">EP</span>
+                                                    <span className="text-base leading-none">{ep.episodeNumber}</span>
+                                                    {watched && (
+                                                        <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 text-black flex items-center justify-center">
+                                                            <Check size={10} strokeWidth={3} />
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap text-xs text-zinc-400">
+                                                    <span className="font-semibold text-zinc-200">
+                                                        S{currentSeason.seasonNumber} · E{ep.episodeNumber}
+                                                    </span>
+                                                    {ep.duration && <span>· {ep.duration}</span>}
+                                                    {isLastWatched ? (
+                                                        <span className="px-1.5 py-0.5 rounded bg-brand-red/20 text-brand-red text-[10px] font-semibold border border-brand-red/30">
+                                                            Last Watched
+                                                        </span>
+                                                    ) : watched ? (
+                                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 text-[10px] font-medium border border-emerald-500/25">
+                                                            <Check size={10} strokeWidth={3} /> Watched
+                                                        </span>
+                                                    ) : null}
+                                                </div>
+                                                <h3 className="text-sm sm:text-base font-semibold text-white mt-0.5 truncate group-hover:text-brand-red transition-colors">
+                                                    {ep.title}
+                                                </h3>
+                                                {ep.overview && (
+                                                    <p className="text-xs text-zinc-400 line-clamp-2 mt-1 leading-relaxed">
+                                                        {ep.overview}
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            <div className="shrink-0 hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.06] group-hover:bg-white text-zinc-300 group-hover:text-black text-xs font-semibold transition">
+                                                <Play size={13} className="fill-current" />
+                                                <span>{isLastWatched ? 'Resume' : 'Play'}</span>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <div className="py-20 text-center space-y-4">
+                                <p className="text-sm text-zinc-400">No episodes found for this season.</p>
+                                <button
+                                    type="button"
+                                    onClick={() => setHasSelectedEpisode(true)}
+                                    className="px-5 py-2.5 rounded-xl bg-white text-black text-xs font-semibold hover:bg-zinc-200 transition cursor-pointer"
+                                >
+                                    Play Season 1, Episode 1
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </main>
+            </div>
+        );
+    }
 
     // Final Main Render
     return (
@@ -2033,26 +2402,17 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                     onClick={() => setPlaying(!playing)}
                                     src={directVideoUrl}
                                     onLoadedMetadata={handleLoadedMetadata}
+                                    onEnded={() => triggerEpisodeEndedRef.current()}
                                     onError={(err) => setPlaybackError(err.message || 'Movi player playback error')}
                                 />
                             ) : finalUrl ? (
                                 <div className="relative w-full h-full">
-                                    {/* Top-bar click interceptor shield for TV embed (blocks external clicks/popups on #vs-bar and opens in-app popup modal) */}
-                                    {isTV && isEmbedPlayer && (
-                                        <div
-                                            className="absolute top-0 left-0 right-0 h-14 z-[35] cursor-pointer"
-                                            title="Click to open Season & Episode selection"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setShowEpisodesMenu(true);
-                                            }}
-                                        />
-                                    )}
                                     <iframe
                                         key={finalUrl}
                                         ref={embedIframeRef}
                                         className="w-full h-full relative z-[30] border-0"
                                         src={finalUrl}
+                                        sandbox={adShieldSandbox}
                                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
                                         scrolling="no"
                                         referrerPolicy="origin"
@@ -2109,7 +2469,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 {/* Drive/Embed overlays for mobile tap-to-fullscreen */}
                 {isMobile && (showDriveOverlay && isDriveVideo || showEmbedOverlay && isDirectIframeEmbed) && (
                     <div
-                        className="absolute inset-0 z-[60] bg-black/85 flex flex-col items-center justify-center cursor-pointer"
+                        className="absolute inset-0 z-[60] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center px-6 text-center cursor-pointer"
                         onClick={async (e) => {
                             e.stopPropagation();
                             await toggleFullscreen();
@@ -2117,11 +2477,28 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                             setShowEmbedOverlay(false);
                         }}
                     >
-                        <div className="bg-[#E50914] text-white p-4 rounded-full mb-3 shadow-[0_0_24px_rgba(229,9,20,0.6)] animate-pulse">
-                            <Play size={36} className="translate-x-0.5" />
+                        <div className="bg-brand-red text-white p-4 rounded-full mb-3 shadow-[0_0_28px_rgba(229,9,20,0.55)] active:scale-95 transition-transform">
+                            <Play size={32} className="translate-x-0.5 fill-current" />
                         </div>
-                        <p className="text-white font-bold text-base">{content.title || 'Tap to Play'}</p>
-                        <p className="text-gray-300 text-xs mt-1">Tap to watch fullscreen</p>
+                        <p className="text-white font-bold text-base max-w-xs truncate">{content.title || 'Tap to Play'}</p>
+                        <p className="text-gray-300 text-xs mt-1">Tap anywhere for fullscreen</p>
+                        {isExternalStream && isAdShieldEnabled && (
+                            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/35 text-emerald-300 text-[11px] font-semibold">
+                                <ShieldCheck size={13} />
+                                <span>Ad Shield Active</span>
+                            </div>
+                        )}
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowDriveOverlay(false);
+                                setShowEmbedOverlay(false);
+                            }}
+                            className="mt-4 text-[11px] text-gray-400 hover:text-white underline underline-offset-4 px-3 py-1"
+                        >
+                            Watch without fullscreen
+                        </button>
                     </div>
                 )}
 
@@ -2147,27 +2524,44 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
             {/* Common Overlays (Error, Skip Intro, Stats) */}
             {playbackError && (
-                <div className="absolute inset-0 z-[250] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in fade-in">
-                    <div className="bg-brand-red/10 p-6 rounded-full mb-6 border border-brand-red/20 shadow-[0_0_50px_rgba(229,9,20,0.2)]">
-                        <AlertCircle size={64} className="text-brand-red" />
-                    </div>
-                    <h2 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">Playback Error</h2>
-                    <p className="text-gray-400 mb-8 max-w-sm leading-relaxed">{playbackError}</p>
-                    <div className="flex gap-4">
+                <div className="absolute inset-0 z-[250] bg-[#0a0a0d]/95 backdrop-blur-xl flex flex-col items-center justify-center p-5 text-center animate-in fade-in">
+                    <div className="w-full max-w-md bg-[#121318] border border-white/15 rounded-3xl p-6 sm:p-8 shadow-[0_25px_80px_rgba(0,0,0,0.9)] ring-1 ring-white/10">
+                        <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-brand-red/15 border border-brand-red/30 flex items-center justify-center text-brand-red">
+                            <AlertCircle size={28} />
+                        </div>
+                        <h2 className="text-xl sm:text-2xl font-black text-white mb-2 tracking-tight">Playback Unavailable</h2>
+                        <p className="text-gray-400 text-xs sm:text-sm mb-6 leading-relaxed">{playbackError}</p>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onClose();
+                                }}
+                                className="w-full bg-white text-black px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm hover:bg-gray-200 transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                                <ArrowLeft size={16} /> Previous Page
+                            </button>
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onClose();
+                                    window.location.href = '/search';
+                                }}
+                                className="w-full bg-brand-red text-white px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm hover:bg-red-600 transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                                <Search size={15} /> Search New Content
+                            </button>
+                        </div>
+
                         <button
+                            type="button"
                             onClick={() => window.location.reload()}
-                            className="bg-white text-black px-8 py-3 rounded-xl font-black hover:bg-gray-200 transition-all active:scale-95 flex items-center gap-2"
+                            className="mt-3 w-full bg-white/5 border border-white/10 text-gray-300 hover:text-white px-5 py-2.5 rounded-xl text-xs font-semibold hover:bg-white/10 transition-all flex items-center justify-center gap-2 cursor-pointer"
                         >
-                            <RefreshCw size={18} /> RETRY
-                        </button>
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onClose();
-                            }}
-                            className="bg-white/5 border border-white/10 text-white px-8 py-3 rounded-xl font-bold hover:bg-white/10 transition-all cursor-pointer"
-                        >
-                            GO BACK
+                            <RefreshCw size={14} /> Try Again
                         </button>
                     </div>
                 </div>
@@ -2190,11 +2584,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
 
 
-            {/* Screen Activity Detector: Detects mouse movement and touch across the screen when controls are hidden for native players */}
+            {/* Screen Activity Detector for native players when controls are hidden */}
             {!showControls && !isDirectIframeEmbed && !isDriveVideo && (
                 <div
                     id="vp-activity-detector"
-                    className="fixed top-0 left-0 right-0 bottom-16 md:bottom-20 z-[90] bg-transparent select-none cursor-auto"
+                    className="fixed inset-0 z-[90] bg-transparent select-none cursor-auto"
                     onPointerMove={resetInactivityTimer}
                     onMouseMove={resetInactivityTimer}
                     onMouseEnter={resetInactivityTimer}
@@ -2203,234 +2597,127 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 />
             )}
 
-            {/* Top Activity Detector: Detects mouse movement and touch near top header area when controls are hidden */}
-            {!showControls && (
-                <div
-                    className="fixed top-0 left-0 right-0 h-16 z-[95] bg-transparent cursor-pointer"
-                    onPointerMove={resetInactivityTimer}
-                    onMouseMove={resetInactivityTimer}
-                    onMouseEnter={resetInactivityTimer}
-                    onTouchStart={resetInactivityTimer}
-                />
-            )}
-
-            {/* Corner Activity Detector for Bottom-Right Fullscreen button */}
+            {/* Subtle Top-Center Reveal Handle for Embed / Drive players when controls are hidden (never blocks iframe buttons) */}
             {!showControls && (isDirectIframeEmbed || isDriveVideo) && (
-                <div
-                    className="fixed bottom-0 right-0 w-24 h-24 z-[95] bg-transparent cursor-pointer"
+                <button
+                    type="button"
+                    aria-label="Show player controls"
                     onPointerMove={resetInactivityTimer}
-                    onMouseMove={resetInactivityTimer}
                     onMouseEnter={resetInactivityTimer}
                     onTouchStart={resetInactivityTimer}
-                />
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        resetInactivityTimer();
+                    }}
+                    className="fixed top-0 left-1/2 -translate-x-1/2 z-[280] px-8 pt-1.5 pb-3 bg-transparent flex items-center justify-center cursor-pointer group"
+                >
+                    <span className="w-12 h-1 rounded-full bg-white/35 group-hover:bg-white/75 transition-all shadow-[0_1px_8px_rgba(0,0,0,0.8)]" />
+                </button>
             )}
 
-            {/* Navigation Pill Header - Fixed in top-left corner */}
-            <div
+            {/* Clean Full-Width Responsive Top Bar */}
+            <header
                 onPointerMove={resetInactivityTimer}
                 onMouseMove={resetInactivityTimer}
-                className={`fixed z-[300] top-2.5 left-2.5 md:top-4 md:left-4 select-none transition-opacity duration-300 ${showControls
-                    ? 'opacity-100 pointer-events-auto'
-                    : 'opacity-0 pointer-events-none'
+                className={`vp-top-bar fixed top-0 left-0 right-0 z-[300] px-2.5 sm:px-4 md:px-6 pt-2.5 sm:pt-3.5 pb-6 bg-gradient-to-b from-black/90 via-black/45 to-transparent select-none transition-all duration-300 ${showControls
+                    ? 'opacity-100 translate-y-0 pointer-events-auto'
+                    : 'opacity-0 -translate-y-2 pointer-events-none'
                     }`}
             >
-                <div className="bg-black/95 backdrop-blur-2xl border border-white/20 inline-flex items-center gap-2 md:gap-3 px-2 py-2 md:px-3 md:py-2.5 rounded-2xl pointer-events-auto hover:bg-black transition-all shadow-2xl ring-1 ring-white/10 group/header min-w-[200px] md:min-w-[260px]">
-                    <button
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onClose();
-                        }}
-                        className="text-white hover:text-brand-red transition-all p-2 md:p-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-90 flex items-center justify-center cursor-pointer shrink-0"
-                        title="Go Back to Previous Page"
-                        aria-label="Previous page"
-                    >
-                        <ArrowLeft size={20} className="md:w-5 md:h-5 transition-transform group-hover/header:-translate-x-1" />
-                    </button>
-                    <div className="h-6 w-px bg-white/20 shrink-0 pointer-events-none"></div>
-                    <button
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            if (isTV) setShowEpisodesMenu(!showEpisodesMenu);
-                        }}
-                        className="text-left px-1.5 md:px-2.5 group/title cursor-pointer select-none"
-                    >
-                        <div className="text-white font-semibold text-[11px] md:text-xs leading-tight tracking-tight line-clamp-1 max-w-[120px] md:max-w-[200px] group-hover/title:text-brand-red transition-colors">
-                            {content.title}
-                        </div>
-                        {isTV && currentEpisode && (
-                            <div className="flex items-center gap-1 mt-0.5">
-                                <span className="text-brand-red font-black text-[7px] md:text-[9px] uppercase tracking-wider bg-brand-red/10 px-1 py-0.5 rounded">
-                                    S{currentSeason?.seasonNumber || 1} • E{currentEpisode.episodeNumber || 1}
-                                </span>
-                            </div>
-                        )}
-                    </button>
-                    {isTV && (
-                        <>
-                            <div className="h-6 w-px bg-white/20 shrink-0 pointer-events-none"></div>
-                            <div className="flex items-center gap-1 md:gap-1.5">
-                                <button
-                                    onPointerDown={(e) => e.stopPropagation()}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setShowEpisodesMenu(true);
-                                    }}
-                                    className="px-2 md:px-2.5 py-1 md:py-1.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 text-white text-[10px] md:text-xs font-semibold flex items-center gap-1 cursor-pointer transition-all shadow-sm"
-                                    title="Open Season selection"
-                                >
-                                    <span>Season {currentSeason?.seasonNumber || 1}</span>
-                                    <ChevronDown size={13} className="text-gray-400" />
-                                </button>
-                                <button
-                                    onPointerDown={(e) => e.stopPropagation()}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setShowEpisodesMenu(true);
-                                    }}
-                                    className="px-2 md:px-2.5 py-1 md:py-1.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 text-white text-[10px] md:text-xs font-semibold flex items-center gap-1 cursor-pointer transition-all shadow-sm"
-                                    title="Open Episode selection"
-                                >
-                                    <span>Episode {currentEpisode?.episodeNumber || 1}</span>
-                                    <ChevronDown size={13} className="text-gray-400" />
-                                </button>
-                            </div>
-                        </>
-                    )}
-
-                    {isExternalStream && (
-                        <>
-                            <div className="h-6 w-px bg-white/20 shrink-0 pointer-events-none"></div>
-                            {/* Streaming Server Switcher */}
-                            <div className="relative">
-                                <button
-                                    onPointerDown={(e) => e.stopPropagation()}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setShowServerMenu(!showServerMenu);
-                                    }}
-                                    className="px-2 md:px-2.5 py-1 md:py-1.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 text-white text-[10px] md:text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all shadow-sm"
-                                    title="Switch Streaming Server"
-                                >
-                                    <Server size={13} className="text-brand-red" />
-                                    <span className="hidden sm:inline">{STREAM_SERVERS.find(s => s.key === activeServer)?.name || 'Server'}</span>
-                                    <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 text-[9px] font-bold border border-emerald-500/30">
-                                        {STREAM_SERVERS.find(s => s.key === activeServer)?.tag || 'Fast'}
-                                    </span>
-                                    <ChevronDown size={11} className="text-gray-400" />
-                                </button>
-
-                                {showServerMenu && (
-                                    <div
-                                        onPointerDown={(e) => e.stopPropagation()}
-                                        className="absolute top-full right-0 mt-2 bg-[#121316]/95 backdrop-blur-2xl border border-white/15 rounded-2xl p-2 min-w-[240px] shadow-[0_20px_50px_rgba(0,0,0,0.8)] z-[500] ring-1 ring-white/10 animate-in fade-in zoom-in-95 duration-150"
-                                    >
-                                        <div className="px-3 py-2 border-b border-white/10 mb-1 flex items-center justify-between">
-                                            <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">Stream Servers</span>
-                                            <button
-                                                onClick={() => handleNextServer()}
-                                                className="text-[10px] text-brand-red font-bold hover:underline cursor-pointer"
-                                            >
-                                                Next ➔
-                                            </button>
-                                        </div>
-                                        <div className="max-h-60 overflow-y-auto space-y-1 custom-scrollbar p-1">
-                                            {STREAM_SERVERS.filter(s => isAnime || !s.isAnime).map(s => {
-                                                const isSel = activeServer === s.key;
-                                                return (
-                                                    <button
-                                                        key={s.key}
-                                                        onClick={() => handleServerSwitch(s.key)}
-                                                        className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${isSel
-                                                            ? 'bg-brand-red text-white shadow-md shadow-brand-red/30'
-                                                            : 'text-gray-300 hover:text-white hover:bg-white/10'
-                                                            }`}
-                                                    >
-                                                        <div className="flex flex-col">
-                                                            <span className="font-bold">{s.name}</span>
-                                                            <span className={`text-[10px] ${isSel ? 'text-white/80' : 'text-gray-500'}`}>{s.description}</span>
-                                                        </div>
-                                                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${isSel ? 'bg-black/30 text-white' : 'bg-white/10 text-emerald-400'
-                                                            }`}>
-                                                            {s.tag}
-                                                        </span>
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Next Server Fast Switch Button */}
-                            <button
-                                onPointerDown={(e) => e.stopPropagation()}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleNextServer();
-                                }}
-                                className="px-2 py-1 md:py-1.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 text-gray-300 hover:text-white text-[10px] md:text-xs font-semibold flex items-center gap-1 cursor-pointer transition-all"
-                                title="Try Next Server if buffering"
-                            >
-                                <RefreshCw size={12} className="text-amber-400" />
-                                <span className="hidden md:inline">Next Server</span>
-                            </button>
-
-                            {/* Anime Sub/Dub Toggle */}
-                            {isAnime && (
-                                <button
-                                    onPointerDown={(e) => e.stopPropagation()}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        const nextTrack = audioTrack === 'sub' ? 'dub' : 'sub';
-                                        setAudioTrack(nextTrack);
-                                        showOsd(`Audio: ${nextTrack.toUpperCase()}`, undefined, 'volume');
-                                    }}
-                                    className="px-2 md:px-2.5 py-1 md:py-1.5 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 active:scale-95 border border-purple-400/40 text-purple-200 text-[10px] md:text-xs font-bold flex items-center gap-1 cursor-pointer transition-all"
-                                    title="Toggle Sub / Dub Audio"
-                                >
-                                    <span>{audioTrack.toUpperCase()}</span>
-                                </button>
-                            )}
-                        </>
-                    )}
-
-
-
-                </div>
-            </div>
-
-
-            {/* Right Down Corner Fullscreen Button (in exact corner, in place of player fullscreen button) */}
-            {(isDirectIframeEmbed || isDriveVideo) && (
-                <div
-                    onPointerMove={resetInactivityTimer}
-                    onMouseMove={resetInactivityTimer}
-                    className={`fixed z-[300] bottom-0 right-0 select-none transition-opacity duration-300 ${showControls
-                        ? 'opacity-100 pointer-events-auto'
-                        : 'opacity-0 pointer-events-none'
-                        }`}
-                >
-                    <div className="bg-black/90 hover:bg-black backdrop-blur-xl border-t border-l border-white/20 rounded-tl-xl p-1 md:p-1.5 shadow-2xl pointer-events-auto transition-all">
+                <div className="flex items-center justify-between gap-2 w-full max-w-7xl mx-auto">
+                    {/* LEFT: Back Button + Title */}
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                         <button
+                            type="button"
+                            onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => {
                                 e.stopPropagation();
-                                toggleFullscreen();
+                                onClose();
                             }}
-                            className="text-white hover:text-brand-red transition-all p-1.5 md:p-2 rounded-lg bg-white/10 hover:bg-white/20 active:scale-90 flex items-center justify-center cursor-pointer"
-                            title={isFullscreen ? "Exit Fullscreen (Esc)" : "Full Screen (F)"}
-                            aria-label="Toggle Fullscreen"
+                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-black/60 hover:bg-white/20 active:scale-90 border border-white/15 backdrop-blur-md text-white hover:text-brand-red transition-all flex items-center justify-center cursor-pointer shrink-0 shadow-lg"
+                            title="Go Back"
+                            aria-label="Go Back"
                         >
-                            {isFullscreen ? (
-                                <Minimize size={18} className="md:w-5 md:h-5" />
-                            ) : (
-                                <Maximize size={18} className="md:w-5 md:h-5" />
+                            <ArrowLeft size={18} className="sm:w-5 sm:h-5" />
+                        </button>
+
+                        <button
+                            type="button"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (isTV) setShowEpisodesMenu(true);
+                            }}
+                            className={`text-left min-w-0 flex-1 ${isTV ? 'cursor-pointer group/title' : 'cursor-default'}`}
+                        >
+                            <div className="text-white font-semibold text-xs sm:text-sm md:text-base leading-tight truncate drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)] group-hover/title:text-brand-red transition-colors">
+                                {content.title}
+                            </div>
+                            {isTV && currentEpisode && (
+                                <div className="text-[10px] sm:text-xs text-white/75 font-medium truncate mt-0.5">
+                                    S{currentSeason?.seasonNumber || 1} • E{currentEpisode.episodeNumber || 1}
+                                    {currentEpisode.title && currentEpisode.title !== `Episode ${currentEpisode.episodeNumber}` ? ` · ${currentEpisode.title}` : ''}
+                                </div>
                             )}
                         </button>
                     </div>
+
+                    {/* RIGHT: Compact Action Cluster (No overflow on smartphones) */}
+                    <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                        {/* TV Episodes Pill (Single clean button replaces separate Season + Episode pills) */}
+                        {isTV && (
+                            <button
+                                type="button"
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowEpisodesMenu(true);
+                                    setShowSettingsMenu(false);
+                                }}
+                                className="h-9 sm:h-10 px-2.5 sm:px-3.5 rounded-full bg-black/60 hover:bg-white/20 active:scale-95 border border-white/15 backdrop-blur-md text-white text-[11px] sm:text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all shadow-lg"
+                                title="Seasons & Episodes"
+                            >
+                                <Layers size={14} className="text-brand-red shrink-0" />
+                                <span className="whitespace-nowrap">S{currentSeason?.seasonNumber || 1} E{currentEpisode?.episodeNumber || 1}</span>
+                            </button>
+                        )}
+
+                        {/* Quick Next Episode Button (TV Shows) */}
+                        {isTV && nextEpisodeInfo && (
+                            <button
+                                type="button"
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    playNextEpisode();
+                                }}
+                                className="h-9 sm:h-10 px-2.5 sm:px-3.5 rounded-full bg-black/60 hover:bg-white/20 active:scale-95 border border-white/15 backdrop-blur-md text-white text-[11px] sm:text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all shadow-lg"
+                                title={`Next: S${nextEpisodeInfo.season.seasonNumber} E${nextEpisodeInfo.episode.episodeNumber}`}
+                            >
+                                <SkipForward size={14} className="shrink-0" />
+                                <span className="hidden sm:inline whitespace-nowrap">Next Ep</span>
+                            </button>
+                        )}
+
+                        {/* Fullscreen Toggle for Embed / Drive Players (Cleanly placed in top-right instead of covering iframe bottom-right) */}
+                        {(isDirectIframeEmbed || isDriveVideo) && (
+                            <button
+                                type="button"
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleFullscreen();
+                                }}
+                                className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-black/60 hover:bg-white/20 active:scale-90 border border-white/15 backdrop-blur-md text-white hover:text-brand-red transition-all flex items-center justify-center cursor-pointer shrink-0 shadow-lg"
+                                title={isFullscreen ? "Exit Fullscreen (Esc)" : "Full Screen (F)"}
+                                aria-label="Toggle Fullscreen"
+                            >
+                                {isFullscreen ? <Minimize size={16} className="sm:w-[18px] sm:h-[18px]" /> : <Maximize size={16} className="sm:w-[18px] sm:h-[18px]" />}
+                            </button>
+                        )}
+                    </div>
                 </div>
-            )}
+            </header>
 
             {/* Visual Feedback for Double Tap / Seek: YouTube style animation (100% pointer-events-none so player is never blocked) */}
             {seekFeedback && !isDirectIframeEmbed && !isDriveVideo && (
@@ -2524,538 +2811,481 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 </div>
             )}
 
-            {/* Controls - Floating Glass Bar */}
-            {
-                !isDriveVideo && !isDirectIframeEmbed && !showContentLoader && (
-                    <div className={`absolute left-0 right-0 px-2 md:px-8 transition-all duration-500 pointer-events-none z-[200] ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
-                        style={{ bottom: '24px' }}>
+            {/* Clean Bottom Controls Bar (Native / Direct / YouTube players) */}
+            {!isDriveVideo && !isDirectIframeEmbed && !showContentLoader && (
+                <div
+                    onPointerMove={resetInactivityTimer}
+                    onMouseMove={resetInactivityTimer}
+                    className={`vp-controls-bar fixed bottom-0 left-0 right-0 z-[200] px-3 sm:px-5 md:px-8 pt-10 pb-3 sm:pb-4 md:pb-5 bg-gradient-to-t from-black/95 via-black/65 to-transparent transition-all duration-300 pointer-events-none ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+                >
+                    <div className="w-full max-w-5xl mx-auto pointer-events-auto flex flex-col gap-1.5 sm:gap-2.5">
+                        {/* Timeline Scrubber */}
+                        <div className="w-full flex items-center gap-2.5 sm:gap-3 group/timeline">
+                            <span className="text-[11px] sm:text-xs font-semibold text-white/85 font-mono tabular-nums min-w-[36px] text-right">
+                                {formatTime(currentTime)}
+                            </span>
 
-                        {/* Main Control Bar */}
-                        <div className="bg-[#0f0f0f]/95 backdrop-blur-2xl border border-white/20 rounded-2xl md:rounded-3xl p-3 md:px-6 md:py-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] pointer-events-auto flex flex-col gap-3 w-full max-w-5xl mx-auto ring-1 ring-white/10 relative overflow-visible">
-
-                            {/* Slider / Timeline */}
-                            <div className="w-full flex items-center gap-2 md:gap-4 group/timeline">
-                                {/* Current Time */}
-                                <div className="text-[10px] md:text-xs font-bold text-gray-400 font-mono w-9 md:w-12 text-right tracking-wider">
-                                    {formatTime(currentTime)}
-                                </div>
-
-                                {/* Progress Bar — tall touch target on mobile */}
-                                <div
-                                    className="flex-1 relative cursor-pointer flex items-center"
-                                    style={{ height: '44px' }}
-                                    onClick={handleSeek}
-                                >
-                                    {/* Track */}
-                                    <div className="absolute left-0 right-0 h-3 md:h-1.5 bg-white/15 rounded-full overflow-hidden" style={{ top: '50%', transform: 'translateY(-50%)' }}>
-                                        <div className="h-full bg-white/5 w-full" />
-                                        {/* Filled */}
-                                        <div
-                                            className="absolute inset-y-0 left-0 bg-gradient-to-r from-brand-red to-red-600 rounded-full shadow-[0_0_10px_rgba(229,9,20,0.5)]"
-                                            style={{ width: `${progress}%` }}
-                                        />
-                                    </div>
-                                    {/* Thumb dot — always visible on mobile, hover on desktop */}
+                            <div
+                                className="flex-1 relative cursor-pointer flex items-center h-7 sm:h-8 touch-none"
+                                onClick={handleSeek}
+                            >
+                                <div className="w-full h-1.5 group-hover/timeline:h-2 bg-white/25 rounded-full overflow-hidden transition-all">
                                     <div
-                                        className="absolute w-4 h-4 bg-white rounded-full shadow-lg z-10 -translate-y-1/2 top-1/2 md:scale-0 md:group-hover/timeline:scale-100 transition-transform duration-200"
-                                        style={{ left: `calc(${progress}% - 8px)` }}
+                                        className="h-full bg-brand-red rounded-full shadow-[0_0_10px_rgba(229,9,20,0.65)]"
+                                        style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
                                     />
                                 </div>
+                                <div
+                                    className="absolute w-3.5 h-3.5 bg-white rounded-full shadow-[0_0_8px_rgba(0,0,0,0.6)] ring-2 ring-brand-red/70 top-1/2 -translate-y-1/2 pointer-events-none transition-transform duration-150 md:scale-0 md:group-hover/timeline:scale-100"
+                                    style={{ left: `calc(${Math.min(100, Math.max(0, progress))}% - 7px)` }}
+                                />
+                            </div>
 
-                                {/* Duration */}
-                                <div className="text-[10px] md:text-xs font-bold text-gray-400 font-mono w-9 md:w-12 text-left tracking-wider">
-                                    {formatTime(duration)}
+                            <span className="text-[11px] sm:text-xs font-semibold text-white/60 font-mono tabular-nums min-w-[36px] text-left">
+                                {formatTime(duration)}
+                            </span>
+                        </div>
+
+                        {/* Clean Single-Row Action Controls */}
+                        <div className="flex items-center justify-between gap-2">
+                            {/* LEFT: Play/Pause, Skip (sm+), Volume */}
+                            <div className="flex items-center gap-1 sm:gap-2">
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        togglePlayState();
+                                    }}
+                                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-full text-white hover:bg-white/15 active:scale-90 transition flex items-center justify-center cursor-pointer"
+                                    title={playing ? "Pause (Space)" : "Play (Space)"}
+                                    aria-label={playing ? "Pause" : "Play"}
+                                >
+                                    {playing ? <Pause size={20} className="fill-current" /> : <Play size={20} className="fill-current ml-0.5" />}
+                                </button>
+
+                                {/* 5s Skip buttons shown on sm+ (mobile uses sleek center controls & double-tap) */}
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSkip(-5);
+                                        triggerRipple('left', 5);
+                                    }}
+                                    className="hidden sm:flex relative w-9 h-9 items-center justify-center text-white/85 hover:text-white rounded-full hover:bg-white/15 active:scale-90 transition cursor-pointer"
+                                    title="Rewind 5s (←)"
+                                    aria-label="Rewind 5 seconds"
+                                >
+                                    <RotateCcw size={18} />
+                                    <span className="absolute text-[8px] font-black pointer-events-none mt-0.5">5</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSkip(5);
+                                        triggerRipple('right', 5);
+                                    }}
+                                    className="hidden sm:flex relative w-9 h-9 items-center justify-center text-white/85 hover:text-white rounded-full hover:bg-white/15 active:scale-90 transition cursor-pointer"
+                                    title="Forward 5s (→)"
+                                    aria-label="Forward 5 seconds"
+                                >
+                                    <RotateCw size={18} />
+                                    <span className="absolute text-[8px] font-black pointer-events-none mt-0.5">5</span>
+                                </button>
+
+                                {/* Mute / Volume */}
+                                <div className="flex items-center group/vol">
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setIsMuted(!isMuted);
+                                            showOsd(isMuted ? 'Unmuted' : 'Muted', undefined, isMuted ? 'volume' : 'mute');
+                                        }}
+                                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-full text-white/90 hover:text-white hover:bg-white/15 active:scale-90 transition flex items-center justify-center cursor-pointer"
+                                        title={isMuted ? "Unmute (M)" : "Mute (M)"}
+                                        aria-label={isMuted ? "Unmute" : "Mute"}
+                                    >
+                                        {isMuted ? <VolumeX size={19} className="text-red-500" /> : volume > 50 ? <Volume2 size={19} /> : <Volume1 size={19} />}
+                                    </button>
+                                    <div className="hidden md:flex w-0 group-hover/vol:w-24 overflow-hidden transition-all duration-300 items-center pr-2">
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max="100"
+                                            value={isMuted ? 0 : volume}
+                                            onChange={(e) => {
+                                                const val = Number(e.target.value);
+                                                setVolume(val);
+                                                if (isMuted) setIsMuted(false);
+                                            }}
+                                            className="w-full h-1 bg-white/25 rounded-lg appearance-none cursor-pointer accent-brand-red focus:outline-none"
+                                            title={`Volume: ${volume}%`}
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Lower Controls Row */}
-                            <div className="flex justify-between items-center">
-
-                                {/* LEFT: 5s Previous, Play/Pause, 5s Next, Volume Slider, and Sound Booster */}
-                                <div className="flex flex-1 items-center gap-1 md:gap-2">
-                                    {/* 5s Previous Button */}
+                            {/* RIGHT: Minimal, High-Utility Controls */}
+                            <div className="flex items-center gap-1 sm:gap-1.5">
+                                {isSports && (
                                     <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleSkip(-5);
-                                            triggerRipple('left', 5);
-                                        }}
-                                        className="relative flex items-center justify-center text-gray-300 hover:text-white p-1.5 md:p-2 rounded-full hover:bg-white/10 transition group"
-                                        title="Rewind 5s (J or ←)"
-                                        aria-label="Rewind 5 seconds"
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); setShowStats(!showStats); }}
+                                        className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition cursor-pointer ${showStats ? 'bg-brand-red/20 text-brand-red' : 'text-white/85 hover:text-white hover:bg-white/15'}`}
+                                        title="Match Stats"
                                     >
-                                        <RotateCcw size={18} className="md:w-5 md:h-5 group-hover:-rotate-12 transition-transform" />
-                                        <span className="absolute inset-0 flex items-center justify-center text-[8px] md:text-[9px] font-black pointer-events-none mt-0.5">
-                                            5
-                                        </span>
+                                        <BarChart2 size={18} />
                                     </button>
+                                )}
 
-                                    {/* Play/Pause Button */}
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            togglePlayState();
-                                        }}
-                                        className="text-gray-300 hover:text-white p-1.5 md:p-2 rounded-full hover:bg-white/10 transition"
-                                        title={playing ? "Pause (k or Space)" : "Play (k or Space)"}
-                                        aria-label={playing ? "Pause" : "Play"}
-                                    >
-                                        {playing ? <Pause size={18} className="md:w-[22px] md:h-[22px] fill-current" /> : <Play size={18} className="md:w-[22px] md:h-[22px] fill-current ml-0.5" />}
-                                    </button>
+                                {/* Compact Sound Boost Toggle */}
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        cycleBoost();
+                                    }}
+                                    className={`h-8 sm:h-9 px-2.5 rounded-full text-[11px] font-bold flex items-center gap-1 transition cursor-pointer ${boostLevel > 1.0
+                                        ? 'bg-amber-500/25 border border-amber-400/50 text-amber-300'
+                                        : 'text-white/80 hover:text-white bg-white/10 hover:bg-white/15 border border-white/10'
+                                        }`}
+                                    title="Sound Booster (B)"
+                                >
+                                    <Zap size={13} className={boostLevel > 1.0 ? 'text-amber-400 fill-amber-400' : 'text-white/70'} />
+                                    <span>{boostLevel > 1.0 ? `${Math.round(boostLevel * 100)}%` : 'Boost'}</span>
+                                </button>
 
-                                    {/* 5s Next Button */}
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleSkip(5);
-                                            triggerRipple('right', 5);
-                                        }}
-                                        className="relative flex items-center justify-center text-gray-300 hover:text-white p-1.5 md:p-2 rounded-full hover:bg-white/10 transition group"
-                                        title="Forward 5s (L or →)"
-                                        aria-label="Forward 5 seconds"
-                                    >
-                                        <RotateCw size={18} className="md:w-5 md:h-5 group-hover:rotate-12 transition-transform" />
-                                        <span className="absolute inset-0 flex items-center justify-center text-[8px] md:text-[9px] font-black pointer-events-none mt-0.5">
-                                            5
-                                        </span>
-                                    </button>
+                                {/* Zoom / Fit Screen (sm+ only; also inside Settings sheet on phones) */}
+                                <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); }}
+                                    className={`hidden sm:flex w-9 h-9 sm:w-10 sm:h-10 rounded-full items-center justify-center transition cursor-pointer ${isZoomed ? 'text-brand-red bg-white/15' : 'text-white/85 hover:text-white hover:bg-white/15'}`}
+                                    title={isZoomed ? "Reset Zoom" : "Fill Screen"}
+                                    aria-label="Toggle Fill Screen"
+                                >
+                                    {isZoomed ? <Minimize size={18} /> : <Scan size={18} />}
+                                </button>
 
-                                    {/* Volume & Hover Slider */}
-                                    <div className="flex items-center group/vol">
-                                        <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); showOsd(isMuted ? 'Unmuted' : 'Muted', undefined, isMuted ? 'volume' : 'mute'); }} className="text-gray-300 hover:text-white p-1.5 md:p-2 rounded-full hover:bg-white/10 transition" title={isMuted ? "Unmute" : "Mute"}>
-                                            {isMuted ? <VolumeX size={18} className="md:w-[22px] md:h-[22px] text-red-500" /> : volume > 50 ? <Volume2 size={18} className="md:w-[22px] md:h-[22px]" /> : <Volume1 size={18} className="md:w-[22px] md:h-[22px]" />}
-                                        </button>
-                                        <div className="w-0 group-hover/vol:w-20 md:group-hover/vol:w-24 overflow-hidden transition-all duration-300 flex items-center pr-2">
-                                            <input
-                                                type="range"
-                                                min="0"
-                                                max="100"
-                                                value={isMuted ? 0 : volume}
-                                                onChange={(e) => {
-                                                    const val = Number(e.target.value);
-                                                    setVolume(val);
-                                                    if (isMuted) setIsMuted(false);
-                                                }}
-                                                className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-brand-red focus:outline-none"
-                                                title={`Volume: ${volume}%`}
-                                            />
-                                        </div>
-                                    </div>
+                                {/* Unified Settings Button (Quality, Subtitles, Audio & Boost, Screen Fit) */}
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowSettingsMenu(true);
+                                        setShowEpisodesMenu(false);
+                                    }}
+                                    className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition cursor-pointer ${showSettingsMenu ? 'bg-white/20 text-white' : 'text-white/85 hover:text-white hover:bg-white/15'}`}
+                                    title="Player Settings"
+                                    aria-label="Player Settings"
+                                >
+                                    <Settings size={18} />
+                                </button>
 
-                                    {/* Quick Sound Booster Button */}
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            cycleBoost();
-                                        }}
-                                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wider transition-all duration-300 ${boostLevel > 1.0
-                                            ? 'bg-gradient-to-r from-red-600/30 to-amber-500/30 border border-amber-500/50 text-amber-300 shadow-[0_0_16px_rgba(245,158,11,0.35)]'
-                                            : 'text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10'
-                                            }`}
-                                        title="Sound Booster: Click to cycle presets (100% → 150% → 200% → 300% → 400%). Hotkey: B"
-                                    >
-                                        <Zap size={13} className={boostLevel > 1.0 ? 'text-amber-400 fill-amber-400 animate-pulse' : 'text-gray-400'} />
-                                        <span>{boostLevel > 1.0 ? `${Math.round(boostLevel * 100)}%` : 'BOOST'}</span>
-                                    </button>
-                                </div>
-
-                                {/* RIGHT: Features */}
-                                <div className="flex items-center gap-0.5 md:gap-3 text-gray-400">
-                                    {isSports && (
-                                        <button onClick={(e) => { e.stopPropagation(); setShowStats(!showStats); }}
-                                            className={`hover:text-brand-red transition-all p-1.5 md:p-2.5 rounded-xl hover:bg-white/5 ${showStats ? 'bg-brand-red/10 text-brand-red md:ring-1 md:ring-brand-red/50' : ''}`} title="Match Stats">
-                                            <BarChart2 size={18} className="md:w-[22px] md:h-[22px]" />
-                                        </button>
-                                    )}
-
-                                    {/* Audio & Subs Button */}
-                                    <div className="relative">
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); setShowAudioSubMenu(!showAudioSubMenu); setShowQualityMenu(false); setShowEpisodesMenu(false); }}
-                                            className={`hover:text-white transition-all p-1.5 md:p-2.5 rounded-xl hover:bg-white/5 ${showAudioSubMenu ? 'bg-white/10 text-white' : ''}`}
-                                            title="Audio & Subtitles"
-                                        >
-                                            <MessageSquare size={18} className="md:w-[22px] md:h-[22px]" />
-                                        </button>
-
-                                        {/* Audio/Sub Menu Popup */}
-                                        {showAudioSubMenu && (
-                                            <div className="absolute bottom-full right-0 mb-6 bg-[#0f0f0f]/95 backdrop-blur-xl border border-white/10 rounded-2xl p-0 min-w-[340px] flex overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-200 shadow-2xl z-[150] ring-1 ring-white/5">
-
-                                                {/* Subtitles Col */}
-                                                <div className="flex-1 p-4 bg-white/[0.02]">
-                                                    <h3 className="text-gray-500 font-bold text-[10px] uppercase tracking-widest mb-3 px-2 flex items-center gap-2">
-                                                        <Subtitles size={12} /> Subtitles
-                                                    </h3>
-                                                    <div className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar pr-1">
-                                                        <button onClick={() => handleSubtitleChange(null)}
-                                                            className={`w-full text-left px-3 py-2 rounded-lg text-sm flex justify-between items-center transition ${!selectedSubtitle ? 'bg-brand-red text-white shadow-lg shadow-brand-red/20' : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'}`}>
-                                                            <span>Off</span>
-                                                            {!selectedSubtitle && <Check size={14} strokeWidth={3} />}
-                                                        </button>
-                                                        {effectiveSubtitleTracks.map((sub, idx) => (
-                                                            <button key={sub.languageCode || idx} onClick={() => handleSubtitleChange(sub)}
-                                                                className={`w-full text-left px-3 py-2 rounded-lg text-sm flex justify-between items-center transition ${selectedSubtitle?.languageCode === sub.languageCode ? 'bg-brand-red text-white shadow-lg shadow-brand-red/20' : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'}`}>
-                                                                <span>{sub.displayName}</span>
-                                                                {selectedSubtitle?.languageCode === sub.languageCode && <Check size={14} strokeWidth={3} />}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
-
-                                                {/* Audio Col */}
-                                                <div className="flex-1 p-4 border-l border-white/5 bg-black/20">
-                                                    <h3 className="text-gray-500 font-bold text-[10px] uppercase tracking-widest mb-3 px-2 flex items-center gap-2">
-                                                        <Headphones size={12} /> Audio & Protection
-                                                    </h3>
-
-                                                    {/* Embed Ad Shield Card */}
-                                                    <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-b from-emerald-500/15 to-emerald-500/5 border border-emerald-500/30 flex flex-col gap-2.5">
-                                                        <div className="flex items-center justify-between">
-                                                            <div className="flex items-center gap-1.5 text-emerald-300 font-bold text-xs">
-                                                                <ShieldCheck size={15} />
-                                                                <span>EMBED AD SHIELD</span>
-                                                            </div>
-                                                            <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${isAdShieldEnabled ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-red-500/20 text-red-300 border-red-500/30'}`}>
-                                                                {isAdShieldEnabled ? 'Active' : 'Disabled'}
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-[11px] text-gray-300 leading-snug">
-                                                            {isAdShieldEnabled
-                                                                ? `HTML5 Sandbox is active. External popups, new tabs, and site redirects are blocked (${adShieldBlockedCount} blocked).`
-                                                                : 'Ad Shield is disabled. External player may open new tabs or popups on click.'}
-                                                        </p>
-                                                        <div className="flex items-center justify-between pt-1">
-                                                            <button
-                                                                type="button"
-                                                                onClick={toggleAdShield}
-                                                                className={`px-3 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer ${isAdShieldEnabled ? 'bg-emerald-500 text-black shadow-md' : 'bg-red-500 text-white shadow-md'}`}
-                                                            >
-                                                                {isAdShieldEnabled ? 'Shield Enabled' : 'Enable Shield'}
-                                                            </button>
-                                                            {isAdShieldEnabled && (
-                                                                <div className="flex gap-1">
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => changeAdShieldMode('strict')}
-                                                                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${adShieldMode === 'strict' ? 'bg-emerald-500 text-black' : 'bg-white/10 text-gray-300 hover:text-white'}`}
-                                                                    >
-                                                                        Strict
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => changeAdShieldMode('standard')}
-                                                                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${adShieldMode === 'standard' ? 'bg-emerald-500 text-black' : 'bg-white/10 text-gray-300 hover:text-white'}`}
-                                                                    >
-                                                                        Standard
-                                                                    </button>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Sound Booster / External Embed Notice */}
-                                                    {isExternalStream ? (
-                                                        <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-b from-amber-500/15 to-amber-500/5 border border-amber-500/30 flex flex-col gap-2.5">
-                                                            <div className="flex items-center justify-between">
-                                                                <div className="flex items-center gap-1.5 text-amber-300 font-bold text-xs">
-                                                                    <AlertCircle size={15} />
-                                                                    <span>EXTERNAL STREAM</span>
-                                                                </div>
-                                                                <span className="text-[10px] uppercase font-bold text-amber-300 px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/30">
-                                                                    Iframe Player
-                                                                </span>
-                                                            </div>
-                                                            <p className="text-[11px] text-gray-300 leading-snug">
-                                                                This title is streamed via an external embed ({embedBaseHost || 'proxy.garageband.rocks'}).
-                                                                Browser security (Same-Origin Policy) isolates external iframe audio from web pages.
-                                                            </p>
-                                                            <a
-                                                                href="https://chromewebstore.google.com/detail/sound-booster-that-works/gnidjfdekbljleajoeamecfijnhbgndl"
-                                                                target="_self"
-                                                                rel="noreferrer"
-                                                                className="flex items-center justify-between p-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 text-xs font-bold transition group"
-                                                            >
-                                                                <div className="flex flex-col">
-                                                                    <span>Sound Booster Extension</span>
-                                                                    <span className="text-[10px] text-amber-300/80 font-normal">Boosts all tab audio up to 600%</span>
-                                                                </div>
-                                                                <ExternalLink size={14} className="group-hover:translate-x-0.5 transition-transform" />
-                                                            </a>
-
-                                                            {/* Interactive 400% Booster Preview */}
-                                                            <div className="pt-2 border-t border-amber-500/20 flex flex-col gap-2">
-                                                                <div className="flex items-center justify-between">
-                                                                    <span className="text-[10px] text-amber-200/90 font-bold uppercase tracking-wider">Test 400% Web Audio Engine</span>
-                                                                    {isTestingAudio && (
-                                                                        <span className="text-[9px] bg-amber-400 text-black px-1.5 py-0.5 rounded font-extrabold animate-pulse">
-                                                                            TESTING
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => {
-                                                                        soundBooster.toggleTestSound((active) => setIsTestingAudio(active));
-                                                                    }}
-                                                                    className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl font-bold text-xs transition border ${isTestingAudio
-                                                                        ? 'bg-amber-400 text-black border-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.5)]'
-                                                                        : 'bg-white/10 hover:bg-white/15 text-amber-100 border-amber-500/30'
-                                                                        }`}
-                                                                >
-                                                                    <Volume2 size={14} />
-                                                                    <span>{isTestingAudio ? 'Stop 400% Demo Chime' : '🎧 Play 400% Demo Chime'}</span>
-                                                                </button>
-                                                                {isTestingAudio && (
-                                                                    <div className="p-2.5 rounded-xl bg-black/50 border border-amber-500/40 flex flex-col gap-1.5 animate-in fade-in duration-150">
-                                                                        <div className="flex justify-between text-[11px] text-amber-300 font-bold">
-                                                                            <span>Demo Volume:</span>
-                                                                            <span>{Math.round(boostLevel * 100)}% ({boostLevel}x)</span>
-                                                                        </div>
-                                                                        <input
-                                                                            type="range"
-                                                                            min="1.0"
-                                                                            max="4.0"
-                                                                            step="0.1"
-                                                                            value={boostLevel}
-                                                                            onChange={(e) => {
-                                                                                const val = parseFloat(e.target.value);
-                                                                                setBoostLevel(val);
-                                                                            }}
-                                                                            className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-amber-400"
-                                                                        />
-                                                                        <div className="flex justify-between text-[9px] text-gray-400">
-                                                                            <span>100% (Normal)</span>
-                                                                            <span>200% (2x)</span>
-                                                                            <span>400% (4x MAX)</span>
-                                                                        </div>
-                                                                        <p className="text-[10px] text-amber-200/90 text-center font-medium mt-0.5">
-                                                                            Drag slider to hear sound amplify up to 400% in real-time!
-                                                                        </p>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="mb-4 p-3 rounded-2xl bg-white/[0.04] border border-white/10 flex flex-col gap-3">
-                                                            <div className="flex items-center justify-between">
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <Zap size={14} className={boostLevel > 1.0 ? 'text-amber-400 fill-amber-400' : 'text-gray-400'} />
-                                                                    <span className="text-xs font-bold text-white tracking-wide">SOUND BOOSTER</span>
-                                                                </div>
-                                                                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${boostLevel > 1.0
-                                                                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
-                                                                    : 'bg-white/5 text-gray-400 border-white/10'
-                                                                    }`}>
-                                                                    {boostLevel > 1.0 ? `${Math.round(boostLevel * 100)}% (${boostLevel}x)` : '100% (NORMAL)'}
-                                                                </span>
-                                                            </div>
-
-                                                            {/* Presets */}
-                                                            <div className="grid grid-cols-5 gap-1">
-                                                                {BOOST_PRESETS.map((lvl) => {
-                                                                    const isActive = Math.abs(lvl - boostLevel) < 0.05;
-                                                                    return (
-                                                                        <button
-                                                                            key={lvl}
-                                                                            onClick={() => setBoostPreset(lvl)}
-                                                                            className={`py-1.5 px-1 rounded-lg text-[10px] font-bold text-center transition-all ${isActive
-                                                                                ? 'bg-brand-red text-white shadow-md shadow-brand-red/30 ring-1 ring-white/20'
-                                                                                : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
-                                                                                }`}
-                                                                        >
-                                                                            {Math.round(lvl * 100)}%
-                                                                        </button>
-                                                                    );
-                                                                })}
-                                                            </div>
-
-                                                            {/* Fine slider */}
-                                                            <div className="flex flex-col gap-1">
-                                                                <div className="flex justify-between text-[10px] text-gray-400 font-medium">
-                                                                    <span>100%</span>
-                                                                    <span className="text-amber-400 font-bold">{Math.round(boostLevel * 100)}%</span>
-                                                                    <span>400%</span>
-                                                                </div>
-                                                                <input
-                                                                    type="range"
-                                                                    min="1.0"
-                                                                    max="4.0"
-                                                                    step="0.1"
-                                                                    value={boostLevel}
-                                                                    onChange={(e) => {
-                                                                        const val = parseFloat(e.target.value);
-                                                                        setBoostLevel(val);
-                                                                    }}
-                                                                    className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-brand-red focus:outline-none"
-                                                                />
-                                                            </div>
-
-                                                            {/* Extra Audio Processing Toggles */}
-                                                            <div className="pt-2 border-t border-white/5 flex flex-col gap-1.5">
-                                                                {/* Dialogue Clarity */}
-                                                                <button
-                                                                    onClick={() => {
-                                                                        const next = !dialogueClarity;
-                                                                        setDialogueClarity(next);
-                                                                        showOsd(next ? 'Dialogue Clarity: ON' : 'Dialogue Clarity: OFF', 'Vocal frequency enhancer', 'zap');
-                                                                    }}
-                                                                    className="flex items-center justify-between text-left p-1.5 rounded-lg hover:bg-white/5 transition"
-                                                                >
-                                                                    <div className="flex items-center gap-2">
-                                                                        <Sparkles size={13} className={dialogueClarity ? 'text-amber-400' : 'text-gray-500'} />
-                                                                        <div className="flex flex-col">
-                                                                            <span className="text-[11px] font-semibold text-gray-200">Dialogue Clarity</span>
-                                                                            <span className="text-[9px] text-gray-500">Boosts voice frequencies for crisp speech</span>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className={`w-8 h-4 rounded-full transition-colors relative flex items-center px-0.5 ${dialogueClarity ? 'bg-brand-red' : 'bg-white/10'}`}>
-                                                                        <div className={`w-3 h-3 rounded-full bg-white transition-transform ${dialogueClarity ? 'translate-x-4' : 'translate-x-0'}`} />
-                                                                    </div>
-                                                                </button>
-
-                                                                {/* Anti-Clipping Limiter */}
-                                                                <button
-                                                                    onClick={() => {
-                                                                        const next = !limiterEnabled;
-                                                                        setLimiterEnabled(next);
-                                                                        showOsd(next ? 'Anti-Clipping: ON' : 'Anti-Clipping: OFF', 'Dynamic distortion protection', 'zap');
-                                                                    }}
-                                                                    className="flex items-center justify-between text-left p-1.5 rounded-lg hover:bg-white/5 transition"
-                                                                >
-                                                                    <div className="flex items-center gap-2">
-                                                                        <ShieldCheck size={13} className={limiterEnabled ? 'text-emerald-400' : 'text-gray-500'} />
-                                                                        <div className="flex flex-col">
-                                                                            <span className="text-[11px] font-semibold text-gray-200">Anti-Clipping Limiter</span>
-                                                                            <span className="text-[9px] text-gray-500">Compresses peaks to prevent distortion</span>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className={`w-8 h-4 rounded-full transition-colors relative flex items-center px-0.5 ${limiterEnabled ? 'bg-emerald-600' : 'bg-white/10'}`}>
-                                                                        <div className={`w-3 h-3 rounded-full bg-white transition-transform ${limiterEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
-                                                                    </div>
-                                                                </button>
-
-                                                                {/* Test Chime Button */}
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => {
-                                                                        soundBooster.toggleTestSound((active) => setIsTestingAudio(active));
-                                                                    }}
-                                                                    className={`w-full flex items-center justify-center gap-2 py-1.5 px-2 rounded-lg font-bold text-[11px] transition border ${isTestingAudio
-                                                                        ? 'bg-amber-400 text-black border-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.5)]'
-                                                                        : 'bg-white/5 hover:bg-white/10 text-gray-300 border-white/10'
-                                                                        }`}
-                                                                >
-                                                                    <Volume2 size={13} />
-                                                                    <span>{isTestingAudio ? 'Stop Demo Chime' : '🎧 Test 400% Audio Chime'}</span>
-                                                                </button>
-                                                            </div>
-
-                                                            {/* Dynamic visualizer bars when boosted */}
-                                                            {boostLevel > 1.0 && (
-                                                                <div className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-black/40 border border-amber-500/20 text-[10px] text-amber-300/90 font-medium">
-                                                                    <span className="flex items-center gap-1.5">
-                                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
-                                                                        Amplification Active
-                                                                    </span>
-                                                                    <div className="flex items-end gap-0.5 h-3">
-                                                                        <div className="w-0.5 bg-amber-400 rounded-full h-2 animate-pulse" />
-                                                                        <div className="w-0.5 bg-amber-400 rounded-full h-3 animate-pulse" />
-                                                                        <div className="w-0.5 bg-amber-400 rounded-full h-1.5 animate-pulse" />
-                                                                        <div className="w-0.5 bg-amber-400 rounded-full h-2.5 animate-pulse" />
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
-
-                                                    <div className="space-y-1">
-                                                        {AUDIO_OPTIONS.map(audi => (
-                                                            <button key={audi.id} onClick={() => setSelectedAudio(audi)}
-                                                                className={`w-full text-left px-3 py-2 rounded-lg text-sm flex justify-between items-center transition ${selectedAudio.id === audi.id ? 'bg-white/10 text-white font-medium' : 'text-gray-400 hover:bg-white/5'}`}>
-                                                                <span>{audi.label}</span>
-                                                                {selectedAudio.id === audi.id && <Check size={14} className="text-brand-red" />}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Episodes Selector (TV Only) */}
-                                    {isTV && !isEmbedPlayer && (
-                                        <div className="relative">
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); setShowEpisodesMenu(!showEpisodesMenu); setShowAudioSubMenu(false); setShowQualityMenu(false); }}
-                                                className={`hover:text-white transition-all p-1.5 md:p-2.5 rounded-xl hover:bg-white/5 ${showEpisodesMenu ? 'bg-white/10 text-white' : ''}`}
-                                                title="Episodes"
-                                            >
-                                                <Layers size={18} className="md:w-[22px] md:h-[22px]" />
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {/* Quality Settings */}
-                                    <div className="relative">
-                                        <button onClick={(e) => { e.stopPropagation(); setShowQualityMenu(!showQualityMenu); setShowAudioSubMenu(false); setShowEpisodesMenu(false); }}
-                                            className={`hover:text-white transition-all p-1.5 md:p-2.5 rounded-xl hover:bg-white/5 ${showQualityMenu ? 'bg-white/10 text-white' : ''}`}
-                                            title="Quality & Speed">
-                                            <Settings size={18} className="md:w-[22px] md:h-[22px]" />
-                                        </button>
-
-                                        {showQualityMenu && (
-                                            <div className="absolute bottom-full right-0 mb-6 bg-[#0f0f0f]/95 backdrop-blur-xl border border-white/10 rounded-xl p-0 min-w-[200px] flex flex-col shadow-2xl animate-in slide-in-from-bottom-4 z-[150] ring-1 ring-white/5 overflow-hidden">
-
-                                                {/* Quality Section */}
-                                                <div>
-                                                    <h3 className="text-gray-500 font-bold text-[10px] uppercase tracking-widest px-4 py-2 bg-white/5">Quality</h3>
-                                                    <div className="max-h-48 overflow-y-auto custom-scrollbar p-1">
-                                                        {qualities.length > 0 ? qualities.map(q => {
-                                                            let usage = '';
-                                                            if (q.includes('1080') || q.includes('highres')) usage = 'Late Data (3GB/hr)';
-                                                            else if (q.includes('720')) usage = 'Med Data (1GB/hr)';
-                                                            else if (q !== 'auto') usage = 'Low Data (<0.5GB/hr)';
-
-                                                            return (
-                                                                <button key={q} onClick={() => handleQualityChange(q)}
-                                                                    className={`w-full text-left px-4 py-2 text-xs hover:bg-white/10 rounded-lg transition-colors flex justify-between items-center ${currentQuality === q ? 'text-brand-red font-bold bg-brand-red/5' : 'text-gray-400 hover:text-white'}`}>
-                                                                    <div className="flex flex-col">
-                                                                        <span>{q.toUpperCase()}</span>
-                                                                        {usage && <span className="text-[9px] opacity-60 font-normal">{usage}</span>}
-                                                                    </div>
-                                                                    {currentQuality === q && <Check size={12} strokeWidth={3} />}
-                                                                </button>
-                                                            );
-                                                        }) : (
-                                                            <div className="px-4 py-2 text-xs text-gray-500 italic">Auto (Default)</div>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                {/* Playback Speed (Bonus Feature integration if space permits, otherwise just Quality) */}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Zoom / Fill Screen Toggle */}
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); }}
-                                        className={`hover:text-white transition-all p-1.5 md:p-2.5 rounded-xl hover:bg-white/5 ${isZoomed ? 'text-brand-red bg-white/5' : ''}`}
-                                        title={isZoomed ? "Reset Zoom" : "Fill Screen"}
-                                    >
-                                        {isZoomed ? <Minimize size={18} className="md:w-[22px] md:h-[22px]" /> : <Scan size={18} className="md:w-[22px] md:h-[22px]" />}
-                                    </button>
-
-                                    {/* Fullscreen */}
-                                    <button className="hover:text-white hover:bg-white/10 transition p-1.5 md:p-2.5 rounded-xl" onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}>
-                                        {isFullscreen ? <Minimize size={18} className="md:w-[22px] md:h-[22px]" /> : <Maximize size={18} className="md:w-[22px] md:h-[22px]" />}
-                                    </button>
-                                </div>
+                                {/* Fullscreen */}
+                                <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
+                                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-full text-white/90 hover:text-white hover:bg-white/15 active:scale-90 transition flex items-center justify-center cursor-pointer"
+                                    title={isFullscreen ? "Exit Fullscreen (Esc)" : "Fullscreen (F)"}
+                                    aria-label="Toggle Fullscreen"
+                                >
+                                    {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
+                                </button>
                             </div>
                         </div>
                     </div>
-                )}
+                </div>
+            )}
+
+            {/* Unified Responsive Settings Sheet (Native / Direct / YouTube players) */}
+            {showSettingsMenu && !isDriveVideo && !isDirectIframeEmbed && (
+                <div
+                    className="fixed inset-0 z-[500] bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150"
+                    onClick={() => setShowSettingsMenu(false)}
+                >
+                    <div
+                        className="bg-[#111216] border border-white/15 rounded-2xl sm:rounded-3xl w-full max-w-md max-h-[82vh] flex flex-col overflow-hidden shadow-[0_25px_80px_rgba(0,0,0,0.95)] ring-1 ring-white/10 animate-in zoom-in-95 duration-150"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header + Tabs */}
+                        <div className="px-4 pt-3.5 pb-2.5 border-b border-white/10 bg-white/[0.03] shrink-0">
+                            <div className="flex items-center justify-between mb-3">
+                                <h3 className="text-white font-bold text-sm sm:text-base flex items-center gap-2">
+                                    <Settings size={16} className="text-brand-red" />
+                                    <span>Player Settings</span>
+                                </h3>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSettingsMenu(false)}
+                                    className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white transition cursor-pointer"
+                                    aria-label="Close settings"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-1.5 bg-black/40 p-1 rounded-xl border border-white/10">
+                                {([
+                                    { id: 'quality', label: 'Quality', icon: Sliders },
+                                    { id: 'subtitles', label: 'Subtitles', icon: Subtitles },
+                                    { id: 'audio', label: 'Audio', icon: Headphones },
+                                ] as const).map(({ id, label, icon: Icon }) => (
+                                    <button
+                                        key={id}
+                                        type="button"
+                                        onClick={() => setSettingsTab(id)}
+                                        className={`py-1.5 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${settingsTab === id
+                                            ? 'bg-brand-red text-white shadow'
+                                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                            }`}
+                                    >
+                                        <Icon size={13} />
+                                        <span>{label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Tab Content */}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3">
+                            {settingsTab === 'quality' && (
+                                <>
+                                    {/* Screen Fit Toggle */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsZoomed(!isZoomed)}
+                                        className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/10 border border-white/10 text-xs font-semibold text-white cursor-pointer transition"
+                                    >
+                                        <span className="flex items-center gap-2">
+                                            <Scan size={14} className="text-brand-red" />
+                                            <span>Fill Screen (Zoom)</span>
+                                        </span>
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isZoomed ? 'bg-brand-red text-white' : 'bg-white/10 text-gray-300'}`}>
+                                            {isZoomed ? 'ON' : 'FIT'}
+                                        </span>
+                                    </button>
+
+                                    <div className="space-y-1">
+                                        {qualities.length > 0 ? qualities.map(q => {
+                                            let usage = '';
+                                            if (q.includes('1080') || q.includes('highres')) usage = 'High Data (~3GB/hr)';
+                                            else if (q.includes('720')) usage = 'Medium Data (~1GB/hr)';
+                                            else if (q !== 'auto') usage = 'Low Data (<0.5GB/hr)';
+
+                                            return (
+                                                <button
+                                                    key={q}
+                                                    type="button"
+                                                    onClick={() => handleQualityChange(q)}
+                                                    className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs flex justify-between items-center transition cursor-pointer ${currentQuality === q
+                                                        ? 'bg-brand-red text-white font-bold'
+                                                        : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                                                        }`}
+                                                >
+                                                    <div className="flex flex-col">
+                                                        <span>{q.toUpperCase()}</span>
+                                                        {usage && <span className={`text-[10px] ${currentQuality === q ? 'text-white/80' : 'text-gray-500'}`}>{usage}</span>}
+                                                    </div>
+                                                    {currentQuality === q && <Check size={14} strokeWidth={3} />}
+                                                </button>
+                                            );
+                                        }) : (
+                                            <div className="px-3.5 py-3 text-xs text-gray-400 text-center bg-white/[0.03] rounded-xl">
+                                                Quality: Auto (Adaptive)
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+
+                            {settingsTab === 'subtitles' && (
+                                <div className="space-y-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSubtitleChange(null)}
+                                        className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold flex justify-between items-center transition cursor-pointer ${!selectedSubtitle
+                                            ? 'bg-brand-red text-white'
+                                            : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                                            }`}
+                                    >
+                                        <span>Off</span>
+                                        {!selectedSubtitle && <Check size={14} strokeWidth={3} />}
+                                    </button>
+                                    {effectiveSubtitleTracks.map((sub, idx) => (
+                                        <button
+                                            key={sub.languageCode || idx}
+                                            type="button"
+                                            onClick={() => handleSubtitleChange(sub)}
+                                            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold flex justify-between items-center transition cursor-pointer ${selectedSubtitle?.languageCode === sub.languageCode
+                                                ? 'bg-brand-red text-white'
+                                                : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                                                }`}
+                                        >
+                                            <span>{sub.displayName}</span>
+                                            {selectedSubtitle?.languageCode === sub.languageCode && <Check size={14} strokeWidth={3} />}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {settingsTab === 'audio' && (
+                                <div className="space-y-3">
+                                    {/* Sound Booster */}
+                                    <div className="p-3 rounded-2xl bg-white/[0.04] border border-white/10 space-y-2.5">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                                                <Zap size={13} className={boostLevel > 1.0 ? 'text-amber-400 fill-amber-400' : 'text-gray-400'} />
+                                                Sound Booster
+                                            </span>
+                                            <span className="text-[11px] font-bold text-amber-400">{Math.round(boostLevel * 100)}%</span>
+                                        </div>
+
+                                        <div className="grid grid-cols-5 gap-1">
+                                            {BOOST_PRESETS.map((lvl) => {
+                                                const isActive = Math.abs(lvl - boostLevel) < 0.05;
+                                                return (
+                                                    <button
+                                                        key={lvl}
+                                                        type="button"
+                                                        onClick={() => setBoostPreset(lvl)}
+                                                        className={`py-1.5 rounded-lg text-[10px] font-bold transition cursor-pointer ${isActive
+                                                            ? 'bg-brand-red text-white'
+                                                            : 'bg-white/10 text-gray-300 hover:text-white'
+                                                            }`}
+                                                    >
+                                                        {Math.round(lvl * 100)}%
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        <input
+                                            type="range"
+                                            min="1.0"
+                                            max="4.0"
+                                            step="0.1"
+                                            value={boostLevel}
+                                            onChange={(e) => setBoostLevel(parseFloat(e.target.value))}
+                                            className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-brand-red"
+                                        />
+
+                                        <div className="flex items-center justify-between gap-2 pt-1 border-t border-white/10">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const next = !dialogueClarity;
+                                                    setDialogueClarity(next);
+                                                    showOsd(next ? 'Dialogue Clarity: ON' : 'Dialogue Clarity: OFF', undefined, 'zap');
+                                                }}
+                                                className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 border transition cursor-pointer ${dialogueClarity ? 'bg-brand-red/20 border-brand-red/50 text-white' : 'bg-white/5 border-white/10 text-gray-400'}`}
+                                            >
+                                                <Sparkles size={12} />
+                                                <span>Voice Clarity</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const next = !limiterEnabled;
+                                                    setLimiterEnabled(next);
+                                                    showOsd(next ? 'Anti-Clipping: ON' : 'Anti-Clipping: OFF', undefined, 'zap');
+                                                }}
+                                                className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 border transition cursor-pointer ${limiterEnabled ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' : 'bg-white/5 border-white/10 text-gray-400'}`}
+                                            >
+                                                <ShieldCheck size={12} />
+                                                <span>Limiter</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Audio Tracks */}
+                                    <div className="space-y-1">
+                                        {AUDIO_OPTIONS.map(audi => (
+                                            <button
+                                                key={audi.id}
+                                                type="button"
+                                                onClick={() => setSelectedAudio(audi)}
+                                                className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold flex justify-between items-center transition cursor-pointer ${selectedAudio.id === audi.id
+                                                    ? 'bg-white/15 text-white'
+                                                    : 'text-gray-300 hover:bg-white/5'
+                                                    }`}
+                                            >
+                                                <span>{audi.label}</span>
+                                                {selectedAudio.id === audi.id && <Check size={14} className="text-brand-red" />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Auto-Play Next Episode Countdown Card */}
+            {upNextCountdown !== null && nextEpisodeInfo && (
+                <div
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                    className="fixed bottom-5 right-4 sm:bottom-8 sm:right-6 z-[360] w-[calc(100vw-2rem)] max-w-sm bg-[#111114]/95 backdrop-blur-2xl border border-white/15 rounded-2xl p-4 shadow-[0_20px_60px_rgba(0,0,0,0.9)] ring-1 ring-white/10 animate-in fade-in slide-in-from-bottom-4 duration-200"
+                >
+                    <div className="flex items-center justify-between gap-2 mb-2.5">
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+                            Up Next in <span className="text-white font-bold tabular-nums">{upNextCountdown}s</span>
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => setUpNextCountdown(null)}
+                            className="text-zinc-400 hover:text-white p-1 rounded-full hover:bg-white/10 transition cursor-pointer"
+                            aria-label="Cancel auto-play"
+                        >
+                            <X size={14} />
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        {nextEpisodeInfo.episode.stillUrl ? (
+                            <img
+                                src={nextEpisodeInfo.episode.stillUrl}
+                                alt={nextEpisodeInfo.episode.title}
+                                className="w-24 aspect-video rounded-lg object-cover border border-white/10 shrink-0 bg-black"
+                            />
+                        ) : (
+                            <div className="w-12 h-12 rounded-xl bg-white/10 flex flex-col items-center justify-center shrink-0 text-white font-bold">
+                                <span className="text-[9px] text-zinc-400">EP</span>
+                                <span className="text-sm leading-none">{nextEpisodeInfo.episode.episodeNumber}</span>
+                            </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                            <div className="text-[11px] font-semibold text-brand-red">
+                                S{nextEpisodeInfo.season.seasonNumber} · E{nextEpisodeInfo.episode.episodeNumber}
+                            </div>
+                            <div className="text-sm font-semibold text-white truncate">
+                                {nextEpisodeInfo.episode.title}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-3.5 flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={playNextEpisode}
+                            className="flex-1 py-2 px-3 rounded-xl bg-white hover:bg-zinc-200 text-black text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                        >
+                            <Play size={13} className="fill-current" />
+                            <span>Play Now</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setUpNextCountdown(null)}
+                            className="py-2 px-3.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.15] text-zinc-200 text-xs font-medium transition cursor-pointer"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Season & Episodes Popup Modal */}
             {showEpisodesMenu && isTV && (
@@ -3121,6 +3351,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-2.5">
                             {currentSeason?.episodes.map((ep, idx) => {
                                 const isCurrent = currentEpisodeIdx === idx;
+                                const watched = isEpisodeWatched(seriesProgress, currentSeason.seasonNumber, ep.episodeNumber);
                                 return (
                                     <button
                                         key={ep.id || `ep_${ep.episodeNumber}`}
@@ -3142,12 +3373,22 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                                 <div className={`absolute inset-0 flex items-center justify-center transition-opacity ${isCurrent ? 'bg-black/40 opacity-100' : 'bg-black/30 opacity-0 group-hover:opacity-100'}`}>
                                                     <Play size={20} className={isCurrent ? 'text-brand-red fill-current' : 'text-white fill-current'} />
                                                 </div>
+                                                {watched && !isCurrent && (
+                                                    <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-emerald-500 text-black flex items-center justify-center shadow">
+                                                        <Check size={10} strokeWidth={3} />
+                                                    </span>
+                                                )}
                                             </div>
                                         ) : (
-                                            <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex flex-col items-center justify-center font-black shrink-0 transition-colors ${isCurrent ? 'bg-brand-red text-white' : 'bg-white/5 text-gray-300 group-hover:bg-white/10 group-hover:text-white'
+                                            <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex flex-col items-center justify-center font-black shrink-0 transition-colors relative ${isCurrent ? 'bg-brand-red text-white' : 'bg-white/5 text-gray-300 group-hover:bg-white/10 group-hover:text-white'
                                                 }`}>
                                                 <span className="text-[9px] uppercase tracking-wider opacity-60 font-semibold">EP</span>
                                                 <span className="text-base sm:text-lg leading-none">{ep.episodeNumber}</span>
+                                                {watched && !isCurrent && (
+                                                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 text-black flex items-center justify-center">
+                                                        <Check size={10} strokeWidth={3} />
+                                                    </span>
+                                                )}
                                             </div>
                                         )}
 
@@ -3162,11 +3403,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                                         • {ep.duration}
                                                     </span>
                                                 )}
-                                                {isCurrent && (
+                                                {isCurrent ? (
                                                     <span className="px-1.5 py-0.5 rounded bg-brand-red text-white text-[9px] font-black uppercase tracking-wider animate-pulse">
                                                         Now Playing
                                                     </span>
-                                                )}
+                                                ) : watched ? (
+                                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 text-[9px] font-semibold border border-emerald-500/25">
+                                                        <Check size={9} strokeWidth={3} /> Watched
+                                                    </span>
+                                                ) : null}
                                             </div>
                                             <h4 className={`text-sm sm:text-base font-bold mt-0.5 truncate ${isCurrent ? 'text-white' : 'text-gray-200 group-hover:text-white'}`}>
                                                 {ep.title}
@@ -3211,18 +3456,20 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 </div>
             )}
 
-            {/* Unclickable Low-Opacity Corner Watermark Logo (Always visible in normal, embedded, and fullscreen modes) */}
+            {/* Unclickable Low-Opacity Corner Watermark Logo (Fades out while controls are visible so it never overlaps buttons) */}
             <div
-                className={`video-watermark absolute z-[999] pointer-events-none select-none transition-all duration-300 drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] ${isFullscreen
-                    ? 'top-6 right-6 md:top-8 md:right-10 opacity-35'
-                    : 'top-4 right-4 md:top-6 md:right-8 opacity-30'
+                className={`video-watermark absolute z-[260] pointer-events-none select-none transition-opacity duration-300 drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] ${showControls
+                    ? 'opacity-0'
+                    : isFullscreen
+                        ? 'top-5 right-5 md:top-7 md:right-9 opacity-30'
+                        : 'top-3.5 right-3.5 md:top-5 md:right-7 opacity-25'
                     }`}
                 aria-hidden="true"
             >
                 <img
                     src="/favicon.png"
                     alt=""
-                    className={`${isFullscreen ? 'w-10 h-10 md:w-14 md:h-14' : 'w-7 h-7 md:w-10 md:h-10'} object-contain pointer-events-none select-none`}
+                    className={`${isFullscreen ? 'w-9 h-9 md:w-12 md:h-12' : 'w-6 h-6 md:w-9 md:h-9'} object-contain pointer-events-none select-none`}
                     draggable={false}
                 />
             </div>

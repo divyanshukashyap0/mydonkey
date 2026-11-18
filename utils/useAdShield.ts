@@ -9,37 +9,22 @@ interface UseAdShieldOptions {
 }
 
 export function useAdShield(options: UseAdShieldOptions = {}) {
-    const { defaultEnabled = true, defaultMode = 'strict', isActive = true } = options;
+    const { defaultMode = 'strict', isActive = true } = options;
 
-    const [isEnabled, setIsEnabled] = useState<boolean>(() => {
-        try {
-            const saved = localStorage.getItem('mydonkey_adshield_enabled');
-            return saved !== null ? saved === 'true' : defaultEnabled;
-        } catch {
-            return defaultEnabled;
-        }
-    });
-
-    const [mode, setMode] = useState<AdShieldMode>(() => {
-        try {
-            const saved = localStorage.getItem('mydonkey_adshield_mode');
-            return (saved === 'strict' || saved === 'standard') ? saved : defaultMode;
-        } catch {
-            return defaultMode;
-        }
-    });
-
+    // Ad Shield is always automatically enabled for a clean, ad-free viewing experience
+    const [isEnabled, setIsEnabled] = useState<boolean>(true);
+    const [mode, setMode] = useState<AdShieldMode>(defaultMode);
     const [blockedCount, setBlockedCount] = useState<number>(0);
 
-    // Save preferences
+    // Ensure any stale disabled preference is cleared so protection stays active
+    useEffect(() => {
+        try {
+            localStorage.setItem('mydonkey_adshield_enabled', 'true');
+        } catch {}
+    }, []);
+
     const toggleAdShield = useCallback(() => {
-        setIsEnabled(prev => {
-            const next = !prev;
-            try {
-                localStorage.setItem('mydonkey_adshield_enabled', String(next));
-            } catch {}
-            return next;
-        });
+        setIsEnabled(true);
     }, []);
 
     const changeMode = useCallback((newMode: AdShieldMode) => {
@@ -50,23 +35,26 @@ export function useAdShield(options: UseAdShieldOptions = {}) {
     }, []);
 
     // Generate strict HTML5 sandbox attributes
-    // By strictly omitting allow-popups and allow-top-navigation, modern browsers silently block all new tabs and top window redirects.
-    const sandboxAttributes = useMemo(() => {
-        if (mode === 'strict' || !isEnabled) {
-            // Maximum Protection: Only scripts, same-origin, forms and presentation
-            // STRICTLY OMIT: allow-popups, allow-popups-to-escape-sandbox, allow-top-navigation, allow-top-navigation-by-user-activation
-            return 'allow-forms allow-scripts allow-same-origin allow-presentation';
+    // Strictly omits allow-popups, allow-popups-to-escape-sandbox, allow-top-navigation,
+    // allow-top-navigation-by-user-activation, and allow-downloads so mobile & desktop browsers
+    // automatically drop all ad popups, popunders, forced APK downloads, and top-window redirects.
+    const sandboxAttributes = useMemo<string>(() => {
+        if (mode === 'standard') {
+            return 'allow-forms allow-scripts allow-same-origin allow-presentation allow-orientation-lock allow-pointer-lock';
         }
-
-        // Standard Protection: allow-pointer-lock included
-        return 'allow-forms allow-scripts allow-same-origin allow-presentation allow-pointer-lock';
-    }, [isEnabled, mode]);
+        return 'allow-forms allow-scripts allow-same-origin allow-presentation allow-orientation-lock';
+    }, [mode]);
 
     // Parent window popup suppression and navigation interception while player is active
     useEffect(() => {
         if (!isActive || typeof window === 'undefined') return;
 
-        (window as any).__isPlayerActive = true;
+        (window as any).__isPlayerActive = isEnabled;
+        if (!isEnabled) {
+            return () => {
+                (window as any).__isPlayerActive = false;
+            };
+        }
 
         // 1. Override window.open to trap rogue ad popup calls escaping to the parent frame
         const originalOpen = window.open;
@@ -159,35 +147,33 @@ export function useAdShield(options: UseAdShieldOptions = {}) {
             };
         }
 
-        // 3. Fallback beforeunload guard to block silent top redirects in all browsers
-        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-            e.preventDefault();
-            e.returnValue = '';
-            return '';
-        };
-        window.addEventListener('beforeunload', handleBeforeUnload);
-
-        // 4. Intercept top-navigation attempt traps from postMessages
+        // 3. Intercept top-navigation attempt traps from postMessages
         const handleWindowMessage = (event: MessageEvent) => {
             if (!event || !event.data) return;
             if (
                 typeof event.data === 'string' &&
-                (event.data.includes('ad') ||
-                    event.data.includes('popup') ||
+                (event.data.includes('popup') ||
+                    event.data.includes('popunder') ||
                     event.data.includes('redirect') ||
-                    event.data.includes('navigate'))
+                    event.data.includes('top.location'))
             ) {
                 console.info('[AdShield] Blocked potential ad frame postMessage:', event.data);
                 setBlockedCount(prev => prev + 1);
             }
         };
 
-        // 5. Intercept external link clicks, touches, or programmatic navigation escaping to parent
+        // 4. Intercept external link clicks, touches, or programmatic navigation escaping to parent
         const handleExternalRedirectEvent = (e: Event) => {
             const target = (e.target as HTMLElement)?.closest('a');
             if (!target) return;
             const href = target.getAttribute('href');
-            if (href && (href.startsWith('http://') || href.startsWith('https://')) && !href.startsWith(window.location.origin)) {
+            const isSafe = (window as any).isSafeDestination;
+            if (
+                href &&
+                (href.startsWith('http://') || href.startsWith('https://')) &&
+                !href.startsWith(window.location.origin) &&
+                !(typeof isSafe === 'function' && isSafe(href))
+            ) {
                 e.preventDefault();
                 e.stopPropagation();
                 console.info('[AdShield] Blocked external link redirect attempt on click/touch:', href);
@@ -206,7 +192,6 @@ export function useAdShield(options: UseAdShieldOptions = {}) {
                 window.open = originalOpen;
             } catch {}
             if (cleanupNav) cleanupNav();
-            window.removeEventListener('beforeunload', handleBeforeUnload);
             window.removeEventListener('message', handleWindowMessage);
             document.removeEventListener('click', handleExternalRedirectEvent, true);
             document.removeEventListener('auxclick', handleExternalRedirectEvent, true);

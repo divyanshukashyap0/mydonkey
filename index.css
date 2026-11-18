@@ -286,6 +286,27 @@ h6 {
   animation: shimmer 2s linear infinite;
 }
 
+/* --- Mature Website Skeleton Shimmer --- */
+@keyframes skeleton-sweep {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.095) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-sweep 1.6s ease-in-out infinite;
+}
+
 /* --- Glassmorphism Utils --- */
 .glass-panel {
   background: rgba(20, 20, 20, 0.7);
@@ -342,16 +363,19 @@ h6 {
 }
 
 /* --- Video Player: Landscape Mobile Overrides --- */
-/* On phones in landscape (height is tiny), make the player chrome minimal */
+/* On phones in landscape (height is tiny), keep the player chrome ultra-compact and unobstructed */
 @media (orientation: landscape) and (max-height: 500px) {
-
-  /* Tighten the bottom controls bar */
-  .vp-controls-bar {
-    padding: 4px 6px !important;
-    gap: 4px !important;
+  .vp-top-bar {
+    padding-top: 8px !important;
+    padding-bottom: 14px !important;
   }
 
-  /* Hide the center playback controls overlay – user taps the bottom bar */
+  .vp-controls-bar {
+    padding-top: 20px !important;
+    padding-bottom: 8px !important;
+  }
+
+  /* Hide center playback overlay in short landscape viewports – bottom bar stays clean */
   .vp-center-controls {
     display: none !important;
   }
@@ -544,9 +568,7 @@ h6 {
 #video-player-root:-moz-full-screen .video-watermark,
 #video-player-root:-ms-fullscreen .video-watermark {
   display: block !important;
-  visibility: visible !important;
-  opacity: 0.35 !important;
-  z-index: 99999 !important;
+  z-index: 260 !important;
 }
 
 /* --- Video Player Active Scroll Lock (removes sidebar/window scrollbar) --- */

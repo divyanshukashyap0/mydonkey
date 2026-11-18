@@ -166,16 +166,16 @@ export default function EpisodesPanel({
           await engine.loadMedia(media, true);
         }
       } else {
-        // Start streaming fresh on Bingr default
+        // Start streaming fresh on Nxsha
         const media = makeEmbed(activeTitle, {
-          server: 'bingr',
+          server: 'nxsha',
           anime: activeTitle.anime,
           season: selectedSeason,
           episode: epNum,
           animeId: null,
           animeEpisode: epNum,
           animeEdition: '',
-          preferences: readServerPreferences('bingr'),
+          preferences: readServerPreferences('nxsha'),
         });
 
         if (party.state.status === 'connected') {

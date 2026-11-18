@@ -1696,6 +1696,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         const profileRef = doc(db, 'users', fbUser.uid, 'profiles', currentProfile.id);
         await updateDoc(profileRef, { avatarUrl: url });
         setCurrentProfile({ ...currentProfile, avatarUrl: url });
+        setUserProfiles(prev => prev.map(p => p.id === currentProfile.id ? { ...p, avatarUrl: url } : p));
     };
 
 

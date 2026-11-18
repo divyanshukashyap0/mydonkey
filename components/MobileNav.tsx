@@ -36,8 +36,8 @@ const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setTab, currentProfile
                 </button>
                 <button onClick={() => setTab('account')} className={`flex flex-col items-center gap-1 transition-colors min-w-[3.5rem] ${activeTab === 'account' ? 'text-white' : 'text-gray-400 hover:text-gray-200'}`}>
                     <img
-                        src={currentProfile?.avatarUrl || "https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg"}
-                        className={`w-5 h-5 rounded object-cover ${activeTab === 'account' ? 'border-2 border-white' : 'opacity-80'}`}
+                        src={currentProfile?.avatarUrl || "/Mydonkey%20user.jpg"}
+                        className={`w-5 h-5 rounded-full object-cover ${activeTab === 'account' ? 'ring-2 ring-white' : 'opacity-85'}`}
                         alt="Profile"
                     />
                     <span className="text-xs font-medium">Profile</span>

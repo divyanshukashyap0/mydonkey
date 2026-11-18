@@ -30,9 +30,17 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
     const searchInputRef = useRef<HTMLInputElement>(null);
     const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    const { logout, currentUser, isInstallable, installPwa, content, settings } = useStore();
+    const { logout, currentUser, currentProfile, userProfiles, isInstallable, installPwa, content, settings } = useStore();
     const navigate = useNavigate();
     const location = useLocation();
+
+    const activeAvatarUrl = currentProfile?.avatarUrl || userProfiles?.[0]?.avatarUrl || '';
+    const activeProfileName = currentProfile?.name || userProfiles?.[0]?.name || currentUser?.name || 'Account';
+    const [avatarFailed, setAvatarFailed] = useState(false);
+
+    useEffect(() => {
+        setAvatarFailed(false);
+    }, [activeAvatarUrl]);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -523,21 +531,19 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
                                     title="Go to Account & Settings"
                                 >
                                     <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-brand-red to-amber-500 flex items-center justify-center text-white shrink-0 overflow-hidden shadow-inner border border-white/20">
-                                        {currentUser?.avatarUrl ? (
+                                        {activeAvatarUrl && !avatarFailed ? (
                                             <img
-                                                src={currentUser.avatarUrl}
+                                                src={activeAvatarUrl}
                                                 className="w-full h-full object-cover"
-                                                alt={currentUser?.name || "Account"}
-                                                onError={(e) => {
-                                                    e.currentTarget.style.display = 'none';
-                                                }}
+                                                alt={activeProfileName}
+                                                onError={() => setAvatarFailed(true)}
                                             />
                                         ) : (
                                             <User size={14} className="text-white" />
                                         )}
                                     </div>
                                     <span className="text-xs font-bold hidden md:inline-block max-w-[80px] truncate">
-                                        {currentUser?.name ? currentUser.name.split(' ')[0] : 'Account'}
+                                        {activeProfileName.split(' ')[0]}
                                     </span>
                                 </button>
                                 <button
@@ -551,9 +557,23 @@ const TopNav: React.FC<TopNavProps & { onLoginClick?: () => void }> = ({ activeT
 
                                 {isProfileMenuOpen && (
                                     <div className="absolute top-12 right-0 w-56 bg-cinema-black/95 backdrop-blur-xl border border-white/10 rounded-lg shadow-2xl py-2 animate-in slide-in-from-top-2 z-50">
-                                        <div className="px-4 py-3 border-b border-white/10 mb-2">
-                                            <div className="font-bold text-sm truncate text-white">{currentUser?.name || currentUser?.email?.split('@')[0]}</div>
-                                            <div className="text-[10px] text-gray-500 truncate">{currentUser?.email}</div>
+                                        <div className="px-4 py-3 border-b border-white/10 mb-2 flex items-center gap-3">
+                                            <div className="w-9 h-9 rounded-full bg-white/10 overflow-hidden shrink-0 flex items-center justify-center border border-white/15">
+                                                {activeAvatarUrl && !avatarFailed ? (
+                                                    <img
+                                                        src={activeAvatarUrl}
+                                                        alt={activeProfileName}
+                                                        className="w-full h-full object-cover"
+                                                        onError={() => setAvatarFailed(true)}
+                                                    />
+                                                ) : (
+                                                    <User size={16} className="text-gray-300" />
+                                                )}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="font-bold text-sm truncate text-white">{activeProfileName || currentUser?.email?.split('@')[0]}</div>
+                                                <div className="text-[10px] text-gray-500 truncate">{currentUser?.email}</div>
+                                            </div>
                                         </div>
 
                                         {isAdmin && (

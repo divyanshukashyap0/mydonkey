@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Check, X, Trash2, Camera } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, Edit2, Check, X, Trash2, Camera, Upload, Loader2 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { Profile } from '../types';
 import Loader from './Loader';
+import { compressImageToDataUrl, formatBytes } from '../utils/imageCompressor';
 
 const ProfileSelection = () => {
   const { currentUser, userProfiles, isLoading, switchProfile, addProfile, deleteProfile, updateProfile } = useStore();
@@ -15,6 +16,27 @@ const ProfileSelection = () => {
   const [name, setName] = useState('');
   const [isKids, setIsKids] = useState(false);
   const [selectedAvatar, setSelectedAvatar] = useState('');
+  const [isCompressingAvatar, setIsCompressingAvatar] = useState(false);
+  const [avatarCompressionInfo, setAvatarCompressionInfo] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAvatarUpload = async (file: File | null) => {
+    if (!file) return;
+    setIsCompressingAvatar(true);
+    try {
+      const result = await compressImageToDataUrl(file, {
+        maxDimension: 200,
+        maxBytes: 22 * 1024,
+        squareCrop: true,
+      });
+      setSelectedAvatar(result.dataUrl);
+      setAvatarCompressionInfo(`${formatBytes(result.originalBytes)} → ${formatBytes(result.compressedBytes)}`);
+    } catch (err: any) {
+      alert(err?.message || 'Could not compress the selected image.');
+    } finally {
+      setIsCompressingAvatar(false);
+    }
+  };
 
   const avatars = [
     'https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg',
@@ -29,6 +51,7 @@ const ProfileSelection = () => {
     setName('');
     setIsKids(false);
     setSelectedAvatar(avatars[0]);
+    setAvatarCompressionInfo(null);
   };
 
   const startEdit = (profile: Profile) => {
@@ -37,6 +60,7 @@ const ProfileSelection = () => {
     setName(profile.name);
     setIsKids(profile.isKids);
     setSelectedAvatar(profile.avatarUrl);
+    setAvatarCompressionInfo(null);
   };
 
   const handleSave = async () => {
@@ -79,19 +103,7 @@ const ProfileSelection = () => {
     return 'Good Evening';
   };
 
-  const [videoDone, setVideoDone] = useState(false);
-
-  // Reset videoDone if loading starts again (though usually component unmounts/remounts or loading is strictly true/false)
-  useEffect(() => {
-    if (loading) setVideoDone(false);
-  }, [loading]);
-
-  if (loading || !videoDone) return (
-    <Loader
-      dataReady={!loading}
-      onComplete={() => setVideoDone(true)}
-    />
-  );
+  if (loading) return <Loader variant="profiles" dataReady={false} />;
 
   // Render Modal for Add/Edit
   if (mode === 'add' || mode === 'edit') {
@@ -103,12 +115,40 @@ const ProfileSelection = () => {
 
           <div className="flex flex-col md:flex-row gap-6 md:gap-8">
             {/* Avatar Section */}
-            <div className="relative group w-32 h-32 md:w-40 md:h-40 mx-auto md:mx-0">
-              <img src={selectedAvatar} className="w-full h-full rounded shadow-lg object-cover" />
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded cursor-pointer opacity-0 group-hover:opacity-100 transition">
-                <Edit2 className="text-white" />
+            <div className="flex flex-col items-center mx-auto md:mx-0">
+              <div
+                className="relative group w-32 h-32 md:w-40 md:h-40 cursor-pointer"
+                onClick={() => fileInputRef.current?.click()}
+                title="Upload profile image"
+              >
+                <img src={selectedAvatar} alt="Profile avatar" className="w-full h-full rounded shadow-lg object-cover" />
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 transition">
+                  {isCompressingAvatar ? <Loader2 className="text-white animate-spin" /> : <Camera className="text-white" />}
+                </div>
               </div>
-              {/* Simple Avatar Picker Popup could go here, for now just use the default set cycling or internal logic if expanded */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null;
+                  void handleAvatarUpload(file);
+                  e.target.value = '';
+                }}
+              />
+              <button
+                type="button"
+                disabled={isCompressingAvatar}
+                onClick={() => fileInputRef.current?.click()}
+                className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-white/10 hover:bg-white/20 text-xs font-medium text-white transition cursor-pointer disabled:opacity-50"
+              >
+                {isCompressingAvatar ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                <span>{isCompressingAvatar ? 'Compressing...' : 'Upload Photo'}</span>
+              </button>
+              {avatarCompressionInfo && (
+                <span className="mt-1 text-[11px] text-emerald-400">{avatarCompressionInfo}</span>
+              )}
             </div>
 
             {/* Form Section */}

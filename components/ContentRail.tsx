@@ -213,6 +213,13 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                             )
                                         )}
 
+                                        {/* Continue Watching S/E pill badge for TV shows */}
+                                        {Number((item as any).lastSeason) > 0 && Number((item as any).lastEpisode) > 0 && (
+                                            <div className="absolute bottom-3 left-2 z-20 px-2 py-0.5 rounded-md bg-black/80 backdrop-blur-md border border-white/15 text-[10px] font-bold text-white tracking-wide pointer-events-none shadow">
+                                                S{(item as any).lastSeason} · E{(item as any).lastEpisode}
+                                            </div>
+                                        )}
+
                                         {/* Playback progress bar for continue watching */}
                                         {typeof (item as any).progress === 'number' && (item as any).progress > 0 && (
                                             <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/70 z-20 overflow-hidden pointer-events-none">
@@ -241,7 +248,11 @@ const ContentRail: React.FC<ContentRailProps> = ({
                                                     aria-label={typeof (item as any).progress === 'number' && (item as any).progress > 0 ? `Resume ${item.title}` : `Play ${item.title}`}
                                                 >
                                                     <Play size={13} className="fill-black text-black ml-0.5" />
-                                                    <span>{typeof (item as any).progress === 'number' && (item as any).progress > 0 ? "Resume" : "Play"}</span>
+                                                    <span>
+                                                        {Number((item as any).lastSeason) > 0 && Number((item as any).lastEpisode) > 0
+                                                            ? `S${(item as any).lastSeason} E${(item as any).lastEpisode}`
+                                                            : (typeof (item as any).progress === 'number' && (item as any).progress > 0 ? "Resume" : "Play")}
+                                                    </span>
                                                 </button>
 
                                                 {/* Add to My List Button */}

@@ -8,10 +8,7 @@ export const DEFAULT_TV_TYPE = 'tv';
 /**
  * Gets the configured base content provider server key or falls back to 'nxsha'.
  */
-export const getBaseContentServer = (settings?: Partial<SiteSettings>): StreamServerKey => {
-    if (settings?.baseContentServer && STREAM_SERVERS.some(s => s.key === settings.baseContentServer)) {
-        return settings.baseContentServer;
-    }
+export const getBaseContentServer = (_settings?: Partial<SiteSettings>): StreamServerKey => {
     return 'nxsha';
 };
 
@@ -203,19 +200,7 @@ export const getPlayableStreamUrl = (url?: string): string => {
     return trimmed;
 };
 
-// ── Multi-Server Content Access (My Donkey Stream Hub) ───────────────────────
-
-export type StreamServerKey =
-    | 'vidstuck'
-    | 'nxsha'
-    | 'bingr'
-    | 'zxc'
-    | 'vidlink'
-    | 'vidnest'
-    | 'megaplay'
-    | 'recloud'
-    | 'zokoanime'
-    | 'default';
+// ── Stream Server Access (My Donkey — Nxsha Only) ────────────────────────────
 
 export interface StreamServerOption {
     key: StreamServerKey;
@@ -229,36 +214,11 @@ export interface StreamServerOption {
 
 export const STREAM_SERVERS: StreamServerOption[] = [
     { key: 'nxsha', name: 'Nxsha', tag: 'HD + Subs', description: 'High definition with multilingual subtitles', hasSubtitles: true },
-    { key: 'bingr', name: 'Bingr', tag: '4K Ultra', description: 'Crystal-clear 4K / UHD resolution', supports4K: true },
-    { key: 'vidstuck', name: 'VidStuck', tag: 'Fast 1080p', description: 'Ultra-fast bufferless streaming' },
-    { key: 'zxc', name: 'ZXC', tag: 'Instant', description: 'Low-latency direct player' },
-    { key: 'vidlink', name: 'VidLink', tag: 'Multi-CDN', description: 'Redundant high-availability CDN' },
-    { key: 'vidnest', name: 'VidNest', tag: 'Alt HD', description: 'Reliable secondary mirror' },
-    { key: 'megaplay', name: 'MegaPlay', tag: 'Anime Fast', description: 'Dedicated high-speed anime server', isAnime: true },
-    { key: 'recloud', name: 'ReCloud', tag: 'Anime HD', description: 'Multi-audio Japanese & English dubs', isAnime: true },
-    { key: 'zokoanime', name: 'Zokoanime', tag: 'Anime Sub/Dub', description: 'Extensive anime catalog with audio switcher', isAnime: true },
-    { key: 'default', name: 'Default Proxy', tag: 'GarageBand', description: 'Legacy streaming fallback' },
 ];
 
-export const STANDARD_SERVER_FALLBACK_ORDER: StreamServerKey[] = [
-    'nxsha',
-    'bingr',
-    'vidstuck',
-    'zxc',
-    'vidlink',
-    'vidnest',
-    'default'
-];
+export const STANDARD_SERVER_FALLBACK_ORDER: StreamServerKey[] = ['nxsha'];
 
-export const ANIME_SERVER_FALLBACK_ORDER: StreamServerKey[] = [
-    'nxsha',
-    'bingr',
-    'megaplay',
-    'recloud',
-    'zokoanime',
-    'vidstuck',
-    'default'
-];
+export const ANIME_SERVER_FALLBACK_ORDER: StreamServerKey[] = ['nxsha'];
 
 export interface ServerEmbedOptions {
     season?: number;
@@ -271,33 +231,27 @@ export interface ServerEmbedOptions {
 }
 
 /**
- * Returns the fallback server order prioritized with the base content server first.
+ * Returns the fallback server order (Nxsha only).
  */
 export const getFallbackOrder = (
-    baseServer: StreamServerKey = 'nxsha',
-    isAnime: boolean = false
+    _baseServer: StreamServerKey = 'nxsha',
+    _isAnime: boolean = false
 ): StreamServerKey[] => {
-    const list = isAnime ? ANIME_SERVER_FALLBACK_ORDER : STANDARD_SERVER_FALLBACK_ORDER;
-    if (!baseServer || !list.includes(baseServer)) return list;
-    return [baseServer, ...list.filter(s => s !== baseServer)];
+    return ['nxsha'];
 };
 
 /**
- * Builds an embed URL for a chosen server key.
+ * Builds an embed URL using the Nxsha streaming server.
  * Accepts either a numeric TMDB ID or IMDb ID (tt...) or content ID.
- * Defaults to the configured base content provider server if not specified.
  */
 export const buildServerEmbedUrl = (
     id: string | number,
     type: 'movie' | 'tv' | string = 'movie',
-    serverKey?: StreamServerKey,
+    _serverKey?: StreamServerKey,
     options: ServerEmbedOptions = {}
 ): string => {
     const rawId = String(id || '').trim();
     if (!rawId) return '';
-
-    const baseServer = getBaseContentServer(options.settings);
-    const targetKey: StreamServerKey = serverKey || baseServer;
 
     const cleanNumeric = rawId.replace(/^(tmdb_|imdb_)/, '');
     const numId = parseInt(cleanNumeric, 10);
@@ -306,105 +260,29 @@ export const buildServerEmbedUrl = (
 
     const s = Math.max(1, options.season || 1);
     const e = Math.max(1, options.episode || 1);
-    const audio = options.audioTrack || 'sub';
-    const source = options.recloudSource || 'hd-1';
 
-    // Check for custom server base URL override
-    const customBase = options.settings?.serverBaseUrls?.[targetKey] || 
-        (targetKey === baseServer && options.settings?.baseContentServerUrl ? options.settings.baseContentServerUrl.trim().replace(/\/+$/, '') : '');
+    // Check for custom Nxsha base URL override in site settings
+    const customBase =
+        options.settings?.serverBaseUrls?.nxsha ||
+        (options.settings?.baseContentServerUrl ? options.settings.baseContentServerUrl.trim().replace(/\/+$/, '') : '');
 
-    // 1. Anime dedicated servers
-    if (targetKey === 'zokoanime') {
-        const mal = options.animeMalId;
-        const ani = options.animeId || (hasNum ? numId : null);
-        const zkBase = customBase || 'https://zokoanime.video';
-        if (mal) return `${zkBase}/stream/mal/${mal}/${e}/${audio}?color=ffffff`;
-        if (ani) return `${zkBase}/stream/anilist/${ani}/${e}/${audio}?color=ffffff`;
-    }
-    if (targetKey === 'megaplay') {
-        const ani = options.animeId || (hasNum ? numId : null);
-        const mpBase = customBase || 'https://megaplay.buzz';
-        if (ani) return `${mpBase}/stream/ani/${ani}/${e}/${audio}`;
-    }
-    if (targetKey === 'recloud') {
-        const ani = options.animeId || (hasNum ? numId : null);
-        const rcBase = customBase || 'https://cdn.4animo.xyz';
-        if (ani) return `${rcBase}/embed/${source}/ani/${ani}/${e}/${audio}?k=1`;
-    }
-
-    // 2. Standard multi-servers (Use TMDB numeric ID if available, otherwise raw or IMDb ID)
     const targetId = hasNum ? numId : (imdbId || rawId);
+    const nxBase = customBase || 'https://nxsha.space';
 
-    switch (targetKey) {
-        case 'vidstuck': {
-            const vsBase = customBase || 'https://vidstuck.xyz';
-            // VidStuck backend expects numeric TMDB ID. If only IMDb ID is available, route to VidLink
-            if (typeof targetId === 'string' && targetId.startsWith('tt')) {
-                return type === 'tv'
-                    ? `https://vidlink.pro/tv/${targetId}/${s}/${e}?autoplay=true`
-                    : `https://vidlink.pro/movie/${targetId}?autoplay=true`;
-            }
-            return type === 'tv'
-                ? `${vsBase}/embed/tv/${targetId}/${s}/${e}?color=ffffff`
-                : `${vsBase}/embed/movie/${targetId}?color=ffffff`;
-        }
-
-        case 'nxsha': {
-            const nxBase = customBase || 'https://nxsha.space';
-            return type === 'tv'
-                ? `${nxBase}/embed/tv/${targetId}/${s}/${e}?autoplay=true`
-                : `${nxBase}/embed/movie/${targetId}?autoplay=true`;
-        }
-
-        case 'bingr': {
-            const bgBase = customBase || 'https://bingr.one';
-            return type === 'tv'
-                ? `${bgBase}/watch/tv/${targetId}/${s}/${e}`
-                : `${bgBase}/watch/movie/${targetId}`;
-        }
-
-        case 'zxc': {
-            const zxcBase = customBase || 'https://zxcstream.xyz';
-            return type === 'tv'
-                ? `${zxcBase}/player/tv/${targetId}?season=${s}&episode=${e}`
-                : `${zxcBase}/player/movie/${targetId}`;
-        }
-
-        case 'vidlink': {
-            const vlBase = customBase || 'https://vidlink.pro';
-            return type === 'tv'
-                ? `${vlBase}/tv/${targetId}/${s}/${e}?autoplay=true`
-                : `${vlBase}/movie/${targetId}?autoplay=true`;
-        }
-
-        case 'vidnest': {
-            const vnBase = customBase || 'https://vidnest.fun';
-            return type === 'tv'
-                ? `${vnBase}/tv/${targetId}/${s}/${e}`
-                : `${vnBase}/movie/${targetId}`;
-        }
-
-        case 'default':
-        default:
-            return buildEmbedUrl(imdbId || targetId, type, options.settings, s, e);
-    }
+    return type === 'tv'
+        ? `${nxBase}/embed/tv/${targetId}/${s}/${e}?autoplay=true`
+        : `${nxBase}/embed/movie/${targetId}?autoplay=true`;
 };
 
 /**
- * Returns the next available server in the fallback chain that hasn't failed yet.
+ * Returns the next available fallback server (none — Nxsha is the sole server).
  */
 export const getNextFallbackServer = (
-    currentServer: StreamServerKey,
-    isAnime: boolean,
-    failedServers: Set<StreamServerKey>,
-    baseServer: StreamServerKey = 'bingr'
+    _currentServer: StreamServerKey,
+    _isAnime: boolean,
+    _failedServers: Set<StreamServerKey>,
+    _baseServer: StreamServerKey = 'nxsha'
 ): StreamServerKey | null => {
-    const list = getFallbackOrder(baseServer, isAnime);
-    for (const server of list) {
-        if (server !== currentServer && !failedServers.has(server)) {
-            return server;
-        }
-    }
     return null;
 };
 

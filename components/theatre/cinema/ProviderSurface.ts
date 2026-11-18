@@ -56,6 +56,9 @@ export class ProviderSurface {
     frame.allow = 'autoplay *; fullscreen *; encrypted-media *; picture-in-picture *; clipboard-write *';
     frame.allowFullscreen = true;
     frame.referrerPolicy = 'strict-origin-when-cross-origin';
+    if (media.selection.preferences.sandbox !== false) {
+      frame.setAttribute('sandbox', 'allow-forms allow-scripts allow-same-origin allow-presentation allow-orientation-lock');
+    }
     frame.addEventListener('load', () => {
       if (frame !== this.iframe) return;
       if (this.timeout) clearTimeout(this.timeout);
@@ -104,6 +107,9 @@ export class ProviderSurface {
       dFrame.allow = 'autoplay *; fullscreen *; encrypted-media *; picture-in-picture *; clipboard-write *';
       dFrame.allowFullscreen = true;
       dFrame.referrerPolicy = 'strict-origin-when-cross-origin';
+      if (this.media.selection.preferences.sandbox !== false) {
+        dFrame.setAttribute('sandbox', 'allow-forms allow-scripts allow-same-origin allow-presentation allow-orientation-lock');
+      }
       dFrame.src = this.media.url;
       this.dock.appendChild(dFrame);
       this.dockIframe = dFrame;

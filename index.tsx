@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 // import App from './App';
 import AppNew from './AppNew';
+import ErrorBoundary from './components/ErrorBoundary';
 import { BrowserRouter } from 'react-router-dom';
 
 // Clean Console Filter: suppress browser/framework warnings and noisy third-party logs
@@ -71,9 +72,14 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <BrowserRouter>
-      <AppNew />
-    </BrowserRouter>
+    <ErrorBoundary
+      title="Something Went Wrong"
+      subtitle="The page ran into an unexpected error. Return to the previous page or search for another movie or show."
+    >
+      <BrowserRouter>
+        <AppNew />
+      </BrowserRouter>
+    </ErrorBoundary>
   </React.StrictMode>
 );
 

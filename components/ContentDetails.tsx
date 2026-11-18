@@ -49,7 +49,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
         // Hydrate full doc if missing seasons (for TV) or missing cast
         if (!contentId.startsWith('tmdb_') && !contentId.startsWith('imdb_') && fetchContentById) {
             const needsFullDoc = (initialContent.type === 'tv' && (!initialContent.seasons || initialContent.seasons.length === 0)) ||
-                                 (!initialContent.cast || initialContent.cast.length === 0);
+                (!initialContent.cast || initialContent.cast.length === 0);
 
             if (needsFullDoc && !fetchedDocIdsRef.current.has(contentId)) {
                 fetchedDocIdsRef.current.add(contentId);
@@ -68,7 +68,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                             };
                         });
                     }
-                }).catch(() => {});
+                }).catch(() => { });
             }
         }
 
@@ -82,9 +82,9 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                 (async () => {
                     let detail: any = null;
                     const reqType = initialContent.type === 'tv' ? 'tv' : 'movie';
-                    try { detail = await fetchTMDBDetails(numericId, reqType); } catch (_) {}
+                    try { detail = await fetchTMDBDetails(numericId, reqType); } catch (_) { }
                     if (!detail || !detail.id || (!detail.title && !detail.name)) {
-                        try { detail = await fetchTMDBDetails(numericId, reqType === 'tv' ? 'movie' : 'tv'); } catch (_) {}
+                        try { detail = await fetchTMDBDetails(numericId, reqType === 'tv' ? 'movie' : 'tv'); } catch (_) { }
                     }
                     if (detail && detail.id && (detail.title || detail.name)) {
                         const trailerUrl = extractTMDBTrailer(detail);
@@ -167,7 +167,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                 if (document.exitFullscreen) {
                     document.exitFullscreen();
                 }
-            } catch {}
+            } catch { }
         }
         onClose();
     };
@@ -413,7 +413,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                                 {content.overview}
                             </p>
                             {content.overview && content.overview.length > 150 && (
-                                <button 
+                                <button
                                     onClick={() => setIsOverviewExpanded(!isOverviewExpanded)}
                                     className="text-brand-red text-xs font-bold mt-1 hover:underline"
                                 >
@@ -567,7 +567,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                             <div className="flex items-center gap-2 mb-6">
                                 <span className="px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-2 shadow-md">
                                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                                    9 High-Speed Streaming Servers (Nxsha HD • Bingr 4K • VidStuck • ZXC • MegaPlay Anime)
+                                    High-Speed Streaming Server Nxsha
                                 </span>
                             </div>
 
@@ -677,7 +677,7 @@ const ContentDetails: React.FC<ContentDetailsProps> = ({ content: initialContent
                                         {content.overview}
                                     </p>
                                     {content.overview && content.overview.length > 250 && (
-                                        <button 
+                                        <button
                                             onClick={() => setIsOverviewExpanded(!isOverviewExpanded)}
                                             className="text-brand-red font-bold hover:underline"
                                         >

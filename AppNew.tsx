@@ -8,6 +8,7 @@ import HeroSkeleton from './components/HeroSkeleton';
 import ContentRail from './components/ContentRail';
 import ContentDetails from './components/ContentDetails';
 import VideoPlayer from './components/VideoPlayer';
+import ErrorBoundary from './components/ErrorBoundary';
 import LoginPage from './components/LoginPage';
 import MobileNav from './components/MobileNav';
 import Footer from './components/Footer';
@@ -33,6 +34,7 @@ import ScrollToTop from './components/ScrollToTop';
 import FontLoader from './components/FontLoader';
 import Loader from './components/Loader';
 import { buildEmbedUrl, parseEmbedContentType, extractDriveId, hasDriveSource, isExternalEmbedUrl, isDirectVideoUrl } from './utils/embedUrl';
+import { getSeriesEpisodeProgress } from './utils/episodeProgress';
 import Pagination from './components/Pagination';
 import GenrePreferenceModal from './components/GenrePreferenceModal';
 import PersonalizeBanner from './components/PersonalizeBanner';
@@ -931,7 +933,15 @@ const MainLayout = () => {
             if (tmdbKey) seenIds.add(tmdbKey);
             if (imdbKey) seenIds.add(imdbKey);
 
-            items.push({ ...c, progress: h.progress || 15 });
+            const epProg = (c.type === 'tv' || (c as any).media_type === 'tv' || (c.seasons && c.seasons.length > 0))
+                ? getSeriesEpisodeProgress(c)
+                : null;
+
+            items.push({
+                ...c,
+                progress: h.progress || 15,
+                ...(epProg ? { lastSeason: epProg.lastSeason, lastEpisode: epProg.lastEpisode } : {}),
+            } as any);
         }
 
         return items.slice(0, 10);
@@ -1266,7 +1276,13 @@ const MainLayout = () => {
             const titleParam = (fullItem.title && fullItem.title !== 'undefined' && fullItem.title !== 'null')
                 ? `&title=${encodeURIComponent(fullItem.title.trim())}`
                 : '';
-            navigate(`/watch/${targetId}?mode=movie${titleParam}`, {
+            const resumeSeason = Number((playableItem as any).lastSeason);
+            const resumeEpisode = Number((playableItem as any).lastEpisode);
+            const hasResumeEpisode = Number.isInteger(resumeSeason) && resumeSeason > 0 && Number.isInteger(resumeEpisode) && resumeEpisode > 0;
+            const watchBasePath = hasResumeEpisode
+                ? `/watch/${targetId}/season/${resumeSeason}/episode/${resumeEpisode}`
+                : `/watch/${targetId}`;
+            navigate(`${watchBasePath}?mode=movie${titleParam}`, {
                 replace: isFromBrowse,
                 state: {
                     item: fullItem,
@@ -2293,12 +2309,9 @@ const MainLayout = () => {
                 </>
             )}
 
-            {/* Deep link resolving modal loader */}
+            {/* Deep link resolving modal skeleton */}
             {isModalRoute && (isResolvingModalContent || (location.pathname.startsWith('/browse/') && !viewingContent) || (location.pathname.startsWith('/watch/') && !playingContent)) && (
-                <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md transition-opacity">
-                    <Loader2 className="w-12 h-12 text-brand-red animate-spin mb-4" />
-                    <p className="text-white/80 text-base font-medium animate-pulse">Loading content...</p>
-                </div>
+                <Loader variant={location.pathname.startsWith('/watch/') ? 'watch' : 'details'} />
             )}
 
             {viewingContent && location.pathname.startsWith('/browse/') && (
@@ -2311,10 +2324,17 @@ const MainLayout = () => {
             )}
 
             {playingContent && location.pathname.startsWith('/watch/') && (
-                <VideoPlayer
-                    content={playingContent}
+                <ErrorBoundary
                     onClose={handleClosePlayer}
-                />
+                    resetKey={playingContent.id}
+                    title="Unable to Play This Title"
+                    subtitle="The video player ran into an error loading this stream. Go back to the previous page or search for another movie or show."
+                >
+                    <VideoPlayer
+                        content={playingContent}
+                        onClose={handleClosePlayer}
+                    />
+                </ErrorBoundary>
             )}
             <UnlockContentModal
                 isOpen={showUnlockModal}
@@ -2412,7 +2432,7 @@ const AppRoutes = () => {
                 path="/login"
                 element={
                     isLoading ? (
-                        <Loader />
+                        <Loader variant="login" />
                     ) : isAlreadyLoggedIn ? (
                         <Navigate to="/" replace />
                     ) : (
@@ -2443,7 +2463,7 @@ const AppRoutes = () => {
                 path="/admin/*"
                 element={
                     isLoading ? (
-                        <Loader />
+                        <Loader variant="admin" />
                     ) : (currentUser?.role === 'admin' || Boolean(currentUser?.email && PERMANENT_ADMINS.includes(currentUser.email)) || (isAuthenticated && window.location.pathname.startsWith('/admin'))) ? (
                         <AdminLayout onExit={() => navigate('/')} />
                     ) : (

@@ -2,35 +2,22 @@ import type { AudioTrack, CatalogTitle, EmbedMedia, EmbedSelection, ServerKey, S
 
 export const STD_SERVERS = [
   { key: 'nxsha', name: 'Nxsha', tag: 'HD + Subs', movie: (id: number) => `https://nxsha.space/embed/movie/${id}?autoplay=true`, tv: (id: number, s: number, e: number) => `https://nxsha.space/embed/tv/${id}/${s}/${e}?autoplay=true`, highlight: true },
-  { key: 'bingr', name: 'Bingr', tag: '4K', movie: (id: number) => `https://bingr.one/watch/movie/${id}`, tv: (id: number, s: number, e: number) => `https://bingr.one/watch/tv/${id}/${s}/${e}` },
-  { key: 'vidstuck', name: 'VidStuck', tag: 'Fast', movie: (id: number) => `https://vidstuck.xyz/embed/movie/${id}?color=ffffff`, tv: (id: number, s: number, e: number) => `https://vidstuck.xyz/embed/tv/${id}/${s}/${e}?color=ffffff` },
-  { key: 'zxc', name: 'ZXC', tag: 'Fast', movie: (id: number) => `https://zxcstream.xyz/player/movie/${id}`, tv: (id: number, s: number, e: number) => `https://zxcstream.xyz/player/tv/${id}?season=${s}&episode=${e}` },
-  { key: 'vidlink', name: 'VidLink', tag: 'Multi', movie: (id: number) => `https://vidlink.pro/movie/${id}?autoplay=true`, tv: (id: number, s: number, e: number) => `https://vidlink.pro/tv/${id}/${s}/${e}?autoplay=true` },
-  { key: 'vidnest', name: 'VidNest', tag: 'Alt', movie: (id: number) => `https://vidnest.fun/movie/${id}`, tv: (id: number, s: number, e: number) => `https://vidnest.fun/tv/${id}/${s}/${e}` },
 ] as const;
 
-
-export const MP_BASE = 'https://megaplay.buzz';
-export const RC_BASE = 'https://cdn.4animo.xyz';
+export const MP_BASE = '';
+export const RC_BASE = '';
 export const ZK_BASE = 'https://zokoanime.video';
 export const ZK_COLOR = '?color=ffffff';
 export const RC_SOURCES = ['hd-1', 'hd-2'] as const;
 export const RC_DEFAULT_SOURCE = 'hd-1';
-export const ANIME_SERVERS = [
-  { key: 'megaplay', name: 'MegaPlay', tag: 'Anime' },
-  { key: 'recloud', name: 'ReCloud', tag: 'HD-1 / HD-2' },
-  { key: 'zokoanime', name: 'Zokoanime', tag: 'Anime' },
-] as const;
+export const ANIME_SERVERS: readonly { key: ServerKey; name: string; tag: string }[] = [];
 
 export const DEFAULT_PREFERENCES: ServerPreferences = { audio: 'sub', source: RC_DEFAULT_SOURCE, zokoTemplate: '', sandbox: true };
 const PREF_KEY = 'mydonkey-server-preferences-v1';
 const LEGACY_PREF_KEY = 'aethoflix-server-preferences-v1';
 
-export function serversFor(anime: boolean): { key: ServerKey; name: string; tag: string; number: number }[] {
-  const list = anime
-    ? [{ key: 'nxsha' as const, name: 'Nxsha', tag: 'HD + Subs' }, ...ANIME_SERVERS, ...STD_SERVERS.filter((s) => s.key !== 'nxsha')]
-    : STD_SERVERS;
-  return list.map((server, index) => ({ key: server.key, name: server.name, tag: server.tag, number: index + 1 }));
+export function serversFor(_anime: boolean): { key: ServerKey; name: string; tag: string; number: number }[] {
+  return STD_SERVERS.map((server, index) => ({ key: server.key, name: server.name, tag: server.tag, number: index + 1 }));
 }
 
 export function readServerPreferences(key: ServerKey): ServerPreferences {
@@ -79,28 +66,13 @@ export function animeDownloadUrl(anilistId: number | null, episode: number, audi
 export function makeEmbed(title: CatalogTitle, selection: EmbedSelection): EmbedMedia {
   if (!Number.isInteger(title.id) || title.id <= 0 || title.id > 2147483647 || !['movie', 'tv'].includes(title.mediaType) || typeof title.title !== 'string' || typeof selection.anime !== 'boolean'
     || !Number.isInteger(selection.season) || selection.season < 0 || selection.season > 10000 || !Number.isInteger(selection.episode) || selection.episode < 1 || selection.episode > 100000) throw new Error('Choose a valid title, season, and episode.');
-  if (!serversFor(selection.anime).some((server) => server.key === selection.server)) throw new Error('This server is only available for anime.');
-  const standard = STD_SERVERS.find((server) => server.key === selection.server);
   const { preferences } = selection;
   if (!preferences || !['sub', 'dub'].includes(preferences.audio) || !RC_SOURCES.includes(preferences.source) || typeof preferences.zokoTemplate !== 'string' || typeof preferences.sandbox !== 'boolean') throw new Error('Choose valid audio, source, and sandbox settings.');
-  let url: string;
-  if (standard) url = title.mediaType === 'movie' ? standard.movie(title.id) : standard.tv(title.id, selection.season, selection.episode);
-  else if (selection.server === 'zokoanime') {
-    if (!Number.isInteger(selection.animeEpisode) || selection.animeEpisode < 1 || selection.animeEpisode > 100000) throw new Error('Choose a valid anime episode number.');
-    const track = preferences.audio === 'dub' ? 'dub' : 'sub';
-    const malId = selection.animeMalId;
-    if (Number.isInteger(malId) && malId && malId > 0) url = `${ZK_BASE}/stream/mal/${malId}/${selection.animeEpisode}/${track}?color=ffffff`;
-    else if (selection.animeId && Number.isInteger(selection.animeId) && selection.animeId > 0) url = `${ZK_BASE}/stream/anilist/${selection.animeId}/${selection.animeEpisode}/${track}?color=ffffff`;
-    else throw new Error('Match the anime edition so Zoko can use its AniList or MAL ID.');
-  } else {
-    if (!selection.animeId || !Number.isInteger(selection.animeId) || selection.animeId <= 0) throw new Error('Match the anime edition or enter its AniList ID. TMDB IDs cannot be used as AniList IDs.');
-    if (!Number.isInteger(selection.animeEpisode) || selection.animeEpisode < 1 || selection.animeEpisode > 100000) throw new Error('Enter the episode number within the selected anime edition.');
-    url = selection.server === 'megaplay'
-      ? `https://megaplay.buzz/stream/ani/${selection.animeId}/${selection.animeEpisode}/${preferences.audio}`
-      : `https://cdn.4animo.xyz/embed/${preferences.source}/ani/${selection.animeId}/${selection.animeEpisode}/${preferences.audio}?k=1`;
-  }
+  const nxsha = STD_SERVERS[0];
+  const url = title.mediaType === 'movie' ? nxsha.movie(title.id) : nxsha.tv(title.id, selection.season, selection.episode);
+  const normalizedSelection: EmbedSelection = { ...selection, server: 'nxsha' };
   const suffix = title.mediaType === 'tv' ? ` / S${selection.season} E${selection.episode}` : '';
-  return { id: `embed-${title.id}-${selection.server}-${Date.now()}`, kind: 'embed', title: `${title.title}${suffix}`.slice(0, 295), url, catalog: title, selection };
+  return { id: `embed-${title.id}-nxsha-${Date.now()}`, kind: 'embed', title: `${title.title}${suffix}`.slice(0, 295), url, catalog: title, selection: normalizedSelection };
 }
 
 export function validateEmbed(media: EmbedMedia): boolean {

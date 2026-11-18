@@ -1,14 +1,47 @@
-import React, { useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronUp, ChevronRight, Monitor, User as UserIcon, Plus, Calendar, Camera, Wifi, Settings, PlayCircle, Smartphone, Download, Send, Maximize, X, Trash2, Film, QrCode, ScanLine, Tv, Sparkles, ArrowRight, ShieldCheck, History, SlidersHorizontal, Globe, Volume2, LayoutDashboard } from 'lucide-react';
+import {
+    ChevronRight,
+    Monitor,
+    User as UserIcon,
+    Plus,
+    Camera,
+    Settings,
+    Smartphone,
+    Download,
+    X,
+    Trash2,
+    Film,
+    QrCode,
+    ShieldCheck,
+    History,
+    SlidersHorizontal,
+    Volume2,
+    LayoutDashboard,
+    LogOut,
+    KeyRound,
+    Mail,
+    Users,
+    Sparkles,
+    CheckCircle2,
+    AlertCircle,
+    Wifi,
+    Tv,
+    ArrowUpRight,
+    Upload,
+    Loader2,
+} from 'lucide-react';
 import { useStore, PERMANENT_ADMINS } from '../context/StoreContext';
 import DeviceManagementModal from './account/DeviceManagementModal';
 import MyContributions from './account/MyContributions';
 import GenrePreferenceModal from './GenrePreferenceModal';
 import GlobalSettingsModal from './account/GlobalSettingsModal';
 import { normalizeGenre } from '../services/recommendationService';
+import { compressImageToDataUrl, formatBytes } from '../utils/imageCompressor';
 
-const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) => {
+type AccountSection = 'overview' | 'security' | 'profiles' | 'preferences' | 'contributions' | 'admin';
+
+const AccountSettings = ({ setActiveTab: _setActiveTab }: { setActiveTab: (tab: string) => void }) => {
     const navigate = useNavigate();
     const {
         currentUser,
@@ -25,21 +58,54 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
         isInstallable,
         isIOS,
         installPwa,
-        submitContentRequest,
-        addPage
     } = useStore();
 
-    const [expandedProfile, setExpandedProfile] = useState<string | null>(null);
+    const [activeSection, setActiveSection] = useState<AccountSection>('overview');
     const [showDeviceModal, setShowDeviceModal] = useState(false);
     const [showGenreModal, setShowGenreModal] = useState(false);
     const [showGlobalSettings, setShowGlobalSettings] = useState(false);
-    const [requestTitle, setRequestTitle] = useState('');
-    const [isRequesting, setIsRequesting] = useState(false);
-    const [showContributions, setShowContributions] = useState(false);
 
-    const isAdmin = currentUser?.role === 'admin' || Boolean(currentUser?.email && PERMANENT_ADMINS.includes(currentUser.email));
+    // Inline feedback toast
+    const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const showNotice = (type: 'success' | 'error', text: string) => {
+        setNotice({ type, text });
+        setTimeout(() => {
+            setNotice((prev) => (prev?.text === text ? null : prev));
+        }, 4000);
+    };
 
-    const userFavoriteGenres = React.useMemo(() => {
+    // Controlled inline modal states (replaces browser prompt/alert dialogs)
+    const [emailModalOpen, setEmailModalOpen] = useState(false);
+    const [emailInput, setEmailInput] = useState('');
+    const [emailSaving, setEmailSaving] = useState(false);
+
+    const [avatarModalOpen, setAvatarModalOpen] = useState(false);
+    const [avatarInput, setAvatarInput] = useState('');
+    const [avatarSaving, setAvatarSaving] = useState(false);
+    const [avatarCompressing, setAvatarCompressing] = useState(false);
+    const [avatarStats, setAvatarStats] = useState<{ original: number; compressed: number } | null>(null);
+    const avatarFileRef = useRef<HTMLInputElement>(null);
+
+    const [resettingPassword, setResettingPassword] = useState(false);
+    const [confirmClearHistory, setConfirmClearHistory] = useState(false);
+
+    // Controlled Profile Add/Edit Modal state
+    const [editingProfile, setEditingProfile] = useState<any | null>(null);
+    const [isAddingProfile, setIsAddingProfile] = useState(false);
+    const [profileNameInput, setProfileNameInput] = useState('');
+    const [profileAvatarInput, setProfileAvatarInput] = useState('/Mydonkey%20user.jpg');
+    const [profileAvatarCompressing, setProfileAvatarCompressing] = useState(false);
+    const [profileAvatarStats, setProfileAvatarStats] = useState<{ original: number; compressed: number } | null>(null);
+    const profileFileRef = useRef<HTMLInputElement>(null);
+    const [profileIsKids, setProfileIsKids] = useState(false);
+    const [profileSaving, setProfileSaving] = useState(false);
+    const [confirmDeleteProfile, setConfirmDeleteProfile] = useState(false);
+
+    const isAdmin =
+        currentUser?.role === 'admin' ||
+        Boolean(currentUser?.email && PERMANENT_ADMINS.includes(currentUser.email));
+
+    const userFavoriteGenres = useMemo(() => {
         if (currentProfile?.favoriteGenres && currentProfile.favoriteGenres.length > 0) {
             return currentProfile.favoriteGenres.map(normalizeGenre);
         }
@@ -52,127 +118,241 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
                 const parsed = JSON.parse(raw);
                 if (Array.isArray(parsed)) return parsed.map(normalizeGenre);
             }
-        } catch (e) { }
+        } catch { }
         return [];
     }, [currentProfile?.favoriteGenres, currentUser?.favoriteGenres]);
 
-    // Profile Management State
-    const [editingProfile, setEditingProfile] = useState<any | null>(null);
-    const [isAddingProfile, setIsAddingProfile] = useState(false);
+    const savedSearchCount = useMemo(() => {
+        if (currentUser?.searchHistory && currentUser.searchHistory.length > 0) {
+            return currentUser.searchHistory.length;
+        }
+        try {
+            const raw = localStorage.getItem('my_donkey_search_history');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) return parsed.length;
+            }
+        } catch { }
+        return 0;
+    }, [currentUser?.searchHistory]);
 
     if (!currentUser) return null;
 
-    const toggleProfile = (id: string) => {
-        setExpandedProfile(expandedProfile === id ? null : id);
-    };
-
-    const handleAddProfile = async () => {
-        const name = prompt("Enter profile name:");
-        if (name) {
-            const isKids = window.confirm("Is this a kid's profile?");
-            await addProfile(name, isKids, "/Mydonkey%20user.jpg");
-        }
-    };
-
-    const handleDeleteProfile = async (id: string) => {
-        if (userProfiles.length <= 1) {
-            alert("You cannot delete your only profile. Your account must keep at least one profile.");
-            return;
-        }
-        if (window.confirm("Delete this profile?")) {
-            try {
-                await deleteProfile(id);
-            } catch (err: any) {
-                alert(`Failed to delete profile: ${err.message || err}`);
-            }
-        }
-    };
-
-    const handleChangeEmail = async () => {
-        const newEmail = prompt("Enter new email address:", currentUser.email);
-        if (newEmail && newEmail !== currentUser.email) {
-            try {
-                await updateUserEmail(newEmail);
-                alert("Email updated successfully. You may need to login again.");
-            } catch (error: any) {
-                alert("Failed to update email: " + error.message);
-            }
-        }
-    };
-
-    const handlePasswordReset = async () => {
-        if (confirm(`Send password reset email to ${currentUser.email}?`)) {
-            try {
-                await triggerPasswordReset();
-                alert("Password reset email sent. Check your inbox.");
-            } catch (error: any) {
-                alert("Failed to send reset email: " + error.message);
-            }
-        }
-    };
-
-    const handleChangeAvatar = async () => {
-        const url = prompt("Enter image URL for avatar:", "/Mydonkey%20user.jpg");
-        if (url) {
-            await updateProfileAvatar(url);
-        }
-    };
-
-    const toggleLowDataMode = async () => {
-        await updateUser({ lowDataMode: !currentUser.lowDataMode });
-    };
-
-    // Safe Date Formatting
     const getMemberSinceDate = () => {
         try {
-            // Prioritize createdAt if available, otherwise fallback to lastLoginAt
             const dateStr = currentUser.createdAt || currentUser.lastLoginAt;
-            if (!dateStr) return new Date().toLocaleDateString();
-
+            if (!dateStr) return 'Recently';
             const d = new Date(dateStr);
             if (isNaN(d.getTime())) return 'Recently';
-            return d.toLocaleDateString();
-        } catch (e) {
+            return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+        } catch {
             return 'Recently';
         }
     };
 
+    const openAddProfileModal = () => {
+        setEditingProfile(null);
+        setProfileNameInput('');
+        setProfileAvatarInput('/Mydonkey%20user.jpg');
+        setProfileAvatarStats(null);
+        setProfileIsKids(false);
+        setConfirmDeleteProfile(false);
+        setIsAddingProfile(true);
+    };
+
+    const openEditProfileModal = (profile: any) => {
+        setIsAddingProfile(false);
+        setEditingProfile(profile);
+        setProfileNameInput(profile.name || '');
+        setProfileAvatarInput(profile.avatarUrl || '/Mydonkey%20user.jpg');
+        setProfileAvatarStats(null);
+        setProfileIsKids(Boolean(profile.isKids));
+        setConfirmDeleteProfile(false);
+    };
+
+    const closeProfileModal = () => {
+        setIsAddingProfile(false);
+        setEditingProfile(null);
+        setConfirmDeleteProfile(false);
+        setProfileAvatarStats(null);
+    };
+
+    const handleAvatarFileUpload = async (file: File | null, target: 'main' | 'profile') => {
+        if (!file) return;
+        const setBusy = target === 'main' ? setAvatarCompressing : setProfileAvatarCompressing;
+        setBusy(true);
+        try {
+            const compressed = await compressImageToDataUrl(file, {
+                maxDimension: 200,
+                maxBytes: 22 * 1024,
+                squareCrop: true,
+            });
+            if (target === 'main') {
+                setAvatarInput(compressed.dataUrl);
+                setAvatarStats({ original: compressed.originalBytes, compressed: compressed.compressedBytes });
+            } else {
+                setProfileAvatarInput(compressed.dataUrl);
+                setProfileAvatarStats({ original: compressed.originalBytes, compressed: compressed.compressedBytes });
+            }
+        } catch (err: any) {
+            showNotice('error', err?.message || 'Could not compress the selected image.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const handleSaveProfile = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const trimmed = profileNameInput.trim();
+        if (!trimmed) return;
+        const finalAvatar = profileAvatarInput.trim() || '/Mydonkey%20user.jpg';
+        setProfileSaving(true);
+        try {
+            if (isAddingProfile) {
+                await addProfile(trimmed, profileIsKids, finalAvatar);
+                showNotice('success', `Profile "${trimmed}" created.`);
+            } else if (editingProfile) {
+                await updateProfile(editingProfile.id, { name: trimmed, isKids: profileIsKids, avatarUrl: finalAvatar });
+                showNotice('success', `Profile "${trimmed}" updated.`);
+            }
+            closeProfileModal();
+        } catch (err: any) {
+            showNotice('error', err?.message || 'Unable to save profile.');
+        } finally {
+            setProfileSaving(false);
+        }
+    };
+
+    const handleConfirmDeleteProfile = async () => {
+        if (!editingProfile) return;
+        if (userProfiles.length <= 1) {
+            showNotice('error', 'Your account must keep at least one profile.');
+            return;
+        }
+        setProfileSaving(true);
+        try {
+            await deleteProfile(editingProfile.id);
+            showNotice('success', `Profile "${editingProfile.name}" deleted.`);
+            closeProfileModal();
+        } catch (err: any) {
+            showNotice('error', err?.message || 'Failed to delete profile.');
+        } finally {
+            setProfileSaving(false);
+        }
+    };
+
+    const handleSaveEmail = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const nextEmail = emailInput.trim();
+        if (!nextEmail || nextEmail === currentUser.email) {
+            setEmailModalOpen(false);
+            return;
+        }
+        setEmailSaving(true);
+        try {
+            await updateUserEmail(nextEmail);
+            setEmailModalOpen(false);
+            showNotice('success', 'Email updated. You may need to sign in again.');
+        } catch (err: any) {
+            showNotice('error', err?.message || 'Failed to update email address.');
+        } finally {
+            setEmailSaving(false);
+        }
+    };
+
+    const handleSaveAvatar = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const url = avatarInput.trim();
+        if (!url) return;
+        setAvatarSaving(true);
+        try {
+            await updateProfileAvatar(url);
+            setAvatarModalOpen(false);
+            showNotice('success', 'Profile photo updated.');
+        } catch (err: any) {
+            showNotice('error', err?.message || 'Could not update profile photo.');
+        } finally {
+            setAvatarSaving(false);
+        }
+    };
+
+    const handlePasswordReset = async () => {
+        setResettingPassword(true);
+        try {
+            await triggerPasswordReset();
+            showNotice('success', `Password reset link sent to ${currentUser.email}.`);
+        } catch (err: any) {
+            showNotice('error', err?.message || 'Failed to send password reset email.');
+        } finally {
+            setResettingPassword(false);
+        }
+    };
+
+    const handleToggleSearchHistory = async () => {
+        const nextVal = currentUser.searchHistoryEnabled === false ? true : false;
+        try {
+            localStorage.setItem('my_donkey_search_history_enabled', String(nextVal));
+        } catch { }
+        await updateUser({ searchHistoryEnabled: nextVal });
+        showNotice('success', nextVal ? 'Search history enabled.' : 'Search history paused.');
+    };
+
+    const handleClearSearchHistory = async () => {
+        try {
+            localStorage.removeItem('my_donkey_search_history');
+        } catch { }
+        await updateUser({ searchHistory: [] });
+        setConfirmClearHistory(false);
+        showNotice('success', 'Search history cleared.');
+    };
+
+    const handleToggleLowData = async () => {
+        const nextVal = !currentUser.lowDataMode;
+        await updateUser({ lowDataMode: nextVal });
+        showNotice('success', nextVal ? 'Data saver enabled.' : 'Data saver disabled.');
+    };
+
+    // Guest View — Mature & Clean
     if (currentUser.isGuest) {
         return (
-            <div className="min-h-screen bg-[#0f0617] text-white font-sans flex items-center justify-center p-4">
-                <div className="max-w-md w-full bg-white/5 border border-white/10 rounded-2xl p-8 text-center shadow-2xl">
-                    <div className="w-20 h-20 bg-gradient-to-br from-gray-700 to-gray-900 rounded-full mx-auto flex items-center justify-center mb-6 shadow-lg shadow-black/50">
-                        <UserIcon size={40} className="text-gray-400" />
+            <div className="min-h-screen bg-[#0a0a0b] text-white font-sans flex items-center justify-center px-4 py-24">
+                <div className="w-full max-w-md bg-[#111114] border border-white/[0.08] rounded-2xl p-7 sm:p-8 shadow-2xl">
+                    <div className="w-12 h-12 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-zinc-300 mb-5">
+                        <UserIcon size={22} />
                     </div>
-                    <h1 className="text-2xl font-bold mb-2">Guest Access</h1>
-                    <p className="text-gray-400 mb-8 text-sm">You are currently browsing as a Guest. Some features are limited to protect our content and community.</p>
+                    <h1 className="text-xl font-semibold tracking-tight text-white">Guest Session</h1>
+                    <p className="text-sm text-zinc-400 mt-1.5 leading-relaxed">
+                        Sign in to sync your watchlist, customize profiles, and keep your viewing history across devices.
+                    </p>
 
-                    <div className="bg-white/5 rounded-xl p-4 mb-8 text-left space-y-3 border border-white/5">
-                        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Restrictions</h3>
-                        <div className="flex items-center gap-3 text-sm text-gray-300">
-                            <Download size={16} className="text-red-400" />
-                            <span>Downloads are disabled</span>
+                    <div className="mt-6 border-t border-white/[0.08] pt-5 space-y-3">
+                        <div className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+                            Unavailable in Guest Mode
                         </div>
-                        <div className="flex items-center gap-3 text-sm text-gray-300">
-                            <Settings size={16} className="text-red-400" />
-                            <span>Watch history is not saved</span>
-                        </div>
-                        <div className="flex items-center gap-3 text-sm text-gray-300">
-                            <UserIcon size={16} className="text-red-400" />
-                            <span>Profile customization is disabled</span>
-                        </div>
+                        {[
+                            { icon: Download, label: 'Offline downloads' },
+                            { icon: History, label: 'Cross-device watch history' },
+                            { icon: Users, label: 'Multiple profiles & personalization' },
+                        ].map(({ icon: Icon, label }) => (
+                            <div key={label} className="flex items-center gap-3 text-sm text-zinc-300">
+                                <Icon size={15} className="text-zinc-500 shrink-0" />
+                                <span>{label}</span>
+                            </div>
+                        ))}
                     </div>
 
-                    <div className="space-y-3">
+                    <div className="mt-7 space-y-2.5">
                         <button
+                            type="button"
                             onClick={logout}
-                            className="w-full py-3 bg-brand-red hover:bg-red-700 text-white font-bold rounded-xl transition shadow-lg shadow-brand-red/20"
+                            className="w-full py-2.5 px-4 bg-white hover:bg-zinc-200 text-black text-sm font-semibold rounded-lg transition cursor-pointer"
                         >
-                            Create Account / Sign In
+                            Sign In or Create Account
                         </button>
                         <button
+                            type="button"
                             onClick={logout}
-                            className="w-full py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl transition"
+                            className="w-full py-2.5 px-4 bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-zinc-300 hover:text-white text-sm font-medium rounded-lg transition cursor-pointer"
                         >
                             Exit Guest Session
                         </button>
@@ -182,619 +362,1039 @@ const AccountSettings = ({ setActiveTab }: { setActiveTab: (tab: string) => void
         );
     }
 
+    const navItems: Array<{ id: AccountSection; label: string; icon: React.ComponentType<{ size?: number; className?: string }> }> = [
+        { id: 'overview', label: 'Overview', icon: UserIcon },
+        { id: 'security', label: 'Security & Devices', icon: ShieldCheck },
+        { id: 'profiles', label: 'Profiles', icon: Users },
+        { id: 'preferences', label: 'Preferences', icon: Settings },
+        { id: 'contributions', label: 'My Content', icon: Film },
+        ...(isAdmin ? [{ id: 'admin' as const, label: 'Administration', icon: LayoutDashboard }] : []),
+    ];
+
+    const displayName = currentProfile?.name || userProfiles[0]?.name || 'Member';
+    const avatarSrc = currentProfile?.avatarUrl || userProfiles[0]?.avatarUrl || '/Mydonkey%20user.jpg';
+
     return (
-        <div className="min-h-screen bg-[#0f0617] text-white font-sans">
-
-            {/* Hotstar-style Account Layout */}
-            <div className="max-w-4xl mx-auto px-4 pt-24 md:pt-28 pb-32">
-
-                {/* Profile Header - Hotstar Style */}
-                <div className="flex items-center gap-4 mb-8">
-                    <div className="relative group">
-                        <img
-                            src={currentProfile?.avatarUrl || userProfiles[0]?.avatarUrl || '/Mydonkey%20user.jpg'}
-                            className="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover ring-2 ring-cyan-500/50 shadow-lg shadow-cyan-500/20"
-                        />
-                        <button
-                            onClick={handleChangeAvatar}
-                            className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition"
-                        >
-                            <Camera size={20} className="text-white" />
-                        </button>
-                    </div>
+        <div className="min-h-screen bg-[#0a0a0b] text-zinc-100 font-sans">
+            <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 md:pt-28 pb-28">
+                {/* Page Header */}
+                <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-6 border-b border-white/[0.08]">
                     <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-xl md:text-2xl font-bold text-white">{currentProfile?.name || userProfiles[0]?.name || 'User'}</h1>
-                            {isAdmin && (
-                                <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-brand-red text-white shadow-sm tracking-wide">
-                                    ADMIN
-                                </span>
-                            )}
-                        </div>
-                        <p className="text-sm text-gray-400 truncate max-w-[200px]">{currentUser.email}</p>
+                        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white">
+                            Account
+                        </h1>
+                        <p className="text-sm text-zinc-400 mt-1">
+                            Manage your profile, connected devices, and playback preferences.
+                        </p>
                     </div>
-                    <div className="ml-auto flex items-center gap-2.5">
+
+                    <div className="flex items-center gap-2.5 self-start sm:self-auto">
+                        <button
+                            type="button"
+                            onClick={() => navigate('/scan')}
+                            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-white/[0.06] hover:bg-white/[0.11] border border-white/[0.09] text-zinc-200 hover:text-white text-xs font-medium transition cursor-pointer"
+                        >
+                            <QrCode size={15} className="text-zinc-400" />
+                            <span>Link TV / Device</span>
+                        </button>
                         {isAdmin && (
                             <button
+                                type="button"
                                 onClick={() => navigate('/admin')}
-                                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-brand-red/15 border border-brand-red/40 text-brand-red hover:bg-brand-red/25 transition-all font-bold text-xs shadow-lg shadow-brand-red/10 active:scale-95 cursor-pointer"
-                                title="Open Admin Dashboard"
+                                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-brand-red hover:bg-red-700 text-white text-xs font-semibold transition cursor-pointer"
                             >
-                                <LayoutDashboard size={16} />
-                                <span className="hidden sm:inline">Admin Dashboard</span>
-                                <span className="sm:hidden">Admin</span>
+                                <LayoutDashboard size={15} />
+                                <span>Admin Console</span>
                             </button>
                         )}
+                    </div>
+                </div>
+
+                {/* Inline Toast Notice */}
+                {notice && (
+                    <div
+                        role="status"
+                        className={`mt-5 px-4 py-3 rounded-xl border text-xs sm:text-sm font-medium flex items-center justify-between gap-3 ${notice.type === 'success'
+                            ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-300'
+                            : 'bg-red-500/10 border-red-500/25 text-red-300'
+                            }`}
+                    >
+                        <div className="flex items-center gap-2.5">
+                            {notice.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+                            <span>{notice.text}</span>
+                        </div>
                         <button
-                            onClick={() => navigate('/scan')}
-                            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 transition-all font-bold text-xs shadow-lg shadow-cyan-500/10 active:scale-95"
+                            type="button"
+                            onClick={() => setNotice(null)}
+                            className="text-current opacity-70 hover:opacity-100 cursor-pointer"
+                            aria-label="Dismiss message"
                         >
-                            <QrCode size={16} />
-                            <span>Scan</span>
+                            <X size={15} />
                         </button>
                     </div>
-                </div>
+                )}
 
-                {/* 100% Free Lifetime Access Banner */}
-                <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 rounded-2xl p-5 md:p-6 mb-6 relative overflow-hidden shadow-xl shadow-teal-950/40 border border-emerald-400/20">
-                    <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxjaXJjbGUgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuMDUiIGN4PSIyMCIgY3k9IjIwIiByPSIyIi8+PC9nPjwvc3ZnPg==')] opacity-30" />
-                    <div className="relative z-10 flex flex-wrap items-center justify-between gap-4">
-                        <div>
-                            <div className="flex items-center gap-2 mb-1">
-                                <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-emerald-200 bg-black/30 px-2.5 py-0.5 rounded-full border border-emerald-300/30">
-                                    <Sparkles size={12} className="text-emerald-300" />
-                                    100% Free Platform
-                                </span>
-                                <span className="px-2 py-0.5 bg-white/20 rounded text-[10px] font-bold text-white">Full HD & 4K</span>
-                            </div>
-                            <div className="text-2xl md:text-3xl font-black text-white">Free Forever Membership</div>
-                            <p className="text-xs text-emerald-100/90 mt-1 max-w-md">Unlimited movies, series & anime at zero cost. No credit card or subscription needed.</p>
-                        </div>
-                        <div className="flex items-center gap-2 px-4 py-2 bg-white/15 backdrop-blur-md rounded-full border border-white/20 text-white text-xs font-bold shadow-md">
-                            <ShieldCheck size={16} className="text-emerald-300" />
-                            <span>Lifetime Free Access</span>
-                        </div>
-                    </div>
-                </div>
+                {/* Mobile Horizontal Navigation */}
+                <nav
+                    aria-label="Account sections"
+                    className="lg:hidden flex items-center gap-1.5 overflow-x-auto no-scrollbar py-4 border-b border-white/[0.08]"
+                >
+                    {navItems.map(({ id, label, icon: Icon }) => {
+                        const isActive = activeSection === id;
+                        return (
+                            <button
+                                key={id}
+                                type="button"
+                                onClick={() => setActiveSection(id)}
+                                className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition cursor-pointer shrink-0 ${isActive
+                                    ? 'bg-white text-black font-semibold'
+                                    : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
+                                    }`}
+                            >
+                                <Icon size={14} />
+                                <span>{label}</span>
+                            </button>
+                        );
+                    })}
+                </nav>
 
-                {/* Settings Sections - Hotstar Style Clean List */}
-                <div className="space-y-3">
+                {/* Two-Column Mature Dashboard Layout */}
+                <div className="mt-6 lg:mt-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                    {/* Desktop Left Sidebar */}
+                    <aside className="hidden lg:flex lg:col-span-3 flex-col gap-1 sticky top-24">
+                        {navItems.map(({ id, label, icon: Icon }) => {
+                            const isActive = activeSection === id;
+                            return (
+                                <button
+                                    key={id}
+                                    type="button"
+                                    onClick={() => setActiveSection(id)}
+                                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm transition cursor-pointer text-left ${isActive
+                                        ? 'bg-white/[0.09] text-white font-medium'
+                                        : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.04]'
+                                        }`}
+                                >
+                                    <Icon size={16} className={isActive ? 'text-white' : 'text-zinc-500'} />
+                                    <span>{label}</span>
+                                </button>
+                            );
+                        })}
 
-                    {/* Account Section */}
-                    <div className="bg-white/5 rounded-xl overflow-hidden">
-                        <div className="px-5 py-3 border-b border-white/5">
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Account</span>
-                        </div>
+                        <div className="my-3 border-t border-white/[0.08]" />
 
-                        <button onClick={handleChangeEmail} className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition border-b border-white/5">
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
-                                    <UserIcon size={18} />
-                                </div>
-                                <div className="text-left">
-                                    <div className="font-medium">Email</div>
-                                    <div className="text-xs text-gray-500 truncate max-w-[180px]">{currentUser.email}</div>
-                                </div>
-                            </div>
-                            <ChevronDown size={18} className="text-gray-500 -rotate-90" />
+                        <button
+                            type="button"
+                            onClick={logout}
+                            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm text-zinc-400 hover:text-red-400 hover:bg-red-500/[0.08] transition cursor-pointer text-left"
+                        >
+                            <LogOut size={16} />
+                            <span>Sign Out</span>
                         </button>
 
-                        <button onClick={handlePasswordReset} className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition border-b border-white/5">
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
-                                    <Settings size={18} />
-                                </div>
-                                <div className="text-left">
-                                    <div className="font-medium">Password</div>
-                                    <div className="text-xs text-gray-500">Reset your password</div>
-                                </div>
-                            </div>
-                            <ChevronDown size={18} className="text-gray-500 -rotate-90" />
-                        </button>
-
-                        <button onClick={() => setShowDeviceModal(true)} className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition">
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center">
-                                    <Monitor size={18} />
-                                </div>
-                                <div className="text-left">
-                                    <div className="font-medium">Manage Devices</div>
-                                    <div className="text-xs text-gray-500">Control active logins</div>
-                                </div>
-                            </div>
-                            <ChevronDown size={18} className="text-gray-500 -rotate-90" />
-                        </button>
-                    </div>
-
-                    {/* Scan & Connect / TV Login Section (Mobile First) */}
-                    <div className="bg-gradient-to-br from-[#121927] via-[#0d121f] to-[#150f26] rounded-2xl overflow-hidden border border-cyan-500/30 shadow-xl shadow-cyan-950/30 relative">
-                        {/* Glowing ambient background element */}
-                        <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-cyan-500/10 via-blue-500/5 to-transparent rounded-full blur-2xl pointer-events-none" />
-
-                        {/* Section Header */}
-                        <div className="px-5 py-3.5 border-b border-white/10 flex items-center justify-between relative z-10">
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-6 h-6 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center">
-                                    <QrCode size={14} className="text-cyan-400" />
-                                </div>
-                                <span className="text-xs font-black text-cyan-300 uppercase tracking-wider">Scan & Connect</span>
-                            </div>
-                            <span className="bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-[10px] font-black px-2.5 py-0.5 rounded-full flex items-center gap-1.5 shadow-sm">
-                                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                                TV & WEB LOGIN
-                            </span>
+                        <div className="px-3.5 pt-4 text-[11px] text-zinc-600">
+                            Member since {getMemberSinceDate()}
                         </div>
+                    </aside>
 
-                        {/* Main Interactive Scan Card */}
-                        <div className="p-5 relative z-10">
-                            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
-                                <div className="flex items-start gap-4">
-                                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/25 flex-shrink-0 border border-white/15">
-                                        <ScanLine size={28} className="text-white" />
+                    {/* Right Content Pane */}
+                    <main className="lg:col-span-9 space-y-6 min-w-0">
+                        {/* SECTION: OVERVIEW */}
+                        {activeSection === 'overview' && (
+                            <>
+                                {/* Identity Card */}
+                                <section className="bg-[#111114] border border-white/[0.08] rounded-2xl p-5 sm:p-6">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+                                        <div className="flex items-center gap-4 min-w-0">
+                                            <div className="relative group shrink-0">
+                                                <img
+                                                    src={avatarSrc}
+                                                    alt={displayName}
+                                                    className="w-16 h-16 rounded-full object-cover border border-white/15 bg-zinc-900"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setAvatarInput(avatarSrc);
+                                                        setAvatarStats(null);
+                                                        setAvatarModalOpen(true);
+                                                    }}
+                                                    className="absolute inset-0 flex items-center justify-center bg-black/65 rounded-full opacity-0 group-hover:opacity-100 transition cursor-pointer"
+                                                    title="Change profile photo"
+                                                    aria-label="Change profile photo"
+                                                >
+                                                    <Camera size={16} className="text-white" />
+                                                </button>
+                                            </div>
+
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h2 className="text-lg font-semibold text-white truncate">
+                                                        {displayName}
+                                                    </h2>
+                                                    {isAdmin && (
+                                                        <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-white/10 text-zinc-200 border border-white/10">
+                                                            Admin
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-sm text-zinc-400 truncate mt-0.5">{currentUser.email}</p>
+                                                <p className="text-xs text-zinc-500 mt-1">
+                                                    Member since {getMemberSinceDate()} · {userProfiles.length} {userProfiles.length === 1 ? 'profile' : 'profiles'}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setAvatarInput(avatarSrc);
+                                                setAvatarStats(null);
+                                                setAvatarModalOpen(true);
+                                            }}
+                                            className="px-3.5 py-2 rounded-lg bg-white/[0.06] hover:bg-white/[0.11] border border-white/[0.09] text-xs font-medium text-zinc-200 hover:text-white transition cursor-pointer self-start sm:self-center shrink-0"
+                                        >
+                                            Edit Photo
+                                        </button>
                                     </div>
-                                    <div>
-                                        <h3 className="font-bold text-base md:text-lg text-white flex items-center gap-2">
-                                            Scan QR Code to Login
+                                </section>
+
+                                {/* Membership Details Card (Calm, Netflix/Apple-style) */}
+                                <section className="bg-[#111114] border border-white/[0.08] rounded-2xl overflow-hidden">
+                                    <div className="px-5 sm:px-6 py-4 border-b border-white/[0.07] flex items-center justify-between">
+                                        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                                            Membership
                                         </h3>
-                                        <p className="text-xs text-gray-300 mt-1 max-w-lg leading-relaxed">
-                                            Easily sign in to <strong className="text-cyan-300 font-semibold">Smart TV, Android TV, Fire TV</strong>, or Web browser by scanning the QR code with your mobile camera. No password needed!
-                                        </p>
-                                        <div className="flex flex-wrap gap-2 mt-3.5">
-                                            <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg bg-white/5 text-gray-300 border border-white/10">
-                                                <Tv size={12} className="text-cyan-400" /> Smart TV
-                                            </span>
-                                            <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg bg-white/5 text-gray-300 border border-white/10">
-                                                <Monitor size={12} className="text-blue-400" /> Web Browser
-                                            </span>
-                                            <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg bg-white/5 text-gray-300 border border-white/10">
-                                                <Sparkles size={12} className="text-purple-400" /> Instant Sign-in
-                                            </span>
+                                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                            Active
+                                        </span>
+                                    </div>
+                                    <div className="p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                        <div>
+                                            <div className="text-base font-semibold text-white">
+                                                Standard Free Plan
+                                            </div>
+                                            <p className="text-sm text-zinc-400 mt-1">
+                                                Unlimited HD & 4K movies, series, and anime with zero subscription fees.
+                                            </p>
+                                        </div>
+                                        <div className="text-left sm:text-right shrink-0">
+                                            <div className="text-sm font-semibold text-white">Free Forever</div>
+                                            <div className="text-xs text-zinc-500 mt-0.5">No card required</div>
                                         </div>
                                     </div>
-                                </div>
+                                </section>
 
-                                <button
-                                    onClick={() => navigate('/scan')}
-                                    className="w-full md:w-auto px-6 py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 active:scale-95 text-white rounded-xl font-bold text-sm shadow-xl shadow-cyan-500/25 transition-all flex items-center justify-center gap-2.5 flex-shrink-0 cursor-pointer"
-                                >
-                                    <QrCode size={18} />
-                                    <span>Open Camera Scanner</span>
-                                    <ArrowRight size={16} />
-                                </button>
-                            </div>
+                                {/* Quick Actions Grid */}
+                                <section className="bg-[#111114] border border-white/[0.08] rounded-2xl overflow-hidden">
+                                    <div className="px-5 sm:px-6 py-4 border-b border-white/[0.07]">
+                                        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                                            Quick Links
+                                        </h3>
+                                    </div>
 
-                            {/* Secondary Quick Action: Enter 6-digit Code */}
-                            <div className="mt-4 pt-3.5 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-gray-400">
-                                <span className="flex items-center gap-1.5">
-                                    <Smartphone size={14} className="text-gray-400" />
-                                    Camera unavailable or low light?
-                                </span>
-                                <button
-                                    onClick={() => navigate('/scan?mode=manual')}
-                                    className="text-cyan-400 hover:text-cyan-300 font-bold hover:underline flex items-center gap-1 transition-colors w-fit"
-                                >
-                                    Enter 6-digit code manually <ArrowRight size={12} />
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                                    <div className="divide-y divide-white/[0.07]">
+                                        <button
+                                            type="button"
+                                            onClick={() => setActiveSection('security')}
+                                            className="w-full flex items-center justify-between px-5 sm:px-6 py-4 hover:bg-white/[0.03] transition text-left cursor-pointer group"
+                                        >
+                                            <div className="flex items-center gap-3.5">
+                                                <ShieldCheck size={18} className="text-zinc-400 group-hover:text-white transition" />
+                                                <div>
+                                                    <div className="text-sm font-medium text-white">Security & Connected Devices</div>
+                                                    <div className="text-xs text-zinc-500">Email, password, active sessions, and TV sign-in</div>
+                                                </div>
+                                            </div>
+                                            <ChevronRight size={16} className="text-zinc-600 group-hover:text-zinc-300 transition" />
+                                        </button>
 
-                    {/* Preferences Section */}
-                    <div className="bg-white/5 rounded-xl overflow-hidden">
-                        <div className="px-5 py-3 border-b border-white/5">
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Preferences</span>
-                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setActiveSection('profiles')}
+                                            className="w-full flex items-center justify-between px-5 sm:px-6 py-4 hover:bg-white/[0.03] transition text-left cursor-pointer group"
+                                        >
+                                            <div className="flex items-center gap-3.5">
+                                                <Users size={18} className="text-zinc-400 group-hover:text-white transition" />
+                                                <div>
+                                                    <div className="text-sm font-medium text-white">Manage Profiles</div>
+                                                    <div className="text-xs text-zinc-500">{userProfiles.length} active {userProfiles.length === 1 ? 'profile' : 'profiles'} on this account</div>
+                                                </div>
+                                            </div>
+                                            <ChevronRight size={16} className="text-zinc-600 group-hover:text-zinc-300 transition" />
+                                        </button>
 
-                        <button
-                            onClick={() => setShowGenreModal(true)}
-                            className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition border-b border-white/5 group text-left cursor-pointer"
-                        >
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-600 to-amber-600 flex items-center justify-center text-white shadow-md shadow-red-600/20 group-hover:scale-105 transition-transform">
-                                    <Sparkles size={18} />
-                                </div>
-                                <div className="text-left">
-                                    <div className="font-medium flex items-center gap-2 text-white">
-                                        Favourite Genres & Taste
-                                        {userFavoriteGenres.length > 0 && (
-                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30">
-                                                {userFavoriteGenres.length} Selected
-                                            </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowGenreModal(true)}
+                                            className="w-full flex items-center justify-between px-5 sm:px-6 py-4 hover:bg-white/[0.03] transition text-left cursor-pointer group"
+                                        >
+                                            <div className="flex items-center gap-3.5">
+                                                <Sparkles size={18} className="text-zinc-400 group-hover:text-white transition" />
+                                                <div>
+                                                    <div className="text-sm font-medium text-white">Taste & Genres</div>
+                                                    <div className="text-xs text-zinc-500">
+                                                        {userFavoriteGenres.length > 0
+                                                            ? userFavoriteGenres.slice(0, 4).join(', ') + (userFavoriteGenres.length > 4 ? ` +${userFavoriteGenres.length - 4}` : '')
+                                                            : 'Personalize your recommendations'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <ChevronRight size={16} className="text-zinc-600 group-hover:text-zinc-300 transition" />
+                                        </button>
+
+                                        {isInstallable && (
+                                            <button
+                                                type="button"
+                                                onClick={installPwa}
+                                                className="w-full flex items-center justify-between px-5 sm:px-6 py-4 hover:bg-white/[0.03] transition text-left cursor-pointer group"
+                                            >
+                                                <div className="flex items-center gap-3.5">
+                                                    <Smartphone size={18} className="text-zinc-400 group-hover:text-white transition" />
+                                                    <div>
+                                                        <div className="text-sm font-medium text-white">
+                                                            {isIOS ? 'Add App to Home Screen' : 'Install My Donkey App'}
+                                                        </div>
+                                                        <div className="text-xs text-zinc-500">
+                                                            {isIOS ? 'Install via Safari Share menu' : 'Faster launch and fullscreen experience'}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <Download size={16} className="text-zinc-500 group-hover:text-white transition" />
+                                            </button>
                                         )}
                                     </div>
-                                    <div className="text-xs text-gray-400">
-                                        {userFavoriteGenres.length > 0
-                                            ? userFavoriteGenres.slice(0, 4).join(', ') + (userFavoriteGenres.length > 4 ? '...' : '')
-                                            : 'Choose genres to personalize recommendations'}
+                                </section>
+                            </>
+                        )}
+
+                        {/* SECTION: SECURITY & DEVICES */}
+                        {activeSection === 'security' && (
+                            <>
+                                <section className="bg-[#111114] border border-white/[0.08] rounded-2xl overflow-hidden">
+                                    <div className="px-5 sm:px-6 py-4 border-b border-white/[0.07]">
+                                        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                                            Login & Credentials
+                                        </h3>
                                     </div>
-                                </div>
-                            </div>
-                            <ChevronRight size={18} className="text-gray-500 group-hover:text-white group-hover:translate-x-1 transition-transform" />
-                        </button>
 
-
-
-
-
-                        {/* Search History Toggle & Clear */}
-                        <div className="border-t border-white/5">
-                            <div className="flex items-center justify-between px-5 py-4 hover:bg-white/5 transition">
-                                <div className="flex items-center gap-4 flex-1 pr-4">
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-md shadow-amber-500/20">
-                                        <History size={18} />
-                                    </div>
-                                    <div className="text-left flex-1 min-w-0">
-                                        <div className="font-medium flex items-center gap-2 text-white">
-                                            Search History
-                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${currentUser.searchHistoryEnabled !== false
-                                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                                                : 'bg-red-500/20 text-red-300 border border-red-500/30'
-                                                }`}>
-                                                {currentUser.searchHistoryEnabled !== false ? 'ENABLED' : 'PAUSED'}
-                                            </span>
+                                    <div className="divide-y divide-white/[0.07]">
+                                        <div className="px-5 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <Mail size={18} className="text-zinc-400 shrink-0" />
+                                                <div className="min-w-0">
+                                                    <div className="text-sm font-medium text-white">Email Address</div>
+                                                    <div className="text-xs text-zinc-400 truncate mt-0.5">{currentUser.email}</div>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setEmailInput(currentUser.email || '');
+                                                    setEmailModalOpen(true);
+                                                }}
+                                                className="px-3.5 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.11] border border-white/[0.09] text-xs font-medium text-zinc-200 hover:text-white transition cursor-pointer self-start sm:self-center shrink-0"
+                                            >
+                                                Change Email
+                                            </button>
                                         </div>
-                                        <div className="text-xs text-gray-500">
-                                            {currentUser.searchHistoryEnabled !== false
-                                                ? 'Showing and saving recent searches in Search page'
-                                                : 'Search history paused (searches won’t be saved or shown)'}
+
+                                        <div className="px-5 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                            <div className="flex items-center gap-3.5">
+                                                <KeyRound size={18} className="text-zinc-400 shrink-0" />
+                                                <div>
+                                                    <div className="text-sm font-medium text-white">Password</div>
+                                                    <div className="text-xs text-zinc-400 mt-0.5">Send a secure password reset email</div>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                disabled={resettingPassword}
+                                                onClick={handlePasswordReset}
+                                                className="px-3.5 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.11] border border-white/[0.09] text-xs font-medium text-zinc-200 hover:text-white transition cursor-pointer disabled:opacity-50 self-start sm:self-center shrink-0"
+                                            >
+                                                {resettingPassword ? 'Sending...' : 'Reset Password'}
+                                            </button>
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowDeviceModal(true)}
+                                            className="w-full px-5 sm:px-6 py-4 hover:bg-white/[0.03] transition flex items-center justify-between text-left cursor-pointer group"
+                                        >
+                                            <div className="flex items-center gap-3.5">
+                                                <Monitor size={18} className="text-zinc-400 group-hover:text-white transition shrink-0" />
+                                                <div>
+                                                    <div className="text-sm font-medium text-white">Active Devices</div>
+                                                    <div className="text-xs text-zinc-400 mt-0.5">Review and revoke signed-in sessions</div>
+                                                </div>
+                                            </div>
+                                            <ChevronRight size={16} className="text-zinc-600 group-hover:text-zinc-300 transition" />
+                                        </button>
+                                    </div>
+                                </section>
+
+                                {/* TV & Web QR Sign-in */}
+                                <section className="bg-[#111114] border border-white/[0.08] rounded-2xl overflow-hidden">
+                                    <div className="px-5 sm:px-6 py-4 border-b border-white/[0.07]">
+                                        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                                            TV & Quick Sign-In
+                                        </h3>
+                                    </div>
+
+                                    <div className="p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+                                        <div className="flex items-start gap-3.5">
+                                            <div className="w-10 h-10 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-zinc-200 shrink-0">
+                                                <Tv size={18} />
+                                            </div>
+                                            <div>
+                                                <div className="text-sm font-semibold text-white">Sign in to Smart TV or Browser</div>
+                                                <p className="text-xs text-zinc-400 mt-1 max-w-md leading-relaxed">
+                                                    Approve a login on Android TV, Fire TV, or another browser by scanning the QR code or entering the 6-digit pairing code.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <button
+                                                type="button"
+                                                onClick={() => navigate('/scan?mode=manual')}
+                                                className="px-3.5 py-2 rounded-lg bg-white/[0.06] hover:bg-white/[0.11] border border-white/[0.09] text-xs font-medium text-zinc-200 hover:text-white transition cursor-pointer"
+                                            >
+                                                Enter Code
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => navigate('/scan')}
+                                                className="px-4 py-2 rounded-lg bg-white hover:bg-zinc-200 text-black text-xs font-semibold inline-flex items-center gap-1.5 transition cursor-pointer"
+                                            >
+                                                <QrCode size={14} />
+                                                <span>Scan QR</span>
+                                            </button>
                                         </div>
                                     </div>
-                                </div>
-                                <div className="flex items-center gap-3">
+                                </section>
+                            </>
+                        )}
+
+                        {/* SECTION: PROFILES */}
+                        {activeSection === 'profiles' && (
+                            <section className="bg-[#111114] border border-white/[0.08] rounded-2xl overflow-hidden">
+                                <div className="px-5 sm:px-6 py-4 border-b border-white/[0.07] flex items-center justify-between">
+                                    <div>
+                                        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                                            Household Profiles
+                                        </h3>
+                                    </div>
                                     <button
                                         type="button"
-                                        onClick={async (e) => {
-                                            e.stopPropagation();
-                                            const nextVal = currentUser.searchHistoryEnabled === false ? true : false;
-                                            localStorage.setItem('my_donkey_search_history_enabled', String(nextVal));
-                                            await updateUser({ searchHistoryEnabled: nextVal });
-                                        }}
-                                        className={`w-12 h-7 rounded-full relative transition-colors cursor-pointer ${currentUser.searchHistoryEnabled !== false ? 'bg-cyan-500' : 'bg-gray-700'
-                                            }`}
-                                        aria-label="Toggle Search History"
+                                        onClick={openAddProfileModal}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-zinc-200 text-black text-xs font-semibold transition cursor-pointer"
                                     >
-                                        <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-all ${currentUser.searchHistoryEnabled !== false ? 'left-6' : 'left-1'
-                                            }`} />
+                                        <Plus size={14} />
+                                        <span>Add Profile</span>
                                     </button>
                                 </div>
-                            </div>
 
-                            {/* Clear History Action Button */}
-                            {((currentUser.searchHistory && currentUser.searchHistory.length > 0) || Boolean(localStorage.getItem('my_donkey_search_history'))) && (
-                                <div className="px-5 pb-3 pt-1 flex items-center justify-between border-t border-white/5 bg-black/20 text-xs">
-                                    <span className="text-gray-400">
-                                        {currentUser.searchHistory?.length || JSON.parse(localStorage.getItem('my_donkey_search_history') || '[]').length || 0} saved search{(currentUser.searchHistory?.length || 0) === 1 ? '' : 'es'}
-                                    </span>
+                                <div className="divide-y divide-white/[0.07]">
+                                    {userProfiles.map((profile) => {
+                                        const isCurrent = currentProfile?.id === profile.id;
+                                        return (
+                                            <div
+                                                key={profile.id}
+                                                className="px-5 sm:px-6 py-4 flex items-center justify-between gap-4 hover:bg-white/[0.02] transition"
+                                            >
+                                                <div className="flex items-center gap-3.5 min-w-0">
+                                                    <img
+                                                        src={profile.avatarUrl || '/Mydonkey%20user.jpg'}
+                                                        alt={profile.name}
+                                                        className="w-11 h-11 rounded-lg object-cover border border-white/10 bg-zinc-900 shrink-0"
+                                                    />
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-sm font-medium text-white truncate">
+                                                                {profile.name}
+                                                            </span>
+                                                            {isCurrent && (
+                                                                <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-white/10 text-zinc-300">
+                                                                    Current
+                                                                </span>
+                                                            )}
+                                                            {profile.isKids && (
+                                                                <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/25">
+                                                                    Kids
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-xs text-zinc-500 mt-0.5">
+                                                            {profile.isKids ? 'Kid-friendly catalog & maturity limits' : 'All maturity ratings'}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openEditProfileModal(profile)}
+                                                    className="px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.11] border border-white/[0.09] text-xs font-medium text-zinc-200 hover:text-white transition cursor-pointer shrink-0"
+                                                >
+                                                    Edit
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </section>
+                        )}
+
+                        {/* SECTION: PREFERENCES */}
+                        {activeSection === 'preferences' && (
+                            <section className="bg-[#111114] border border-white/[0.08] rounded-2xl overflow-hidden">
+                                <div className="px-5 sm:px-6 py-4 border-b border-white/[0.07]">
+                                    <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                                        Playback & Privacy
+                                    </h3>
+                                </div>
+
+                                <div className="divide-y divide-white/[0.07]">
+                                    {/* Genres */}
                                     <button
                                         type="button"
-                                        onClick={async () => {
-                                            if (window.confirm("Clear all your search history?")) {
-                                                localStorage.removeItem('my_donkey_search_history');
-                                                await updateUser({ searchHistory: [] });
-                                            }
-                                        }}
-                                        className="text-red-400 hover:text-red-300 font-bold hover:underline flex items-center gap-1.5 transition-colors py-1 px-2 rounded hover:bg-red-500/10 cursor-pointer"
+                                        onClick={() => setShowGenreModal(true)}
+                                        className="w-full px-5 sm:px-6 py-4 hover:bg-white/[0.03] transition flex items-center justify-between gap-4 text-left cursor-pointer group"
                                     >
-                                        <Trash2 size={13} />
-                                        <span>Clear Search History</span>
+                                        <div className="flex items-center gap-3.5 min-w-0">
+                                            <Sparkles size={18} className="text-zinc-400 group-hover:text-white transition shrink-0" />
+                                            <div className="min-w-0">
+                                                <div className="text-sm font-medium text-white">Favourite Genres</div>
+                                                <div className="text-xs text-zinc-400 truncate mt-0.5">
+                                                    {userFavoriteGenres.length > 0
+                                                        ? userFavoriteGenres.join(', ')
+                                                        : 'Choose genres to tailor recommendations'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <ChevronRight size={16} className="text-zinc-600 group-hover:text-zinc-300 shrink-0 transition" />
+                                    </button>
+
+                                    {/* Data Saver */}
+                                    <div className="px-5 sm:px-6 py-4 flex items-center justify-between gap-4">
+                                        <div className="flex items-center gap-3.5 min-w-0">
+                                            <Wifi size={18} className="text-zinc-400 shrink-0" />
+                                            <div>
+                                                <div className="text-sm font-medium text-white">Data Saver</div>
+                                                <div className="text-xs text-zinc-400 mt-0.5">
+                                                    Disable automatic playback on mobile networks to reduce data usage
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            role="switch"
+                                            aria-checked={Boolean(currentUser.lowDataMode)}
+                                            onClick={handleToggleLowData}
+                                            className={`w-11 h-6 rounded-full relative transition-colors cursor-pointer shrink-0 ${currentUser.lowDataMode ? 'bg-brand-red' : 'bg-zinc-700'
+                                                }`}
+                                        >
+                                            <span
+                                                className={`block w-4 h-4 bg-white rounded-full shadow transition-transform ${currentUser.lowDataMode ? 'translate-x-6' : 'translate-x-1'
+                                                    }`}
+                                            />
+                                        </button>
+                                    </div>
+
+                                    {/* Search History */}
+                                    <div className="px-5 sm:px-6 py-4 space-y-3">
+                                        <div className="flex items-center justify-between gap-4">
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <History size={18} className="text-zinc-400 shrink-0" />
+                                                <div>
+                                                    <div className="text-sm font-medium text-white">Search History</div>
+                                                    <div className="text-xs text-zinc-400 mt-0.5">
+                                                        {currentUser.searchHistoryEnabled !== false
+                                                            ? 'Save recent searches for faster lookup'
+                                                            : 'Paused — searches are not being saved'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                role="switch"
+                                                aria-checked={currentUser.searchHistoryEnabled !== false}
+                                                onClick={handleToggleSearchHistory}
+                                                className={`w-11 h-6 rounded-full relative transition-colors cursor-pointer shrink-0 ${currentUser.searchHistoryEnabled !== false ? 'bg-brand-red' : 'bg-zinc-700'
+                                                    }`}
+                                            >
+                                                <span
+                                                    className={`block w-4 h-4 bg-white rounded-full shadow transition-transform ${currentUser.searchHistoryEnabled !== false ? 'translate-x-6' : 'translate-x-1'
+                                                        }`}
+                                                />
+                                            </button>
+                                        </div>
+
+                                        {savedSearchCount > 0 && (
+                                            <div className="pl-8 flex items-center justify-between gap-3 pt-2 border-t border-white/[0.06] text-xs">
+                                                <span className="text-zinc-500">
+                                                    {savedSearchCount} saved {savedSearchCount === 1 ? 'search' : 'searches'}
+                                                </span>
+                                                {confirmClearHistory ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setConfirmClearHistory(false)}
+                                                            className="px-2.5 py-1 rounded-md text-zinc-400 hover:text-white transition cursor-pointer"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleClearSearchHistory}
+                                                            className="px-2.5 py-1 rounded-md bg-red-600 hover:bg-red-700 text-white font-medium transition cursor-pointer"
+                                                        >
+                                                            Confirm Clear
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setConfirmClearHistory(true)}
+                                                        className="text-zinc-400 hover:text-red-400 font-medium inline-flex items-center gap-1.5 transition cursor-pointer"
+                                                    >
+                                                        <Trash2 size={13} />
+                                                        <span>Clear History</span>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Adblockers & Mobile DNS */}
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate('/adblocker')}
+                                        className="w-full px-5 sm:px-6 py-4 hover:bg-white/[0.03] transition flex items-center justify-between gap-4 text-left cursor-pointer group"
+                                    >
+                                        <div className="flex items-center gap-3.5">
+                                            <ShieldCheck size={18} className="text-zinc-400 group-hover:text-white transition shrink-0" />
+                                            <div>
+                                                <div className="text-sm font-medium text-white">Ad Protection & Private DNS</div>
+                                                <div className="text-xs text-zinc-400 mt-0.5">Setup guide for desktop browsers and mobile DNS</div>
+                                            </div>
+                                        </div>
+                                        <ArrowUpRight size={16} className="text-zinc-600 group-hover:text-zinc-300 shrink-0 transition" />
+                                    </button>
+
+                                    {/* Sound Enhancements */}
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate('/sound-enhancements')}
+                                        className="w-full px-5 sm:px-6 py-4 hover:bg-white/[0.03] transition flex items-center justify-between gap-4 text-left cursor-pointer group"
+                                    >
+                                        <div className="flex items-center gap-3.5">
+                                            <Volume2 size={18} className="text-zinc-400 group-hover:text-white transition shrink-0" />
+                                            <div>
+                                                <div className="text-sm font-medium text-white">Audio Enhancements</div>
+                                                <div className="text-xs text-zinc-400 mt-0.5">Sound booster, dialogue clarity, and equalizer guide</div>
+                                            </div>
+                                        </div>
+                                        <ArrowUpRight size={16} className="text-zinc-600 group-hover:text-zinc-300 shrink-0 transition" />
                                     </button>
                                 </div>
+                            </section>
+                        )}
+
+                        {/* SECTION: MY CONTENT / CONTRIBUTIONS */}
+                        {activeSection === 'contributions' && (
+                            <section className="bg-[#111114] border border-white/[0.08] rounded-2xl overflow-hidden">
+                                <div className="px-5 sm:px-6 py-4 border-b border-white/[0.07]">
+                                    <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                                        My Added Content
+                                    </h3>
+                                </div>
+                                <div className="p-4 sm:p-5">
+                                    <MyContributions userId={currentUser.uid} />
+                                </div>
+                            </section>
+                        )}
+
+                        {/* SECTION: ADMINISTRATION (Admin Only) */}
+                        {activeSection === 'admin' && isAdmin && (
+                            <section className="bg-[#111114] border border-white/[0.08] rounded-2xl overflow-hidden">
+                                <div className="px-5 sm:px-6 py-4 border-b border-white/[0.07]">
+                                    <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                                        Administration
+                                    </h3>
+                                </div>
+
+                                <div className="divide-y divide-white/[0.07]">
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate('/admin')}
+                                        className="w-full px-5 sm:px-6 py-4 hover:bg-white/[0.03] transition flex items-center justify-between gap-4 text-left cursor-pointer group"
+                                    >
+                                        <div className="flex items-center gap-3.5">
+                                            <LayoutDashboard size={18} className="text-zinc-400 group-hover:text-white transition shrink-0" />
+                                            <div>
+                                                <div className="text-sm font-medium text-white">Admin Console</div>
+                                                <div className="text-xs text-zinc-400 mt-0.5">
+                                                    Manage catalog, users, analytics, and content requests
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <ChevronRight size={16} className="text-zinc-600 group-hover:text-zinc-300 transition" />
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowGlobalSettings(true)}
+                                        className="w-full px-5 sm:px-6 py-4 hover:bg-white/[0.03] transition flex items-center justify-between gap-4 text-left cursor-pointer group"
+                                    >
+                                        <div className="flex items-center gap-3.5">
+                                            <SlidersHorizontal size={18} className="text-zinc-400 group-hover:text-white transition shrink-0" />
+                                            <div>
+                                                <div className="text-sm font-medium text-white">Global Site Settings</div>
+                                                <div className="text-xs text-zinc-400 mt-0.5">
+                                                    Configure branding, stream endpoints, and maintenance mode
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <ChevronRight size={16} className="text-zinc-600 group-hover:text-zinc-300 transition" />
+                                    </button>
+                                </div>
+                            </section>
+                        )}
+
+                        {/* Mobile Sign Out Footer */}
+                        <div className="lg:hidden pt-4 border-t border-white/[0.08] flex items-center justify-between gap-4">
+                            <span className="text-xs text-zinc-500">Member since {getMemberSinceDate()}</span>
+                            <button
+                                type="button"
+                                onClick={logout}
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.05] hover:bg-red-500/15 border border-white/[0.08] text-xs font-medium text-zinc-300 hover:text-red-400 transition cursor-pointer"
+                            >
+                                <LogOut size={14} />
+                                <span>Sign Out</span>
+                            </button>
+                        </div>
+                    </main>
+                </div>
+            </div>
+
+            {/* Email Change Modal */}
+            {emailModalOpen && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+                    onClick={() => setEmailModalOpen(false)}
+                >
+                    <form
+                        onSubmit={handleSaveEmail}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full max-w-md bg-[#111114] border border-white/[0.1] rounded-2xl p-6 shadow-2xl"
+                    >
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-base font-semibold text-white">Update Email Address</h2>
+                            <button
+                                type="button"
+                                onClick={() => setEmailModalOpen(false)}
+                                className="text-zinc-400 hover:text-white cursor-pointer"
+                                aria-label="Close"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">New Email</label>
+                        <input
+                            type="email"
+                            required
+                            value={emailInput}
+                            onChange={(e) => setEmailInput(e.target.value)}
+                            placeholder="name@example.com"
+                            className="w-full bg-black/50 border border-white/[0.12] focus:border-white/40 text-white text-sm px-3.5 py-2.5 rounded-lg outline-none transition"
+                        />
+                        <div className="mt-5 flex items-center justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setEmailModalOpen(false)}
+                                className="px-4 py-2 rounded-lg text-xs font-medium text-zinc-400 hover:text-white transition cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={emailSaving}
+                                className="px-4 py-2 rounded-lg bg-white hover:bg-zinc-200 text-black text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+                            >
+                                {emailSaving ? 'Saving...' : 'Save Changes'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {/* Avatar Upload / URL Modal */}
+            {avatarModalOpen && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+                    onClick={() => setAvatarModalOpen(false)}
+                >
+                    <form
+                        onSubmit={handleSaveAvatar}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full max-w-md bg-[#111114] border border-white/[0.1] rounded-2xl p-6 shadow-2xl"
+                    >
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-base font-semibold text-white">Update Profile Photo</h2>
+                            <button
+                                type="button"
+                                onClick={() => setAvatarModalOpen(false)}
+                                className="text-zinc-400 hover:text-white cursor-pointer"
+                                aria-label="Close"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="flex flex-col items-center mb-5">
+                            <div className="relative">
+                                <img
+                                    src={avatarInput || '/Mydonkey%20user.jpg'}
+                                    alt="Preview"
+                                    className="w-24 h-24 rounded-full object-cover border border-white/15 bg-zinc-900"
+                                />
+                                {avatarCompressing && (
+                                    <div className="absolute inset-0 rounded-full bg-black/70 flex items-center justify-center">
+                                        <Loader2 size={20} className="text-white animate-spin" />
+                                    </div>
+                                )}
+                            </div>
+                            {avatarStats && (
+                                <p className="text-[11px] text-emerald-400 font-medium mt-2.5">
+                                    Compressed {formatBytes(avatarStats.original)} → {formatBytes(avatarStats.compressed)}
+                                </p>
                             )}
                         </div>
 
+                        {/* Upload from device */}
+                        <input
+                            ref={avatarFileRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                                const file = e.target.files?.[0] || null;
+                                void handleAvatarFileUpload(file, 'main');
+                                e.target.value = '';
+                            }}
+                        />
                         <button
-                            onClick={() => navigate('/adblocker')}
-                            className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition border-t border-white/5 group text-left cursor-pointer"
+                            type="button"
+                            disabled={avatarCompressing}
+                            onClick={() => avatarFileRef.current?.click()}
+                            className="w-full py-3 px-4 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-dashed border-white/20 hover:border-white/35 text-zinc-200 hover:text-white text-xs font-medium flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
                         >
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-md shadow-cyan-500/20 group-hover:scale-105 transition-transform">
-                                    <ShieldCheck size={18} />
-                                </div>
-                                <div className="text-left">
-                                    <div className="font-medium flex items-center gap-2 text-white">
-                                        Adblockers & Mobile DNS
-                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                                            AD-FREE
-                                        </span>
-                                    </div>
-                                    <div className="text-xs text-gray-500">Suggested adblockers for PC & private DNS for smartphones</div>
-                                </div>
-                            </div>
-                            <ChevronDown size={18} className="text-gray-500 -rotate-90 group-hover:translate-x-1 transition-transform" />
+                            {avatarCompressing ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+                            <span>{avatarCompressing ? 'Compressing image...' : 'Upload Image from Device'}</span>
                         </button>
+                        <p className="text-[11px] text-zinc-500 text-center mt-1.5">
+                            Automatically compressed in your browser to a tiny size before saving.
+                        </p>
 
-                        <button
-                            onClick={() => navigate('/sound-enhancements')}
-                            className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition border-t border-white/5 group text-left cursor-pointer"
-                        >
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-black shadow-md shadow-amber-500/20 group-hover:scale-105 transition-transform">
-                                    <Volume2 size={18} />
-                                </div>
-                                <div className="text-left">
-                                    <div className="font-medium flex items-center gap-2 text-white">
-                                        Sound Enhancements & Booster
-                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                                            AUDIO LAB
-                                        </span>
-                                    </div>
-                                    <div className="text-xs text-gray-500">400% Web Audio studio, dialogue clarity EQ, & OS guide</div>
-                                </div>
-                            </div>
-                            <ChevronDown size={18} className="text-gray-500 -rotate-90 group-hover:translate-x-1 transition-transform" />
-                        </button>
-                    </div>
-                </div>
-
-                {/* App Install Section */}
-                {isInstallable && (
-                    <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl overflow-hidden border border-white/10 shadow-xl">
-                        <div className="px-5 py-3 border-b border-white/5">
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Device Experience</span>
-                        </div>
-                        <button
-                            onClick={installPwa}
-                            className="w-full flex items-center justify-between px-5 py-5 hover:bg-white/5 transition group"
-                        >
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-2xl bg-brand-red flex items-center justify-center shadow-lg shadow-brand-red/20 group-hover:scale-110 transition-transform">
-                                    <Smartphone size={24} className="text-white" />
-                                </div>
-                                <div className="text-left">
-                                    <div className="font-bold text-lg">{isIOS ? 'Add to Home Screen' : 'Download My Donkey App'}</div>
-                                    <div className="text-xs text-gray-400">{isIOS ? 'Install via Safari Share menu' : 'Get the best experience on your home screen'}</div>
-                                </div>
-                            </div>
-                            <div className="bg-white/10 p-2 rounded-full group-hover:bg-brand-red group-hover:text-white transition-colors">
-                                <Download size={20} />
-                            </div>
-                        </button>
-                    </div>
-                )}
-
-                {/* Profiles Section */}
-                <div className="bg-white/5 rounded-xl overflow-hidden mb-8">
-                    <div className="px-5 py-3 border-b border-white/5 flex justify-between items-center">
-                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Profiles</span>
-                        <button
-                            onClick={() => { setEditingProfile(null); setIsAddingProfile(true); }}
-                            className="text-cyan-400 text-sm font-bold hover:text-cyan-300 transition flex items-center gap-1"
-                        >
-                            <Plus size={16} /> Add
-                        </button>
-                    </div>
-
-                    <div className="p-4 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
-                        {userProfiles.map(profile => (
-                            <div key={profile.id} className="group text-center cursor-pointer relative" onClick={() => setEditingProfile(profile)}>
-                                <div className="relative mb-2">
-                                    <img
-                                        src={profile.avatarUrl || "/Mydonkey%20user.jpg"}
-                                        className="w-14 h-14 md:w-16 md:h-16 mx-auto rounded-lg object-cover ring-2 ring-transparent group-hover:ring-cyan-500 transition"
-                                    />
-                                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition rounded-lg">
-                                        <div className="bg-black/60 p-1.5 rounded-full">
-                                            <Settings size={14} />
-                                        </div>
-                                    </div>
-                                    {profile.isKids && (
-                                        <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 bg-yellow-500 text-black text-[8px] font-bold rounded">KIDS</span>
-                                    )}
-                                </div>
-                                <div className="text-xs font-medium truncate">{profile.name}</div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* My Added Content Section */}
-                <div className="bg-white/5 rounded-xl overflow-hidden">
-                    <button
-                        onClick={() => setShowContributions(!showContributions)}
-                        className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition"
-                    >
-                        <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-red to-red-700 flex items-center justify-center">
-                                <Film size={18} />
-                            </div>
-                            <div className="text-left">
-                                <div className="font-medium">My Added Content</div>
-                                <div className="text-xs text-gray-500">Movies & shows you've added to the platform</div>
-                            </div>
-                        </div>
-                        {showContributions ? <ChevronUp size={18} className="text-gray-400" /> : <ChevronDown size={18} className="text-gray-400" />}
-                    </button>
-
-                    {showContributions && (
-                        <div className="px-4 pb-4 border-t border-white/5">
-                            <MyContributions userId={currentUser.uid} />
-                        </div>
-                    )}
-                </div>
-
-                {/* Administrator Controls (Only visible to Admins) */}
-                {isAdmin && (
-                    <div className="bg-gradient-to-br from-[#18111e] via-[#141021] to-black rounded-xl overflow-hidden border border-brand-red/30 shadow-lg shadow-brand-red/10">
-                        <div className="px-5 py-3 border-b border-white/5 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <LayoutDashboard size={15} className="text-brand-red" />
-                                <span className="text-xs font-bold text-gray-300 uppercase tracking-wider">Administrator Controls</span>
-                            </div>
-                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-brand-red/20 text-brand-red border border-brand-red/30">
-                                ADMIN ONLY
-                            </span>
+                        {/* Optional URL fallback */}
+                        <div className="mt-4 pt-4 border-t border-white/[0.08]">
+                            <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">Or paste an image URL</label>
+                            <input
+                                type="text"
+                                value={avatarInput.startsWith('data:') ? '' : avatarInput}
+                                onChange={(e) => {
+                                    setAvatarStats(null);
+                                    setAvatarInput(e.target.value);
+                                }}
+                                placeholder="https://example.com/avatar.jpg"
+                                className="w-full bg-black/50 border border-white/[0.12] focus:border-white/40 text-white text-xs px-3.5 py-2.5 rounded-lg outline-none transition"
+                            />
                         </div>
 
-                        {/* Admin Dashboard Option */}
-                        <button
-                            onClick={() => navigate('/admin')}
-                            className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition group text-left cursor-pointer border-b border-white/5"
-                        >
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-red to-purple-600 flex items-center justify-center text-white shadow-md shadow-brand-red/30 group-hover:scale-105 transition-transform">
-                                    <LayoutDashboard size={20} />
-                                </div>
-                                <div className="text-left">
-                                    <div className="font-bold flex items-center gap-2 text-white">
-                                        Admin Dashboard
-                                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-brand-red/20 text-brand-red border border-brand-red/40">
-                                            DASHBOARD
-                                        </span>
-                                    </div>
-                                    <div className="text-xs text-gray-400">
-                                        Manage movies, TV shows, anime, users, catalog, analytics & content requests
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-1.5 text-brand-red font-bold text-xs group-hover:translate-x-1 transition-transform">
-                                <span>Open Panel</span>
-                                <ChevronRight size={18} />
-                            </div>
-                        </button>
-
-                        <button
-                            onClick={() => setShowGlobalSettings(true)}
-                            className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition group text-left cursor-pointer"
-                        >
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-red to-orange-600 flex items-center justify-center text-white shadow-md shadow-brand-red/25 group-hover:scale-105 transition-transform">
-                                    <SlidersHorizontal size={18} />
-                                </div>
-                                <div className="text-left">
-                                    <div className="font-bold flex items-center gap-2 text-white">
-                                        Global Website Settings
-                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-gray-300">
-                                            SYSTEM
-                                        </span>
-                                    </div>
-                                    <div className="text-xs text-gray-400">
-                                        Configure site-wide branding, stream URLs, maintenance mode & security
-                                    </div>
-                                </div>
-                            </div>
-                            <ChevronRight size={18} className="text-gray-500 group-hover:text-white group-hover:translate-x-1 transition-transform" />
-                        </button>
-                    </div>
-                )}
-
-                {/* Sign Out */}
-                <button
-                    onClick={logout}
-                    className="w-full py-4 bg-white/5 hover:bg-red-500/20 rounded-xl text-gray-400 hover:text-red-400 font-bold transition flex items-center justify-center gap-2"
-                >
-                    Sign Out
-                </button>
-
-                <div className="text-center text-xs text-gray-600 pt-2">
-                    Member since {getMemberSinceDate()} • Version 2.0
-                </div>
-
-
-            </div>
-
-            {/* Profile Edit/Add Modal */}
-            {
-                (isAddingProfile || editingProfile) && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 animate-in fade-in zoom-in-95 duration-300">
-                        <div className="w-full max-w-md bg-[#141414] p-8 rounded-2xl relative border border-white/10 shadow-2xl">
+                        <div className="mt-5 flex items-center justify-end gap-2">
                             <button
-                                onClick={() => { setIsAddingProfile(false); setEditingProfile(null); }}
-                                className="absolute top-4 right-4 text-gray-400 hover:text-white"
+                                type="button"
+                                onClick={() => setAvatarModalOpen(false)}
+                                className="px-4 py-2 rounded-lg text-xs font-medium text-zinc-400 hover:text-white transition cursor-pointer"
                             >
-                                <X size={24} />
+                                Cancel
                             </button>
+                            <button
+                                type="submit"
+                                disabled={avatarSaving || avatarCompressing || !avatarInput.trim()}
+                                className="px-4 py-2 rounded-lg bg-white hover:bg-zinc-200 text-black text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+                            >
+                                {avatarSaving ? 'Saving...' : 'Save Photo'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
 
-                            <h2 className="text-2xl font-bold mb-6">{isAddingProfile ? 'Add Profile' : 'Edit Profile'}</h2>
+            {/* Profile Edit / Add Modal */}
+            {(isAddingProfile || editingProfile) && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+                    onClick={closeProfileModal}
+                >
+                    <form
+                        onSubmit={handleSaveProfile}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full max-w-md bg-[#111114] border border-white/[0.1] rounded-2xl p-6 shadow-2xl"
+                    >
+                        <div className="flex items-center justify-between mb-5">
+                            <h2 className="text-base font-semibold text-white">
+                                {isAddingProfile ? 'Add Profile' : 'Edit Profile'}
+                            </h2>
+                            <button
+                                type="button"
+                                onClick={closeProfileModal}
+                                className="text-zinc-400 hover:text-white cursor-pointer"
+                                aria-label="Close"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
 
-                            <div className="flex flex-col items-center mb-6">
+                        <div className="flex flex-col items-center mb-5">
+                            <div className="relative group">
                                 <img
-                                    src={editingProfile?.avatarUrl || "/Mydonkey%20user.jpg"}
-                                    className="w-24 h-24 rounded-lg object-cover mb-4 shadow-lg"
+                                    src={profileAvatarInput || '/Mydonkey%20user.jpg'}
+                                    alt="Profile avatar"
+                                    className="w-20 h-20 rounded-xl object-cover border border-white/15 bg-zinc-900"
                                 />
-                                {/* Avatar picker could go here */}
+                                <button
+                                    type="button"
+                                    disabled={profileAvatarCompressing}
+                                    onClick={() => profileFileRef.current?.click()}
+                                    className="absolute inset-0 rounded-xl bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition cursor-pointer"
+                                    title="Upload profile photo"
+                                    aria-label="Upload profile photo"
+                                >
+                                    {profileAvatarCompressing ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
+                                </button>
+                            </div>
+                            <input
+                                ref={profileFileRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0] || null;
+                                    void handleAvatarFileUpload(file, 'profile');
+                                    e.target.value = '';
+                                }}
+                            />
+                            <button
+                                type="button"
+                                disabled={profileAvatarCompressing}
+                                onClick={() => profileFileRef.current?.click()}
+                                className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.11] border border-white/[0.09] text-xs font-medium text-zinc-200 hover:text-white transition cursor-pointer disabled:opacity-50"
+                            >
+                                {profileAvatarCompressing ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                                <span>{profileAvatarCompressing ? 'Compressing...' : 'Upload Photo'}</span>
+                            </button>
+                            {profileAvatarStats && (
+                                <p className="text-[11px] text-emerald-400 font-medium mt-1.5">
+                                    Compressed {formatBytes(profileAvatarStats.original)} → {formatBytes(profileAvatarStats.compressed)}
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                                    Profile Name
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={profileNameInput}
+                                    onChange={(e) => setProfileNameInput(e.target.value)}
+                                    placeholder="e.g. Alex"
+                                    className="w-full bg-black/50 border border-white/[0.12] focus:border-white/40 text-white text-sm px-3.5 py-2.5 rounded-lg outline-none transition"
+                                />
                             </div>
 
-                            <div className="space-y-4">
+                            <label className="flex items-center justify-between p-3.5 bg-white/[0.03] border border-white/[0.08] rounded-xl cursor-pointer">
                                 <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Name</label>
-                                    <input
-                                        type="text"
-                                        defaultValue={editingProfile?.name}
-                                        id="profileNameInput"
-                                        placeholder="Profile Name"
-                                        className="w-full bg-gray-800 text-white px-4 py-3 rounded-lg focus:ring-2 ring-cyan-500 outline-none"
-                                    />
+                                    <div className="text-sm font-medium text-white">Kids Profile</div>
+                                    <div className="text-xs text-zinc-500">Show family-friendly titles only</div>
                                 </div>
+                                <input
+                                    type="checkbox"
+                                    checked={profileIsKids}
+                                    onChange={(e) => setProfileIsKids(e.target.checked)}
+                                    className="w-4 h-4 accent-brand-red cursor-pointer"
+                                />
+                            </label>
 
-                                <div className="flex items-center gap-3 p-3 bg-gray-800 rounded-lg cursor-pointer" onClick={() => {
-                                    const cb = document.getElementById('isKidsInput') as HTMLInputElement;
-                                    if (cb) cb.checked = !cb.checked;
-                                }}>
-                                    <input
-                                        type="checkbox"
-                                        id="isKidsInput"
-                                        defaultChecked={editingProfile?.isKids}
-                                        className="w-5 h-5 rounded bg-gray-600 border-none focus:ring-cyan-500"
-                                        onClick={(e) => e.stopPropagation()}
-                                    />
-                                    <label className="font-medium cursor-pointer">Kid's Profile?</label>
-                                </div>
-
-                                <div className="flex gap-3 pt-4">
-                                    <button
-                                        onClick={async () => {
-                                            const nameInput = document.getElementById('profileNameInput') as HTMLInputElement;
-                                            const kidsInput = document.getElementById('isKidsInput') as HTMLInputElement;
-                                            const name = nameInput.value;
-                                            const isKids = kidsInput.checked;
-
-                                            if (!name) return;
-
-                                            if (isAddingProfile) {
-                                                await addProfile(name, isKids, "/Mydonkey%20user.jpg");
-                                            } else if (editingProfile) {
-                                                await updateProfile(editingProfile.id, { name, isKids });
-                                            }
-                                            setIsAddingProfile(false);
-                                            setEditingProfile(null);
-                                        }}
-                                        className="flex-1 py-3 bg-white text-black font-bold rounded-lg hover:bg-gray-200 transition"
-                                    >
-                                        Save
-                                    </button>
-                                    {editingProfile && (
+                            {editingProfile && confirmDeleteProfile && (
+                                <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/25 flex items-center justify-between gap-3">
+                                    <span className="text-xs text-red-300">Delete "{editingProfile.name}" permanently?</span>
+                                    <div className="flex items-center gap-2 shrink-0">
                                         <button
-                                            onClick={async () => {
-                                                if (userProfiles.length <= 1) {
-                                                    alert("You cannot delete your only profile. Your account must keep at least one profile.");
-                                                    return;
-                                                }
-                                                if (confirm("Delete this profile?")) {
-                                                    try {
-                                                        await deleteProfile(editingProfile.id);
-                                                        setEditingProfile(null);
-                                                    } catch (err: any) {
-                                                        alert(`Failed to delete profile: ${err.message || err}`);
-                                                    }
-                                                }
-                                            }}
-                                            className="px-4 py-3 border border-red-500/50 text-red-500 hover:bg-red-500/10 font-bold rounded-lg transition"
-                                            title="Delete profile"
+                                            type="button"
+                                            onClick={() => setConfirmDeleteProfile(false)}
+                                            className="text-xs text-zinc-300 hover:text-white px-2 py-1 cursor-pointer"
                                         >
-                                            <Trash2 size={20} />
+                                            Cancel
                                         </button>
-                                    )}
+                                        <button
+                                            type="button"
+                                            disabled={profileSaving}
+                                            onClick={handleConfirmDeleteProfile}
+                                            className="text-xs font-semibold bg-red-600 hover:bg-red-700 text-white px-2.5 py-1 rounded-md cursor-pointer"
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="flex items-center justify-between gap-2 pt-2">
+                                {editingProfile && !confirmDeleteProfile ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setConfirmDeleteProfile(true)}
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition cursor-pointer"
+                                    >
+                                        <Trash2 size={14} />
+                                        <span>Delete</span>
+                                    </button>
+                                ) : (
+                                    <div />
+                                )}
+
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={closeProfileModal}
+                                        className="px-4 py-2 rounded-lg text-xs font-medium text-zinc-400 hover:text-white transition cursor-pointer"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={profileSaving}
+                                        className="px-4 py-2 rounded-lg bg-white hover:bg-zinc-200 text-black text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+                                    >
+                                        {profileSaving ? 'Saving...' : 'Save'}
+                                    </button>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                )
-            }
-            {/* Modals */}
+                    </form>
+                </div>
+            )}
+
+            {/* Existing Account Modals */}
             {showDeviceModal && <DeviceManagementModal onClose={() => setShowDeviceModal(false)} />}
             {showGenreModal && <GenrePreferenceModal isOpen={showGenreModal} onClose={() => setShowGenreModal(false)} />}
             {showGlobalSettings && <GlobalSettingsModal isOpen={showGlobalSettings} onClose={() => setShowGlobalSettings(false)} />}
-        </div >
+        </div>
     );
 };
 
