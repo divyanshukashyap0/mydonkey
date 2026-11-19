@@ -2221,9 +2221,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                         <div className="flex items-center gap-3 min-w-0">
                             <button
                                 type="button"
-                                onClick={onClose}
+                                onClick={() => {
+                                    onClose();
+                                    navigate('/');
+                                }}
                                 className="w-9 h-9 rounded-full bg-white/[0.08] hover:bg-white/[0.16] border border-white/10 flex items-center justify-center text-white transition shrink-0 cursor-pointer"
-                                aria-label="Go Back"
+                                aria-label="Return to Home"
+                                title="Return to Home"
                             >
                                 <ArrowLeft size={18} />
                             </button>
@@ -2611,10 +2615,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     onClose();
+                                    navigate('/');
                                 }}
                                 className="w-full bg-white text-black px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm hover:bg-gray-200 transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
                             >
-                                <ArrowLeft size={16} /> Previous Page
+                                <ArrowLeft size={16} /> Home Screen
                             </button>
                             <button
                                 type="button"
@@ -2706,10 +2711,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                             onClick={(e) => {
                                 e.stopPropagation();
                                 onClose();
+                                navigate('/');
                             }}
                             className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-black/60 hover:bg-white/20 active:scale-90 border border-white/15 backdrop-blur-md text-white hover:text-brand-red transition-all flex items-center justify-center cursor-pointer shrink-0 shadow-lg"
-                            title="Go Back"
-                            aria-label="Go Back"
+                            title="Return to Home"
+                            aria-label="Return to Home"
                         >
                             <ArrowLeft size={18} className="sm:w-5 sm:h-5" />
                         </button>

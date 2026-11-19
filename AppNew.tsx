@@ -1360,20 +1360,8 @@ const MainLayout = () => {
         document.documentElement.style.overflow = '';
         setPlayingContent(null);
         setViewingContent(null);
-
-        let destination = (location.state as any)?.from || lastNonModalUrlRef.current;
-        if (!destination || destination.startsWith('/watch') || destination.startsWith('/browse')) {
-            destination = lastNonModalUrlRef.current;
-        }
-        if (!destination || destination.startsWith('/watch') || destination.startsWith('/browse')) {
-            const tab = lastActiveTabRef.current || activeTab;
-            destination = (!tab || tab === 'home') ? '/' : `/${tab}`;
-        }
-        if (window.history.state && window.history.state.idx > 0) {
-            navigate(-1);
-        } else {
-            navigate(destination, { replace: true });
-        }
+        document.title = 'My Donkey | Watch Free Movies, TV Shows & Anime in HD';
+        navigate('/');
     };
 
     const handleTabChange = (tabId: string) => {
