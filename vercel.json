@@ -38,6 +38,17 @@
             "destination": "/api/content-seo?id=:id&type=watch"
         },
         {
+            "source": "/(movies|tv|anime|categories|exclusive)",
+            "has": [
+                {
+                    "type": "header",
+                    "key": "user-agent",
+                    "value": ".*(facebookexternalhit|Facebot|WhatsApp|TelegramBot|Twitterbot|Pinterest|Googlebot|bingbot|Discordbot|Slackbot|LinkedInBot|Applebot|SkypeUriPreview|Embedly|redditbot|vkShare|line|viber|snapchat|meta-externalagent).*"
+                }
+            ],
+            "destination": "/api/content-seo?type=$1"
+        },
+        {
             "source": "/((?!api/|sitemap.*\\.xml|robots\\.txt|google.*\\.html).*)",
             "destination": "/index.html"
         }

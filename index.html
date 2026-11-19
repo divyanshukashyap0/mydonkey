@@ -242,12 +242,48 @@
   <script>
     (function() {
       try {
-        var path = window.location.pathname;
+        var path = window.location.pathname.replace(/\/+$/, '') || '/';
+        var descEl = document.querySelector('meta[name="description"]');
+        
+        if (path === '/movies') {
+          document.title = 'Watch Free Movies Online in HD | Bollywood & Hollywood Hits - My Donkey';
+          if (descEl) descEl.setAttribute('content', 'Stream Bollywood blockbusters, Hollywood hits, action, romance, comedy, and thriller movies in HD for free on My Donkey. No subscription required.');
+          return;
+        }
+        if (path === '/tv') {
+          document.title = 'Watch Free TV Shows & Web Series Online in HD - My Donkey';
+          if (descEl) descEl.setAttribute('content', 'Binge watch full seasons, latest episodes, and trending web series online for free in HD on My Donkey.');
+          return;
+        }
+        if (path === '/anime') {
+          document.title = 'Watch Free Anime Online in HD | English Sub & Dub - My Donkey';
+          if (descEl) descEl.setAttribute('content', 'Stream top anime series, movies, and episodes in HD with English subtitles and dubbing on My Donkey.');
+          return;
+        }
+        if (path === '/categories' || path.indexOf('/categories') === 0 || path.indexOf('/category') === 0) {
+          document.title = 'Browse Movies & TV Shows by Category & Genre - My Donkey';
+          if (descEl) descEl.setAttribute('content', 'Discover free movies and TV series across Action, Comedy, Drama, Horror, Romance, Sci-Fi, and Thriller on My Donkey.');
+          return;
+        }
+        if (path === '/exclusive') {
+          document.title = 'My Donkey Originals & Exclusive Movies - Watch Free in HD';
+          if (descEl) descEl.setAttribute('content', 'Watch exclusive releases, original movies, and premium HD content for free on My Donkey.');
+          return;
+        }
+        if (path === '/theatre' || path === '/theater') {
+          document.title = '3D - Virtual Cinema Theatre | My Donkey';
+          if (descEl) descEl.setAttribute('content', 'Experience movies in an immersive 3D virtual cinema theatre on My Donkey.');
+          return;
+        }
+        if (path === '/support') {
+          document.title = 'Help & Support Hub — Guides & FAQs | My Donkey';
+          return;
+        }
+
         var isBrowse = path.indexOf('/browse/') !== -1;
         var isWatch = path.indexOf('/watch/') !== -1;
         var isTheatre = path.indexOf('/theatre') !== -1 || path.indexOf('/theater') !== -1;
         if (isBrowse || isWatch || isTheatre) {
-          // 1. Instant check from URL query param ?title= (0ms for shared/copied links)
           var params = new URLSearchParams(window.location.search);
           var paramTitle = params.get('title');
           if (paramTitle && paramTitle !== 'undefined' && paramTitle !== 'null' && paramTitle.trim() !== '') {
@@ -259,7 +295,6 @@
               return;
             }
           }
-          // 2. Instant check from localStorage title cache
           var id = params.get('id');
           if (!id) {
             var parts = path.split('/');
@@ -595,9 +630,21 @@
 
 <body>
   <div id="root">
-    <h1 style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">
-      My Donkey - Watch Free Movies, TV Shows &amp; Anime in HD
-    </h1>
+    <header style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">
+      <h1>My Donkey - Watch Free Movies, TV Shows &amp; Anime in HD</h1>
+      <nav aria-label="Main Navigation">
+        <a href="/">Home</a>
+        <a href="/movies">Watch Free Movies Online</a>
+        <a href="/tv">Watch TV Shows &amp; Web Series</a>
+        <a href="/anime">Watch Free Anime Online</a>
+        <a href="/categories">Browse Categories &amp; Genres</a>
+        <a href="/exclusive">My Donkey Originals</a>
+        <a href="/theatre">3D Virtual Cinema</a>
+        <a href="/support">Help &amp; Support</a>
+        <a href="/contact">Contact</a>
+        <a href="/devices">Supported Devices</a>
+      </nav>
+    </header>
     <!-- Instant pre-hydration skeleton shell -->
     <div style="min-height:100vh;background:#0a0a0b;overflow:hidden;">
       <div style="height:68px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;">
