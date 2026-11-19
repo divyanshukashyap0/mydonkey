@@ -169,11 +169,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     }, []);
 
 
-    // Season & Episode State (TV Shows)
-    const [currentSeasonIdx, setCurrentSeasonIdx] = useState(0);
-    const [currentEpisodeIdx, setCurrentEpisodeIdx] = useState(0);
-    const [showEpisodesMenu, setShowEpisodesMenu] = useState(false);
-    const embedIframeRef = useRef<HTMLIFrameElement | null>(null);
+    const isTV = Boolean(
+        content.type === 'tv' ||
+        (content as any).media_type === 'tv' ||
+        (content.seasons && content.seasons.length > 0) ||
+        (content.videoUrl && content.videoUrl.includes('/embed/tv/'))
+    );
 
     // Parse unique episode URL: /watch/:id/season/:s/episode/:e (or ?season=..&episode=..)
     const routeSeasonEp = useMemo(() => {
@@ -205,24 +206,56 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         return null;
     }, [routeSeasonEp, content.videoUrl]);
 
-    const isTV = Boolean(
-        content.type === 'tv' ||
-        (content as any).media_type === 'tv' ||
-        (content.seasons && content.seasons.length > 0) ||
-        (content.videoUrl && content.videoUrl.includes('/embed/tv/'))
-    );
+    // Initial series progress read synchronously from storage/props
+    const initialSeriesProgress = useMemo(() => {
+        if (!isTV || isTrailer) return null;
+        return getSeriesEpisodeProgress(content);
+    }, [isTV, isTrailer, content]);
+
+    // Target season/episode explicitly preferred on mount
+    const initialTargetSeason = routeSeasonEp?.season || (content as any).lastSeason || urlSeasonEp?.season || initialSeriesProgress?.lastSeason || 1;
+    const initialTargetEpisode = routeSeasonEp?.episode || (content as any).lastEpisode || urlSeasonEp?.episode || initialSeriesProgress?.lastEpisode || 1;
+
+    // Season & Episode State (TV Shows)
+    const [currentSeasonIdx, setCurrentSeasonIdx] = useState<number>(() => {
+        if (content.seasons && content.seasons.length > 0) {
+            const idx = content.seasons.findIndex(s => s.seasonNumber === initialTargetSeason);
+            return idx !== -1 ? idx : 0;
+        }
+        return 0;
+    });
+
+    const [currentEpisodeIdx, setCurrentEpisodeIdx] = useState<number>(() => {
+        if (content.seasons && content.seasons.length > 0) {
+            const sIdx = content.seasons.findIndex(s => s.seasonNumber === initialTargetSeason);
+            const season = sIdx !== -1 ? content.seasons[sIdx] : content.seasons[0];
+            if (season?.episodes) {
+                const epIdx = season.episodes.findIndex(e => e.episodeNumber === initialTargetEpisode);
+                return epIdx !== -1 ? epIdx : 0;
+            }
+        }
+        return 0;
+    });
+
+    const [showEpisodesMenu, setShowEpisodesMenu] = useState(false);
+    const embedIframeRef = useRef<HTMLIFrameElement | null>(null);
+    const iframeMountTimeRef = useRef<number>(Date.now());
+    const lastSyncedUrlRef = useRef<string>('');
+    const lastRecordedEpRef = useRef<string>('');
 
     // Require episode selection before showing the video player screen for TV series
-    // (unless the user opened a direct unique episode URL like /watch/:id/season/1/episode/3)
-    const [hasSelectedEpisode, setHasSelectedEpisode] = useState<boolean>(() => !isTV || isTrailer || Boolean(routeSeasonEp));
+    // (unless user opened a direct unique episode URL or clicked Resume on Continue Watching)
+    const [hasSelectedEpisode, setHasSelectedEpisode] = useState<boolean>(() =>
+        !isTV || isTrailer || Boolean(routeSeasonEp) || Boolean((content as any).lastSeason)
+    );
     const [isLoadingSeasons, setIsLoadingSeasons] = useState<boolean>(() =>
         isTV && !isTrailer && !(content.seasons && content.seasons.length > 0 && content.seasons.some(s => s.episodes && s.episodes.length > 0))
     );
     const needsEpisodeSelection = isTV && !isTrailer && !hasSelectedEpisode;
 
     useEffect(() => {
-        setHasSelectedEpisode(!isTV || isTrailer || Boolean(routeSeasonEp));
-    }, [content.id, isTV, isTrailer, Boolean(routeSeasonEp)]);
+        setHasSelectedEpisode(!isTV || isTrailer || Boolean(routeSeasonEp) || Boolean((content as any).lastSeason));
+    }, [content.id, isTV, isTrailer, Boolean(routeSeasonEp), (content as any).lastSeason]);
 
     // Build and navigate to the unique URL for each episode (/watch/:id/season/:s/episode/:e)
     const syncEpisodeUrl = useCallback((seasonNum: number, episodeNum: number) => {
@@ -235,14 +268,29 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         }
         const nextUrl = `${basePath}?${params.toString()}`;
         const currentFull = `${location.pathname}${location.search}`;
-        if (currentFull !== nextUrl) {
-            navigate(nextUrl, { replace: true, state: location.state });
+        if (lastSyncedUrlRef.current === nextUrl || currentFull === nextUrl) {
+            return;
         }
+        lastSyncedUrlRef.current = nextUrl;
+        navigate(nextUrl, { replace: true, state: location.state });
     }, [content?.id, content?.playMode, content?.title, isTrailer, location.pathname, location.search, location.state, navigate]);
 
+    // Pre-seed dynamicSeasons with target season/episode so it NEVER defaults to S1:E1 while TMDB is hydrating
     const [dynamicSeasons, setDynamicSeasons] = useState<Season[]>(() => {
         if (content.seasons && content.seasons.length > 0) {
             return content.seasons;
+        }
+        if (isTV) {
+            return [{
+                id: `season_${initialTargetSeason}`,
+                seasonNumber: initialTargetSeason,
+                title: `Season ${initialTargetSeason}`,
+                episodes: [{
+                    id: `s${initialTargetSeason}_e${initialTargetEpisode}`,
+                    episodeNumber: initialTargetEpisode,
+                    title: `Episode ${initialTargetEpisode}`
+                }]
+            }];
         }
         return [];
     });
@@ -255,17 +303,19 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
 
     // Synchronize initial season & episode indices with parsed URL numbers
     useEffect(() => {
-        if (urlSeasonEp && dynamicSeasons.length > 0) {
-            const sIdx = dynamicSeasons.findIndex(s => s.seasonNumber === urlSeasonEp.season);
+        const targetS = routeSeasonEp?.season || (content as any).lastSeason || initialTargetSeason;
+        const targetE = routeSeasonEp?.episode || (content as any).lastEpisode || initialTargetEpisode;
+        if (dynamicSeasons.length > 0) {
+            const sIdx = dynamicSeasons.findIndex(s => s.seasonNumber === targetS);
             if (sIdx !== -1) {
                 setCurrentSeasonIdx(sIdx);
-                const eIdx = dynamicSeasons[sIdx].episodes.findIndex(e => e.episodeNumber === urlSeasonEp.episode);
+                const eIdx = dynamicSeasons[sIdx].episodes.findIndex(e => e.episodeNumber === targetE);
                 if (eIdx !== -1) {
                     setCurrentEpisodeIdx(eIdx);
                 }
             }
         }
-    }, [urlSeasonEp, dynamicSeasons.length]);
+    }, [dynamicSeasons.length, routeSeasonEp?.season, routeSeasonEp?.episode, (content as any).lastSeason, (content as any).lastEpisode, initialTargetSeason, initialTargetEpisode]);
 
     // Fetch seasons & episodes dynamically from TMDB for TV shows if not pre-populated
     useEffect(() => {
@@ -372,9 +422,17 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                 if (!data || typeof data !== 'object') return;
 
                 if (data.type === 'TV_STATE' || data.event === 'tv_state') {
-                    if (data.season !== undefined) {
+                    if (data.season !== undefined && data.episode !== undefined) {
                         const sNum = Number(data.season);
                         const eNum = Number(data.episode);
+                        if (!sNum || !eNum) return;
+
+                        // Ignore default/spurious boot-up messages from embed iframe during first 3.5 seconds
+                        const isBootPhase = Date.now() - iframeMountTimeRef.current < 3500;
+                        if (isBootPhase && (sNum !== initialTargetSeason || eNum !== initialTargetEpisode)) {
+                            return;
+                        }
+
                         setDynamicSeasons(prev => {
                             const sIdx = prev.findIndex(s => s.seasonNumber === sNum);
                             if (sIdx !== -1) {
@@ -638,6 +696,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
     // Keep unique episode URL & watched progress synced if user opened an episode directly
     useEffect(() => {
         if (isTV && !isTrailer && hasSelectedEpisode && currentSeason && currentEpisode) {
+            const epKey = `${currentSeason.seasonNumber}:${currentEpisode.episodeNumber}`;
+            if (lastRecordedEpRef.current === epKey) return;
+            lastRecordedEpRef.current = epKey;
+
             syncEpisodeUrl(currentSeason.seasonNumber, currentEpisode.episodeNumber);
             const updated = recordEpisodeWatched(
                 content,
@@ -649,7 +711,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             );
             setSeriesProgress(updated);
         }
-    }, [isTV, isTrailer, hasSelectedEpisode, currentSeason?.seasonNumber, currentEpisode?.episodeNumber, syncEpisodeUrl]);
+    }, [isTV, isTrailer, hasSelectedEpisode, currentSeason?.seasonNumber, currentEpisode?.episodeNumber, syncEpisodeUrl, content, currentUser]);
 
     // Listen for episode end / completion signals from external embed iframes (Nxsha / HTML5 / JW / Plyr)
     useEffect(() => {
@@ -2061,12 +2123,20 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         if (!url) return '';
         const trimmed = url.trim();
 
-        // Keep Nxsha embed URLs directly
+        const fallbackType = isTV ? 'tv' : 'movie';
+        const activeSeason = currentSeason?.seasonNumber || initialTargetSeason;
+        const activeEpisode = currentEpisode?.episodeNumber || initialTargetEpisode;
+
+        // Keep Nxsha embed URLs directly, with active season & episode for TV
         if (trimmed.includes('nxsha.space')) {
+            if (isTV && activeSeason && activeEpisode) {
+                if (trimmed.includes('/embed/tv/')) {
+                    return trimmed.replace(/\/embed\/tv\/([^\/]+)(?:\/\d+\/\d+)?/, `/embed/tv/$1/${activeSeason}/${activeEpisode}`);
+                }
+            }
             return trimmed;
         }
 
-        const fallbackType = isTV ? 'tv' : 'movie';
         const imdbMatch = trimmed.match(/(tt\d+)/);
 
         // If content is 100% manual, bypass all external embed transformations
@@ -2084,8 +2154,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
             const idForNxsha = content.tmdbId || imdbMatch?.[1];
             if (idForNxsha) {
                 return buildServerEmbedUrl(idForNxsha, fallbackType, 'nxsha', {
-                    season: currentSeason?.seasonNumber || 1,
-                    episode: currentEpisode?.episodeNumber || 1,
+                    season: activeSeason,
+                    episode: activeEpisode,
                     audioTrack,
                     settings
                 });
@@ -2095,7 +2165,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         return url;
     };
 
-    const finalUrl = useMemo(() => getFinalVideoUrl(directVideoUrl || ''), [directVideoUrl, isTV, settings, embedBaseHost, audioTrack, content.tmdbId, currentSeason?.seasonNumber, currentEpisode?.episodeNumber]);
+    const finalUrl = useMemo(
+        () => getFinalVideoUrl(directVideoUrl || ''),
+        [directVideoUrl, isTV, settings, embedBaseHost, audioTrack, content.tmdbId, currentSeason?.seasonNumber, currentEpisode?.episodeNumber, initialTargetSeason, initialTargetEpisode]
+    );
 
     // Dynamically update document title to movie/show (and episode) name during playback
     useEffect(() => {
@@ -2408,7 +2481,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
                             ) : finalUrl ? (
                                 <div className="relative w-full h-full">
                                     <iframe
-                                        key={finalUrl}
+                                        key={`embed-${content.id}`}
                                         ref={embedIframeRef}
                                         className="w-full h-full relative z-[30] border-0"
                                         src={finalUrl}

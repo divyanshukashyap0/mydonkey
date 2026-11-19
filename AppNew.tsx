@@ -485,6 +485,11 @@ const MainLayout = () => {
             const mode = (searchParams.get('mode') as 'trailer' | 'movie') || 'movie';
             const stateItem = (location.state as any)?.item;
 
+            // Parse season/episode from path: /watch/:id/season/:season/episode/:episode
+            const epMatch = currentPath.match(/\/season\/(\d+)\/episode\/(\d+)/i);
+            const routeSeason = epMatch ? parseInt(epMatch[1], 10) : undefined;
+            const routeEpisode = epMatch ? parseInt(epMatch[2], 10) : undefined;
+
             // Instant title resolution for watch deep link before any network calls
             const earlyTitle = stateItem?.title || resolveContentTitleInstant(location.pathname, location.search, location.state, rawContentRef.current || contentRef.current);
             if (earlyTitle) {
@@ -492,9 +497,10 @@ const MainLayout = () => {
             }
 
             if (contentId) {
-                // If already playing this ID and mode, avoid resetting
+                // If already playing this ID, mode, and same season/episode, avoid resetting
                 const cur = playingContentRef.current;
-                if (cur && (cur.id === contentId || `tmdb_${cur.tmdbId}` === contentId || String(cur.tmdbId) === contentId) && cur.playMode === mode) {
+                const isSameEpisode = !routeSeason || ((cur as any)?.lastSeason === routeSeason && (cur as any)?.lastEpisode === routeEpisode);
+                if (cur && (cur.id === contentId || `tmdb_${cur.tmdbId}` === contentId || String(cur.tmdbId) === contentId) && cur.playMode === mode && isSameEpisode) {
                     setIsResolvingModalContent(false);
                     return;
                 }
@@ -543,6 +549,10 @@ const MainLayout = () => {
                     const effectiveStreamId = imdbId || tmdbNumId;
 
                     let playableItem = { ...itemToPlay };
+                    if (routeSeason !== undefined && routeEpisode !== undefined) {
+                        (playableItem as any).lastSeason = routeSeason;
+                        (playableItem as any).lastEpisode = routeEpisode;
+                    }
                     if (itemHasDrive) {
                         playableItem.movieDriveId = itemDriveId;
                         if (isExternalEmbedUrl(playableItem.videoUrl, embedBaseHost)) {
@@ -558,7 +568,9 @@ const MainLayout = () => {
                             }
                         } else {
                             const existingType = itemToPlay.videoUrl ? parseEmbedContentType(itemToPlay.videoUrl) : null;
-                            const streamUrl = effectiveStreamId ? buildEmbedUrl(effectiveStreamId, existingType || itemToPlay.type || 'movie', settingsRef.current) : itemToPlay.videoUrl;
+                            const streamUrl = effectiveStreamId
+                                ? buildEmbedUrl(effectiveStreamId, existingType || itemToPlay.type || 'movie', settingsRef.current, routeSeason, routeEpisode)
+                                : itemToPlay.videoUrl;
                             if (streamUrl) {
                                 playableItem.videoUrl = streamUrl;
                             }
@@ -1282,6 +1294,8 @@ const MainLayout = () => {
             const watchBasePath = hasResumeEpisode
                 ? `/watch/${targetId}/season/${resumeSeason}/episode/${resumeEpisode}`
                 : `/watch/${targetId}`;
+            setViewingContent(null);
+            setPlayingContent(fullItem);
             navigate(`${watchBasePath}?mode=movie${titleParam}`, {
                 replace: isFromBrowse,
                 state: {
