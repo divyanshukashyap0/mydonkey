@@ -1,3 +1,8 @@
+# ==============================================================================
+# My Donkey (https://www.mydonkey.in) - Robots Exclusion Protocol
+# ==============================================================================
+
+# Global Default Rules
 User-agent: *
 Allow: /
 Allow: /movies
@@ -29,7 +34,61 @@ Disallow: /login
 Disallow: /help
 Disallow: /help-center
 
-# Host
+# ------------------------------------------------------------------------------
+# Explicitly Unblock Top 7 AI & Search Crawlers (OpenAI, Anthropic, Perplexity, Google, Apple, Cohere, Meta)
+# ------------------------------------------------------------------------------
+
+# 1. OpenAI ChatGPT Web Crawler
+User-agent: GPTBot
+Allow: /
+Disallow: /admin/*
+Disallow: /account/*
+
+# 2. ChatGPT Interactive User Search
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /admin/*
+Disallow: /account/*
+
+# 3. Anthropic Claude Crawler
+User-agent: ClaudeBot
+Allow: /
+Disallow: /admin/*
+Disallow: /account/*
+
+# 4. Perplexity AI Search Engine
+User-agent: PerplexityBot
+Allow: /
+Disallow: /admin/*
+Disallow: /account/*
+
+# 5. Google Gemini & AI Overviews
+User-agent: Google-Extended
+Allow: /
+Disallow: /admin/*
+Disallow: /account/*
+
+# 6. Apple Intelligence Siri & Spotlight
+User-agent: Applebot-Extended
+Allow: /
+Disallow: /admin/*
+Disallow: /account/*
+
+# 7. Cohere AI Search
+User-agent: Cohere-ai
+Allow: /
+Disallow: /admin/*
+Disallow: /account/*
+
+# 8. Meta AI Crawler
+User-agent: meta-externalagent
+Allow: /
+Disallow: /admin/*
+Disallow: /account/*
+
+# ------------------------------------------------------------------------------
+# Host & Sitemaps
+# ------------------------------------------------------------------------------
 Host: https://www.mydonkey.in
 
 # Master Sitemap (Contains all website URLs)

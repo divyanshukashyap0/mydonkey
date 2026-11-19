@@ -626,44 +626,240 @@
     ]
   }
   </script>
+
+  <!-- 6. FAQPage structured data: Provides concrete facts for AI answers (Google AI Overviews, Perplexity, ChatGPT) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What is My Donkey?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "My Donkey is a free OTT streaming platform offering over 1,000 movies, TV shows, web series, and anime online in 1080p Full HD with authentic audio and zero subscription fees."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is My Donkey completely free to watch movies and shows?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes, My Donkey is 100% free with no monthly subscription fees, credit card entry, or trial periods. All movies and series are free to stream."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Do I need to sign up or create an account to stream on My Donkey?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "No account registration or sign-up is required. Viewers can start streaming any movie or series episode immediately in their web browser."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What movies and TV shows are available on My Donkey?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "My Donkey features Bollywood blockbusters, Hollywood hits, Hindi dubbed action movies, popular Indian and international TV series, and Japanese anime with English subtitles and dubs."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What video streaming quality does My Donkey support?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Content streams in 1080p Full HD with adaptive bitrate streaming to ensure buffer-free playback across all internet connection speeds."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Which devices support My Donkey?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "My Donkey is compatible with Android smartphones, iPhones, iPads, Windows PC, Mac, and Android Smart TVs. It can also be installed as a Progressive Web App (PWA)."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does My Donkey feature an ad blocker and 3D cinema mode?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes, My Donkey includes a built-in AdShield security redirect blocker and an exclusive 3D Virtual Cinema Theatre mode that simulates a virtual movie theatre auditorium directly in your browser."
+        }
+      }
+    ]
+  }
+  </script>
 </head>
 
 <body>
-  <div id="root">
-    <header style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">
-      <h1>My Donkey - Watch Free Movies, TV Shows &amp; Anime in HD</h1>
-      <nav aria-label="Main Navigation">
-        <a href="/">Home</a>
-        <a href="/movies">Watch Free Movies Online</a>
-        <a href="/tv">Watch TV Shows &amp; Web Series</a>
-        <a href="/anime">Watch Free Anime Online</a>
-        <a href="/categories">Browse Categories &amp; Genres</a>
-        <a href="/exclusive">My Donkey Originals</a>
-        <a href="/theatre">3D Virtual Cinema</a>
-        <a href="/support">Help &amp; Support</a>
-        <a href="/contact">Contact</a>
-        <a href="/devices">Supported Devices</a>
-      </nav>
-    </header>
-    <!-- Instant pre-hydration skeleton shell -->
-    <div style="min-height:100vh;background:#0a0a0b;overflow:hidden;">
-      <div style="height:68px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;">
-        <div style="width:110px;height:26px;border-radius:6px;background:rgba(255,255,255,0.06);"></div>
-        <div style="display:flex;gap:12px;align-items:center;">
-          <div style="width:140px;height:34px;border-radius:999px;background:rgba(255,255,255,0.05);"></div>
-          <div style="width:34px;height:34px;border-radius:999px;background:rgba(255,255,255,0.06);"></div>
-        </div>
-      </div>
-      <div style="height:62vh;margin:0;background:linear-gradient(180deg,rgba(255,255,255,0.04) 0%,#0a0a0b 100%);display:flex;align-items:flex-end;padding:32px 24px;">
-        <div style="width:100%;max-width:480px;">
-          <div style="width:72%;height:42px;border-radius:8px;background:rgba(255,255,255,0.07);margin-bottom:14px;"></div>
-          <div style="width:48%;height:14px;border-radius:6px;background:rgba(255,255,255,0.05);margin-bottom:20px;"></div>
-          <div style="display:flex;gap:12px;">
-            <div style="width:130px;height:44px;border-radius:10px;background:rgba(255,255,255,0.08);"></div>
-            <div style="width:130px;height:44px;border-radius:10px;background:rgba(255,255,255,0.05);"></div>
+  <!-- Fallback for crawlers & non-JS engines: Fully accessible page content with real links & factual text -->
+  <noscript>
+    <div style="background:#0a0a0b;color:#fff;font-family:system-ui,-apple-system,sans-serif;padding:24px;line-height:1.6;max-width:1000px;margin:0 auto;">
+      <header style="border-bottom:1px solid #27272a;padding-bottom:16px;margin-bottom:24px;">
+        <h1 style="color:#ef4444;font-size:28px;margin:0 0 10px 0;">My Donkey — Watch Free Movies, TV Shows &amp; Anime Online in HD</h1>
+        <nav aria-label="Main Navigation" style="display:flex;gap:14px;flex-wrap:wrap;">
+          <a href="/" style="color:#fff;">Home</a> |
+          <a href="/movies" style="color:#fff;">Watch Free Movies</a> |
+          <a href="/tv" style="color:#fff;">TV Shows &amp; Web Series</a> |
+          <a href="/anime" style="color:#fff;">Anime Online</a> |
+          <a href="/categories" style="color:#fff;">Categories &amp; Genres</a> |
+          <a href="/exclusive" style="color:#fff;">Originals</a> |
+          <a href="/theatre" style="color:#fff;">3D Virtual Cinema</a> |
+          <a href="/support" style="color:#fff;">Support</a> |
+          <a href="/contact" style="color:#fff;">Contact</a>
+        </nav>
+      </header>
+
+      <main>
+        <section style="margin-bottom:32px;">
+          <h2 style="font-size:22px;">About My Donkey OTT Platform</h2>
+          <p>My Donkey is India's leading free OTT streaming platform offering unlimited access to over 1,000 movies, popular TV shows, web series, and anime in 1080p Full HD. Stream Hollywood blockbusters, Bollywood cinema, Hindi dubbed hits, and full seasons with authentic multi-language audio, zero subscription fees, and no account sign-up required.</p>
+        </section>
+
+        <section style="margin-bottom:32px;">
+          <h2 style="font-size:20px;border-bottom:1px solid #27272a;padding-bottom:8px;">Trending Movies on My Donkey</h2>
+          <ul style="list-style:none;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;">
+            <li><a href="/browse/2aoRTBD1NlTd8QAW2HsL" style="color:#ef4444;text-decoration:none;">Avatar (2009) — Watch Free HD</a></li>
+            <li><a href="/browse/0farFH1N13tEFd7ESsFp" style="color:#ef4444;text-decoration:none;">Iron Man 3 (2013) — Watch Free HD</a></li>
+            <li><a href="/browse/1fbSRwKKyDX53u2QXvAW" style="color:#ef4444;text-decoration:none;">Doctor Strange (2016) — Watch Free HD</a></li>
+            <li><a href="/browse/NJg3yKfsH3ADnHBAl3BE" style="color:#ef4444;text-decoration:none;">Pushpa: The Rise (2021) — Watch Free HD</a></li>
+            <li><a href="/browse/SDXvJva1B4NxALXlpJVj" style="color:#ef4444;text-decoration:none;">Vikram Vedha (2022) — Watch Free HD</a></li>
+            <li><a href="/browse/1dhIn7Ivh9E7nLG8Ps2w" style="color:#ef4444;text-decoration:none;">Titanic (1997) — Watch Free HD</a></li>
+            <li><a href="/browse/2EbPBBwbo7kUIVK8udPH" style="color:#ef4444;text-decoration:none;">Harry Potter and the Goblet of Fire (2005)</a></li>
+            <li><a href="/browse/2BeYZQD85hGssA5CFerC" style="color:#ef4444;text-decoration:none;">The Gentlemen (2020) — Watch Free HD</a></li>
+            <li><a href="/browse/0HqSjtEgPoDf45L85Glx" style="color:#ef4444;text-decoration:none;">Miss Peregrine's Home for Peculiar Children</a></li>
+            <li><a href="/browse/2Um5Me45JIKISOUh5MHW" style="color:#ef4444;text-decoration:none;">Subedaar (2026) — Watch Free HD</a></li>
+            <li><a href="/browse/0LmZKSjSJscSN4nl5rEO" style="color:#ef4444;text-decoration:none;">Ishqnama (2026) — Watch Free HD</a></li>
+            <li><a href="/browse/0VsfThOkJhHjCWQb547C" style="color:#ef4444;text-decoration:none;">Dastaar (2026) — Watch Free HD</a></li>
+          </ul>
+        </section>
+
+        <section style="margin-bottom:32px;">
+          <h2 style="font-size:20px;border-bottom:1px solid #27272a;padding-bottom:8px;">Popular TV Shows &amp; Web Series</h2>
+          <ul style="list-style:none;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;">
+            <li><a href="/browse/1VXdQcGc2w13ydlBB3fG" style="color:#ef4444;text-decoration:none;">The Vampire Diaries (2009) — All Seasons</a></li>
+            <li><a href="/browse/1GeaE92RqDOoMyBMSv6B" style="color:#ef4444;text-decoration:none;">Landman (2024) — TV Series HD</a></li>
+            <li><a href="/browse/02EMJ4CsyfRdfXspr1tZ" style="color:#ef4444;text-decoration:none;">Blue Murder (2001) — Full Series</a></li>
+            <li><a href="/browse/0EDWA477n0oNuqxoaWEF" style="color:#ef4444;text-decoration:none;">LA Web Series (2017) — HD Episodes</a></li>
+            <li><a href="/browse/0ypvtycfjk4Upey9i8fT" style="color:#ef4444;text-decoration:none;">Karenjit Kaur: Untold Story of Sunny Leone</a></li>
+            <li><a href="/browse/0Kt8VKnce3Vl3461rdf4" style="color:#ef4444;text-decoration:none;">Playground (2022) — All Episodes</a></li>
+          </ul>
+        </section>
+
+        <section style="margin-bottom:32px;">
+          <h2 style="font-size:20px;border-bottom:1px solid #27272a;padding-bottom:8px;">Frequently Asked Questions (FAQ)</h2>
+          <div style="margin-bottom:16px;">
+            <h3 style="font-size:16px;color:#ef4444;margin-bottom:4px;">What is My Donkey?</h3>
+            <p>My Donkey is India's free OTT streaming platform offering unlimited online streaming of HD movies, TV shows, web series, and anime with authentic multi-language audio and zero subscription fees.</p>
           </div>
+          <div style="margin-bottom:16px;">
+            <h3 style="font-size:16px;color:#ef4444;margin-bottom:4px;">Is My Donkey completely free to watch?</h3>
+            <p>Yes, My Donkey is 100% free with no monthly subscription fees, credit card entry, or trial periods. All titles are free to stream immediately.</p>
+          </div>
+          <div style="margin-bottom:16px;">
+            <h3 style="font-size:16px;color:#ef4444;margin-bottom:4px;">Do I need an account to watch movies?</h3>
+            <p>No registration or sign-up is required. Viewers can start watching any movie or episode directly in their web browser.</p>
+          </div>
+          <div style="margin-bottom:16px;">
+            <h3 style="font-size:16px;color:#ef4444;margin-bottom:4px;">What devices are supported?</h3>
+            <p>My Donkey works across all Android smartphones, iPhones, iPads, PCs, Macs, and Android Smart TVs, and can be installed as a Progressive Web App (PWA).</p>
+          </div>
+        </section>
+      </main>
+
+      <footer style="border-top:1px solid #27272a;padding-top:16px;color:#a1a1aa;font-size:14px;">
+        <p>&copy; 2026 My Donkey. Stream unlimited movies, TV shows, and anime in HD for free.</p>
+      </footer>
+    </div>
+  </noscript>
+
+  <div id="root">
+    <!-- Pre-hydration semantic crawler structure & skeleton -->
+    <div style="min-height:100vh;background:#0a0a0b;color:#fff;overflow:hidden;font-family:system-ui,-apple-system,sans-serif;">
+      <!-- Navigation Header for search crawlers & instant UI -->
+      <header style="height:68px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.06);">
+        <div style="display:flex;align-items:center;gap:20px;">
+          <a href="/" style="color:#ef4444;font-size:20px;font-weight:800;text-decoration:none;">My Donkey</a>
+          <nav aria-label="Main Navigation" style="display:flex;gap:16px;font-size:14px;">
+            <a href="/" style="color:#d1d5db;text-decoration:none;">Home</a>
+            <a href="/movies" style="color:#d1d5db;text-decoration:none;">Movies</a>
+            <a href="/tv" style="color:#d1d5db;text-decoration:none;">TV Shows</a>
+            <a href="/anime" style="color:#d1d5db;text-decoration:none;">Anime</a>
+            <a href="/categories" style="color:#d1d5db;text-decoration:none;">Categories</a>
+            <a href="/theatre" style="color:#d1d5db;text-decoration:none;">3D Theatre</a>
+          </nav>
         </div>
-      </div>
+        <div style="display:flex;gap:12px;align-items:center;">
+          <a href="/search" style="color:#9ca3af;font-size:13px;text-decoration:none;">Search</a>
+          <a href="/account" style="color:#9ca3af;font-size:13px;text-decoration:none;">Sign In</a>
+        </div>
+      </header>
+
+      <!-- Semantic Main Content in Page Code for AI & Search Indexing -->
+      <main style="max-width:1100px;margin:0 auto;padding:32px 20px;">
+        <h1 style="font-size:28px;font-weight:800;margin:0 0 12px 0;">My Donkey — Watch Free Movies, TV Shows &amp; Anime Online in HD</h1>
+        <p style="color:#9ca3af;font-size:15px;line-height:1.6;margin:0 0 28px 0;max-width:850px;">
+          Stream unlimited free movies, trending web series, TV shows, and anime in 1080p Full HD on My Donkey. Enjoy Bollywood blockbusters, Hollywood hits, Hindi dubbed cinema, and complete seasons with authentic audio, zero subscription fees, and no sign-up required.
+        </p>
+
+        <!-- Trending Titles Crawl Links in Page Code -->
+        <section style="margin-bottom:32px;">
+          <h2 style="font-size:20px;font-weight:700;margin:0 0 16px 0;">Trending Free Movies &amp; Shows</h2>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;">
+            <a href="/browse/2aoRTBD1NlTd8QAW2HsL" style="background:#18181b;border:1px solid rgba(255,255,255,0.08);color:#ef4444;padding:8px 14px;border-radius:8px;font-size:13px;text-decoration:none;">Avatar (2009)</a>
+            <a href="/browse/0farFH1N13tEFd7ESsFp" style="background:#18181b;border:1px solid rgba(255,255,255,0.08);color:#ef4444;padding:8px 14px;border-radius:8px;font-size:13px;text-decoration:none;">Iron Man 3 (2013)</a>
+            <a href="/browse/1fbSRwKKyDX53u2QXvAW" style="background:#18181b;border:1px solid rgba(255,255,255,0.08);color:#ef4444;padding:8px 14px;border-radius:8px;font-size:13px;text-decoration:none;">Doctor Strange (2016)</a>
+            <a href="/browse/NJg3yKfsH3ADnHBAl3BE" style="background:#18181b;border:1px solid rgba(255,255,255,0.08);color:#ef4444;padding:8px 14px;border-radius:8px;font-size:13px;text-decoration:none;">Pushpa: The Rise</a>
+            <a href="/browse/SDXvJva1B4NxALXlpJVj" style="background:#18181b;border:1px solid rgba(255,255,255,0.08);color:#ef4444;padding:8px 14px;border-radius:8px;font-size:13px;text-decoration:none;">Vikram Vedha</a>
+            <a href="/browse/1dhIn7Ivh9E7nLG8Ps2w" style="background:#18181b;border:1px solid rgba(255,255,255,0.08);color:#ef4444;padding:8px 14px;border-radius:8px;font-size:13px;text-decoration:none;">Titanic (1997)</a>
+            <a href="/browse/2EbPBBwbo7kUIVK8udPH" style="background:#18181b;border:1px solid rgba(255,255,255,0.08);color:#ef4444;padding:8px 14px;border-radius:8px;font-size:13px;text-decoration:none;">Harry Potter &amp; the Goblet of Fire</a>
+            <a href="/browse/2BeYZQD85hGssA5CFerC" style="background:#18181b;border:1px solid rgba(255,255,255,0.08);color:#ef4444;padding:8px 14px;border-radius:8px;font-size:13px;text-decoration:none;">The Gentlemen (2020)</a>
+            <a href="/browse/1VXdQcGc2w13ydlBB3fG" style="background:#18181b;border:1px solid rgba(255,255,255,0.08);color:#ef4444;padding:8px 14px;border-radius:8px;font-size:13px;text-decoration:none;">The Vampire Diaries — All Seasons</a>
+            <a href="/browse/1GeaE92RqDOoMyBMSv6B" style="background:#18181b;border:1px solid rgba(255,255,255,0.08);color:#ef4444;padding:8px 14px;border-radius:8px;font-size:13px;text-decoration:none;">Landman (2024)</a>
+            <a href="/browse/2Um5Me45JIKISOUh5MHW" style="background:#18181b;border:1px solid rgba(255,255,255,0.08);color:#ef4444;padding:8px 14px;border-radius:8px;font-size:13px;text-decoration:none;">Subedaar (2026)</a>
+            <a href="/browse/0LmZKSjSJscSN4nl5rEO" style="background:#18181b;border:1px solid rgba(255,255,255,0.08);color:#ef4444;padding:8px 14px;border-radius:8px;font-size:13px;text-decoration:none;">Ishqnama (2026)</a>
+          </div>
+        </section>
+
+        <!-- Concrete Facts & FAQ for AI Answers -->
+        <section style="margin-bottom:32px;background:#141416;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:24px;">
+          <h2 style="font-size:20px;font-weight:700;margin:0 0 16px 0;">Frequently Asked Questions (FAQ)</h2>
+          <div style="margin-bottom:14px;">
+            <strong style="color:#ef4444;font-size:15px;display:block;margin-bottom:4px;">What is My Donkey?</strong>
+            <span style="color:#d1d5db;font-size:14px;line-height:1.5;">My Donkey is India's free OTT streaming platform offering over 1,000 movies, TV shows, web series, and anime online in 1080p Full HD with authentic audio and zero subscription fees.</span>
+          </div>
+          <div style="margin-bottom:14px;">
+            <strong style="color:#ef4444;font-size:15px;display:block;margin-bottom:4px;">Is My Donkey 100% free?</strong>
+            <span style="color:#d1d5db;font-size:14px;line-height:1.5;">Yes, My Donkey is completely free with no monthly subscription charges, credit card details, or trial periods.</span>
+          </div>
+          <div style="margin-bottom:14px;">
+            <strong style="color:#ef4444;font-size:15px;display:block;margin-bottom:4px;">Do I need to sign up to stream?</strong>
+            <span style="color:#d1d5db;font-size:14px;line-height:1.5;">No sign-up or registration is required. You can click on any title and start watching immediately.</span>
+          </div>
+          <div>
+            <strong style="color:#ef4444;font-size:15px;display:block;margin-bottom:4px;">What devices can I use to watch My Donkey?</strong>
+            <span style="color:#d1d5db;font-size:14px;line-height:1.5;">My Donkey works seamlessly on all Android smartphones, iPhones, iPads, PCs, Macs, and Android Smart TVs, and can be installed as a PWA app.</span>
+          </div>
+        </section>
+      </main>
+
+      <footer style="border-top:1px solid rgba(255,255,255,0.06);padding:24px 20px;text-align:center;color:#6b7280;font-size:13px;">
+        <p>Stream free movies, series, and anime online in HD on My Donkey.</p>
+        <div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-top:10px;">
+          <a href="/" style="color:#9ca3af;text-decoration:none;">Home</a>
+          <a href="/movies" style="color:#9ca3af;text-decoration:none;">Movies</a>
+          <a href="/tv" style="color:#9ca3af;text-decoration:none;">TV Shows</a>
+          <a href="/anime" style="color:#9ca3af;text-decoration:none;">Anime</a>
+          <a href="/categories" style="color:#9ca3af;text-decoration:none;">Categories</a>
+          <a href="/exclusive" style="color:#9ca3af;text-decoration:none;">Exclusives</a>
+          <a href="/theatre" style="color:#9ca3af;text-decoration:none;">3D Cinema</a>
+          <a href="/support" style="color:#9ca3af;text-decoration:none;">Support</a>
+          <a href="/contact" style="color:#9ca3af;text-decoration:none;">Contact</a>
+        </div>
+      </footer>
     </div>
   </div>
   <script type="module" src="/index.tsx"></script>
